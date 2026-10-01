@@ -10,6 +10,9 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
+	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.
+	"workers_dev": false,
+	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
 	"d1_databases": [
 		{
 			"binding": "DB",

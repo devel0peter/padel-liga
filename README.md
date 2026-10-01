@@ -42,8 +42,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft) |
 | `docs/go-to-market.md` | Clubs, recruiting, social content, organizer model |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
-| `landing/index.html` | Phase 0 interest-collection page (static; moving into `app/`) |
-| `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle |
+| `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/adatkezeles`) |
 | `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |
 
 ## Decision log

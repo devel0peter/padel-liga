@@ -7,7 +7,7 @@
 - Our advantage is a local organizer (Peter) who is part of the community, plus a format built for pairs.
 
 ## Phase 0: validation (now)
-1. Landing page (`landing/index.html`): explains the system and the rules, and collects interest from pairs or individual players.
+1. Landing page (`/` in `app/`): explains the system and the rules, and collects interest from pairs or individual players.
 2. **Talk to the clubs, all 3 of them, neutrally.**
    - The pitch: a city-wide league that brings **extra weekly bookings** to every club, from people who otherwise only play at weekend tournaments.
    - What we ask for: a poster or QR code at reception, a post in the club's player group, and optionally a league discount or reserved slots.

@@ -18,7 +18,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft) |
 | `docs/go-to-market.md` | Clubs, recruiting, social content, organizer model |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
-| `landing/index.html` | Phase 0 interest-collection page |
+| `landing/index.html` | Phase 0 interest-collection page (static; moving into `app/`) |
+| `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle |
+| `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |
 
 ## Decision log
 
@@ -37,6 +39,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Phase 0 first: landing page + interest list + talking to clubs | Validate demand before building |
 | 2026-10-01 | Privacy page required from Phase 0 (spec section 17) | The landing page already collects personal data |
 | 2026-10-01 | Both inactive = loss for both, scored 0-6 0-6 | Inactivity must cost in the tiebreakers too; consistent with walkovers |
+| 2026-10-01 | Host on Cloudflare (Workers + D1 + R2 backups + Cron Triggers) | Very simple ops, one deploy, free tier likely enough |
+| 2026-10-01 | Stack: TypeScript, React Router v8, Tailwind + shadcn/ui, Drizzle, Better Auth, Resend; replaces the proposed .NET stack | .NET doesn't run on Workers; React has the largest component ecosystem; React Router has a first-class Cloudflare template |
+| 2026-10-01 | Rules engine as its own workspace package (`packages/rules`) | Keeps it pure and fully unit-tested, per CLAUDE.md |
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 
 ## Roadmap

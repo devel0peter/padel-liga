@@ -1,0 +1,23 @@
+/**
+ * Wrangler config: https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "padel-liga",
+	"compatibility_date": "2026-09-26",
+	"main": "./workers/app.ts",
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "padel-liga",
+			// Placeholder; replace with the id from `wrangler d1 create padel-liga --location=weur`.
+			// Local dev (`npm run dev`) works without it.
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "drizzle"
+		}
+	]
+}

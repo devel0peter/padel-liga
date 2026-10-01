@@ -21,9 +21,19 @@
 - Auth, emails and personal data: always flag them for human review in the PR or summary.
 - Never expose another player's email or phone number on a public page.
 
-## Proposed stack (to be confirmed, see open-questions)
-- .NET 10, ASP.NET Core, Razor Pages or Blazor SSR.
-- EF Core with PostgreSQL (SQLite allowed in dev).
-- ASP.NET Identity with email + password, Google and Facebook external logins.
-- Transactional email provider (to be decided).
-- Hosting: Docker, on the homelab behind Cloudflare Tunnel or on a cheap VPS.
+## Stack
+- TypeScript everywhere, npm workspaces.
+- `app/`: React Router v8 (framework mode, server-rendered) on **Cloudflare Workers**.
+- UI: Tailwind CSS v4 + **shadcn/ui** (`app/app/components/ui`). Prefer an existing shadcn component over custom markup: `npx shadcn@latest add <name>` in `app/`.
+- Data: **Cloudflare D1** (SQLite) + **Drizzle ORM**. Schema in `app/app/db/schema.ts`, migrations in `app/drizzle/`. Access the DB only from `*.server.ts` modules.
+- Auth: **Better Auth** (email + password, Google, Facebook). Not installed yet.
+- Email: **Resend**. Not installed yet.
+- Scheduled jobs (deadlines, reminders, auto-confirm): Cloudflare **Cron Triggers**.
+- `packages/rules/`: the rules engine. Pure TypeScript, no I/O and no Cloudflare imports, tested with **Vitest**.
+
+## Commands (from the repo root)
+- `npm run dev`: local dev server with a local D1.
+- `npm test`: rules engine tests.
+- `npm run typecheck`, `npm run build`.
+- `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
+- `npm run deploy`: deploy to Cloudflare. Ask first.

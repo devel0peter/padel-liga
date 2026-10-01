@@ -2,8 +2,8 @@
 
 ## Blocks phase 0 (landing page)
 1. **Name and domain.** "Győri Padel Liga" is a placeholder. Should the brand be city-neutral (because of multi-city) with Győr as one league inside it?
-2. **Where do signups go?** Options: Formspree or Tally (zero code), or a minimal ASP.NET endpoint with SQLite (the start of the real repo).
-3. **Hosting** for the landing page: homelab behind Cloudflare Tunnel, Cloudflare Pages, or a VPS?
+2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
+3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
 4. **Which contact details to collect?** Currently name and email for both players, a level, and a comment. Phone number too?
 5. **Planned start of the first season?** Indoor vs. outdoor courts in winter?
 
@@ -17,8 +17,8 @@
 12. Entry fee: is the first season free?
 
 ## Product and tech
-13. Stack confirmation: .NET 10 + Blazor SSR/Razor Pages + Postgres + ASP.NET Identity?
-14. Email provider (Brevo, Postmark, SES)?
+13. ~~Stack confirmation~~ ✅ TypeScript, React Router, shadcn/ui, D1 + Drizzle, Better Auth. See CLAUDE.md.
+14. ~~Email provider~~ ✅ Resend.
 15. Phone numbers visible to opponents, or keep everything on the platform?
 16. Players without a partner: a separate "keresek párt" (looking for a partner) list in the MVP?
 17. Should the MVP include a PWA (installable, push notifications), or is email enough?

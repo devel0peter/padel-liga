@@ -122,7 +122,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 ## 16. Non-functional requirements
 - Mobile-first; most usage will be from a phone link.
 - Hungarian characters everywhere (ő, ű), including email subject lines.
-- Backups: daily database dump.
+- Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
 - Logs: an audit log for every match status change.
 
 ## 17. Privacy page (Adatkezelési tájékoztató)
@@ -136,7 +136,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Public: names, results, standings and ratings.
   - Never public: email and phone number.
   - Phone number: only the current opponent sees it (❓ see section 3).
-- **Where it is stored:** our own server in the EU. List the processors we use, such as the email provider and the form provider.
+- **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database) and Resend (email).
 - **Retention:**
   - Interest list: deleted after the first season starts, unless the person registers.
   - Accounts: kept until deletion, then anonymized (section 3).

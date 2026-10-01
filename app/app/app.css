@@ -1,14 +1,19 @@
 @import "tailwindcss" source(".");
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/archivo/wdth.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Dark mode follows the system setting; there is no toggle. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Archivo Variable', system-ui, sans-serif;
+  --color-court: var(--court);
+  --color-court-deep: var(--court-deep);
+  --color-ball: var(--ball);
+  --color-ball-foreground: var(--ball-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,24 +55,29 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Brand: padel court blue, ball yellow, glass. */
+  --court: #1e5ba8;
+  --court-deep: #173f75;
+  --ball: #dceb3c;
+  --ball-foreground: #10233d;
+  --background: #fbfcfd;
+  --foreground: #10233d;
+  --card: #fbfcfd;
+  --card-foreground: #10233d;
+  --popover: #ffffff;
+  --popover-foreground: #10233d;
+  --primary: #1e5ba8;
+  --primary-foreground: #ffffff;
+  --secondary: #e9f1f8;
+  --secondary-foreground: #10233d;
+  --muted: #e9f1f8;
+  --muted-foreground: #4a5b70;
+  --accent: #e9f1f8;
+  --accent-foreground: #10233d;
+  --destructive: #b42318;
+  --border: color-mix(in srgb, #10233d 15%, transparent);
+  --input: color-mix(in srgb, #10233d 35%, transparent);
+  --ring: #1e5ba8;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -84,38 +94,29 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --court: #2a6cc0;
+    --court-deep: #1b4a85;
+    --background: #0e1b2e;
+    --foreground: #e8eef5;
+    --card: #0e1b2e;
+    --card-foreground: #e8eef5;
+    --popover: #16273f;
+    --popover-foreground: #e8eef5;
+    --primary: #2a6cc0;
+    --primary-foreground: #ffffff;
+    --secondary: #16273f;
+    --secondary-foreground: #e8eef5;
+    --muted: #16273f;
+    --muted-foreground: #a9b6c6;
+    --accent: #16273f;
+    --accent-foreground: #e8eef5;
+    --destructive: #f97066;
+    --border: color-mix(in srgb, #e8eef5 15%, transparent);
+    --input: color-mix(in srgb, #e8eef5 35%, transparent);
+    --ring: #5b9be6;
+  }
 }
 
 @layer base {
@@ -128,4 +129,10 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Archivo's width axis: headings are set wider than body text. */
+@utility font-display {
+  font-stretch: 115%;
+  line-height: 1.08;
 }

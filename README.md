@@ -20,17 +20,15 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - `padelparbaj.hu` added to Cloudflare (Free plan, zone pending). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
   - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migration `0000` applied remotely.
   - Zone: Always Use HTTPS on.
+  - Landing page moved into the app (`/`): signup form → `interest_signups` with server-side validation (unit tested) and a honeypot, privacy page at `/adatkezeles`, system dark mode, `hello@padelparbaj.hu` as contact.
 - Next, in this order:
   1. Nameservers switched at Rackhost (2026-10-01); wait for the zone to go active.
   2. Peter adds `padelparbaj.hu` as a secondary domain in the Psionic Flare Google Workspace; add the verification TXT, MX, SPF, DKIM and DMARC records in Cloudflare DNS; `hello@` becomes an alias on Peter's user.
   3. Add proxied `www` record + Redirect Rule `www` → apex (301).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
   5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
-  6. Move `landing/index.html` into the app, then first deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`):
-     - signup form writing to `interest_signups`,
-     - privacy page (spec section 17),
-     - dark mode,
-     - real contact email.
+  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: add the company seat to the privacy page (`app/app/lib/site.ts`).
+  7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
 - Waiting on Peter:
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
   - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).

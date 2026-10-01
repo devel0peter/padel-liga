@@ -11,6 +11,26 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 
 **Phase 0:** interest-collection landing page and conversations with the clubs. Nothing else gets built until there's real demand.
 
+### Where we are (2026-10-01)
+- Done:
+  - Docs and decisions (see the log below).
+  - App scaffolded in `app/`. It isn't deployed yet.
+  - Rules engine started in `packages/rules/`, with the fixture order tested.
+  - `padelparbaj.hu` registered at Rackhost.
+- Next, in this order:
+  1. Add `padelparbaj.hu` to Cloudflare (Free plan) via the Cloudflare MCP tools; Peter switches the nameservers at Rackhost.
+  2. Create the D1 database (`wrangler d1 create padel-liga --location=weur`) and put its id into `app/wrangler.jsonc`.
+  3. Set up Email Routing for `hello@padelparbaj.hu` and attach the custom domain to the Worker.
+  4. Move `landing/index.html` into the app:
+     - signup form writing to `interest_signups`,
+     - privacy page (spec section 17),
+     - dark mode,
+     - real contact email.
+- Waiting on Peter:
+  - The data controller for the privacy page (Peter personally or a company).
+  - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
+  - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).
+
 ## Docs
 
 | File | What it covers |

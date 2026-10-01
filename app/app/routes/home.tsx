@@ -1,4 +1,5 @@
 import type { Route } from "./+types/home";
+import { LadderDemo } from "~/components/ladder-demo";
 import { SignupForm, type SignupActionData } from "~/components/signup-form";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import {
@@ -45,64 +46,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
 
 const btn = "inline-block rounded-full border-2 px-6 py-3 font-bold no-underline";
 
-const LADDER = [
-  {
-    title: "1. csoport",
-    sub: "legerősebb",
-    pairs: ["Szabó – Kiss", "Tóth – Varga", "Horváth – Fekete", "Molnár – Balogh"],
-    className: "scale-[.94] origin-bottom",
-  },
-  {
-    title: "2. csoport",
-    sub: "3. hét után",
-    pairs: ["Nagy – Kovács", "Papp – Takács", "Juhász – Lakatos", "Mészáros – Oláh"],
-    up: 0,
-    down: 3,
-  },
-  {
-    title: "3. csoport",
-    pairs: ["Simon – Rácz", "Fehér – Szilágyi", "Török – Vincze", "Kozma – Hegedűs"],
-    className: "scale-[.94] origin-top",
-  },
-];
 
-function Ladder() {
-  return (
-    <div
-      role="img"
-      aria-label="Példa: három csoport, a 2. csoport első helyezettje feljut az 1. csoportba, a negyedik a 3. csoportba kerül."
-      className="grid gap-3.5"
-    >
-      {LADDER.map((box) => (
-        <div
-          key={box.title}
-          className={`relative rounded-[10px] border-[3px] border-white bg-court px-4 pt-3.5 pb-3 text-white outline-2 outline-court-deep after:absolute after:inset-x-0 after:top-1/2 after:border-t-2 after:border-dashed after:border-white/35 ${box.className ?? ""}`}
-        >
-          <h3 className="font-display mb-2 flex justify-between font-bold">
-            {box.title}
-            {box.sub && <span className="font-medium opacity-80 [font-stretch:100%]">{box.sub}</span>}
-          </h3>
-          <ol className="relative z-10 grid gap-x-4 gap-y-1 sm:grid-cols-2">
-            {box.pairs.map((pair, i) => (
-              <li
-                key={pair}
-                className={`flex items-baseline gap-2 text-[0.95rem] ${i === box.up ? "font-bold text-ball" : ""} ${i === box.down ? "opacity-65" : ""}`}
-              >
-                <b className="font-semibold tabular-nums opacity-75">{i + 1}</b>
-                {pair}
-                {(i === box.up || i === box.down) && (
-                  <span className="ml-auto rounded-full border border-current px-2 text-xs">
-                    {i === box.up ? "feljut" : "lejjebb"}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function SectionHead({ title, lede }: { title: string; lede?: string }) {
   return (
@@ -165,7 +109,7 @@ export default function Home() {
                 </a>
               </div>
             </div>
-            <Ladder />
+            <LadderDemo />
           </Wrap>
         </div>
 

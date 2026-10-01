@@ -10,7 +10,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 |---|---|
 | Visitor | See the landing page, rules and public standings |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
-| Organizer | Create and configure a league and season, seed groups, settle disputes, override results |
+| Organizer | Create and configure a league and season, seed groups, approve substitutes, settle disputes, override results |
 | Platform admin | Create cities/leagues, appoint organizers (Peter) |
 
 ## 3. Authentication
@@ -32,6 +32,12 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 - **Phase:** 3 weeks (❓ plus 1 catch-up week). Group composition is fixed within a phase.
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest).
 - **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases.
+- **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
+  - The pair requests it, naming the substitute; the organizer sees the substitute's and the absent player's Elo side by side and approves or rejects. The opponents are notified and see the substitute on the match page.
+  - The substitute needs an account (for Elo) and must not be in another pair of the same group.
+  - The substitute's level should be similar to or lower than the absent player's; the organizer judges.
+  - The result counts for the pair as normal (standings, set and game difference).
+  - Without an approved substitute, the unplayed-match rules apply (section 8).
 - **Match:** 2 pairs, a scheduled week, a deadline, a status, proposals, a result, and a venue (one of the city's clubs).
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.
@@ -104,6 +110,7 @@ Points: ❓ (win/loss count only, or 3/1/0 where a loss after a played match is 
 - Pair rating = average of the two players.
 - After a match, both players receive the same delta. K = 32 at first, 16 after 20 matches.
 - Walkovers don't change Elo.
+- Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)
 Group size, phase length in weeks, catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.

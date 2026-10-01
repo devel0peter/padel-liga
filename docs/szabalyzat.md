@@ -12,6 +12,12 @@
 - Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
 - Mindkét játékosnak saját fiókja van.
 - **Párcsere csak két kör között lehetséges.** Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
+- **Helyettes:** ha a párod megsérül vagy nem ér rá, a szervező jóváhagyásával helyettes játszhat helyette egy vagy több meccsen a körön belül.
+  - A kérést a meccs előtt kell beadni az oldalon, a helyettes nevével. Az ellenfelek látják, ki játszik.
+  - A helyettes nagyjából azonos vagy alacsonyabb szintű legyen, és nem játszhat másik párban ugyanebben a csoportban.
+  - Az eredmény a párnak számít, ugyanúgy, mint bármelyik meccs.
+  - A helyettes értékszáma változik, a hiányzó játékosé nem.
+  - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.

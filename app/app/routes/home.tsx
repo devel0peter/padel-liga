@@ -82,6 +82,7 @@ const FAQ = [
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
+  ["Mi van, ha megsérül a párom?", "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."],
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 

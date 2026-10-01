@@ -13,6 +13,12 @@
    - What we ask for: a poster or QR code at reception, a post in the club's player group, and optionally a league discount or reserved slots.
    - What we give: after the season, booking statistics per club (venue is recorded for every match).
    - The tournament club may not like sending players to competitors. Frame it as a city league, not a rival competition.
+   - **No exclusivity** (2026-10-02). It would make scheduling harder (the biggest club is busy, and scarce slots mean walkovers), tie the league to one relationship, and lose the other clubs' posters. The ask is small anyway: one poster near reception.
+   - Ways to keep clubs motivated without exclusivity:
+     - A QR code per club (`?ref=<club>`), so we can tell each club "your poster brought in N players".
+     - Visibility: list the clubs on the site with links to their booking pages; tag the club in posts about each round's matches.
+     - A carrot for the most helpful club: host the season-end event or finals day, or get listed first for offering a league discount.
+   - When: Peter talks to the club owners once the website is live.
 3. **Recruit in person** at weekend tournaments: a flyer with a QR code pointing to the landing page.
 4. **Launch threshold:** 8 pairs (2 groups); 12 pairs (3 groups) is ideal.
 

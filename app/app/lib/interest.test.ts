@@ -27,6 +27,7 @@ describe("parseInterest", () => {
       ok: true,
       data: {
         city: "gyor",
+        cityOther: null,
         mode: "pair",
         name1: "Nagy Anna",
         email1: "anna@example.com",
@@ -72,6 +73,26 @@ describe("parseInterest", () => {
     expect(!parseInterest(form(noCity)).ok).toBe(true);
     const r = parseInterest(form({ ...pair, city: "budapest" }));
     expect(!r.ok && r.errors.city).toBe("Válaszd ki a várost.");
+  });
+
+  it("accepts another city with its name", () => {
+    const r = parseInterest(form({ ...pair, city: "other", cityOther: " Szeged " }));
+    expect(r.ok && r.data).toMatchObject({ city: "other", cityOther: "Szeged" });
+  });
+
+  it("requires the name of the other city", () => {
+    const r = parseInterest(form({ ...pair, city: "other", cityOther: "" }));
+    expect(!r.ok && r.errors.cityOther).toBeTruthy();
+  });
+
+  it("files a typed supported city under that city", () => {
+    const r = parseInterest(form({ ...pair, city: "other", cityOther: "gyor" }));
+    expect(r.ok && r.data).toMatchObject({ city: "gyor", cityOther: null });
+  });
+
+  it("ignores cityOther when a supported city is picked", () => {
+    const r = parseInterest(form({ ...pair, cityOther: "Szeged" }));
+    expect(r.ok && r.data).toMatchObject({ city: "gyor", cityOther: null });
   });
 
   it("rejects an unknown level", () => {

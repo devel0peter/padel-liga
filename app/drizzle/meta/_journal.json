@@ -15,6 +15,13 @@
       "when": 1790892310099,
       "tag": "0001_interest_city",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790892562476,
+      "tag": "0002_interest_city_other",
+      "breakpoints": true
     }
   ]
 }

@@ -14,12 +14,12 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
-import { CITIES } from "~/lib/cities";
+import { CITIES, OTHER_CITY } from "~/lib/cities";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
 import { CONTACT_EMAIL } from "~/lib/site";
 
 export type SignupActionData =
-  | { ok: true }
+  | { ok: true; cityOther?: string | null }
   | { ok: false; errors: Partial<Record<InterestField, string>> }
   | { ok: false; formError: string };
 
@@ -62,6 +62,8 @@ const inputClass = "h-11 bg-background text-base";
 export function SignupForm() {
   const fetcher = useFetcher<SignupActionData>();
   const [mode, setMode] = useState<Mode>("pair");
+  const [city, setCity] = useState<string>(CITIES[0].slug);
+  const otherCity = city === OTHER_CITY;
   const doneRef = useRef<HTMLDivElement>(null);
 
   const data = fetcher.data;
@@ -82,10 +84,18 @@ export function SignupForm() {
         className="grid gap-2 rounded-2xl border-2 border-court p-6 outline-none"
       >
         <h3 className="font-display text-xl font-bold">Jelentkezés elküldve</h3>
-        <p>
-          Köszönjük! Írunk, amint elég pár összegyűlik. Addig is küldd el az
-          oldalt annak, akivel szívesen játszanál.
-        </p>
+        {data.cityOther ? (
+          <p>
+            Köszönjük! Felírtunk ({data.cityOther}), és szólunk, ha nálatok is
+            indul liga. Addig is küldd el az oldalt a többi helyi padelesnek: minél
+            többen jelentkeztek, annál hamarabb indulhat.
+          </p>
+        ) : (
+          <p>
+            Köszönjük! Írunk, amint elég pár összegyűlik. Addig is küldd el az
+            oldalt annak, akivel szívesen játszanál.
+          </p>
+        )}
       </div>
     );
   }
@@ -100,7 +110,7 @@ export function SignupForm() {
       className="grid gap-5 rounded-2xl border-2 border-foreground bg-background p-6"
     >
       <Field name="city" label="Város" error={errors.city}>
-        <Select name="city" defaultValue={CITIES[0].slug}>
+        <Select name="city" value={city} onValueChange={setCity}>
           <SelectTrigger id="city" className="h-11! w-full bg-background text-base" {...invalid("city")}>
             <SelectValue />
           </SelectTrigger>
@@ -110,16 +120,24 @@ export function SignupForm() {
                 {c.name}
               </SelectItem>
             ))}
+            <SelectItem value={OTHER_CITY}>Más város</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground">
-          Nincs a listán a városod? Írj a{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
-            {CONTACT_EMAIL}
-          </a>{" "}
-          címre.
-        </p>
       </Field>
+
+      {otherCity && (
+        <Field name="cityOther" label="Melyik városban játszanál?" error={errors.cityOther}>
+          <Input id="cityOther" name="cityOther" maxLength={100} required className={inputClass} {...invalid("cityOther")} />
+          <p className="text-sm text-muted-foreground">
+            Ott még nincs liga. Felírunk, és szólunk, ha indul. Ha szívesen
+            szerveznéd, írj a{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+              {CONTACT_EMAIL}
+            </a>{" "}
+            címre.
+          </p>
+        </Field>
+      )}
 
       <fieldset className="grid gap-3">
         <legend className="mb-2 font-bold">Hogyan jelentkezel?</legend>

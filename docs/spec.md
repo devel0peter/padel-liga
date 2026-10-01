@@ -26,7 +26,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".
 
 ## 4. Domain model (simplified)
-- **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. User-facing text never hard-codes a city.
+- **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
 - **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases.
 - **Phase:** 3 weeks (❓ plus 1 catch-up week). Group composition is fixed within a phase.

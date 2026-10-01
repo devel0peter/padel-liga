@@ -27,7 +27,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   3. Add proxied `www` record + Redirect Rule `www` → apex (301).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
   5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
-  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: add the company seat to the privacy page (`app/app/lib/site.ts`) and apply migration `0001_interest_city` remotely.
+  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: add the company seat to the privacy page (`app/app/lib/site.ts`) and apply migrations `0001` and `0002` remotely.
   7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
 - Waiting on Peter:
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
@@ -90,4 +90,4 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 2. **Season operations:** shareable result images, automatic social posts, organizer admin tools.
 3. **Multi-city:** onboarding new organizers, organizer playbook.
    - Idea (2026-10-02, not MVP): an "Szervezz ligát a városodban" application form. Peter approves an applicant, who becomes the city's organizer and can create a league; the city then appears in the signup picker.
-   - Demand first: before a city has an organizer, collect "notify me" signups per city (a free-text "Más város" option), so a new organizer starts with a list of players.
+   - Demand first: the signup form's "Más város" option (done 2026-10-02) collects signups per city before it has an organizer, so a new organizer starts with a list of players.

@@ -55,6 +55,7 @@ export default function Privacy() {
             <p>Most, a jelentkezéskor:</p>
             <ul className={list}>
               <li>a neved és az e-mail-címed,</li>
+              <li>a város, ahol játszanál,</li>
               <li>ha párral jelentkezel, a párod neve és (ha megadod) az e-mail-címe,</li>
               <li>a szint, amit megadsz, és a megjegyzésed,</li>
               <li>a jelentkezés és a hozzájárulás időpontja.</li>

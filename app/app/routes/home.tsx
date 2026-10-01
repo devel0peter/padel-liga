@@ -41,7 +41,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
       formError: "Nem sikerült elküldeni a jelentkezést. Próbáld újra pár perc múlva.",
     };
   }
-  return { ok: true };
+  return { ok: true, cityOther: result.data.cityOther };
 }
 
 const btn = "inline-block rounded-full border-2 px-6 py-3 font-bold no-underline";

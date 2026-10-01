@@ -1,0 +1,1 @@
+ALTER TABLE `interest_signups` ADD `city_other` text;

@@ -1,7 +1,7 @@
 // Phase 0 interest signup: parsing and validation of the landing page form.
 // Pure (no I/O) so it runs on both server and client and can be unit tested.
 
-import { isCity, type CitySlug } from "./cities";
+import { findCity, isCity, OTHER_CITY, type CitySlug } from "./cities";
 
 export const LEVELS = {
   kezdo: "Kezdő – most ismerkedünk a játékkal",
@@ -14,7 +14,8 @@ export type Level = keyof typeof LEVELS;
 export type Mode = "pair" | "solo";
 
 export type InterestSignup = {
-  city: CitySlug;
+  city: CitySlug | typeof OTHER_CITY;
+  cityOther: string | null;
   mode: Mode;
   name1: string;
   email1: string;
@@ -26,6 +27,7 @@ export type InterestSignup = {
 
 export type InterestField =
   | "city"
+  | "cityOther"
   | "name1"
   | "email1"
   | "name2"
@@ -54,7 +56,14 @@ function isLevel(value: string): value is Level {
 }
 
 export function parseInterest(form: FormData): InterestResult {
-  const city = str(form, "city");
+  let city = str(form, "city");
+  let cityOther = city === OTHER_CITY ? str(form, "cityOther") : "";
+  // Someone typed a city we already support: file it there.
+  const typed = cityOther ? findCity(cityOther) : null;
+  if (typed) {
+    city = typed;
+    cityOther = "";
+  }
   const mode: Mode = str(form, "mode") === "solo" ? "solo" : "pair";
   const name1 = str(form, "name1");
   const email1 = str(form, "email1").toLowerCase();
@@ -66,7 +75,10 @@ export function parseInterest(form: FormData): InterestResult {
 
   const errors: Partial<Record<InterestField, string>> = {};
 
-  if (!isCity(city)) errors.city = "Válaszd ki a várost.";
+  if (city === OTHER_CITY) {
+    if (!cityOther) errors.cityOther = "Írd be, melyik városban játszanál.";
+    else if (cityOther.length > MAX_NAME) errors.cityOther = "Ez a városnév túl hosszú.";
+  } else if (!isCity(city)) errors.city = "Válaszd ki a várost.";
 
   if (!name1) errors.name1 = "Add meg a neved.";
   else if (name1.length > MAX_NAME) errors.name1 = "Ez a név túl hosszú.";
@@ -99,7 +111,8 @@ export function parseInterest(form: FormData): InterestResult {
   return {
     ok: true,
     data: {
-      city: city as CitySlug,
+      city: city as CitySlug | typeof OTHER_CITY,
+      cityOther: cityOther || null,
       mode,
       name1,
       email1,

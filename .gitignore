@@ -19,3 +19,6 @@ secrets.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Windows download metadata (WSL)
+*:Zone.Identifier

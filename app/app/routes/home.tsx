@@ -15,7 +15,7 @@ import { saveInterest } from "~/lib/interest.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Padelpárbaj – heti egy meccs, a saját pároddal" },
+    { title: "Padelpárbaj – Ki a legjobb páros a városban?" },
     {
       name: "description",
       content:
@@ -97,12 +97,11 @@ export default function Home() {
           <Wrap className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
             <div className="grid gap-6">
               <h1 className="font-display text-[clamp(2.4rem,6vw,4.25rem)] font-black tracking-tight">
-                Heti egy meccs, a saját pároddal.
+                Ki a legjobb páros a városban?
               </h1>
               <p className="max-w-[34em] text-xl text-muted-foreground">
-                Padelbajnokság pároknak. Szint szerinti négyes csoportokban
-                mindenki mindenkivel játszik, három hét után a csoportgyőztes
-                feljebb lép, az utolsó lejjebb kerül.
+                Négyes csoportok, heti egy meccs. Aki nyer, feljebb lép. Aki
+                nem, a következő körben visszavághat.
               </p>
               <div className="flex flex-wrap gap-3">
                 <a href="#jelentkezes" className={`${btn} border-ball bg-ball text-ball-foreground`}>

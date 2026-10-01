@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Győri Padel Liga – heti egy meccs, a saját pároddal</title>
+<meta name="description" content="Győri padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#10233D; --court:#1E5BA8; --court-deep:#173F75; --glass:#E9F1F8;
+  --line:#FFFFFF; --ball:#DCEB3C; --paper:#FBFCFD; --muted:#4A5B70; --err:#B42318;
+  --bg:var(--paper); --fg:var(--ink); --soft:var(--glass); --sub:var(--muted);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1B2E; --fg:#E8EEF5; --soft:#16273F; --sub:#A9B6C6; --court:#2A6CC0; --court-deep:#1B4A85; --err:#F97066;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1B2E; --fg:#E8EEF5; --soft:#16273F; --sub:#A9B6C6; --court:#2A6CC0; --court-deep:#1B4A85; --err:#F97066;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:1.0625rem;line-height:1.55;font-variation-settings:"wdth" 100;
+}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 1.25rem}
+h1,h2,h3{font-variation-settings:"wdth" 115;line-height:1.08;margin:0}
+h1{font-size:clamp(2.4rem,6vw,4.25rem);font-weight:850;letter-spacing:-.01em}
+h2{font-size:clamp(1.7rem,3.6vw,2.4rem);font-weight:800}
+h3{font-size:1.2rem;font-weight:750;font-variation-settings:"wdth" 108}
+p{margin:0}
+.lede{font-size:1.2rem;color:var(--sub);max-width:34em}
+
+/* header */
+header{padding:1.1rem 0}
+header .wrap{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.mark{font-weight:850;font-variation-settings:"wdth" 120;font-size:1.15rem;text-decoration:none;display:flex;align-items:center;gap:.55rem}
+.mark i{width:14px;height:14px;border-radius:50%;background:var(--ball);box-shadow:inset -3px -2px 0 rgba(0,0,0,.12);display:inline-block}
+.btn{
+  display:inline-block;font:inherit;font-weight:750;text-decoration:none;cursor:pointer;
+  border:2px solid var(--fg);border-radius:999px;padding:.7rem 1.4rem;background:transparent;color:var(--fg);
+}
+.btn.primary{background:var(--ball);border-color:var(--ball);color:#10233D}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--court);outline-offset:3px}
+
+/* hero */
+.hero{padding:2.5rem 0 4rem}
+.hero .wrap{display:grid;grid-template-columns:1.05fr 1fr;gap:3rem;align-items:center}
+.hero-copy{display:grid;gap:1.4rem}
+.ctas{display:flex;flex-wrap:wrap;gap:.75rem}
+
+/* the ladder: groups drawn as courts */
+.ladder{display:grid;gap:.9rem;position:relative}
+.box{
+  background:var(--court);color:#fff;border-radius:10px;padding:.9rem 1rem .8rem;
+  border:3px solid var(--line);outline:2px solid var(--court-deep);
+  position:relative;
+}
+.box::after{content:"";position:absolute;top:50%;left:0;right:0;border-top:2px dashed rgba(255,255,255,.35)}
+.box h3{font-size:1rem;margin-bottom:.45rem;display:flex;justify-content:space-between;color:#fff}
+.box h3 span{font-weight:500;opacity:.8;font-variation-settings:"wdth" 100}
+.box ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.25rem 1rem;position:relative;z-index:1}
+.box li{display:flex;gap:.45rem;align-items:baseline;font-size:.95rem}
+.box li b{font-variant-numeric:tabular-nums;opacity:.75;font-weight:600}
+.box li.up{color:var(--ball);font-weight:700}
+.box li.down{opacity:.65}
+.box li .tag{font-size:.78rem;border:1px solid currentColor;border-radius:999px;padding:0 .45rem;margin-left:auto}
+.box.b1{transform:scale(.94);transform-origin:center bottom}
+.box.b3{transform:scale(.94);transform-origin:center top}
+
+/* sections */
+section{padding:4rem 0}
+section.tint{background:var(--soft)}
+.sec-head{display:grid;gap:.8rem;margin-bottom:2.2rem;max-width:40em}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;counter-reset:s}
+.steps li{counter-increment:s;display:grid;gap:.5rem;align-content:start;border-top:3px solid var(--court);padding-top:1rem}
+.steps li::before{content:counter(s);font-weight:850;font-size:2.2rem;font-variation-settings:"wdth" 125;color:var(--court);line-height:1}
+.steps p{color:var(--sub)}
+.why{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem}
+.why div{display:grid;gap:.5rem;align-content:start}
+.why p{color:var(--sub)}
+.rules{display:grid;grid-template-columns:minmax(9rem,14rem) 1fr;gap:0;margin:0;max-width:52rem}
+.rules dt,.rules dd{padding:.9rem 0;border-bottom:1px solid color-mix(in srgb,var(--fg) 15%,transparent);margin:0}
+.rules dt{font-weight:750;padding-right:1rem}
+.rules dd{color:var(--sub)}
+.faq{max-width:48rem;display:grid;gap:.25rem}
+.faq details{border-bottom:1px solid color-mix(in srgb,var(--fg) 15%,transparent)}
+.faq summary{cursor:pointer;font-weight:700;padding:1rem 0;list-style:none;display:flex;justify-content:space-between;gap:1rem}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-weight:500;font-size:1.3rem;line-height:1}
+.faq details[open] summary::after{content:"–"}
+.faq details p{padding:0 0 1rem;color:var(--sub);max-width:40em}
+
+/* form */
+.join .wrap{display:grid;grid-template-columns:1fr 1.2fr;gap:3rem;align-items:start}
+form{display:grid;gap:1.1rem;background:var(--bg);border:2px solid var(--fg);border-radius:14px;padding:1.5rem}
+fieldset{border:0;margin:0;padding:0;display:grid;gap:.8rem}
+legend{font-weight:750;margin-bottom:.4rem;padding:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+label{display:grid;gap:.3rem;font-size:.95rem;font-weight:600}
+label small{font-weight:400;color:var(--sub)}
+input[type=text],input[type=email],select,textarea{
+  font:inherit;font-weight:400;color:var(--fg);background:var(--bg);
+  border:1.5px solid color-mix(in srgb,var(--fg) 35%,transparent);border-radius:8px;padding:.65rem .75rem;width:100%;
+}
+textarea{min-height:5rem;resize:vertical}
+.mode{display:flex;flex-wrap:wrap;gap:.5rem}
+.mode label{display:flex;align-items:center;gap:.5rem;border:1.5px solid color-mix(in srgb,var(--fg) 35%,transparent);border-radius:999px;padding:.45rem .9rem;cursor:pointer;font-weight:600}
+.mode input{accent-color:var(--court)}
+.mode label:has(input:checked){border-color:var(--court);background:color-mix(in srgb,var(--court) 12%,transparent)}
+.consent{display:flex;gap:.6rem;align-items:flex-start;font-weight:400;font-size:.92rem;color:var(--sub)}
+.consent input{margin-top:.25rem;accent-color:var(--court);width:1.1rem;height:1.1rem;flex:none}
+.msg{font-weight:600;min-height:1.4em}
+.msg.err{color:var(--err)}
+.done{display:grid;gap:.6rem;border:2px solid var(--court);border-radius:14px;padding:1.5rem}
+.hidden{display:none !important}
+
+footer{padding:2.5rem 0;color:var(--sub);font-size:.92rem}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
+
+@media (max-width:900px){
+  .hero .wrap,.join .wrap{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr 1fr}
+  .why{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .steps{grid-template-columns:1fr}
+  .row{grid-template-columns:1fr}
+  .rules{grid-template-columns:1fr}
+  .rules dt{border-bottom:0;padding-bottom:0}
+  .box ol{grid-template-columns:1fr}
+  section{padding:3rem 0}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="mark" href="#"><i aria-hidden="true"></i>Győri Padel Liga</a>
+    <a class="btn" href="#jelentkezes">Jelentkezem</a>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <h1>Heti egy meccs, a saját pároddal.</h1>
+      <p class="lede">Győri padelbajnokság pároknak. Szint szerinti négyes csoportokban mindenki mindenkivel játszik, három hét után a csoportgyőztes feljebb lép, az utolsó lejjebb kerül.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#jelentkezes">Jelentkezem</a>
+        <a class="btn" href="#hogyan">Hogyan működik?</a>
+      </div>
+    </div>
+
+    <div class="ladder" role="img" aria-label="Példa: három csoport, a 2. csoport első helyezettje feljut az 1. csoportba, a negyedik a 3. csoportba kerül.">
+      <div class="box b1">
+        <h3>1. csoport <span>legerősebb</span></h3>
+        <ol>
+          <li><b>1</b>Szabó – Kiss</li>
+          <li><b>2</b>Tóth – Varga</li>
+          <li><b>3</b>Horváth – Fekete</li>
+          <li><b>4</b>Molnár – Balogh</li>
+        </ol>
+      </div>
+      <div class="box b2">
+        <h3>2. csoport <span>3. hét után</span></h3>
+        <ol>
+          <li class="up"><b>1</b>Nagy – Kovács <span class="tag">feljut</span></li>
+          <li><b>2</b>Papp – Takács</li>
+          <li><b>3</b>Juhász – Lakatos</li>
+          <li class="down"><b>4</b>Mészáros – Oláh <span class="tag">lejjebb</span></li>
+        </ol>
+      </div>
+      <div class="box b3">
+        <h3>3. csoport</h3>
+        <ol>
+          <li><b>1</b>Simon – Rácz</li>
+          <li><b>2</b>Fehér – Szilágyi</li>
+          <li><b>3</b>Török – Vincze</li>
+          <li><b>4</b>Kozma – Hegedűs</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="hogyan" class="tint">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Hogyan működik?</h2>
+      <p class="lede">Nem kell egész hétvégét rászánni egy versenyre. Elég heti egy meccs, amikor nektek jó.</p>
+    </div>
+    <ol class="steps">
+      <li><h3>Jelentkeztek párban</h3><p>Ha még nincs párod, írd fel magad egyedül, és segítünk párt találni.</p></li>
+      <li><h3>Csoportba kerültök</h3><p>Szint szerint négy pár kerül egy csoportba, hogy kiegyenlített meccsek legyenek.</p></li>
+      <li><h3>Hetente egy meccs</h3><p>Az időpontot az oldalon egyeztetitek az ellenféllel, a pályát bármelyik győri klubban lefoglalhatjátok.</p></li>
+      <li><h3>Feljutás, kiesés</h3><p>Három hét után a csoport első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Miért működik, ha eddig nem sikerült?</h2>
+    </div>
+    <div class="why">
+      <div><h3>Nincs végtelen chatelés</h3><p>Az egyik pár időpontokat ajánl, a másik választ egyet, vagy újakat ajánl. Néhány kattintás, és megvan a meccs.</p></div>
+      <div><h3>Aki egyeztet, az nyer</h3><p>Ha a határidőig nem jön össze a meccs, az a pár kapja a győzelmet, amelyik ténylegesen próbált időpontot egyeztetni.</p></div>
+      <div><h3>Bármelyik győri pályán</h3><p>Nem kötünk ki egy klubot sem. Ott játszotok, ahol nektek kényelmes, a pályadíjat négyfelé osztjátok.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="tint">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>A szabályok röviden</h2>
+      <p class="lede">A részletes szabályzatot az indulás előtt véglegesítjük, a jelentkezők véleményét is figyelembe véve.</p>
+    </div>
+    <dl class="rules">
+      <dt>Csoportok</dt><dd>4 pár csoportonként, szint szerint sorba rendezve.</dd>
+      <dt>Egy kör</dt><dd>3 hét, hetente egy meccs, mindenki mindenkivel játszik a csoportban.</dd>
+      <dt>Határidő</dt><dd>Minden meccset az adott hét vasárnapjáig le kell játszani.</dd>
+      <dt>Időpontok</dt><dd>Legalább 3 időpontot kell ajánlani, legalább 2 különböző napra, 48 órával előre.</dd>
+      <dt>Elmaradt meccs</dt><dd>Ha csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap.</dd>
+      <dt>Eredmény</dt><dd>Az egyik pár rögzíti, a másik megerősíti az oldalon.</dd>
+      <dt>Párcsere</dt><dd>Mindenkinek van egyéni értékszáma, így új párral is a megfelelő csoportba kerülsz.</dd>
+    </dl>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><h2>Gyakori kérdések</h2></div>
+    <div class="faq">
+      <details><summary>Mennyibe kerül?</summary><p>Az első szezonban a részvétel ingyenes, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll.</p></details>
+      <details><summary>Mikor indul?</summary><p>Amint összegyűlik legalább 8 pár. Mindenkinek írunk e-mailben, aki jelentkezett.</p></details>
+      <details><summary>Nincs párom. Jelentkezhetek?</summary><p>Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül.</p></details>
+      <details><summary>Milyen szinten kell játszanom?</summary><p>Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig.</p></details>
+      <details><summary>Mi van, ha egy héten nem érünk rá?</summary><p>A hét bármelyik napján játszhattok, amikor mind a négyen ráértek. Ha egyszer nem jön össze, az nem a világ vége, de a szabály az, hogy az a pár nyer, amelyik próbált egyeztetni.</p></details>
+      <details><summary>Ki szervezi?</summary><p>Győri padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni.</p></details>
+    </div>
+  </div>
+</section>
+
+<section id="jelentkezes" class="tint join">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Jelentkezz az első szezonra</h2>
+      <p class="lede">A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről.</p>
+    </div>
+
+    <div>
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Hogyan jelentkezel?</legend>
+        <div class="mode">
+          <label><input type="radio" name="mode" value="pair" checked> Párral</label>
+          <label><input type="radio" name="mode" value="solo"> Egyedül, párt keresek</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Te</legend>
+        <div class="row">
+          <label>Név <input type="text" name="name1" autocomplete="name" required></label>
+          <label>E-mail-cím <input type="email" name="email1" autocomplete="email" required></label>
+        </div>
+      </fieldset>
+
+      <fieldset id="partner">
+        <legend>A párod</legend>
+        <div class="row">
+          <label>Név <input type="text" name="name2"></label>
+          <label>E-mail-cím <small>nem kötelező</small><input type="email" name="email2"></label>
+        </div>
+      </fieldset>
+
+      <label>Szint
+        <select name="level" required>
+          <option value="">Válassz…</option>
+          <option value="kezdo">Kezdő – most ismerkedünk a játékkal</option>
+          <option value="kozephalado">Középhaladó – rendszeresen játszunk</option>
+          <option value="halado">Haladó – versenyeken is indulunk</option>
+          <option value="versenyzo">Versenyző – eredményesen versenyzünk</option>
+        </select>
+      </label>
+
+      <label>Megjegyzés <small>nem kötelező, pl. melyik napok jók nektek</small>
+        <textarea name="note"></textarea>
+      </label>
+
+      <label class="consent"><input type="checkbox" name="consent" required>
+        <span>Hozzájárulok, hogy a megadott adatokat a liga szervezése céljából kezeljétek, és e-mailben értesítsetek az indulásról. A hozzájárulás bármikor visszavonható.</span>
+      </label>
+
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+      <div><button class="btn primary" type="submit" id="submit">Jelentkezem</button></div>
+    </form>
+
+    <div class="done hidden" id="done" tabindex="-1">
+      <h3>Jelentkezés elküldve</h3>
+      <p>Köszönjük! Írunk, amint elég pár összegyűlik. Addig is küldd el az oldalt annak, akivel szívesen játszanál.</p>
+    </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Győri Padel Liga</span>
+    <span>Kapcsolat: <a href="mailto:hello@example.hu">hello@example.hu</a></span>
+    <a href="#">Adatkezelési tájékoztató</a>
+  </div>
+</footer>
+
+<script>
+// Set this to the signup endpoint (Formspree URL or own API, e.g. /api/interest).
+const FORM_ENDPOINT = "";
+
+const form = document.getElementById("form");
+const msg = document.getElementById("msg");
+const partner = document.getElementById("partner");
+const done = document.getElementById("done");
+const submitBtn = document.getElementById("submit");
+
+function syncMode(){
+  const solo = form.mode.value === "solo";
+  partner.classList.toggle("hidden", solo);
+  form.name2.required = !solo;
+}
+form.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener("change", syncMode));
+syncMode();
+
+const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  msg.className = "msg"; msg.textContent = "";
+  const d = Object.fromEntries(new FormData(form));
+  const solo = d.mode === "solo";
+
+  let error = "";
+  if (!d.name1?.trim()) error = "Add meg a neved.";
+  else if (!emailOk(d.email1 || "")) error = "Adj meg egy érvényes e-mail-címet.";
+  else if (!solo && !d.name2?.trim()) error = "Add meg a párod nevét, vagy válaszd az egyéni jelentkezést.";
+  else if (!solo && d.email2 && !emailOk(d.email2)) error = "A párod e-mail-címe nem érvényes.";
+  else if (!d.level) error = "Válaszd ki a szinteteket.";
+  else if (!d.consent) error = "A jelentkezéshez el kell fogadnod az adatkezelést.";
+  if (error){ msg.className = "msg err"; msg.textContent = error; return; }
+
+  if (!FORM_ENDPOINT){
+    msg.className = "msg err";
+    msg.textContent = "A jelentkezési űrlap még nincs bekötve.";
+    return;
+  }
+
+  submitBtn.disabled = true; submitBtn.textContent = "Küldés…";
+  try{
+    const payload = {
+      mode: d.mode, name1: d.name1.trim(), email1: d.email1.trim(),
+      name2: solo ? "" : (d.name2 || "").trim(), email2: solo ? "" : (d.email2 || "").trim(),
+      level: d.level, note: (d.note || "").trim(), consent: true, submittedAt: new Date().toISOString()
+    };
+    const res = await fetch(FORM_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(res.status);
+    form.classList.add("hidden");
+    done.classList.remove("hidden");
+    done.focus();
+  }catch(err){
+    msg.className = "msg err";
+    msg.textContent = "Nem sikerült elküldeni a jelentkezést. Próbáld újra pár perc múlva.";
+    submitBtn.disabled = false; submitBtn.textContent = "Jelentkezem";
+  }
+});
+</script>
+</body>
+</html>

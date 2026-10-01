@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.json
+appsettings.*.local.json
+
+# Secrets / env
+.env
+.env.*
+secrets.json
+
+# OS
+.DS_Store
+Thumbs.db

@@ -17,9 +17,11 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - App scaffolded in `app/`. It isn't deployed yet.
   - Rules engine started in `packages/rules/`, with the fixture order tested.
   - `padelparbaj.hu` registered at Rackhost.
+  - `padelparbaj.hu` added to Cloudflare (Free plan, zone pending). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
+  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`.
 - Next, in this order:
-  1. Add `padelparbaj.hu` to Cloudflare (Free plan) via the Cloudflare MCP tools; Peter switches the nameservers at Rackhost.
-  2. Create the D1 database (`wrangler d1 create padel-liga --location=weur`) and put its id into `app/wrangler.jsonc`.
+  1. Peter switches the nameservers at Rackhost; wait for the zone to go active.
+  2. Apply migrations to remote D1 (`wrangler d1 migrations apply padel-liga --remote`).
   3. Set up Email Routing for `hello@padelparbaj.hu` and attach the custom domain to the Worker.
   4. Move `landing/index.html` into the app:
      - signup form writing to `interest_signups`,

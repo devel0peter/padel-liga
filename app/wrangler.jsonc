@@ -14,9 +14,7 @@
 		{
 			"binding": "DB",
 			"database_name": "padel-liga",
-			// Placeholder; replace with the id from `wrangler d1 create padel-liga --location=weur`.
-			// Local dev (`npm run dev`) works without it.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "ab926c11-5f24-483d-a8d3-c21ff40bb41e",
 			"migrations_dir": "drizzle"
 		}
 	]

@@ -1,6 +1,6 @@
 # Padelpárbaj – Szabályzat (tervezet)
 
-*Munkaverzió, 2026. 10. 01. A ❓-lel jelölt pontok még nincsenek véglegesítve.*
+*Munkaverzió, 2026. 10. 02. A ❓-lel jelölt pontok még nincsenek véglegesítve.*
 
 ## 1. A liga lényege
 - Párok jelentkeznek, akik szint szerint **4 páros csoportokba** kerülnek.

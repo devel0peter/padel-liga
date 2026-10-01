@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
 import { SignupForm, type SignupActionData } from "~/components/signup-form";
@@ -148,6 +150,9 @@ export default function Home() {
                 </div>
               ))}
             </dl>
+            <Link to="/szabalyzat" className="mt-6 inline-block font-bold underline">
+              A teljes szabályzat
+            </Link>
           </Wrap>
         </section>
 

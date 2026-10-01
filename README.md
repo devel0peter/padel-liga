@@ -18,18 +18,20 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Rules engine started in `packages/rules/`, with the fixture order tested.
   - `padelparbaj.hu` registered at Rackhost.
   - `padelparbaj.hu` added to Cloudflare (Free plan, zone pending). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
-  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`.
+  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migration `0000` applied remotely.
+  - Zone: Always Use HTTPS on.
 - Next, in this order:
-  1. Peter switches the nameservers at Rackhost; wait for the zone to go active.
-  2. Apply migrations to remote D1 (`wrangler d1 migrations apply padel-liga --remote`).
-  3. Set up Email Routing for `hello@padelparbaj.hu` and attach the custom domain to the Worker.
-  4. Move `landing/index.html` into the app:
+  1. Nameservers switched at Rackhost (2026-10-01); wait for the zone to go active.
+  2. Peter adds `padelparbaj.hu` as a secondary domain in the Psionic Flare Google Workspace; add the verification TXT, MX, SPF, DKIM and DMARC records in Cloudflare DNS; `hello@` becomes an alias on Peter's user.
+  3. Add proxied `www` record + Redirect Rule `www` → apex (301).
+  4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
+  5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
+  6. Move `landing/index.html` into the app, then first deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`):
      - signup form writing to `interest_signups`,
      - privacy page (spec section 17),
      - dark mode,
      - real contact email.
 - Waiting on Peter:
-  - The data controller for the privacy page (Peter personally or a company).
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
   - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).
 
@@ -68,7 +70,19 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | `.hu` domain at a Hungarian registrar, DNS on Cloudflare | Cloudflare Registrar does not sell `.hu`; Workers only need the zone on Cloudflare |
 | 2026-10-01 | Brand: **Padelpárbaj**, leagues per city (e.g. "Padelpárbaj Győr") | Memorable, Hungarian, "pár" pun fits a pairs format. Padel-specific; another sport later would get its own brand on the same multi-tenant platform |
 | 2026-10-01 | Rules engine as its own workspace package (`packages/rules`) | Keeps it pure and fully unit-tested, per CLAUDE.md |
+| 2026-10-01 | Canonical host is the apex `padelparbaj.hu`; `www` 301-redirects; `workers.dev` disabled | One public URL, no duplicates |
+| 2026-10-01 | `hello@padelparbaj.hu` is an alias in the Psionic Flare Google Workspace (`padelparbaj.hu` as secondary domain) | Free, real inbox, can send as `hello@`; Rackhost mailbox renews at 13,000 Ft/year |
+| 2026-10-01 | App sends from `noreply@padelparbaj.hu` (Resend), Reply-To `hello@` | Keeps transactional mail apart from the human inbox |
+| 2026-10-01 | First deploy only after the landing page is in the app (signup + privacy page) | Nothing public until the privacy page exists |
+| 2026-10-01 | Data controller: Psionic Flare Kft. (tax no. 29268782-2-19), which also owns the domain | Company seat as the postal contact; keeps Peter's home address off the site |
+| 2026-10-01 | DMARC starts at `p=none`, reports to Cloudflare DMARC Management | Monitor before enforcing; avoids losing real mail to a setup mistake |
+| 2026-10-01 | Always Use HTTPS now; HSTS only after a stable launch | HSTS is hard to undo |
+| 2026-10-01 | No staging environment in Phase 0 | Local dev + prod is enough until the MVP season |
+| 2026-10-01 | Backups: D1 Time Travel (30 days) for now; R2 exports before the MVP season | Phase 0 data is small; Time Travel is built in |
+| 2026-10-01 | Resend in the EU region, set up together with signup confirmation emails | Data stays in the EU; Phase 0 sends no mail yet |
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
+| 2026-10-01 | Phase 0 interest list goes in the app on padelparbaj.hu (D1), not Google Forms | Avoids migrating signups and links later; the domain and email setup were nearly done anyway |
+| 2026-10-01 | Email: `hello@` via Google Workspace (padelparbaj.hu as a secondary domain); `noreply@` via Resend later | Reuses the existing Workspace; no extra mailbox cost |
 
 ## Roadmap
 

@@ -24,7 +24,14 @@
 - A pályadíjat a négy játékos egyenlő arányban állja.
 
 ## 4. A meccs
-- ❓ Formátum: 2 nyert szett, a harmadik szett helyett szuper tie-break 10 pontig, arany ponttal.
+- **Formátum:**
+  - 2 nyert szettig játszotok. Egy szett 6 nyert játékig tart, 6:6-nál rendes tie-break dönt 7 pontig (2 pont különbséggel).
+  - 1:1-es szettállásnál a 3. szett helyett szuper tie-break jön 10 pontig (2 pont különbséggel).
+  - **Arany pont:** 40:40-nél nincs előny, egyetlen pont dönt. A fogadó pár választja ki, melyik játékosuk fogadja.
+  - A szett- és játékkülönbségnél a szuper tie-break egy szettnek és 1:0-s játéknak számít.
+- Mindenki ugyanígy játszik, eltérő formátumban nem lehet megegyezni.
+- **Pályafoglalás:** 90 percet ajánlunk, egy órába gyakran nem fér bele a meccs.
+- **Ha lejár a pályaidő:** jegyezzétek fel az állást, és egy új időpontban onnan folytassátok, a határidőig. Csak a végeredményt kell rögzíteni.
 - Az eredményt az egyik pár rögzíti, a másik megerősíti. Ha 48 órán belül nem érkezik megerősítés, az eredmény elfogadottnak számít.
 - Vitás esetben a szervező dönt.
 

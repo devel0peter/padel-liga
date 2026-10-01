@@ -54,7 +54,13 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
    ❓ Is a late cancellation (under 24 hours) a walkover?
 
 ## 7. Recording results
-- Format: ❓ (proposal: 2 winning sets, the third set replaced by a super tie-break to 10, golden point).
+- Format (league default, one format per league, no per-match variants; see section 12):
+  - Best of 2 sets. A set goes to 6 games; at 6-6 a regular tie-break to 7 (win by 2).
+  - At 1-1 in sets, a super tie-break to 10 (win by 2) replaces the third set.
+  - Golden point: no advantage at deuce, one point decides; the receiving pair chooses which player receives.
+  - For set and game difference the super tie-break counts as one set and as a 1-0 game (ITF convention).
+- Court booking: 90 minutes recommended; 60 minutes is often not enough.
+- Court time runs out: the match is unfinished. The pairs note the score and finish it from there in a new slot before the deadline. Only the final result is recorded.
 - One pair records the result, and the other confirms or disputes it.
 - Not confirmed within 48 hours: the result is accepted automatically.
 - A disputed result goes to the organizer, who decides.

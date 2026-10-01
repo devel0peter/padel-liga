@@ -1,7 +1,7 @@
 # Open questions
 
 ## Blocks phase 0 (landing page)
-1. **Name and domain.** "Győri Padel Liga" is a placeholder. Should the brand be city-neutral (because of multi-city) with Győr as one league inside it? Domain will be `.hu`, registered at a Hungarian registrar, with DNS moved to Cloudflare. Name still open.
+1. ~~**Name and domain.**~~ ✅ **Padelpárbaj**, `padelparbaj.hu` at a Hungarian registrar, DNS on Cloudflare. City leagues: "Padelpárbaj Győr".
 2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
 3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
 4. **Which contact details to collect?** Currently name and email for both players, a level, and a comment. Phone number too?

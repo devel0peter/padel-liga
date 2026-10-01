@@ -1,4 +1,6 @@
-# Padel Liga (working title)
+# Padelpárbaj
+
+Domain: `padelparbaj.hu` (to be registered). The repo and internal identifiers keep the `padel-liga` name.
 
 A platform for running weekly padel box leagues for **pairs**, starting in Győr.
 Every pair plays one match per week inside a group of 4 pairs. At the end of each phase the group winner moves up and the last pair moves down.
@@ -42,6 +44,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Host on Cloudflare (Workers + D1 + R2 backups + Cron Triggers) | Very simple ops, one deploy, free tier likely enough |
 | 2026-10-01 | Stack: TypeScript, React Router v8, Tailwind + shadcn/ui, Drizzle, Better Auth, Resend; replaces the proposed .NET stack | .NET doesn't run on Workers; React has the largest component ecosystem; React Router has a first-class Cloudflare template |
 | 2026-10-01 | `.hu` domain at a Hungarian registrar, DNS on Cloudflare | Cloudflare Registrar does not sell `.hu`; Workers only need the zone on Cloudflare |
+| 2026-10-01 | Brand: **Padelpárbaj**, leagues per city (e.g. "Padelpárbaj Győr") | Memorable, Hungarian, "pár" pun fits a pairs format. Padel-specific; another sport later would get its own brand on the same multi-tenant platform |
 | 2026-10-01 | Rules engine as its own workspace package (`packages/rules`) | Keeps it pure and fully unit-tested, per CLAUDE.md |
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 

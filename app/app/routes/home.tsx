@@ -12,7 +12,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Padel Liga" },
+    { title: "Padelpárbaj" },
     { name: "description", content: "Heti páros padelliga Győrben." },
   ];
 }
@@ -24,7 +24,7 @@ export default function Home() {
     <main className="mx-auto max-w-xl p-4 pt-16">
       <Card>
         <CardHeader>
-          <CardTitle>Padel Liga</CardTitle>
+          <CardTitle>Padelpárbaj</CardTitle>
           <CardDescription>Hamarosan. Egy 4 páros csoport sorsolása:</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">

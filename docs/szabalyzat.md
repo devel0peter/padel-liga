@@ -1,4 +1,4 @@
-# Győri Padel Liga – Szabályzat (tervezet)
+# Padelpárbaj Győr – Szabályzat (tervezet)
 
 *Munkaverzió, 2026. 10. 01. A ❓-lel jelölt pontok még nincsenek véglegesítve.*
 

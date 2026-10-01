@@ -22,7 +22,7 @@ Pairs who play padel in Győr get a fixed weekly match against opponents at thei
   - Required: name, email.
   - Optional: phone number (visible only to opponents in the current round ❓), self-assessed level.
 - GDPR:
-  - Privacy notice and consent at registration.
+  - Privacy notice (section 17) and consent at registration.
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".
 
 ## 4. Domain model (simplified)
@@ -65,7 +65,7 @@ Pairs who play padel in Győr get a fixed weekly match against opponents at thei
 |---|---|
 | One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 6-0 6-0 |
 | Both active, no agreement | 0 points for both sides, no Elo change ❓ |
-| Neither side active | Both sides get a loss |
+| Neither side active | Both sides get a loss, recorded as 0-6 0-6 for each (counts in set and game difference) |
 | Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover |
 
 The organizer can always override the outcome manually.
@@ -77,6 +77,11 @@ Order within a group:
 3. Set difference.
 4. Game difference.
 5. Elo (average of the pair).
+
+Set and game difference are counted over all of the pair's matches in the group in that phase, including walkovers.
+
+When 3 or more pairs are tied, apply steps 3–5 in order. As soon as a step separates one or more pairs and only 2 are still tied with each other, go back to step 2 (head-to-head) for those 2.
+Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set difference and is 1st. B and C are still tied, and B beat C, so B is 2nd.
 
 Points: ❓ (win/loss count only, or 3/1/0 where a loss after a played match is worth 1 point, rewarding pairs who show up).
 
@@ -109,6 +114,7 @@ Group size, phase length in weeks, catch-up week on or off, deadline day, slot r
 - League home: groups, standings, matches this week.
 - Pair and player profiles: results and Elo history (no contact details).
 - Rules page (`szabalyzat.md`).
+- Privacy page ("Adatkezelési tájékoztató", section 17), linked from the footer and from every consent checkbox.
 
 ## 15. Out of MVP scope
 Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2).
@@ -118,3 +124,21 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 - Hungarian characters everywhere (ő, ű), including email subject lines.
 - Backups: daily database dump.
 - Logs: an audit log for every match status change.
+
+## 17. Privacy page (Adatkezelési tájékoztató)
+A short, plain-language Hungarian page. Needed from Phase 0, since the landing page already collects personal data. Contents:
+- **Who handles the data:** the organizer (Peter), with a contact email.
+- **What we collect:**
+  - Landing page: names, emails, level, comment.
+  - Later: account data, an optional phone number, match history, ratings.
+- **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
+- **Who sees what:**
+  - Public: names, results, standings and ratings.
+  - Never public: email and phone number.
+  - Phone number: only the current opponent sees it (❓ see section 3).
+- **Where it is stored:** our own server in the EU. List the processors we use, such as the email provider and the form provider.
+- **Retention:**
+  - Interest list: deleted after the first season starts, unless the person registers.
+  - Accounts: kept until deletion, then anonymized (section 3).
+- **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address.
+- **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion. Nothing else is sent to them until they register themselves.

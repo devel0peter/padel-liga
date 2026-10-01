@@ -35,6 +35,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Auth: email + password, Google, Facebook | Low friction for players |
 | 2026-10-01 | Social: auto-generated content on our own channels, not posting in groups | Group spam would burn local trust |
 | 2026-10-01 | Phase 0 first: landing page + interest list + talking to clubs | Validate demand before building |
+| 2026-10-01 | Privacy page required from Phase 0 (spec section 17) | The landing page already collects personal data |
+| 2026-10-01 | Both inactive = loss for both, scored 0-6 0-6 | Inactivity must cost in the tiebreakers too; consistent with walkovers |
+| 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 
 ## Roadmap
 

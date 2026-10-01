@@ -31,7 +31,7 @@
 A határidő lejártakor a rendszer automatikusan dönt:
 - **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel.
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs pont nélkül marad. ❓
-- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap.
+- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel.
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
 
 Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
@@ -42,6 +42,10 @@ Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
 3. Szettkülönbség.
 4. Játékkülönbség.
 5. A pár átlagos értékszáma.
+
+A szett- és játékkülönbségbe a szakasz összes csoportmeccse beszámít, a játék nélküli eredmények is.
+
+Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben már csak két pár marad holtversenyben, köztük az egymás elleni eredmény dönt.
 
 ## 7. Feljutás és kiesés
 - Az első helyezett egy csoporttal feljebb lép, a negyedik egy csoporttal lejjebb kerül.

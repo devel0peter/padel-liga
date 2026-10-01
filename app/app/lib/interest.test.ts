@@ -9,6 +9,7 @@ function form(fields: Record<string, string>): FormData {
 }
 
 const pair = {
+  city: "gyor",
   mode: "pair",
   name1: "Nagy Anna",
   email1: "anna@example.com",
@@ -25,6 +26,7 @@ describe("parseInterest", () => {
     expect(r).toEqual({
       ok: true,
       data: {
+        city: "gyor",
         mode: "pair",
         name1: "Nagy Anna",
         email1: "anna@example.com",
@@ -48,7 +50,7 @@ describe("parseInterest", () => {
   });
 
   it("requires name, valid email, level and consent", () => {
-    const r = parseInterest(form({ mode: "solo" }));
+    const r = parseInterest(form({ city: "gyor", mode: "solo" }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["consent", "email1", "level", "name1"]);
   });
@@ -63,6 +65,13 @@ describe("parseInterest", () => {
     expect(!bad.ok && bad.errors.email2).toBe("A párod e-mail-címe nem érvényes.");
     const same = parseInterest(form({ ...pair, email2: "ANNA@example.com" }));
     expect(!same.ok && same.errors.email2).toBeTruthy();
+  });
+
+  it("requires a supported city", () => {
+    const { city: _, ...noCity } = pair;
+    expect(!parseInterest(form(noCity)).ok).toBe(true);
+    const r = parseInterest(form({ ...pair, city: "budapest" }));
+    expect(!r.ok && r.errors.city).toBe("Válaszd ki a várost.");
   });
 
   it("rejects an unknown level", () => {

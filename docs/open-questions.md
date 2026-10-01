@@ -9,7 +9,7 @@
 
 ## Rules
 6. Match format: 2 sets with a super tie-break and golden point? Or a fixed-length match, given that court time is booked in 60/90-minute slots?
-7. Phase of 3 weeks, or 3+1 with a catch-up week?
+7. Phase of 3 weeks, or 3+1 with a catch-up week? (Less pressing since 2026-10-02: unplayed matches can be made up until the end of the phase.)
 8. Both sides active but no agreement: 0 points for both, or does the organizer decide?
 9. Late cancellation (under 24 hours): walkover?
 10. Scoring: wins only, or 3/1/0 (reward for showing up)?

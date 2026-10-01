@@ -1,4 +1,4 @@
-# Padelpárbaj Győr – Szabályzat (tervezet)
+# Padelpárbaj – Szabályzat (tervezet)
 
 *Munkaverzió, 2026. 10. 01. A ❓-lel jelölt pontok még nincsenek véglegesítve.*
 
@@ -14,12 +14,13 @@
 - Párcsere a szakaszok között lehetséges. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
 
 ## 3. Időpont-egyeztetés
-- Minden meccsnek van egy **határideje**: az adott hét vasárnapja, 23:59.
+- Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
+- Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a szakasz utolsó hetének vasárnapja, 23:59.
 - Az időpontot az oldalon egyeztetitek:
   - Az egyik pár legalább **3 időpontot** ajánl, legalább **2 különböző napra**, 7:00 és 22:00 között, legalább **48 órával előre**.
   - A másik pár elfogad egyet, vagy ugyanilyen feltételekkel új időpontokat ajánl. Elutasítani csak új ajánlattal lehet.
 - A pályát az foglalja le, akit megbeszéltek, és rögzíti az oldalon, hol foglalt.
-- Bármelyik győri padelpályán játszhattok.
+- A városotok bármelyik padelpályáján játszhattok.
 - A pályadíjat a négy játékos egyenlő arányban állja.
 
 ## 4. A meccs
@@ -28,7 +29,7 @@
 - Vitás esetben a szervező dönt.
 
 ## 5. Ha elmarad a meccs
-A határidő lejártakor a rendszer automatikusan dönt:
+A határidő (a szakasz vége) lejártakor a rendszer automatikusan dönt:
 - **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel.
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs pont nélkül marad. ❓
 - **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel.

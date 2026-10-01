@@ -27,7 +27,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   3. Add proxied `www` record + Redirect Rule `www` → apex (301).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
   5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
-  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: add the company seat to the privacy page (`app/app/lib/site.ts`).
+  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: add the company seat to the privacy page (`app/app/lib/site.ts`) and apply migration `0001_interest_city` remotely.
   7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
 - Waiting on Peter:
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
@@ -71,6 +71,8 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | `hello@padelparbaj.hu` is an alias in the Psionic Flare Google Workspace (`padelparbaj.hu` as secondary domain) | Free, real inbox, can send as `hello@`; Rackhost mailbox renews at 13,000 Ft/year |
 | 2026-10-01 | App sends from `noreply@padelparbaj.hu` (Resend), Reply-To `hello@` | Keeps transactional mail apart from the human inbox |
 | 2026-10-01 | First deploy only after the landing page is in the app (signup + privacy page) | Nothing public until the privacy page exists |
+| 2026-10-02 | Match deadline = end of the phase; playing in the scheduled week is strongly recommended, not required | More forgiving; avoids walkovers over one busy week |
+| 2026-10-02 | City is the tenant: signups (and later leagues, organizers) carry a city; the signup form has a city picker (Győr only for now). Rules and landing copy never name a city | Same platform for every city; inspired by piramisbajnoksag.hu |
 | 2026-10-01 | Data controller: Psionic Flare Kft. (tax no. 29268782-2-19), which also owns the domain | Company seat as the postal contact; keeps Peter's home address off the site |
 | 2026-10-01 | DMARC starts at `p=none`, reports to Cloudflare DMARC Management | Monitor before enforcing; avoids losing real mail to a setup mistake |
 | 2026-10-01 | Always Use HTTPS now; HSTS only after a stable launch | HSTS is hard to undo |
@@ -87,3 +89,5 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 1. **MVP for the first Győr season:** registration, leagues and groups, scheduling, results, standings, promotion and relegation, Elo, email notifications.
 2. **Season operations:** shareable result images, automatic social posts, organizer admin tools.
 3. **Multi-city:** onboarding new organizers, organizer playbook.
+   - Idea (2026-10-02, not MVP): an "Szervezz ligát a városodban" application form. Peter approves an applicant, who becomes the city's organizer and can create a league; the city then appears in the signup picker.
+   - Demand first: before a city has an organizer, collect "notify me" signups per city (a free-text "Más város" option), so a new organizer starts with a list of players.

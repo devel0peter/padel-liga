@@ -12,11 +12,11 @@ import { saveInterest } from "~/lib/interest.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Padelpárbaj Győr – heti egy meccs, a saját pároddal" },
+    { title: "Padelpárbaj – heti egy meccs, a saját pároddal" },
     {
       name: "description",
       content:
-        "Győri padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
+        "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
     },
   ];
 }
@@ -116,22 +116,17 @@ function SectionHead({ title, lede }: { title: string; lede?: string }) {
 const STEPS = [
   ["Jelentkeztek párban", "Ha még nincs párod, írd fel magad egyedül, és segítünk párt találni."],
   ["Csoportba kerültök", "Szint szerint négy pár kerül egy csoportba, hogy kiegyenlített meccsek legyenek."],
-  ["Hetente egy meccs", "Az időpontot az oldalon egyeztetitek az ellenféllel, a pályát bármelyik győri klubban lefoglalhatjátok."],
+  ["Hetente egy meccs", "Az időpontot az oldalon egyeztetitek az ellenféllel, a pályát bármelyik klubban lefoglalhatjátok a városotokban."],
   ["Feljutás, kiesés", "Három hét után a csoport első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör."],
 ];
 
-const WHY = [
-  ["Nincs végtelen chatelés", "Az egyik pár időpontokat ajánl, a másik választ egyet, vagy újakat ajánl. Néhány kattintás, és megvan a meccs."],
-  ["Aki egyeztet, az nyer", "Ha a határidőig nem jön össze a meccs, az a pár kapja a győzelmet, amelyik ténylegesen próbált időpontot egyeztetni."],
-  ["Bármelyik győri pályán", "Nem kötünk ki egy klubot sem. Ott játszotok, ahol nektek kényelmes, a pályadíjat négyfelé osztjátok."],
-];
 
 const RULES = [
   ["Csoportok", "4 pár csoportonként, szint szerint sorba rendezve."],
   ["Egy kör", "3 hét, hetente egy meccs, mindenki mindenkivel játszik a csoportban."],
-  ["Határidő", "Minden meccset az adott hét vasárnapjáig le kell játszani."],
+  ["Határidő", "Minden meccsnek megvan a maga hete, érdemes akkor lejátszani. Ha nem jön össze, a kör végéig, a 3. hét vasárnapjáig pótolhatjátok."],
   ["Időpontok", "Legalább 3 időpontot kell ajánlani, legalább 2 különböző napra, 48 órával előre."],
-  ["Elmaradt meccs", "Ha csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap."],
+  ["Elmaradt meccs", "Ha a kör végéig sem jön össze, és csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap."],
   ["Eredmény", "Az egyik pár rögzíti, a másik megerősíti az oldalon."],
   ["Párcsere", "Mindenkinek van egyéni értékszáma, így új párral is a megfelelő csoportba kerülsz."],
 ];
@@ -141,8 +136,8 @@ const FAQ = [
   ["Mikor indul?", "Amint összegyűlik legalább 8 pár. Mindenkinek írunk e-mailben, aki jelentkezett."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
-  ["Mi van, ha egy héten nem érünk rá?", "A hét bármelyik napján játszhattok, amikor mind a négyen ráértek. Ha egyszer nem jön össze, az nem a világ vége, de a szabály az, hogy az a pár nyer, amelyik próbált egyeztetni."],
-  ["Ki szervezi?", "Győri padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
+  ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
+  ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 
 export default function Home() {
@@ -157,7 +152,7 @@ export default function Home() {
                 Heti egy meccs, a saját pároddal.
               </h1>
               <p className="max-w-[34em] text-xl text-muted-foreground">
-                Győri padelbajnokság pároknak. Szint szerinti négyes csoportokban
+                Padelbajnokság pároknak. Szint szerinti négyes csoportokban
                 mindenki mindenkivel játszik, három hét után a csoportgyőztes
                 feljebb lép, az utolsó lejjebb kerül.
               </p>
@@ -192,19 +187,6 @@ export default function Home() {
           </Wrap>
         </section>
 
-        <section className="py-16">
-          <Wrap>
-            <SectionHead title="Miért működik, ha eddig nem sikerült?" />
-            <div className="grid gap-8 lg:grid-cols-3">
-              {WHY.map(([title, text]) => (
-                <div key={title} className="grid content-start gap-2">
-                  <h3 className="font-display text-xl font-bold">{title}</h3>
-                  <p className="text-muted-foreground">{text}</p>
-                </div>
-              ))}
-            </div>
-          </Wrap>
-        </section>
 
         <section className="bg-muted py-16">
           <Wrap>

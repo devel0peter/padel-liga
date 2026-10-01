@@ -1,0 +1,1 @@
+ALTER TABLE `interest_signups` ADD `city` text DEFAULT 'gyor' NOT NULL;

@@ -8,6 +8,13 @@
       "when": 1790886630745,
       "tag": "0000_interest_signups",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790892310099,
+      "tag": "0001_interest_city",
+      "breakpoints": true
     }
   ]
 }

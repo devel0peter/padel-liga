@@ -37,7 +37,7 @@ export function SiteFooter() {
   return (
     <footer className="py-10 text-sm text-muted-foreground">
       <Wrap className="flex flex-wrap justify-between gap-4">
-        <span>{SITE_NAME} Győr</span>
+        <span>{SITE_NAME}</span>
         <span>
           Kapcsolat: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </span>

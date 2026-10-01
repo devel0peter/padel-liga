@@ -4,6 +4,8 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  // City slug (tenant), see app/lib/cities.ts.
+  city: text("city").notNull().default("gyor"),
   mode: text("mode", { enum: ["pair", "solo"] }).notNull(),
   name1: text("name1").notNull(),
   email1: text("email1").notNull(),

@@ -1,6 +1,8 @@
 // Phase 0 interest signup: parsing and validation of the landing page form.
 // Pure (no I/O) so it runs on both server and client and can be unit tested.
 
+import { isCity, type CitySlug } from "./cities";
+
 export const LEVELS = {
   kezdo: "Kezdő – most ismerkedünk a játékkal",
   kozephalado: "Középhaladó – rendszeresen játszunk",
@@ -12,6 +14,7 @@ export type Level = keyof typeof LEVELS;
 export type Mode = "pair" | "solo";
 
 export type InterestSignup = {
+  city: CitySlug;
   mode: Mode;
   name1: string;
   email1: string;
@@ -22,6 +25,7 @@ export type InterestSignup = {
 };
 
 export type InterestField =
+  | "city"
   | "name1"
   | "email1"
   | "name2"
@@ -50,6 +54,7 @@ function isLevel(value: string): value is Level {
 }
 
 export function parseInterest(form: FormData): InterestResult {
+  const city = str(form, "city");
   const mode: Mode = str(form, "mode") === "solo" ? "solo" : "pair";
   const name1 = str(form, "name1");
   const email1 = str(form, "email1").toLowerCase();
@@ -60,6 +65,8 @@ export function parseInterest(form: FormData): InterestResult {
   const consent = form.get("consent") != null;
 
   const errors: Partial<Record<InterestField, string>> = {};
+
+  if (!isCity(city)) errors.city = "Válaszd ki a várost.";
 
   if (!name1) errors.name1 = "Add meg a neved.";
   else if (name1.length > MAX_NAME) errors.name1 = "Ez a név túl hosszú.";
@@ -92,6 +99,7 @@ export function parseInterest(form: FormData): InterestResult {
   return {
     ok: true,
     data: {
+      city: city as CitySlug,
       mode,
       name1,
       email1,

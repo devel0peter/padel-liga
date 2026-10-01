@@ -14,7 +14,9 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
+import { CITIES } from "~/lib/cities";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
+import { CONTACT_EMAIL } from "~/lib/site";
 
 export type SignupActionData =
   | { ok: true }
@@ -97,6 +99,28 @@ export function SignupForm() {
       noValidate
       className="grid gap-5 rounded-2xl border-2 border-foreground bg-background p-6"
     >
+      <Field name="city" label="Város" error={errors.city}>
+        <Select name="city" defaultValue={CITIES[0].slug}>
+          <SelectTrigger id="city" className="h-11! w-full bg-background text-base" {...invalid("city")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CITIES.map((c) => (
+              <SelectItem key={c.slug} value={c.slug}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          Nincs a listán a városod? Írj a{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+            {CONTACT_EMAIL}
+          </a>{" "}
+          címre.
+        </p>
+      </Field>
+
       <fieldset className="grid gap-3">
         <legend className="mb-2 font-bold">Hogyan jelentkezel?</legend>
         <RadioGroup

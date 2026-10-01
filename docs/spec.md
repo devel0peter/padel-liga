@@ -3,7 +3,7 @@
 Status: draft v0.1 (2026-10-01). Items marked ❓ are open, see `open-questions.md`.
 
 ## 1. Goal
-Pairs who play padel in Győr get a fixed weekly match against opponents at their level, with fair rules on no-shows. The organizer has almost no admin work.
+Pairs who play padel in a city (starting with Győr) get a fixed weekly match against opponents at their level, with fair rules on no-shows. The organizer has almost no admin work.
 
 ## 2. Roles
 | Role | Can do |
@@ -26,19 +26,20 @@ Pairs who play padel in Győr get a fixed weekly match against opponents at thei
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".
 
 ## 4. Domain model (simplified)
-- **League:** city, name, organizer(s), configuration (see section 11).
+- **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. User-facing text never hard-codes a city.
+- **League:** city, name, organizer(s), configuration (see section 12).
 - **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases.
 - **Phase:** 3 weeks (❓ plus 1 catch-up week). Group composition is fixed within a phase.
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest).
 - **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league.
-- **Match:** 2 pairs, a deadline, a status, proposals, a result, and a venue (one of the 3 clubs).
+- **Match:** 2 pairs, a scheduled week, a deadline, a status, proposals, a result, and a venue (one of the city's clubs).
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.
 
 ## 5. Fixtures
 - Groups of 4 give 3 rounds per phase, 2 matches per round, and each pair plays once a week.
 - Round order is generated automatically: week 1 is 1–4 and 2–3, week 2 is 1–3 and 2–4, week 3 is 1–2 and 3–4, based on seeding.
-- Each match has a deadline: the end of its week (Sunday 23:59).
+- Each match has a **scheduled week** (its round) and a **deadline: the end of the phase** (Sunday 23:59 of the last week). Playing in the scheduled week is strongly recommended; the UI and emails nudge towards it, but a match can be played any time until the deadline.
 - The "home" pair is responsible for proposing the first slots. Home is decided by alternation.
 
 ## 6. Scheduling (core feature)
@@ -59,6 +60,7 @@ Pairs who play padel in Győr get a fixed weekly match against opponents at thei
 - A disputed result goes to the organizer, who decides.
 
 ## 8. Unplayed matches (resolved automatically at the deadline)
+The deadline is the end of the phase (section 5), so a match missed in its scheduled week can still be played later in the phase.
 "Valid activity" means a valid proposal or counter-proposal before the deadline.
 
 | Situation | Outcome |
@@ -103,6 +105,7 @@ Group size, phase length in weeks, catch-up week on or off, deadline day, slot r
 ## 13. Notifications (email, in Hungarian)
 - New round, with the opponent and the deadline.
 - A proposal arrived, or a slot was accepted.
+- Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
 - Reminder: 3 days before the deadline if the match is still unscheduled.
 - A result is waiting for confirmation.
 - End of a phase, with your new group.

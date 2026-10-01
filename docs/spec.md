@@ -31,7 +31,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 - **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases.
 - **Phase:** 3 weeks (❓ plus 1 catch-up week). Group composition is fixed within a phase.
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest).
-- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league.
+- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases.
 - **Match:** 2 pairs, a scheduled week, a deadline, a status, proposals, a result, and a venue (one of the city's clubs).
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.

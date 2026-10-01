@@ -5,17 +5,17 @@
 ## 1. A liga lényege
 - Párok jelentkeznek, akik szint szerint **4 páros csoportokba** kerülnek.
 - Minden héten **egy meccset** játszotok a csoportotok egy másik párjával.
-- Egy szakasz **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
-- A szakasz végén a csoport **első helyezettje feljebb lép**, a **negyedik lejjebb kerül**.
+- Egy kör **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
+- A kör végén a csoport **első helyezettje feljebb lép**, a **negyedik lejjebb kerül**.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
 - Mindkét játékosnak saját fiókja van.
-- Párcsere a szakaszok között lehetséges. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
+- **Párcsere csak két kör között lehetséges.** Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
-- Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a szakasz utolsó hetének vasárnapja, 23:59.
+- Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
 - Az időpontot az oldalon egyeztetitek:
   - Az egyik pár legalább **3 időpontot** ajánl, legalább **2 különböző napra**, 7:00 és 22:00 között, legalább **48 órával előre**.
   - A másik pár elfogad egyet, vagy ugyanilyen feltételekkel új időpontokat ajánl. Elutasítani csak új ajánlattal lehet.
@@ -36,7 +36,7 @@
 - Vitás esetben a szervező dönt.
 
 ## 5. Ha elmarad a meccs
-A határidő (a szakasz vége) lejártakor a rendszer automatikusan dönt:
+A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
 - **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel.
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs pont nélkül marad. ❓
 - **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel.
@@ -51,7 +51,7 @@ Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
 4. Játékkülönbség.
 5. A pár átlagos értékszáma.
 
-A szett- és játékkülönbségbe a szakasz összes csoportmeccse beszámít, a játék nélküli eredmények is.
+A szett- és játékkülönbségbe a kör összes csoportmeccse beszámít, a játék nélküli eredmények is.
 
 Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben már csak két pár marad holtversenyben, köztük az egymás elleni eredmény dönt.
 

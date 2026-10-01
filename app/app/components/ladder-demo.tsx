@@ -94,7 +94,7 @@ export function LadderDemo() {
     <figure className="grid gap-3">
       <div
         role="img"
-        aria-label="Példa: három csoport tabellája a szakasz végén. A csoportok első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör."
+        aria-label="Példa: három csoport tabellája a kör végén. A csoportok első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör."
         className={`relative transition-opacity duration-500 ${visible ? "opacity-100" : "opacity-0"}`}
         style={{ height: GROUPS * BOX + (GROUPS - 1) * GAP }}
       >

@@ -33,7 +33,6 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys run from GitHub Actions on every push to `main` (migrations, then deploy; [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1)). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - Backlog (ideas from 2026-10-02, not scheduled):
-  - Link previews (Open Graph title, description, image) for Facebook and Messenger shares.
   - Per-club poster QR codes: a `?ref=` code stored with each signup.
   - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
   - Club list on the landing page with booking links, stored per city.
@@ -54,6 +53,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft). Rendered as-is on the site at `/szabalyzat` |
 | `docs/go-to-market.md` | Clubs, recruiting, social content, organizer model |
 | `docs/monetization.md` | Monetization ideas, running costs, things to keep in mind (ideas only, not scheduled) |
+| `docs/club-outreach.md` | Messenger drafts for the club owners (poster request, feedback ask) and answers to likely questions |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
 | `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/adatkezeles`) |
 | `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |

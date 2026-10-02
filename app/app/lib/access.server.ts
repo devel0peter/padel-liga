@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
+import { accessToken } from "./access";
+
 // Admin pages sit behind Cloudflare Access (Zero Trust). Access handles the
 // login; here we verify the signed token it adds to every request, so the
 // admin stays closed even if the Access app is misconfigured or bypassed.
@@ -23,7 +25,7 @@ export async function requireAdmin(request: Request): Promise<Admin> {
   // Fail closed until Access is configured.
   if (!team || !aud) forbidden();
 
-  const token = request.headers.get("Cf-Access-Jwt-Assertion");
+  const token = accessToken(request);
   if (!token) forbidden();
 
   jwks ??= createRemoteJWKSet(new URL(`https://${team}/cdn-cgi/access/certs`));

@@ -14,11 +14,11 @@
 	"workers_dev": false,
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
 	// Cloudflare Access protecting /admin (see app/lib/access.server.ts).
-	// Team domain like "<team>.cloudflareaccess.com"; AUD tag of the Access app.
-	// The admin returns 403 until both are set.
+	// Access app "Padelpárbaj admin" (padelparbaj.hu/admin, allows admin@padelparbaj.hu
+	// via one-time PIN). The admin returns 403 if either value is empty.
 	"vars": {
-		"ACCESS_TEAM_DOMAIN": "",
-		"ACCESS_AUD": ""
+		"ACCESS_TEAM_DOMAIN": "padelparbaj.cloudflareaccess.com",
+		"ACCESS_AUD": "98cc1f4493e4533dcf39fb86ce590ff324474125db12c72b98c642d075957793"
 	},
 	"d1_databases": [
 		{

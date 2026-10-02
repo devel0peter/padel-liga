@@ -32,6 +32,11 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   5. ~~Email go-live~~ ✅ 2026-10-02: secrets set, code deployed, hourly cron registered. Cron triggers need an account-level `workers.dev` subdomain (`mracspeter`); the Worker itself stays off it (`workers_dev: false`). Still to do: a test signup with your own address and a test broadcast from `/admin/levelek/uj`.
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys run from GitHub Actions on every push to `main` (migrations, then deploy; [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1)). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
+- MVP build (spec section 18): GitHub issues [#6–#40](https://github.com/devel0peter/padel-liga/issues), grouped by milestone:
+  - [Registration opens](https://github.com/devel0peter/padel-liga/milestone/1), Mon 2 Nov 2026: rules engine (fixtures for groups of 3, seeding), accounts, Google login, profile, roles (admin moves into the app), leagues, venues, invites, pairs, seasons, season entry, first-phase groups.
+  - [Round 1 starts](https://github.com/devel0peter/padel-liga/milestone/2), Mon 9 Nov 2026: slot rules, score validation, standings, my matches, scheduling, venue and cancellation, results, disputes, public standings, reminders, daily backup.
+  - [First round switch](https://github.com/devel0peter/padel-liga/milestone/3), Mon 30 Nov 2026: unplayed-match resolution, promotion and relegation, Elo, no-shows, withdrawal, round switch, profiles, substitutes, account deletion, interest-list deletion.
+  - After the MVP: Facebook login (devel0peter/padel-liga#40).
 - Backlog (ideas from 2026-10-02, not scheduled):
   - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
   - Clubs on the platform (one feature, built when the first owner agrees): clubs belong to a city and are added only with the owner's consent to the poster and the listing. Brings the club list on the landing page (booking links), a per-club poster with QR code (`?ref=<club>` stored with each signup) and a signup count per club in the admin.

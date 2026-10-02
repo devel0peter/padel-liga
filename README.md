@@ -29,10 +29,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   2. ~~Google Workspace secondary domain~~ ✅ verification TXT, MX, SPF, DKIM, DMARC in Cloudflare DNS; `hello@` is an alias on Peter's user.
   3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
-  5. Email go-live (Resend is verified, migration `0004` applied). Still to do, as of 2026-10-02 12:40:
-     - Worker secrets: `npx wrangler secret list` shows only a secret wrongly *named* with an old Resend key. Revoke that key in Resend, `npx wrangler secret delete <that name>`, then `npx wrangler secret put RESEND_API_KEY` and `EMAIL_SECRET` (value at the prompt, not as the name).
-     - Deploy the email code (`npm run deploy`); the last code upload predates it.
-     - Test signup on the live site with your own address; send a test broadcast from `/admin/levelek/uj`.
+  5. ~~Email go-live~~ ✅ 2026-10-02: secrets set, code deployed, hourly cron registered. Cron triggers need an account-level `workers.dev` subdomain (`mracspeter`); the Worker itself stays off it (`workers_dev: false`). Still to do: a test signup with your own address and a test broadcast from `/admin/levelek/uj`.
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys are manual (`npm run deploy`) until CI/CD is set up: [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - Backlog (ideas from 2026-10-02, not scheduled):

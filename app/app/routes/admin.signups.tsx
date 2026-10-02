@@ -1,4 +1,4 @@
-import { Download, Trash2 } from "lucide-react";
+import { Download, Mail, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
@@ -240,11 +240,18 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
             {counts.solo} egyéni · {counts.players} játékos
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <a href={`/admin/export.csv?${params.toString()}`} download>
-            <Download /> CSV letöltése
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link to={`/admin/levelek/uj?${params.toString()}`}>
+              <Mail /> Levél nekik
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/admin/export.csv?${params.toString()}`} download>
+              <Download /> CSV letöltése
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

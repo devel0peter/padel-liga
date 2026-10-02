@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
@@ -22,6 +22,64 @@ export const interestSignups = sqliteTable("interest_signups", {
     .default("new"),
   adminNote: text("admin_note"),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// Every email the app sends goes through this outbox, so sends can be retried
+// and spread over days to stay under the provider's daily quota
+// (app/lib/email/outbox.server.ts). Bodies are cleared once sent.
+export const emailMessages = sqliteTable(
+  "email_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    kind: text("kind", { enum: ["signup_confirmation", "partner_notice", "broadcast"] }).notNull(),
+    broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull(),
+    html: text("html"),
+    text: text("text"),
+    // JSON object of extra headers, e.g. List-Unsubscribe.
+    headers: text("headers"),
+    status: text("status", { enum: ["pending", "sending", "sent", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    providerId: text("provider_id"),
+    claimedAt: integer("claimed_at", { mode: "timestamp" }),
+    sentAt: integer("sent_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    index("email_messages_status_idx").on(t.status, t.id),
+    index("email_messages_sent_at_idx").on(t.sentAt),
+    index("email_messages_to_idx").on(t.toEmail),
+  ],
+);
+
+// Admin-written emails to a filtered audience (app/routes/admin.broadcasts.*).
+export const broadcasts = sqliteTable("broadcasts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  // Human-readable audience, e.g. "Győr · Kezdő".
+  audience: text("audience").notNull(),
+  recipients: integer("recipients").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// Addresses that unsubscribed from broadcasts. Kept after a signup is deleted,
+// so a re-imported or re-entered address is still not mailed.
+export const emailSuppressions = sqliteTable("email_suppressions", {
+  email: text("email").primaryKey(),
+  reason: text("reason", { enum: ["unsubscribed", "bounced", "complained"] }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { interestSignups } from "~/db/schema";
+import { deleteMessagesTo } from "~/lib/email/outbox.server";
 
 import type { SignupRow, Status } from "./signups-admin";
 
@@ -22,6 +23,11 @@ export async function updateSignup(
 }
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").
+// Also removes the stored emails sent to them; an unsubscribe is kept.
 export async function deleteSignup(id: number): Promise<void> {
-  await db.delete(interestSignups).where(eq(interestSignups.id, id));
+  const [row] = await db
+    .delete(interestSignups)
+    .where(eq(interestSignups.id, id))
+    .returning({ email1: interestSignups.email1, email2: interestSignups.email2 });
+  if (row) await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
 }

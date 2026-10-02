@@ -12,6 +12,7 @@ import {
 } from "~/components/ui/accordion";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
+import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -42,6 +43,13 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
       ok: false,
       formError: "Nem sikerült elküldeni a jelentkezést. Próbáld újra pár perc múlva.",
     };
+  }
+  // The signup is saved; an email problem must not fail it. Anything not sent
+  // now stays queued for the hourly cron.
+  try {
+    await deliver(await queueSignupEmails(result.data));
+  } catch (error) {
+    console.error("signup email failed", error);
   }
   return { ok: true, cityOther: result.data.cityOther };
 }

@@ -77,6 +77,11 @@ export default function Privacy() {
               át az adataidat marketingcélra.
             </p>
             <p>
+              Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
+              mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
+              őrizzük meg, hogy ne írjunk rá többet.
+            </p>
+            <p>
               Az adatkezelés alapja a hozzájárulásod, amit a jelentkezéskor adsz
               meg, és bármikor visszavonhatsz.
             </p>

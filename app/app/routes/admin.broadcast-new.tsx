@@ -1,0 +1,184 @@
+import { useState } from "react";
+import { Link, redirect, useFetcher, useSearchParams } from "react-router";
+
+import type { Route } from "./+types/admin.broadcast-new";
+import { Wrap } from "~/components/site";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import { requireAdmin } from "~/lib/access.server";
+import { audienceLabel, signupRecipients } from "~/lib/email/audience";
+import { TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
+import {
+  createBroadcast,
+  dailyLimit,
+  deliver,
+  sendTestBroadcast,
+  suppressedSet,
+} from "~/lib/email/outbox.server";
+import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
+import { filterSignups, parseFilters } from "~/lib/signups-admin";
+import { listSignups } from "~/lib/signups-admin.server";
+
+const MAX_SUBJECT = 200;
+const MAX_BODY = 20000;
+
+async function audience(params: URLSearchParams) {
+  const filters = parseFilters(params);
+  const [rows, suppressed] = await Promise.all([listSignups(), suppressedSet()]);
+  return { label: audienceLabel(filters), ...signupRecipients(filterSignups(rows, filters), suppressed) };
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const admin = await requireAdmin(request);
+  const { label, recipients, suppressed } = await audience(new URL(request.url).searchParams);
+  return { label, recipients, suppressed, adminEmail: admin.email, limit: dailyLimit() };
+}
+
+type ActionData = { error?: string; tested?: string };
+
+export async function action({ request }: Route.ActionArgs): Promise<ActionData | Response> {
+  const admin = await requireAdmin(request);
+  const form = await request.formData();
+  const subject = String(form.get("subject") ?? "").trim();
+  const body = String(form.get("body") ?? "").trim();
+  if (!subject || subject.length > MAX_SUBJECT) return { error: "Adj meg egy tárgyat (legfeljebb 200 karakter)." };
+  if (!body || body.length > MAX_BODY) return { error: "Írd meg a levelet." };
+
+  if (form.get("intent") === "test") {
+    const result = await sendTestBroadcast({ subject, body }, { email: admin.email, name: "Teszt Elek" });
+    return result.ok ? { tested: admin.email } : { error: `Nem ment ki a tesztlevél: ${result.error}` };
+  }
+
+  // Recomputed from the same filters, so the list is current at send time.
+  const { label, recipients } = await audience(new URL(request.url).searchParams);
+  if (recipients.length === 0) return { error: "Nincs címzett." };
+  await createBroadcast({ subject, body, audience: label, recipients, createdBy: admin.email });
+  await deliver();
+  return redirect("/admin/levelek");
+}
+
+export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) {
+  const { label, recipients, suppressed, adminEmail, limit } = loaderData;
+  const [params] = useSearchParams();
+  const fetcher = useFetcher<ActionData>();
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState(`Szia ${NAME_PLACEHOLDER}!\n\n`);
+  const busy = fetcher.state !== "idle";
+  const ready = subject.trim() !== "" && body.trim() !== "";
+
+  const preview = broadcastEmail({ subject, body }, { name: recipients[0]?.name ?? "Teszt Elek" }, "#");
+  const submit = (intent: string) =>
+    fetcher.submit({ intent, subject, body }, { method: "post", action: `/admin/levelek/uj?${params}` });
+  const perDay = limit - TRANSACTIONAL_RESERVE;
+
+  return (
+    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
+      <div>
+        <Link to="/admin/levelek" className="text-sm text-muted-foreground underline">
+          ← Körlevelek
+        </Link>
+        <h1 className="font-display text-2xl font-extrabold">Új körlevél</h1>
+      </div>
+
+      <div className="rounded-lg border p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <strong>Címzettek:</strong> {label} · {recipients.length} cím
+            {suppressed > 0 && ` (${suppressed} leiratkozottat kihagyunk)`}
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/admin?${params.toString()}`}>Szűrők módosítása</Link>
+          </Button>
+        </div>
+        <p className="mt-2 text-muted-foreground">
+          Csak a jelentkezőnek megy, a megadott párnak nem (adatkezelési tájékoztató).
+          {recipients.length > perDay &&
+            ` Naponta legfeljebb ${perDay} körlevél megy ki, a többi a következő napokon.`}
+        </p>
+        {recipients.length > 0 && (
+          <details className="mt-2">
+            <summary className="cursor-pointer">Lista</summary>
+            <p className="mt-1 text-muted-foreground">
+              {recipients.map((r) => `${r.name} <${r.email}>`).join(", ")}
+            </p>
+          </details>
+        )}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid content-start gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="subject">Tárgy</Label>
+            <Input id="subject" value={subject} maxLength={MAX_SUBJECT} onChange={(e) => setSubject(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="body">Levél</Label>
+            <Textarea
+              id="body"
+              value={body}
+              maxLength={MAX_BODY}
+              onChange={(e) => setBody(e.target.value)}
+              className="min-h-72"
+            />
+            <p className="text-xs text-muted-foreground">
+              Sima szöveg. Üres sor = új bekezdés, a linkek kattinthatók lesznek. A{" "}
+              <code>{NAME_PLACEHOLDER}</code> helyére a címzett neve kerül. A lábléc (leiratkozás,
+              adatkezelés) automatikus.
+            </p>
+          </div>
+
+          {fetcher.data?.error && <p className="text-sm text-destructive">{fetcher.data.error}</p>}
+          {fetcher.data?.tested && !busy && (
+            <p className="text-sm">Tesztlevél elküldve ide: {fetcher.data.tested}</p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled={!ready || busy} onClick={() => submit("test")}>
+              Tesztlevél nekem ({adminEmail})
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={!ready || busy || recipients.length === 0}>
+                  Küldés {recipients.length} címzettnek
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    „{subject}” · {label}. Elküldés után nem lehet visszavonni.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Mégse</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => submit("send")}>Küldés</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+
+        <div className="grid content-start gap-1.5">
+          <Label>Előnézet</Label>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Tárgy:</span> {preview.subject}
+          </div>
+          <iframe title="Előnézet" srcDoc={preview.html} sandbox="" className="h-[32rem] w-full rounded-lg border bg-white" />
+        </div>
+      </div>
+    </Wrap>
+  );
+}

@@ -1,0 +1,3 @@
+# Copy to .dev.vars. Without RESEND_API_KEY, local dev logs emails to the console.
+EMAIL_SECRET="any-long-random-string"
+RESEND_API_KEY=""

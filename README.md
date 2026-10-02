@@ -26,16 +26,15 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   2. Peter adds `padelparbaj.hu` as a secondary domain in the Psionic Flare Google Workspace; add the verification TXT, MX, SPF, DKIM and DMARC records in Cloudflare DNS; `hello@` becomes an alias on Peter's user.
   3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
-  5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
+  5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain). The code is ready (signup confirmation, partner notice, admin broadcasts at `/admin/levelek`); emails queue in D1 until `RESEND_API_KEY` and `EMAIL_SECRET` are set (`npx wrangler secret put`), then apply migration `0004` remotely and deploy.
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys are manual (`npm run deploy`) until CI/CD is set up: [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
-  7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
+  7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - Backlog (ideas from 2026-10-02, not scheduled):
   - Link previews (Open Graph title, description, image) for Facebook and Messenger shares.
   - Per-club poster QR codes: a `?ref=` code stored with each signup.
   - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
   - Club list on the landing page with booking links, stored per city.
   - Cloudflare Web Analytics (cookieless, no consent banner), switched on at go-live.
-  - Signup confirmation email (with the partner email, needs Resend).
 - Waiting on Peter:
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
   - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).
@@ -95,6 +94,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 | 2026-10-01 | Phase 0 interest list goes in the app on padelparbaj.hu (D1), not Google Forms | Avoids migrating signups and links later; the domain and email setup were nearly done anyway |
 | 2026-10-01 | Email: `hello@` via Google Workspace (padelparbaj.hu as a secondary domain); `noreply@` via Resend later | Reuses the existing Workspace; no extra mailbox cost |
+| 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
+| 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |
+| 2026-10-02 | Broadcasts go only to the person who signed up, never to the partner they entered; signed one-click unsubscribe links, unsubscribes kept in `email_suppressions` | Spec section 17 (nothing else to the partner until they register); RFC 8058 for Gmail and Yahoo bulk-sender rules |
 
 ## Roadmap
 

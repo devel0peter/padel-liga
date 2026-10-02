@@ -36,4 +36,8 @@
 - `npm test`: rules engine tests.
 - `npm run typecheck`, `npm run build`.
 - `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
-- `npm run deploy`: deploy to Cloudflare. Ask first.
+- Deploys are automatic: every push to `main` runs GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests, build, then remote D1 migrations, then deploy. Work on a branch and open a PR; merging to `main` ships it, so ask before merging.
+- `npm run deploy`: manual fallback only (CI down). Ask first.
+
+## Commits
+- Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`, `refactor:`, `test:`), lowercase subject, e.g. `fix: accept the Access cookie on admin data requests`. CI runs commitlint on every PR's commits; check locally with `echo "<msg>" | npx commitlint`.

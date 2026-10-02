@@ -24,7 +24,7 @@
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
-- Minden meccsnek van egy **hazai párja**, ők ajánlanak először időpontokat. A sorsolás váltakozva jelöli ki: egy körben minden pár legalább egyszer hazai.
+- **Bármelyik pár ajánlhat időpontokat**, nem kell megvárni a másikat. Minél előbb ajánltok, annál könnyebb időpontot találni.
 - Az időpontot az oldalon egyeztetitek:
   - Az egyik pár legalább **3 időpontot** ajánl, legalább **2 különböző napra**, 7:00 és 22:00 között, legalább **48 órával előre**.
   - A másik pár elfogad egyet, vagy ugyanilyen feltételekkel új időpontokat ajánl. Elutasítani csak új ajánlattal lehet.

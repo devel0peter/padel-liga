@@ -47,7 +47,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 - Round order is generated automatically: week 1 is 1–4 and 2–3, week 2 is 1–3 and 2–4, week 3 is 1–2 and 3–4, based on seeding.
 - Groups of 3 use the same order with seed 4 as a bye: week 1 is 2–3 (1 rests), week 2 is 1–3 (2 rests), week 3 is 1–2 (3 rests). Each pair plays 2 matches.
 - Each match has a **scheduled week** (its round) and a **deadline: the end of the phase** (Sunday 23:59 of the last week). Playing in the scheduled week is strongly recommended; the UI and emails nudge towards it, but a match can be played any time until the deadline.
-- The "home" pair is responsible for proposing the first slots. The fixture generator assigns home so it alternates: in a group of 4, every pair is home at least once and at most twice per phase; in a group of 3, every pair is home exactly once.
+- There is no "home" pair: either pair may make the first proposal (section 6), so scheduling starts as soon as either side is ready.
 
 ## 6. Scheduling (core feature)
 1. Either pair can make a proposal: **at least 3 slots, spread over at least 2 different days, between 07:00 and 22:00, at least 48 hours ahead of now**, before the deadline. Optionally with a venue.
@@ -119,8 +119,8 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 Group size, phase length in weeks, catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
 
 ## 13. Notifications (email, in Hungarian)
-- New phase (Monday morning after the deadline): your group, opponents, home matches and the deadline.
-- Reminder to the home pair if it hasn't proposed slots 2 days into the match's scheduled week.
+- New phase (Monday morning after the deadline): your group, opponents and the deadline.
+- Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
 - A proposal arrived, or a slot was accepted.
 - Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
 - Reminder: 3 days before the deadline if the match is still unscheduled.

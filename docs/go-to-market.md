@@ -15,7 +15,7 @@
    - The tournament club may not like sending players to competitors. Frame it as a city league, not a rival competition.
    - **No exclusivity** (2026-10-02). It would make scheduling harder (the biggest club is busy, and scarce slots mean walkovers), tie the league to one relationship, and lose the other clubs' posters. The ask is small anyway: one poster near reception.
    - Ways to keep clubs motivated without exclusivity:
-     - A QR code per club (`?ref=<club>`), so we can tell each club "your poster brought in N players".
+     - A QR code per club (`?ref=<club>`), so we can tell each club "your poster brought in N players". Clubs are added to the platform only after the owner agrees to the poster and the listing (2026-10-02).
      - Visibility: list the clubs on the site with links to their booking pages; tag the club in posts about each round's matches.
      - A carrot for the most helpful club: host the season-end event or finals day, or get listed first for offering a league discount.
    - When: Peter talks to the club owners once the website is live.

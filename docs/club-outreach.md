@@ -6,7 +6,7 @@ Decided 2026-10-02:
 - Start date: depends on demand ("ha összegyűlik 8 pár"), with a target month.
 - Entry fee: not mentioned (undecided, open question #12).
 - The ask stays small: one poster with a QR code near reception. The player group post is a bonus.
-- Each club gets its own QR code (`?ref=<club>`), so we can later tell them how many players their poster brought in.
+- A club goes on the platform only after the owner says yes to the poster and to being listed on the site. Then it gets its own poster QR code (`?ref=<club>`), so we can later tell them how many players their poster brought in.
 
 ## 1. Poster request
 
@@ -20,7 +20,7 @@ Decided 2026-10-02:
 >
 > Kitehetnék nálatok egy plakátot QR-kóddal a recepció mellé? Ha belefér, a játékoscsoportotokban is megosztanám, de ez már csak extra.
 >
-> Cserébe a szezon végén megmutatom, hány ligameccset játszottak nálatok. Köszi!
+> Ha benne vagy, a klubot az oldalon is feltüntetném a foglalási linketekkel, és a szezon végén megmutatom, hány ligameccset játszottak nálatok. Köszi!
 >
 > Peter
 

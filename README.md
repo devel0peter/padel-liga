@@ -33,9 +33,8 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys run from GitHub Actions on every push to `main` (migrations, then deploy; [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1)). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - Backlog (ideas from 2026-10-02, not scheduled):
-  - Per-club poster QR codes: a `?ref=` code stored with each signup.
   - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
-  - Club list on the landing page with booking links, stored per city.
+  - Clubs on the platform (one feature, built when the first owner agrees): clubs belong to a city and are added only with the owner's consent to the poster and the listing. Brings the club list on the landing page (booking links), a per-club poster with QR code (`?ref=<club>` stored with each signup) and a signup count per club in the admin.
   - Cloudflare Web Analytics (cookieless, no consent banner), switched on at go-live.
   - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
   - Turnstile on the signup form, so bots can't burn the daily email quota.
@@ -100,6 +99,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 | 2026-10-01 | Phase 0 interest list goes in the app on padelparbaj.hu (D1), not Google Forms | Avoids migrating signups and links later; the domain and email setup were nearly done anyway |
 | 2026-10-01 | Email: `hello@` via Google Workspace (padelparbaj.hu as a secondary domain); `noreply@` via Resend later | Reuses the existing Workspace; no extra mailbox cost |
+| 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed | Consent first; the outreach message stays a simple ask, the club features follow the yes |
 | 2026-10-02 | CI/CD on GitHub Actions: checks on every PR and push; on `main`, D1 migrations then `wrangler deploy` (environment `production`). Conventional Commits enforced on PR commits by commitlint | Whole pipeline in the repo; a failed migration stops the deploy; Workers Builds runs migrations and tests less naturally |
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |

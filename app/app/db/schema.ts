@@ -16,6 +16,12 @@ export const interestSignups = sqliteTable("interest_signups", {
   level: text("level").notNull(),
   note: text("note"),
   consentAt: integer("consent_at", { mode: "timestamp" }).notNull(),
+  // Admin-only fields, see app/lib/signups-admin.ts.
+  status: text("status", { enum: ["new", "contacted", "paired", "withdrawn"] })
+    .notNull()
+    .default("new"),
+  adminNote: text("admin_note"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

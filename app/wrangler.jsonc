@@ -13,6 +13,13 @@
 	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.
 	"workers_dev": false,
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
+	// Cloudflare Access protecting /admin (see app/lib/access.server.ts).
+	// Team domain like "<team>.cloudflareaccess.com"; AUD tag of the Access app.
+	// The admin returns 403 until both are set.
+	"vars": {
+		"ACCESS_TEAM_DOMAIN": "",
+		"ACCESS_AUD": ""
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

@@ -1,0 +1,27 @@
+import { desc, eq } from "drizzle-orm";
+
+import { db } from "~/db/client.server";
+import { interestSignups } from "~/db/schema";
+
+import type { SignupRow, Status } from "./signups-admin";
+
+// Phase 0 volumes are small (hundreds at most), so the admin loads the whole
+// list and filters in memory (filterSignups).
+export async function listSignups(): Promise<SignupRow[]> {
+  return db.select().from(interestSignups).orderBy(desc(interestSignups.createdAt), desc(interestSignups.id));
+}
+
+export async function updateSignup(
+  id: number,
+  changes: { status?: Status; adminNote?: string | null },
+): Promise<void> {
+  await db
+    .update(interestSignups)
+    .set({ ...changes, updatedAt: new Date() })
+    .where(eq(interestSignups.id, id));
+}
+
+// Permanent: used for deletion requests (privacy page, "Mik a jogaid?").
+export async function deleteSignup(id: number): Promise<void> {
+  await db.delete(interestSignups).where(eq(interestSignups.id, id));
+}

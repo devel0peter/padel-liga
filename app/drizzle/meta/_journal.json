@@ -22,6 +22,13 @@
       "when": 1790892562476,
       "tag": "0002_interest_city_other",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790933774130,
+      "tag": "0003_interest_admin",
+      "breakpoints": true
     }
   ]
 }

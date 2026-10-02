@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 01.";
+const EFFECTIVE_FROM = "2026. 10. 02.";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -47,7 +47,9 @@ export default function Privacy() {
 
           <Section title="Ki kezeli az adataidat?">
             <p>
-              {DATA_CONTROLLER}. Bármilyen kérdéssel írj a {mail} címre.
+              {DATA_CONTROLLER.name} (székhely: {DATA_CONTROLLER.seat},
+              adószám: {DATA_CONTROLLER.taxNumber}). Bármilyen kérdéssel írj a{" "}
+              {mail} címre, vagy postán a székhely címére.
             </p>
           </Section>
 

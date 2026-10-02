@@ -1,6 +1,6 @@
 # MVP spec
 
-Status: draft v0.1 (2026-10-01). Items marked ❓ are open, see `open-questions.md`.
+Status: draft v0.2 (2026-10-02). All open questions resolved; see `open-questions.md`.
 
 ## 1. Goal
 Pairs who play padel in a city (starting with Győr) get a fixed weekly match against opponents at their level, with fair rules on no-shows. The organizer has almost no admin work.
@@ -20,7 +20,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 - Linking several login methods to one account (same email = same account, after confirmation).
 - Profile:
   - Required: name, email.
-  - Optional: phone number (visible only to opponents in the current round ❓), self-assessed level.
+  - Optional: phone number (visible only to opponents in the current round, never public; collected at registration, not on the interest form), self-assessed level.
 - GDPR:
   - Privacy notice (section 17) and consent at registration.
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".
@@ -29,8 +29,8 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 - **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
 - **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases.
-- **Phase:** 3 weeks (❓ plus 1 catch-up week). Group composition is fixed within a phase.
-- **Group:** 4 pairs, ordered by level (1. csoport = strongest).
+- **Phase:** 3 weeks, back to back: the next phase starts on the Monday after the deadline, and new groups are emailed that Monday morning. Group composition is fixed within a phase. (A catch-up week exists as a league setting, off by default; revisit if the first week of a phase turns out to be lost.)
+- **Group:** 4 pairs, ordered by level (1. csoport = strongest). When the number of pairs isn't divisible by 4, some groups have 3 pairs (9 = 3+3+3, 10 = 4+3+3, 11 = 4+4+3); no waiting list. 3-pair groups go at the bottom unless the organizer places them otherwise.
 - **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases.
 - **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
   - The pair requests it, naming the substitute; the organizer sees the substitute's and the absent player's Elo side by side and approves or rejects. The opponents are notified and see the substitute on the match page.
@@ -45,8 +45,9 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 ## 5. Fixtures
 - Groups of 4 give 3 rounds per phase, 2 matches per round, and each pair plays once a week.
 - Round order is generated automatically: week 1 is 1–4 and 2–3, week 2 is 1–3 and 2–4, week 3 is 1–2 and 3–4, based on seeding.
+- Groups of 3 use the same order with seed 4 as a bye: week 1 is 2–3 (1 rests), week 2 is 1–3 (2 rests), week 3 is 1–2 (3 rests). Each pair plays 2 matches.
 - Each match has a **scheduled week** (its round) and a **deadline: the end of the phase** (Sunday 23:59 of the last week). Playing in the scheduled week is strongly recommended; the UI and emails nudge towards it, but a match can be played any time until the deadline.
-- The "home" pair is responsible for proposing the first slots. Home is decided by alternation.
+- The "home" pair is responsible for proposing the first slots. The fixture generator assigns home so it alternates: in a group of 4, every pair is home at least once and at most twice per phase; in a group of 3, every pair is home exactly once.
 
 ## 6. Scheduling (core feature)
 1. Either pair can make a proposal: **at least 3 slots, spread over at least 2 different days, between 07:00 and 22:00, at least 48 hours ahead of now**, before the deadline. Optionally with a venue.
@@ -57,7 +58,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 3. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration).
 4. Every action is timestamped and logged. This is the evidence for walkovers.
 5. Either side can cancel an accepted slot; this reopens the proposal process.
-   ❓ Is a late cancellation (under 24 hours) a walkover?
+   - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal. If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
 
 ## 7. Recording results
 - Format (league default, one format per league, no per-match variants; see section 12):
@@ -78,15 +79,18 @@ The deadline is the end of the phase (section 5), so a match missed in its sched
 | Situation | Outcome |
 |---|---|
 | One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 6-0 6-0 |
-| Both active, no agreement | 0 points for both sides, no Elo change ❓ |
-| Neither side active | Both sides get a loss, recorded as 0-6 0-6 for each (counts in set and game difference) |
+| Both active, no agreement | Unplayed: 0 points for both sides, no Elo change, not counted in set and game difference. The organizer may award a walkover if the log shows one side clearly blocked the match |
+| Neither side active | Both sides get a loss, recorded as 0-6 0-6 for each (counts in set and game difference, 0 points) |
+| Late cancellation, then not played by the deadline | The cancelling side counts as inactive: walkover for the other side (section 6) |
 | Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover |
 
 The organizer can always override the outcome manually.
 
 ## 9. Standings and tiebreakers
+Points: win 3, loss in a played match 1, walkover loss (or a loss because neither side was active) 0.
+
 Order within a group:
-1. Matches won.
+1. Points.
 2. Head-to-head result (only when 2 pairs are tied).
 3. Set difference.
 4. Game difference.
@@ -97,16 +101,15 @@ Set and game difference are counted over all of the pair's matches in the group 
 When 3 or more pairs are tied, apply steps 3–5 in order. As soon as a step separates one or more pairs and only 2 are still tied with each other, go back to step 2 (head-to-head) for those 2.
 Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set difference and is 1st. B and C are still tied, and B beat C, so B is 2nd.
 
-Points: ❓ (win/loss count only, or 3/1/0 where a loss after a played match is worth 1 point, rewarding pairs who show up).
 
 ## 10. Promotion and relegation
-- At the end of a phase, 1st place moves up a group and 4th place moves down. The top group has no promotion and the bottom group has no relegation.
+- At the end of a phase, 1st place moves up a group and last place (4th, or 3rd in a group of 3) moves down. The top group has no promotion and the bottom group has no relegation.
 - New pairs: placed by the average Elo of the pair, or by self-assessed level if they have no rating.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
-- An odd number of pairs: ❓ (a group of 3 or 5, or a waiting list).
+- Pair count not divisible by 4: groups of 3 fill the gap (section 4).
 
 ## 11. Rating (Elo)
-- Individual Elo, starting value based on self-assessed level (kezdő 1000, középhaladó 1200, haladó 1400, profi 1600 ❓).
+- Individual Elo, starting value based on self-assessed level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600; the same levels as the signup form).
 - Pair rating = average of the two players.
 - After a match, both players receive the same delta. K = 32 at first, 16 after 20 matches.
 - Walkovers don't change Elo.
@@ -116,7 +119,8 @@ Points: ❓ (win/loss count only, or 3/1/0 where a loss after a played match is 
 Group size, phase length in weeks, catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
 
 ## 13. Notifications (email, in Hungarian)
-- New round, with the opponent and the deadline.
+- New phase (Monday morning after the deadline): your group, opponents, home matches and the deadline.
+- Reminder to the home pair if it hasn't proposed slots 2 days into the match's scheduled week.
 - A proposal arrived, or a slot was accepted.
 - Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
 - Reminder: 3 days before the deadline if the match is still unscheduled.
@@ -124,7 +128,7 @@ Group size, phase length in weeks, catch-up week on or off, deadline day, slot r
 - End of a phase, with your new group.
 - Every notification includes a shareable link ("küldd el a párodnak / ellenfélnek").
 
-❓ Push notifications or a PWA later.
+Email only in the MVP. A PWA with push notifications later, if players miss emails.
 
 ## 14. Public pages
 - League home: groups, standings, matches this week.
@@ -151,7 +155,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
 - **Who sees what:**
   - Public: names, results, standings and ratings.
   - Never public: email and phone number.
-  - Phone number: only the current opponent sees it (❓ see section 3).
+  - Phone number: only the current round's opponents see it (section 3).
 - **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database) and Resend (email).
 - **Retention:**
   - Interest list: deleted after the first season starts, unless the person registers.

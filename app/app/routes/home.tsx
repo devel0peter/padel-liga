@@ -75,7 +75,7 @@ const STEPS = [
 
 
 const RULES = [
-  ["Csoportok", "4 pár csoportonként, szint szerint sorba rendezve."],
+  ["Csoportok", "4 pár csoportonként, szint szerint sorba rendezve. Ha nem jön ki, néhány csoport 3 páros."],
   ["Egy kör", "3 hét, hetente egy meccs, mindenki mindenkivel játszik a csoportban."],
   ["Határidő", "Minden meccsnek megvan a maga hete, érdemes akkor lejátszani. Ha nem jön össze, a kör végéig, a 3. hét vasárnapjáig pótolhatjátok."],
   ["Időpontok", "Legalább 3 időpontot kell ajánlani, legalább 2 különböző napra, 48 órával előre."],
@@ -87,7 +87,7 @@ const RULES = [
 
 const FAQ = [
   ["Mennyibe kerül?", "Az első szezonban a részvétel ingyenes, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor indul?", "Amint összegyűlik legalább 8 pár. Mindenkinek írunk e-mailben, aki jelentkezett."],
+  ["Mikor indul?", "Amint összegyűlik legalább 8 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],

@@ -1,24 +1,28 @@
 # Open questions
 
-## Blocks phase 0 (landing page)
+All resolved on 2026-10-02 unless noted. Decisions are also in the decision log in `README.md`.
+
+## Phase 0 (landing page)
 1. ~~**Name and domain.**~~ ✅ **Padelpárbaj**, `padelparbaj.hu` at a Hungarian registrar, DNS on Cloudflare. City leagues: "Padelpárbaj Győr".
 2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
 3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
-4. **Which contact details to collect?** Currently name and email for both players, a level, and a comment. Phone number too?
-5. **Planned start of the first season?** Indoor vs. outdoor courts in winter?
+4. ~~**Contact details**~~ ✅ The interest form stays as it is (names, emails, level, comment). Phone number only at registration, optional (see #15).
+5. ~~**Season start**~~ ✅ When 8 pairs have signed up; target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
 
 ## Rules
 6. ~~Match format~~ ✅ 2 sets to 6 (tie-break at 6-6), super tie-break to 10 as the decider, golden point; one format per league; 90-minute booking recommended; unfinished matches continue in a new slot. See spec section 7.
-7. Phase of 3 weeks, or 3+1 with a catch-up week? (Less pressing since 2026-10-02: unplayed matches can be made up until the end of the phase.)
-8. Both sides active but no agreement: 0 points for both, or does the organizer decide?
-9. Late cancellation (under 24 hours): walkover?
-10. Scoring: wins only, or 3/1/0 (reward for showing up)?
-11. Odd number of pairs: a group of 3 or 5, or a waiting list?
-12. Entry fee: is the first season free?
+7. ~~Phase length~~ ✅ 3 weeks, back to back, no catch-up week; new groups emailed on the Monday morning. Revisit if the first week turns out to be lost to late scheduling (the catch-up week stays a league setting).
+8. ~~Both active, no agreement~~ ✅ Unplayed, 0 points for both, no Elo change; the organizer may award a walkover if one side clearly blocked the match.
+9. ~~Late cancellation~~ ✅ Not an immediate walkover: the cancelling side must re-propose; if the match isn't played by the deadline, it counts as the inactive side.
+10. ~~Scoring~~ ✅ 3/1/0: win 3, played loss 1, walkover loss 0.
+11. ~~Pair count not divisible by 4~~ ✅ 3-pair groups fill the gap (2 matches each, one week off); no waiting list.
+12. ~~Entry fee~~ ✅ The first season is free (already on the landing page).
+- ~~Elo starting values~~ ✅ kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
+- ~~Home pair~~ ✅ Alternating, assigned by the fixture generator.
 
 ## Product and tech
 13. ~~Stack confirmation~~ ✅ TypeScript, React Router, shadcn/ui, D1 + Drizzle, Better Auth. See CLAUDE.md.
 14. ~~Email provider~~ ✅ Resend.
-15. Phone numbers visible to opponents, or keep everything on the platform?
-16. Players without a partner: a separate "keresek párt" (looking for a partner) list in the MVP?
-17. Should the MVP include a PWA (installable, push notifications), or is email enough?
+15. ~~Phone numbers~~ ✅ Optional, visible only to the current round's opponents, never public. Scheduling stays on the platform.
+16. ~~Players without a partner~~ ✅ The organizer pairs them by hand in the first season (admin status "Párosítva"). A "keresek párt" list later, if there are many.
+17. ~~PWA~~ ✅ Email only in the MVP; a PWA with push later if players miss emails.

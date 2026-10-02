@@ -18,16 +18,16 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Rules engine started in `packages/rules/`, with the fixture order tested.
   - `padelparbaj.hu` registered at Rackhost.
   - `padelparbaj.hu` added to Cloudflare (Free plan, zone pending). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
-  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migration `0000` applied remotely.
+  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migrations `0000`–`0003` applied remotely (2026-10-02).
   - Zone: Always Use HTTPS on.
   - Landing page moved into the app (`/`): signup form → `interest_signups` with server-side validation (unit tested) and a honeypot, privacy page at `/adatkezeles`, system dark mode, `hello@padelparbaj.hu` as contact.
 - Next, in this order:
   1. Nameservers switched at Rackhost (2026-10-01); wait for the zone to go active.
   2. Peter adds `padelparbaj.hu` as a secondary domain in the Psionic Flare Google Workspace; add the verification TXT, MX, SPF, DKIM and DMARC records in Cloudflare DNS; `hello@` becomes an alias on Peter's user.
-  3. Add proxied `www` record + Redirect Rule `www` → apex (301).
+  3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
   5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
-  6. First deploy (custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). Before it: apply migrations `0001`–`0003` remotely. (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
+  6. First deploy: `npm run deploy` (Peter runs it; custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
 - Backlog (ideas from 2026-10-02, not scheduled):
   - Link previews (Open Graph title, description, image) for Facebook and Messenger shares.
@@ -48,6 +48,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | `docs/spec.md` | Functional spec for the MVP (source of truth) |
 | `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft). Rendered as-is on the site at `/szabalyzat` |
 | `docs/go-to-market.md` | Clubs, recruiting, social content, organizer model |
+| `docs/monetization.md` | Monetization ideas, running costs, things to keep in mind (ideas only, not scheduled) |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
 | `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/adatkezeles`) |
 | `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |

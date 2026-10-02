@@ -1,6 +1,6 @@
 # MVP spec
 
-Status: draft v0.2 (2026-10-02). All open questions resolved; see `open-questions.md`.
+Status: draft v0.3 (2026-10-03). All open questions resolved; see `open-questions.md`. MVP plan and calendar: section 18.
 
 ## 1. Goal
 Pairs who play padel in a city (starting with Győr) get a fixed weekly match against opponents at their level, with fair rules on no-shows. The organizer has almost no admin work.
@@ -10,13 +10,16 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 |---|---|
 | Visitor | See the landing page, rules and public standings |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
-| Organizer | Create and configure a league and season, seed groups, approve substitutes, settle disputes, override results |
-| Platform admin | Create cities/leagues, appoint organizers (Peter) |
+| Organizer | Create and configure a league and season, approve pairs, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs |
+| Platform admin | Create cities/leagues, appoint organizers, see the interest list, send broadcasts (Peter) |
+
+Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).
 
 ## 3. Authentication
 - Email + password, with email confirmation and password reset.
 - Google login.
-- Facebook login.
+- Facebook login: after the MVP (Meta business verification and app review take weeks).
+- Onboarding from the interest list: when registration opens, everyone on the interest list (the person who signed up, not the partner they entered) gets one invite email with a registration link, their email pre-filled. Pairs are then formed in the app (section 4), not taken from the signup.
 - Linking several login methods to one account (same email = same account, after confirmation).
 - Profile:
   - Required: name, email.
@@ -28,10 +31,13 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 ## 4. Domain model (simplified)
 - **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
-- **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases.
+- **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases. It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break.
+- **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by Elo.
+- **Venue:** the city's padel clubs, an internal list the organizer maintains, used when recording where a match was booked (and for per-club statistics). Separate from the public club listing, which needs the owner's consent (README decision log, 2026-10-02).
 - **Phase:** 3 weeks, back to back: the next phase starts on the Monday after the deadline, and new groups are emailed that Monday morning. Group composition is fixed within a phase. (A catch-up week exists as a league setting, off by default; revisit if the first week of a phase turns out to be lost.)
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest). When the number of pairs isn't divisible by 4, some groups have 3 pairs (9 = 3+3+3, 10 = 4+3+3, 11 = 4+4+3); no waiting list. 3-pair groups go at the bottom unless the organizer places them otherwise.
-- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases.
+- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. A pair is formed by one player inviting the other by email; the pair exists once the invitee accepts.
+- **Withdrawal:** if a pair drops out mid-phase (injury, moving away), the organizer withdraws it: all its matches in that phase, played or not, are removed from the group's standings, and the group continues without it. No replacement mid-phase.
 - **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
   - The pair requests it, naming the substitute; the organizer sees the substitute's and the absent player's Elo side by side and approves or rejects. The opponents are notified and see the substitute on the match page.
   - The substitute needs an account (for Elo) and must not be in another pair of the same group.
@@ -105,6 +111,8 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 ## 10. Promotion and relegation
 - At the end of a phase, 1st place moves up a group and last place (4th, or 3rd in a group of 3) moves down. The top group has no promotion and the bottom group has no relegation.
 - New pairs: placed by the average Elo of the pair, or by self-assessed level if they have no rating.
+- First phase of a season: the system sorts the approved pairs by average Elo into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
+- **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
 - Pair count not divisible by 4: groups of 3 fill the gap (section 4).
 
@@ -137,7 +145,7 @@ Email only in the MVP. A PWA with push notifications later, if players miss emai
 - Privacy page ("Adatkezelési tájékoztató", section 17), linked from the footer and from every consent checkbox.
 
 ## 15. Out of MVP scope
-Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2).
+Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2), Facebook login, PWA and push notifications, a "keresek párt" list.
 
 ## 16. Non-functional requirements
 - Mobile-first; most usage will be from a phone link.
@@ -162,3 +170,14 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Accounts: kept until deletion, then anonymized (section 3).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address.
 - **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion. Nothing else is sent to them until they register themselves.
+
+## 18. MVP plan and calendar (decided 2026-10-03)
+Dates are Europe/Budapest.
+
+| Milestone | Date | Must work |
+|---|---|---|
+| Registration opens | Mon 2 Nov 2026 | Accounts (email + password, Google), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
+| Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling, results and confirmation, disputes, public standings, emails and reminders, daily backup |
+| First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, account deletion |
+
+First season: phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec, break 21 Dec – 3 Jan, phase 3 starts 4 Jan 2027. Until substitutes are built, the organizer handles them by hand.

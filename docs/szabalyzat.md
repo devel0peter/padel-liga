@@ -8,6 +8,7 @@
 - Egy kör **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
 - A kör végén a csoport **első helyezettje feljebb lép**, az **utolsó lejjebb kerül**.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
+- Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
@@ -20,6 +21,8 @@
   - Az eredmény a párnak számít, ugyanúgy, mint bármelyik meccs.
   - A helyettes értékszáma változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
+- **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja.
+- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, a szervező jóváhagyja. Ha a szezon már elindult, a következő kör elején kapcsolódtok be.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.

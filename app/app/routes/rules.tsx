@@ -2,15 +2,18 @@ import Markdown, { type Components } from "react-markdown";
 
 import type { Route } from "./+types/rules";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
+import { pageMeta } from "~/lib/site";
 // The rules page renders docs/szabalyzat.md directly, so the site and the
 // source of truth can't drift apart.
 import rules from "../../../docs/szabalyzat.md?raw";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Szabályzat – Padelpárbaj" },
-    { name: "description", content: "A Padelpárbaj liga szabályai: csoportok, egyeztetés, meccsformátum, elmaradt meccsek, feljutás és kiesés." },
-  ];
+  return pageMeta({
+    title: "Szabályzat – Padelpárbaj",
+    description:
+      "A Padelpárbaj liga szabályai: csoportok, egyeztetés, meccsformátum, elmaradt meccsek, feljutás és kiesés.",
+    path: "/szabalyzat",
+  });
 }
 
 const components: Components = {

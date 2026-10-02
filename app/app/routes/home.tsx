@@ -12,17 +12,16 @@ import {
 } from "~/components/ui/accordion";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
+import { pageMeta } from "~/lib/site";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Padelpárbaj – Ki a legjobb páros a városban?" },
-    {
-      name: "description",
-      content:
-        "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
-    },
-  ];
+  return pageMeta({
+    title: "Padelpárbaj – Ki a legjobb páros a városban?",
+    description:
+      "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
+    path: "/",
+  });
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {

@@ -1,15 +1,16 @@
 import type { Route } from "./+types/privacy";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
-import { CONTACT_EMAIL, DATA_CONTROLLER } from "~/lib/site";
+import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
 const EFFECTIVE_FROM = "2026. 10. 02.";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Adatkezelési tájékoztató – Padelpárbaj" },
-    { name: "description", content: "Milyen adatokat kezelünk, miért, és mik a jogaid." },
-  ];
+  return pageMeta({
+    title: "Adatkezelési tájékoztató – Padelpárbaj",
+    description: "Milyen adatokat kezelünk, miért, és mik a jogaid.",
+    path: "/adatkezeles",
+  });
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

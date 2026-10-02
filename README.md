@@ -11,22 +11,28 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 
 **Phase 0:** interest-collection landing page and conversations with the clubs. Nothing else gets built until there's real demand.
 
-### Where we are (2026-10-01)
+### Where we are (2026-10-02)
 - Done:
   - Docs and decisions (see the log below).
-  - App scaffolded in `app/`. It isn't deployed yet.
+  - App in `app/`, live on `https://padelparbaj.hu` since 2026-10-02.
   - Rules engine started in `packages/rules/`, with the fixture order tested.
   - `padelparbaj.hu` registered at Rackhost.
-  - `padelparbaj.hu` added to Cloudflare (Free plan, zone pending). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
-  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migrations `0000`–`0003` applied remotely (2026-10-02).
+  - `padelparbaj.hu` on Cloudflare (Free plan, zone active). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
+  - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migrations `0000`–`0004` applied remotely (2026-10-02).
   - Zone: Always Use HTTPS on.
   - Landing page moved into the app (`/`): signup form → `interest_signups` with server-side validation (unit tested) and a honeypot, privacy page at `/adatkezeles`, system dark mode, `hello@padelparbaj.hu` as contact.
+  - Admin at `/admin` behind Cloudflare Access: signup list with filters, status, notes, CSV export, deletion.
+  - Email (code in `app/app/lib/email/`): signup confirmation, one-time partner notice, admin broadcasts at `/admin/levelek` ("Levél nekik" on the filtered signup list), unsubscribe at `/leiratkozas`. Outbox table + hourly cron, within `EMAIL_DAILY_LIMIT`.
+  - Resend: account created, `padelparbaj.hu` verified in the EU region via Cloudflare auto-configure (`resend._domainkey` TXT, `send` and `rsend` CNAMEs). Google Workspace DNS complete, including DKIM. One DMARC record (`p=none`).
 - Next, in this order:
-  1. Nameservers switched at Rackhost (2026-10-01); wait for the zone to go active.
-  2. Peter adds `padelparbaj.hu` as a secondary domain in the Psionic Flare Google Workspace; add the verification TXT, MX, SPF, DKIM and DMARC records in Cloudflare DNS; `hello@` becomes an alias on Peter's user.
+  1. ~~Nameservers and zone~~ ✅ zone active.
+  2. ~~Google Workspace secondary domain~~ ✅ verification TXT, MX, SPF, DKIM, DMARC in Cloudflare DNS; `hello@` is an alias on Peter's user.
   3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
-  5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain). The code is ready (signup confirmation, partner notice, admin broadcasts at `/admin/levelek`); emails queue in D1 until `RESEND_API_KEY` and `EMAIL_SECRET` are set (`npx wrangler secret put`), then apply migration `0004` remotely and deploy.
+  5. Email go-live (Resend is verified, migration `0004` applied). Still to do, as of 2026-10-02 12:40:
+     - Worker secrets: `npx wrangler secret list` shows only a secret wrongly *named* with an old Resend key. Revoke that key in Resend, `npx wrangler secret delete <that name>`, then `npx wrangler secret put RESEND_API_KEY` and `EMAIL_SECRET` (value at the prompt, not as the name).
+     - Deploy the email code (`npm run deploy`); the last code upload predates it.
+     - Test signup on the live site with your own address; send a test broadcast from `/admin/levelek/uj`.
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys are manual (`npm run deploy`) until CI/CD is set up: [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - Backlog (ideas from 2026-10-02, not scheduled):
@@ -35,6 +41,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
   - Club list on the landing page with booking links, stored per city.
   - Cloudflare Web Analytics (cookieless, no consent banner), switched on at go-live.
+  - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
+  - Turnstile on the signup form, so bots can't burn the daily email quota.
+  - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
 - Waiting on Peter:
   - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
   - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).

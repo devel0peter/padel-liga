@@ -27,7 +27,7 @@
 - UI: Tailwind CSS v4 + **shadcn/ui** (`app/app/components/ui`). Prefer an existing shadcn component over custom markup: `npx shadcn@latest add <name>` in `app/`.
 - Data: **Cloudflare D1** (SQLite) + **Drizzle ORM**. Schema in `app/app/db/schema.ts`, migrations in `app/drizzle/`. Access the DB only from `*.server.ts` modules.
 - Auth: **Better Auth** (email + password, Google, Facebook). Not installed yet.
-- Email: **Resend**. Not installed yet.
+- Email: **Resend** (EU), called with plain `fetch`, no SDK. All mail goes through the outbox in `app/app/lib/email/outbox.server.ts`; templates are pure functions in `templates.ts`. Secrets: `RESEND_API_KEY`, `EMAIL_SECRET` (local: `app/.dev.vars`; without a key, dev logs emails to the console).
 - Scheduled jobs (deadlines, reminders, auto-confirm): Cloudflare **Cron Triggers**.
 - `packages/rules/`: the rules engine. Pure TypeScript, no I/O and no Cloudflare imports, tested with **Vitest**.
 

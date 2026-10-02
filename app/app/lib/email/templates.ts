@@ -3,9 +3,7 @@
 
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
-import { CONTACT_EMAIL, SITE_NAME } from "../site";
-
-export const SITE_URL = "https://padelparbaj.hu";
+import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
 
 export type Email = { subject: string; html: string; text: string };
 

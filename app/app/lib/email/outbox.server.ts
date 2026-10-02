@@ -8,7 +8,9 @@ import type { InterestSignup } from "~/lib/interest";
 import type { Recipient } from "./audience";
 import { parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { MAX_BATCH, sendBatch } from "./resend.server";
-import { broadcastEmail, partnerNotice, signupConfirmation, SITE_URL, type Email } from "./templates";
+import { SITE_URL } from "~/lib/site";
+
+import { broadcastEmail, partnerNotice, signupConfirmation, type Email } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered

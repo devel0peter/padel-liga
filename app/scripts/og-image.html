@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Source of public/og.png (link preview, 1200x630). Regenerate:
+     chromium --headless --screenshot=public/og.png --window-size=1200,630 --hide-scrollbars scripts/og-image.html -->
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Archivo"; src: url("../../node_modules/@fontsource-variable/archivo/files/archivo-latin-ext-wdth-normal.woff2") format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; }
+  @font-face { font-family: "Archivo"; src: url("../../node_modules/@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2") format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; }
+  * { margin: 0; box-sizing: border-box; }
+  body { width: 1200px; height: 630px; overflow: hidden; font-family: "Archivo", sans-serif; color: #fff;
+    background: radial-gradient(circle at 85% 20%, #2a6cc0 0, #1e5ba8 35%, #173f75 100%); position: relative; }
+  .lines { position: absolute; inset: 40px; border: 4px solid rgba(255,255,255,.18); border-radius: 18px; }
+  .lines::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 4px solid rgba(255,255,255,.18); }
+  .lines::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 4px dashed rgba(255,255,255,.12); }
+  .ball { position: absolute; right: 120px; top: 110px; width: 170px; height: 170px; border-radius: 50%; background: #dceb3c;
+    box-shadow: inset -18px -14px 0 rgba(0,0,0,.12); }
+  .ball::before, .ball::after { content: ""; position: absolute; width: 170px; height: 170px; border-radius: 50%; border: 6px solid rgba(255,255,255,.75); }
+  .ball::before { left: -112px; } .ball::after { left: 112px; }
+  .ball { overflow: hidden; }
+  main { position: absolute; left: 96px; top: 96px; right: 96px; bottom: 96px; display: flex; flex-direction: column; justify-content: space-between; }
+  .brand { font-size: 40px; font-weight: 800; font-stretch: 120%; display: flex; align-items: center; gap: 16px; }
+  .dot { width: 26px; height: 26px; border-radius: 50%; background: #dceb3c; }
+  h1 { font-size: 84px; line-height: 1.02; font-weight: 900; letter-spacing: -1.5px; max-width: 800px; }
+  p { font-size: 32px; color: rgba(255,255,255,.88); font-weight: 500; }
+  .url { color: #dceb3c; font-weight: 800; }
+</style>
+</head>
+<body>
+  <div class="lines"></div>
+  <div class="ball"></div>
+  <main>
+    <div class="brand"><span class="dot"></span>Padelpárbaj</div>
+    <h1>Ki a legjobb páros a városban?</h1>
+    <p>Padelbajnokság pároknak · heti egy meccs · <span class="url">padelparbaj.hu</span></p>
+  </main>
+</body>
+</html>

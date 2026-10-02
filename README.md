@@ -40,8 +40,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
 - Waiting on Peter:
-  - The Phase 0 questions in `docs/open-questions.md` (#4 contact details, #5 season start).
-  - The MVP rules questions (#6–#12, plus the Elo start values and the home-pair alternation).
+  - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
 ## Docs
 
@@ -99,6 +98,14 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-01 | Ties of 3+: go back to head-to-head once only 2 pairs remain tied | FIFA/ITF practice; matches what players expect |
 | 2026-10-01 | Phase 0 interest list goes in the app on padelparbaj.hu (D1), not Google Forms | Avoids migrating signups and links later; the domain and email setup were nearly done anyway |
 | 2026-10-01 | Email: `hello@` via Google Workspace (padelparbaj.hu as a secondary domain); `noreply@` via Resend later | Reuses the existing Workspace; no extra mailbox cost |
+| 2026-10-02 | Phases are 3 weeks back to back, no catch-up week; new groups emailed on Monday morning | 3 weeks is enough for 3 matches; revisit if the first week is lost to late scheduling |
+| 2026-10-02 | Scoring 3/1/0 (win, played loss, walkover loss) | Showing up is rewarded; a walkover costs more than a lost match |
+| 2026-10-02 | Both active but no agreement: unplayed, 0 points each; the organizer may award a walkover if one side clearly blocked | Mechanical by default, with an escape for obvious cases |
+| 2026-10-02 | Late cancellation (<24 h) isn't a walkover; the canceller must re-propose and counts as inactive if the match isn't played by the deadline | Fits the end-of-phase deadline; illness isn't punished outright |
+| 2026-10-02 | Pair counts not divisible by 4: 3-pair groups (2 matches, one week off), no waiting list | Nobody is turned away; promotion and relegation still work |
+| 2026-10-02 | Home pair alternates, assigned by the fixture generator; Elo starts at 1000/1200/1400/1600 by level | Balanced proposing duty; 200 per level closes quickly if someone misjudged |
+| 2026-10-02 | Phone optional, only current opponents see it; email-only notifications in the MVP; partnerless players paired by hand; first season free | Less to build and less personal data for the first season |
+| 2026-10-02 | Season start: when 8 pairs sign up, target November 2026 | Start while interest is fresh; winter court capacity to check with the clubs |
 | 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed | Consent first; the outreach message stays a simple ask, the club features follow the yes |
 | 2026-10-02 | CI/CD on GitHub Actions: checks on every PR and push; on `main`, D1 migrations then `wrangler deploy` (environment `production`). Conventional Commits enforced on PR commits by commitlint | Whole pipeline in the repo; a failed migration stops the deploy; Workers Builds runs migrations and tests less naturally |
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |

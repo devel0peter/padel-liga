@@ -27,7 +27,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
   5. Set up Resend for `noreply@padelparbaj.hu` (EU region, sending records on its own subdomain) when signup confirmation emails are built.
-  6. First deploy: `npm run deploy` (Peter runs it; custom domain `padelparbaj.hu` is in `app/wrangler.jsonc`). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
+  6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys are manual (`npm run deploy`) until CI/CD is set up: [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. Partner notification email (spec section 17: email the partner once); needs Resend (step 5).
 - Backlog (ideas from 2026-10-02, not scheduled):
   - Link previews (Open Graph title, description, image) for Facebook and Messenger shares.

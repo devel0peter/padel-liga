@@ -103,7 +103,8 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-02 | Both active but no agreement: unplayed, 0 points each; the organizer may award a walkover if one side clearly blocked | Mechanical by default, with an escape for obvious cases |
 | 2026-10-02 | Late cancellation (<24 h) isn't a walkover; the canceller must re-propose and counts as inactive if the match isn't played by the deadline | Fits the end-of-phase deadline; illness isn't punished outright |
 | 2026-10-02 | Pair counts not divisible by 4: 3-pair groups (2 matches, one week off), no waiting list | Nobody is turned away; promotion and relegation still work |
-| 2026-10-02 | Home pair alternates, assigned by the fixture generator; Elo starts at 1000/1200/1400/1600 by level | Balanced proposing duty; 200 per level closes quickly if someone misjudged |
+| 2026-10-02 | Elo starts at 1000/1200/1400/1600 by level | 200 per level closes quickly if someone misjudged |
+| 2026-10-03 | No home pair: either pair may propose first (replaces the alternating home pair from 2026-10-02) | Faster scheduling; the walkover rule already counts a proposal from either side as activity |
 | 2026-10-02 | Phone optional, only current opponents see it; email-only notifications in the MVP; partnerless players paired by hand; first season free | Less to build and less personal data for the first season |
 | 2026-10-02 | Season start: when 8 pairs sign up, target November 2026 | Start while interest is fresh; winter court capacity to check with the clubs |
 | 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed | Consent first; the outreach message stays a simple ask, the club features follow the yes |

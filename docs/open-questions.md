@@ -18,7 +18,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 11. ~~Pair count not divisible by 4~~ ✅ 3-pair groups fill the gap (2 matches each, one week off); no waiting list.
 12. ~~Entry fee~~ ✅ The first season is free (already on the landing page).
 - ~~Elo starting values~~ ✅ kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
-- ~~Home pair~~ ✅ Alternating, assigned by the fixture generator.
+- ~~Home pair~~ ✅ No home pair: either side may propose first (changed 2026-10-03; was alternating home).
 
 ## Product and tech
 13. ~~Stack confirmation~~ ✅ TypeScript, React Router, shadcn/ui, D1 + Drizzle, Better Auth. See CLAUDE.md.

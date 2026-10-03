@@ -38,12 +38,12 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - [First round switch](https://github.com/devel0peter/padel-liga/milestone/3), Mon 30 Nov 2026: unplayed-match resolution, promotion and relegation, Elo, no-shows, withdrawal, round switch, profiles, substitutes, account deletion, interest-list deletion.
   - After the MVP: Facebook login (devel0peter/padel-liga#40).
 - Backlog (ideas from 2026-10-02, not scheduled):
-  - Signup counter on the landing page: "X pár jelentkezett, 8 kell az induláshoz".
-  - Clubs on the platform (one feature, built when the first owner agrees): clubs belong to a city and are added only with the owner's consent to the poster and the listing. Brings the club list on the landing page (booking links), a per-club poster with QR code (`?ref=<club>` stored with each signup) and a signup count per club in the admin.
+  - Signup counter on the landing page: "X pár jelentkezett, 12 kell az induláshoz".
   - Cloudflare Web Analytics (cookieless, no consent banner), switched on at go-live.
   - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
+- Clubs (2026-10-03): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup (source column and filter in the admin, CSV), and the consented clubs listed on the landing page with booking links.
 - Waiting on Peter:
   - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
@@ -121,6 +121,9 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-03 | Pair withdrawal mid-phase: all its matches are removed from the standings, the group continues | Usual tournament practice; no skewed table |
 | 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed | Consent first; the outreach message stays a simple ask, the club features follow the yes |
 | 2026-10-02 | CI/CD on GitHub Actions: checks on every PR and push; on `main`, D1 migrations then `wrangler deploy` (environment `production`). Conventional Commits enforced on PR commits by commitlint | Whole pipeline in the repo; a failed migration stops the deploy; Workers Builds runs migrations and tests less naturally |
+| 2026-10-03 | Launch threshold raised from 8 to 12 pairs | 8 pairs is only 2 groups, so the ladder barely moves; 12 gives 3 groups with a middle group that both promotes and relegates |
+| 2026-10-03 | One `clubs` table with a `listed` flag (owner consent) for the public listing; later also the venue list | One list per city; consent stays a visible switch |
+| 2026-10-03 | Signup source is any `?ref=` (lowercase slug), stored as typed; a club's slug is its poster's ref. No cookie: the ref only lasts while the landing page is open | Other sources (e.g. a tournament flyer) need no code; no cookie consent needed |
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |
 | 2026-10-02 | Broadcasts go only to the person who signed up, never to the partner they entered; signed one-click unsubscribe links, unsubscribes kept in `email_suppressions` | Spec section 17 (nothing else to the partner until they register); RFC 8058 for Gmail and Yahoo bulk-sender rules |

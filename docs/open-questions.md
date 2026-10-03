@@ -7,7 +7,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
 3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
 4. ~~**Contact details**~~ ✅ The interest form stays as it is (names, emails, level, comment). Phone number only at registration, optional (see #15).
-5. ~~**Season start**~~ ✅ When 8 pairs have signed up; target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
+5. ~~**Season start**~~ ✅ When 12 pairs have signed up (raised from 8 on 2026-10-03); target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
 
 ## Rules
 6. ~~Match format~~ ✅ 2 sets to 6 (tie-break at 6-6), super tie-break to 10 as the decider, golden point; one format per league; 90-minute booking recommended; unfinished matches continue in a new slot. See spec section 7.

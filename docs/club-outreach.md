@@ -3,10 +3,11 @@
 Messenger messages to the 3 Győr club owners (informal, "tegező"). Part of the organizer playbook (`go-to-market.md`). Replace the `[…]` parts before sending.
 
 Decided 2026-10-02:
-- Start date: depends on demand ("ha összegyűlik 8 pár"), target November 2026.
+- Start date: depends on demand ("ha összegyűlik 12 pár"), target November 2026. (Was 8 until 2026-10-03.)
 - Entry fee: the first season is free for players (they pay only the court). Fine to mention if asked.
 - The ask stays small: one poster with a QR code near reception. The player group post is a bonus.
 - A club goes on the platform only after the owner says yes to the poster and to being listed on the site. Then it gets its own poster QR code (`?ref=<club>`), so we can later tell them how many players their poster brought in.
+- Built 2026-10-03: add the club at `/admin/klubok` (tick "Megjelenhet a főoldalon" only after the yes), then print its poster (printer icon, A4). The signup count per club is on the same page.
 
 ## 1. Poster request
 
@@ -16,7 +17,7 @@ Decided 2026-10-02:
 >
 > A párok maguk foglalnak pályát a meccseikhez, bármelyik győri klubban. Így hétköznap is többen jönnek játszani, nem csak a versenyekre.
 >
-> Ha összegyűlik legalább 8 pár, november körül indulunk. Most gyűjtjük a jelentkezőket: https://padelparbaj.hu
+> Ha összegyűlik legalább 12 pár, november körül indulunk. Most gyűjtjük a jelentkezőket: https://padelparbaj.hu
 >
 > Kitehetnék nálatok egy plakátot QR-kóddal a recepció mellé? Ha belefér, a játékoscsoportotokban is megosztanám, de ez már csak extra.
 >
@@ -42,5 +43,5 @@ Questions worth asking over coffee:
 - **"Ez nem a konkurenciának visz játékost?"** It's a city league, not a club competition. Every club gets bookings, and no club is exclusive. The match venue is recorded, so each club sees its own numbers.
 - **"Mennyibe kerül a klubnak?"** Nothing. The ask is a poster.
 - **"Mi a különbség a Piramisbajnoksághoz képest?"** Pairs, fixed weekly rhythm, a local organizer, and scheduling on the site, with a walkover rule for pairs that don't respond.
-- **"Mikor indul?"** When 8 pairs have signed up; target November.
+- **"Mikor indul?"** When 12 pairs have signed up; target November.
 - **"Fizetnek a játékosok?"** The first season is free; players only pay for the court, at the club.

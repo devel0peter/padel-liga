@@ -20,7 +20,7 @@
      - A carrot for the most helpful club: host the season-end event or finals day, or get listed first for offering a league discount.
    - When: Peter talks to the club owners once the website is live.
 3. **Recruit in person** at weekend tournaments: a flyer with a QR code pointing to the landing page.
-4. **Launch threshold:** 8 pairs (2 groups); 12 pairs (3 groups) is ideal.
+4. **Launch threshold:** 12 pairs (3 groups), decided 2026-10-03; was 8. With 2 groups the ladder barely moves.
 
 ## Social media
 - Not allowed: an agent posting in Facebook groups. It would be flagged as spam and burn local trust.

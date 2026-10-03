@@ -32,6 +32,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             <NavLink to="/admin/levelek" className={navClass}>
               Körlevelek
             </NavLink>
+            <NavLink to="/admin/klubok" className={navClass}>
+              Klubok
+            </NavLink>
           </nav>
           <span className="text-muted-foreground">{loaderData.email}</span>
         </Wrap>

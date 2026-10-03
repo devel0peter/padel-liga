@@ -6,7 +6,7 @@
 // Later audiences (e.g. active league players) get their own function here.
 
 import { CITIES, OTHER_CITY } from "../cities";
-import { levelLabel, STATUSES, type Filters, type SignupRow } from "../signups-admin";
+import { levelLabel, NO_REF, STATUSES, type Filters, type SignupRow } from "../signups-admin";
 
 export type Recipient = { email: string; name: string };
 
@@ -33,6 +33,7 @@ export function audienceLabel(f: Filters): string {
     f.status ? (STATUSES as Record<string, string>)[f.status] : undefined,
     f.level ? levelLabel(f.level) : undefined,
     f.mode === "pair" ? "Pár" : f.mode === "solo" ? "Egyéni" : undefined,
+    f.ref === NO_REF ? "Forrás nélkül" : f.ref ? `Forrás: ${f.ref}` : undefined,
     f.q ? `„${f.q}”` : undefined,
   ].filter(Boolean);
   return parts.length ? `Jelentkezők: ${parts.join(" · ")}` : "Minden jelentkező";

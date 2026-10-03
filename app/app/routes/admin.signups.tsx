@@ -37,6 +37,8 @@ import { Textarea } from "~/components/ui/textarea";
 import { requireAdmin } from "~/lib/access.server";
 import { CITIES, OTHER_CITY } from "~/lib/cities";
 import { formatDateTime } from "~/lib/format";
+import { refLabel } from "~/lib/clubs";
+import { listClubs } from "~/lib/clubs.server";
 import { LEVELS } from "~/lib/interest";
 import {
   cityLabel,
@@ -44,6 +46,7 @@ import {
   filterSignups,
   isStatus,
   levelLabel,
+  NO_REF,
   parseFilters,
   STATUSES,
   type SignupRow,
@@ -55,9 +58,12 @@ const MAX_ADMIN_NOTE = 2000;
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const filters = parseFilters(new URL(request.url).searchParams);
-  const all = await listSignups();
-  const rows = filterSignups(all, filters);
-  return { rows, counts: countSignups(rows), total: all.length };
+  const [all, clubs] = await Promise.all([listSignups(), listClubs()]);
+  const rows = filterSignups(all, filters).map((r) => ({ ...r, source: refLabel(r.ref, clubs) }));
+  // Filter options: every club, plus any other ref that came in.
+  const refs = new Map<string, string>(clubs.map((c) => [c.slug, c.name]));
+  for (const r of all) if (r.ref && !refs.has(r.ref)) refs.set(r.ref, r.ref);
+  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs] };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -137,7 +143,7 @@ function Player({ name, email }: { name: string; email: string | null }) {
   );
 }
 
-function SignupTableRow({ row }: { row: SignupRow }) {
+function SignupTableRow({ row }: { row: SignupRow & { source: string } }) {
   const fetcher = useFetcher();
   const [note, setNote] = useState(row.adminNote ?? "");
   const saving = fetcher.state !== "idle";
@@ -164,6 +170,7 @@ function SignupTableRow({ row }: { row: SignupRow }) {
       </TableCell>
       <TableCell>{levelLabel(row.level)}</TableCell>
       <TableCell className="max-w-56 text-sm whitespace-normal">{row.note}</TableCell>
+      <TableCell className="text-sm">{row.source}</TableCell>
       <TableCell>
         <Select defaultValue={row.status} onValueChange={(status) => save({ status })}>
           <SelectTrigger aria-label="Állapot" className="w-36">
@@ -226,7 +233,7 @@ function SignupTableRow({ row }: { row: SignupRow }) {
 }
 
 export default function AdminSignups({ loaderData }: Route.ComponentProps) {
-  const { rows, counts, total } = loaderData;
+  const { rows, counts, total, refs } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
 
@@ -288,6 +295,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
             ["solo", "Egyéni"],
           ]}
         />
+        <FilterSelect name="ref" label="Forrás" options={[...refs, [NO_REF, "Forrás nélkül"]]} />
         {filtered && (
           <Button variant="ghost" asChild>
             <Link to="/admin">Szűrők törlése</Link>
@@ -309,6 +317,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
                 <TableHead>Játékosok</TableHead>
                 <TableHead>Szint</TableHead>
                 <TableHead>Megjegyzés</TableHead>
+                <TableHead>Forrás</TableHead>
                 <TableHead>Állapot</TableHead>
                 <TableHead>Admin jegyzet</TableHead>
                 <TableHead>

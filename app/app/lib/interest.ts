@@ -2,6 +2,7 @@
 // Pure (no I/O) so it runs on both server and client and can be unit tested.
 
 import { findCity, isCity, OTHER_CITY, type CitySlug } from "./cities";
+import { normalizeRef } from "./clubs";
 
 export const LEVELS = {
   kezdo: "Kezdő – most ismerkedünk a játékkal",
@@ -23,6 +24,8 @@ export type InterestSignup = {
   email2: string | null;
   level: Level;
   note: string | null;
+  // Signup source from the landing page link (`?ref=`), see clubs.ts.
+  ref: string | null;
 };
 
 export type InterestField =
@@ -120,6 +123,7 @@ export function parseInterest(form: FormData): InterestResult {
       email2: email2 || null,
       level: level as Level,
       note: note || null,
+      ref: normalizeRef(str(form, "ref")),
     },
   };
 }

@@ -10,6 +10,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { CITIES } from "~/lib/cities";
+import { normalizeRef, toPublicClub } from "~/lib/clubs";
+import { listListedClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
@@ -22,6 +25,13 @@ export function meta({}: Route.MetaArgs) {
       "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
     path: "/",
   });
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  // Only Győr has a league so far; with more cities this follows the picker.
+  const city = CITIES[0];
+  const clubs = (await listListedClubs(city.slug)).map(toPublicClub);
+  return { ref: normalizeRef(new URL(request.url).searchParams.get("ref")), city: city.name, clubs };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -87,7 +97,7 @@ const RULES = [
 
 const FAQ = [
   ["Mennyibe kerül?", "Az első szezonban a részvétel ingyenes, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor indul?", "Amint összegyűlik legalább 8 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
+  ["Mikor indul?", "Amint összegyűlik legalább 12 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
@@ -95,7 +105,8 @@ const FAQ = [
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 
-export default function Home() {
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { ref, city, clubs } = loaderData;
   return (
     <>
       <SiteHeader />
@@ -142,6 +153,35 @@ export default function Home() {
         </section>
 
 
+        {clubs.length > 0 && (
+          <section id="klubok" className="scroll-mt-4 py-16">
+            <Wrap>
+              <SectionHead
+                title={`Hol játszhattok? (${city})`}
+                lede="A pályát ti foglaljátok, bármelyik klubban, ahol nektek és az ellenfélnek jó."
+              />
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {clubs.map((club) => (
+                  <li key={club.slug} className="grid content-start gap-1 rounded-2xl border-2 p-5">
+                    <h3 className="font-display text-xl font-bold">{club.name}</h3>
+                    {club.address && <p className="text-muted-foreground">{club.address}</p>}
+                    {club.bookingUrl && (
+                      <a
+                        href={club.bookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 font-bold underline"
+                      >
+                        Pályafoglalás
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Wrap>
+          </section>
+        )}
+
         <section className="bg-muted py-16">
           <Wrap>
             <SectionHead
@@ -182,7 +222,7 @@ export default function Home() {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm />
+            <SignupForm signupRef={ref} />
           </Wrap>
         </section>
       </main>

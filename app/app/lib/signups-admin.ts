@@ -29,6 +29,7 @@ export type SignupRow = {
   email2: string | null;
   level: string;
   note: string | null;
+  ref: string | null;
   status: Status;
   adminNote: string | null;
   consentAt: Date;
@@ -41,13 +42,24 @@ export type Filters = {
   status: string; // Status or ""
   level: string; // Level or ""
   mode: string; // "pair" | "solo" | ""
+  ref: string; // signup source (club slug or other ref), NO_REF, or ""
   q: string;
 };
 
 export function parseFilters(params: URLSearchParams): Filters {
   const get = (k: string) => (params.get(k) ?? "").trim();
-  return { city: get("city"), status: get("status"), level: get("level"), mode: get("mode"), q: get("q") };
+  return {
+    city: get("city"),
+    status: get("status"),
+    level: get("level"),
+    mode: get("mode"),
+    ref: get("ref"),
+    q: get("q"),
+  };
 }
+
+// Ref filter value for signups that came without a `?ref=`.
+export const NO_REF = "none";
 
 // Case- and accent-insensitive, so "kovacs" finds "Kovács".
 function fold(s: string): string {
@@ -62,6 +74,7 @@ export function filterSignups(rows: SignupRow[], f: Filters): SignupRow[] {
       (!f.status || r.status === f.status) &&
       (!f.level || r.level === f.level) &&
       (!f.mode || r.mode === f.mode) &&
+      (!f.ref || (f.ref === NO_REF ? !r.ref : r.ref === f.ref)) &&
       (!q ||
         [r.name1, r.email1, r.name2, r.email2, r.cityOther, r.note, r.adminNote].some(
           (v) => v != null && fold(v).includes(q),
@@ -88,10 +101,11 @@ export function levelLabel(level: string): string {
 }
 
 // Semicolon-separated with a BOM: opens correctly in Hungarian Excel.
-export function toCsv(rows: SignupRow[]): string {
+// `source` maps a ref to its label (refLabel in clubs.ts).
+export function toCsv(rows: SignupRow[], source: (ref: string | null) => string = (r) => r ?? ""): string {
   const header = [
     "Azonosító", "Jelentkezett", "Város", "Mód", "Név 1", "E-mail 1", "Név 2", "E-mail 2",
-    "Szint", "Megjegyzés", "Állapot", "Admin jegyzet",
+    "Szint", "Megjegyzés", "Forrás", "Állapot", "Admin jegyzet",
   ];
   const cell = (v: string | number | null) => {
     const s = v == null ? "" : String(v);
@@ -109,6 +123,7 @@ export function toCsv(rows: SignupRow[]): string {
       r.email2,
       levelLabel(r.level),
       r.note,
+      source(r.ref),
       STATUSES[r.status],
       r.adminNote,
     ]

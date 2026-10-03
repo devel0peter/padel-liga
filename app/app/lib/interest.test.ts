@@ -35,8 +35,14 @@ describe("parseInterest", () => {
         email2: null,
         level: "kozephalado",
         note: null,
+        ref: null,
       },
     });
+  });
+
+  it("keeps a valid ref and drops a malformed one", () => {
+    expect(parseInterest(form({ ...pair, ref: "Gyor-Padel" }))).toMatchObject({ ok: true, data: { ref: "gyor-padel" } });
+    expect(parseInterest(form({ ...pair, ref: "<b>" }))).toMatchObject({ ok: true, data: { ref: null } });
   });
 
   it("drops partner fields for a solo signup", () => {

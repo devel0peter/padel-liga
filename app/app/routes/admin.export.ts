@@ -1,5 +1,7 @@
 import type { Route } from "./+types/admin.export";
 import { requireAdmin } from "~/lib/access.server";
+import { refLabel } from "~/lib/clubs";
+import { listClubs } from "~/lib/clubs.server";
 import { filterSignups, parseFilters, toCsv } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 
@@ -7,9 +9,10 @@ import { listSignups } from "~/lib/signups-admin.server";
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const filters = parseFilters(new URL(request.url).searchParams);
-  const rows = filterSignups(await listSignups(), filters);
+  const [signups, clubs] = await Promise.all([listSignups(), listClubs()]);
+  const rows = filterSignups(signups, filters);
   const date = new Date().toISOString().slice(0, 10);
-  return new Response(toCsv(rows), {
+  return new Response(toCsv(rows, (ref) => refLabel(ref, clubs)), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="jelentkezok-${date}.csv"`,

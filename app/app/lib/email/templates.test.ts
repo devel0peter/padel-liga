@@ -13,6 +13,7 @@ const pair: InterestSignup = {
   email2: "bela@example.com",
   level: "kezdo",
   note: null,
+  ref: null,
 };
 
 describe("textToHtml", () => {

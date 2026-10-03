@@ -59,7 +59,7 @@ function Field({
 
 const inputClass = "h-11 bg-background text-base";
 
-export function SignupForm() {
+export function SignupForm({ signupRef }: { signupRef?: string | null }) {
   const fetcher = useFetcher<SignupActionData>();
   const [mode, setMode] = useState<Mode>("pair");
   const [city, setCity] = useState<string>(CITIES[0].slug);
@@ -218,6 +218,8 @@ export function SignupForm() {
       >
         <Textarea id="note" name="note" maxLength={1000} className="min-h-20 bg-background text-base" {...invalid("note")} />
       </Field>
+
+      {signupRef && <input type="hidden" name="ref" value={signupRef} />}
 
       {/* Honeypot for bots; hidden from people and screen readers. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden">

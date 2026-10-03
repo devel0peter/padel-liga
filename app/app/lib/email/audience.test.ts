@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { audienceLabel, signupRecipients } from "./audience";
 
-const none = { city: "", status: "", level: "", mode: "", q: "" };
+const none = { city: "", status: "", level: "", mode: "", ref: "", q: "" };
 
 describe("signupRecipients", () => {
   it("takes only the signer, never the partner", () => {
@@ -44,5 +44,7 @@ describe("audienceLabel", () => {
       "Jelentkezők: Győr · Új · Kezdő · Egyéni",
     );
     expect(audienceLabel({ ...none, city: "other", q: "pécs" })).toBe("Jelentkezők: Más város · „pécs”");
+    expect(audienceLabel({ ...none, ref: "gyp" })).toBe("Jelentkezők: Forrás: gyp");
+    expect(audienceLabel({ ...none, ref: "none" })).toBe("Jelentkezők: Forrás nélkül");
   });
 });

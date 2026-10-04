@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
@@ -11,11 +12,12 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { CITIES } from "~/lib/cities";
-import { normalizeRef, toClubOption } from "~/lib/clubs";
+import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
+import { landingSource } from "~/lib/traffic";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 
 export function meta({}: Route.MetaArgs) {
@@ -30,7 +32,7 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
   const clubs = (await listClubs()).map(toClubOption);
-  return { ref: normalizeRef(new URL(request.url).searchParams.get("ref")), clubs };
+  return { ref: landingSource(new URL(request.url).searchParams), clubs };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -108,8 +110,21 @@ const FAQ = [
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 
+// One landing count per page load, not per client-side visit back to "/".
+let landingCounted = false;
+
+// Counts the landing per source for the admin funnel (app/lib/traffic.ts).
+function useLandingCount() {
+  useEffect(() => {
+    if (landingCounted) return;
+    landingCounted = true;
+    navigator.sendBeacon?.(`/api/landing${window.location.search}`);
+  }, []);
+}
+
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { ref, clubs } = loaderData;
+  useLandingCount();
   return (
     <>
       <SiteHeader />

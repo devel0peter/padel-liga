@@ -20,7 +20,10 @@
 		"ACCESS_TEAM_DOMAIN": "padelparbaj.cloudflareaccess.com",
 		"ACCESS_AUD": "98cc1f4493e4533dcf39fb86ce590ff324474125db12c72b98c642d075957793",
 		// Resend plan's daily quota (free: 100). Raise it after upgrading.
-		"EMAIL_DAILY_LIMIT": "100"
+		"EMAIL_DAILY_LIMIT": "100",
+		// Cloudflare Web Analytics site token (public, it ships in the page).
+		// Site "padelparbaj.hu", manual JS snippet. Empty: no beacon.
+		"CF_WEB_ANALYTICS_TOKEN": ""
 	},
 	// Set with `npx wrangler secret put <NAME>`; locally in .dev.vars.
 	// RESEND_API_KEY: sending-only key. EMAIL_SECRET: signs unsubscribe links.

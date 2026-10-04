@@ -129,6 +129,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |
 | 2026-10-02 | Broadcasts go only to the person who signed up, never to the partner they entered; signed one-click unsubscribe links, unsubscribes kept in `email_suppressions` | Spec section 17 (nothing else to the partner until they register); RFC 8058 for Gmail and Yahoo bulk-sender rules |
+| 2026-10-04 | Match format changed to short sets: 2 sets to 4 (win by 2, tie-break at 4-4), super tie-break to 10 at 1-1, golden point. 60-minute booking; walkovers 4-0 4-0, both inactive 0-4 0-4. Replaces the sets-to-6 format of 2026-10-02 | Győr clubs only take 60-minute bookings, and sets to 6 often don't fit. Short sets to 4 with a 4-4 tie-break are the standard short padel format (LTA tours), not tennis Fast4 (3-3). Typical match about 45–50 min; the rare overrun continues in a new slot |
 
 ## Roadmap
 

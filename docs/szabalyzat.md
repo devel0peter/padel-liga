@@ -39,21 +39,21 @@
 
 ## 4. A meccs
 - **Formátum:**
-  - 2 nyert szettig játszotok. Egy szett 6 nyert játékig tart, 6:6-nál rendes tie-break dönt 7 pontig (2 pont különbséggel).
+  - 2 nyert szettig játszotok. Egy szett 4 nyert játékig tart (2 játék különbséggel), 4:4-nél rendes tie-break dönt 7 pontig (2 pont különbséggel).
   - 1:1-es szettállásnál a 3. szett helyett szuper tie-break jön 10 pontig (2 pont különbséggel).
   - **Arany pont:** 40:40-nél nincs előny, egyetlen pont dönt. A fogadó pár választja ki, melyik játékosuk fogadja.
   - A szett- és játékkülönbségnél a szuper tie-break egy szettnek és 1:0-s játéknak számít.
 - Mindenki ugyanígy játszik, eltérő formátumban nem lehet megegyezni.
-- **Pályafoglalás:** 90 percet ajánlunk, egy órába gyakran nem fér bele a meccs.
+- **Pályafoglalás:** egy óra általában elég.
 - **Ha lejár a pályaidő:** jegyezzétek fel az állást, és egy új időpontban onnan folytassátok, a határidőig. Csak a végeredményt kell rögzíteni.
 - Az eredményt az egyik pár rögzíti, a másik megerősíti. Ha 48 órán belül nem érkezik megerősítés, az eredmény elfogadottnak számít.
 - Vitás esetben a szervező dönt.
 
 ## 5. Ha elmarad a meccs
 A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
-- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel.
+- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 4:0, 4:0 eredménnyel.
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az értékszámok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
-- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel.
+- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:4, 0:4 eredménnyel.
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
 
 Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.

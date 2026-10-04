@@ -69,7 +69,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
 
   if (form.get("intent") === "delete") {
     await deleteClub(id);
-    return redirect("/admin/klubok");
+    return redirect("/admin/clubs");
   }
 
   const result = parseClub(form);
@@ -78,7 +78,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     return { errors: { slug: "Ez az azonosító már egy másik klubé." } };
   if (id) await updateClub(id, result.data);
   else await createClub(result.data);
-  return redirect("/admin/klubok");
+  return redirect("/admin/clubs");
 }
 
 function Field({
@@ -151,7 +151,7 @@ function ClubForm({ club, errors }: { club?: Club; errors: Partial<Record<ClubFi
         </Button>
         {club && (
           <Button variant="ghost" asChild>
-            <Link to="/admin/klubok">Mégse</Link>
+            <Link to="/admin/clubs">Mégse</Link>
           </Button>
         )}
       </div>
@@ -207,7 +207,7 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
           </p>
         </div>
         <Button variant="outline" asChild>
-          <Link to="/admin/plakat" target="_blank">
+          <Link to="/admin/poster" target="_blank">
             <Printer /> Általános plakát
           </Link>
         </Button>
@@ -251,7 +251,7 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
                   <TableCell className="max-w-56 text-sm whitespace-normal">{club.adminNote}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Button variant="ghost" size="icon" aria-label="Plakát" asChild>
-                      <Link to={`/admin/plakat?ref=${club.slug}`} target="_blank">
+                      <Link to={`/admin/poster?ref=${club.slug}`} target="_blank">
                         <Printer />
                       </Link>
                     </Button>

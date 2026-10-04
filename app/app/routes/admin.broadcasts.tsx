@@ -34,7 +34,7 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
           </p>
         </div>
         <Button asChild>
-          <Link to="/admin/levelek/uj">Új körlevél</Link>
+          <Link to="/admin/broadcasts/new">Új körlevél</Link>
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">

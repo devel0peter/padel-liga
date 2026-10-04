@@ -8,6 +8,7 @@
 ## Language
 - Everything the user sees is **Hungarian**: UI, emails, error messages, validation messages, page titles.
 - Code, identifiers, commits and comments are in English.
+- URL paths and query parameters are English too (`/login`, `/admin/clubs`, `?returnTo=`); everything shown on the page is Hungarian.
 - Hungarian formats:
   - Dates: `2026. 10. 01.` and `okt. 1., csütörtök`.
   - Time: 24-hour.

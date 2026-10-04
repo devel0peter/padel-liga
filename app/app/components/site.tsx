@@ -42,8 +42,8 @@ export function SiteFooter() {
           Kapcsolat: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </span>
         <span className="flex gap-4">
-          <Link to="/szabalyzat">Szabályzat</Link>
-          <Link to="/adatkezeles">Adatkezelési tájékoztató</Link>
+          <Link to="/rules">Szabályzat</Link>
+          <Link to="/privacy">Adatkezelési tájékoztató</Link>
         </span>
       </Wrap>
     </footer>

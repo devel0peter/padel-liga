@@ -1,6 +1,6 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
-import type { Route } from "./+types/udvozlunk";
+import type { Route } from "./+types/welcome";
 import { AuthPage, Field, FieldError, inputClass, invalid } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -19,7 +19,7 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireAccount(request);
-  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("vissza"));
+  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("returnTo"));
   if (user.consentAt) throw redirect(returnTo);
   return { name: user.name, email: user.email, returnTo };
 }
@@ -30,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
   const result = validateProfile({ name: form.get("name"), consent: form.get("consent") });
   if (!result.ok) return { errors: result.errors };
   await saveProfile(user.id, result.value);
-  return redirect(safeReturnTo(String(form.get("vissza") ?? "")));
+  return redirect(safeReturnTo(String(form.get("returnTo") ?? "")));
 }
 
 export default function Welcome({ loaderData, actionData }: Route.ComponentProps) {
@@ -39,7 +39,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
   return (
     <AuthPage title="Üdv!" intro={<>Még két dolog, és kész. Belépve: {loaderData.email}</>}>
       <Form method="post" className="grid gap-5">
-        <input type="hidden" name="vissza" value={loaderData.returnTo} />
+        <input type="hidden" name="returnTo" value={loaderData.returnTo} />
         <Field name="name" label="Neved" error={errors.name}>
           <Input
             id="name"
@@ -57,7 +57,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
             <Checkbox id="consent" name="consent" className="mt-0.5 size-5" {...invalid("consent", errors.consent)} />
             <Label htmlFor="consent" className="block text-sm leading-relaxed font-normal text-muted-foreground">
               Elolvastam az{" "}
-              <Link to="/adatkezeles" target="_blank" className="underline">
+              <Link to="/privacy" target="_blank" className="underline">
                 adatkezelési tájékoztatót
               </Link>
               , és hozzájárulok, hogy az adataimat a liga szervezéséhez kezeljétek. Bármikor visszavonhatom.

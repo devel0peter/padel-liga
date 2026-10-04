@@ -7,7 +7,7 @@ const args = process.argv.slice(2);
 const remote = args.includes("--remote");
 const noteAt = args.indexOf("--note");
 const note = noteAt >= 0 ? args[noteAt + 1] : null;
-const email = args.find((a, i) => !a.startsWith("--") && i !== noteAt + 1)?.trim().toLowerCase();
+const email = args.find((a, i) => !a.startsWith("--") && (noteAt < 0 || i !== noteAt + 1))?.trim().toLowerCase();
 
 if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   console.error("Usage: npm run auth:invite -w app -- <email> [--remote] [--note <text>]");

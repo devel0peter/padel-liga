@@ -20,16 +20,16 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - `padelparbaj.hu` on Cloudflare (Free plan, zone active). Nameservers: `keira.ns.cloudflare.com`, `yahir.ns.cloudflare.com`.
   - D1 database `padel-liga` created (WEUR); id in `app/wrangler.jsonc`. Migrations `0000`–`0004` applied remotely (2026-10-02).
   - Zone: Always Use HTTPS on.
-  - Landing page moved into the app (`/`): signup form → `interest_signups` with server-side validation (unit tested) and a honeypot, privacy page at `/adatkezeles`, system dark mode, `hello@padelparbaj.hu` as contact.
+  - Landing page moved into the app (`/`): signup form → `interest_signups` with server-side validation (unit tested) and a honeypot, privacy page at `/privacy`, system dark mode, `hello@padelparbaj.hu` as contact.
   - Admin at `/admin` behind Cloudflare Access: signup list with filters, status, notes, CSV export, deletion.
-  - Email (code in `app/app/lib/email/`): signup confirmation, one-time partner notice, admin broadcasts at `/admin/levelek` ("Levél nekik" on the filtered signup list), unsubscribe at `/leiratkozas`. Outbox table + hourly cron, within `EMAIL_DAILY_LIMIT`.
+  - Email (code in `app/app/lib/email/`): signup confirmation, one-time partner notice, admin broadcasts at `/admin/broadcasts` ("Levél nekik" on the filtered signup list), unsubscribe at `/unsubscribe`. Outbox table + hourly cron, within `EMAIL_DAILY_LIMIT`.
   - Resend: account created, `padelparbaj.hu` verified in the EU region via Cloudflare auto-configure (`resend._domainkey` TXT, `send` and `rsend` CNAMEs). Google Workspace DNS complete, including DKIM. One DMARC record (`p=none`).
 - Next, in this order:
   1. ~~Nameservers and zone~~ ✅ zone active.
   2. ~~Google Workspace secondary domain~~ ✅ verification TXT, MX, SPF, DKIM, DMARC in Cloudflare DNS; `hello@` is an alias on Peter's user.
   3. ~~`www` → apex redirect~~ ✅ proxied `www` AAAA `100::` + Single Redirect rule (301, keeps path and query).
   4. Turn on Cloudflare DMARC Management; DMARC record `p=none` with its `rua`, tighten to `quarantine` once Google mail passes.
-  5. ~~Email go-live~~ ✅ 2026-10-02: secrets set, code deployed, hourly cron registered. Cron triggers need an account-level `workers.dev` subdomain (`mracspeter`); the Worker itself stays off it (`workers_dev: false`). Still to do: a test signup with your own address and a test broadcast from `/admin/levelek/uj`.
+  5. ~~Email go-live~~ ✅ 2026-10-02: secrets set, code deployed, hourly cron registered. Cron triggers need an account-level `workers.dev` subdomain (`mracspeter`); the Worker itself stays off it (`workers_dev: false`). Still to do: a test signup with your own address and a test broadcast from `/admin/broadcasts/new`.
   6. ~~First deploy~~ ✅ 2026-10-02, live on `https://padelparbaj.hu`. Deploys run from GitHub Actions on every push to `main` (migrations, then deploy; [devel0peter/padel-liga#1](https://github.com/devel0peter/padel-liga/issues/1)). (Access is set up: team `padelparbaj.cloudflareaccess.com`, app "Padelpárbaj admin" on `padelparbaj.hu/admin`, one-time PIN to `admin@padelparbaj.hu`.)
   7. ~~Partner notification email~~ ✅ built with step 5 (sent once per address).
 - MVP build (spec section 18): GitHub issues [#6–#40](https://github.com/devel0peter/padel-liga/issues), grouped by milestone:
@@ -42,8 +42,8 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
-- Clubs (2026-10-04, internal only): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup, and an optional "Hol játszol a legtöbbet?" field on the signup form. Both show as columns and filters in the signups admin and in the CSV, and as counts per club. The landing page hero lists the cities with a league.
-- Analytics (2026-10-04, devel0peter/padel-liga#45): Cloudflare Web Analytics beacon on public pages (site `padelparbaj.hu`, manual snippet, token in `app/wrangler.jsonc`), plus landing views per source vs signups at `/admin/forgalom`. Ad links: `https://padelparbaj.hu/?ref=<source>` (e.g. `fb-hirdetes`); a bare `utm_source` also works.
+- Clubs (2026-10-04, internal only): `/admin/clubs` to add clubs, a printable A4 poster per club with a QR code (`/admin/poster?ref=<club>`, plus a general one), `?ref=` stored with each signup, and an optional "Hol játszol a legtöbbet?" field on the signup form. Both show as columns and filters in the signups admin and in the CSV, and as counts per club. The landing page hero lists the cities with a league.
+- Analytics (2026-10-04, devel0peter/padel-liga#45): Cloudflare Web Analytics beacon on public pages (site `padelparbaj.hu`, manual snippet, token in `app/wrangler.jsonc`), plus landing views per source vs signups at `/admin/traffic`. Ad links: `https://padelparbaj.hu/?ref=<source>` (e.g. `fb-hirdetes`); a bare `utm_source` also works.
 - Waiting on Peter:
   - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
@@ -53,13 +53,13 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 |---|---|
 | `CLAUDE.md` | Instructions for the coding agent |
 | `docs/spec.md` | Functional spec for the MVP (source of truth) |
-| `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft). Rendered as-is on the site at `/szabalyzat` |
+| `docs/szabalyzat.md` | League rules, in Hungarian (user-facing draft). Rendered as-is on the site at `/rules` |
 | `docs/go-to-market.md` | Clubs, recruiting, social content, organizer model |
 | `docs/monetization.md` | Monetization ideas, running costs, things to keep in mind (ideas only, not scheduled) |
 | `docs/club-outreach.md` | Messenger drafts for the club owners (poster request, feedback ask) and answers to likely questions |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
 | `docs/admin-plan.md` | Plan for accounts, roles and the admin area (login, sidebar, delivery order) |
-| `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/adatkezeles`) |
+| `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/privacy`) |
 | `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |
 
 ## Decision log
@@ -138,6 +138,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-04 | Account creation is invite-only until registration opens on 2 Nov (`npm run auth:invite -w app`) | Lets organizers and testers in before the public opening |
 | 2026-10-04 | Lean notifications: one new-phase email per phase, "action needed" only to the pair who must act, a deadline reminder only for unscheduled matches, at most one digest per player per day (about 4–5 per player per phase). Stay on Resend free; when it becomes the bottleneck, a bigger Resend plan or Workers Paid + Cloudflare Email Service. No SMS | Keeps inboxes quiet and the email bill at zero for a pet project; SMS costs over 100× an email |
 | 2026-10-04 | Login brute force: a Cloudflare WAF rate-limiting rule on the login routes (the Free plan includes one), plus at most 5 codes per email per hour in our code | No extra infrastructure |
+| 2026-10-04 | URL paths and query parameters in English (`/login`, `/rules`, `/privacy`, `/admin/broadcasts`, `?returnTo=`); page content stays Hungarian. Old Hungarian public paths keep working: `/szabalyzat` and `/adatkezeles` redirect (301), `/leiratkozas` still serves the unsubscribe page | Routes are code, like identifiers; Hungarian slugs without accents read as typos. Unsubscribe links in sent emails are POSTed by mail clients, which don't follow redirects |
 | 2026-10-04 | Pairs joining after the first phase (late entries, partner changes): placed by Elo, minus 100 per player with no rated match; never into the top group; free spots (3-pair groups, withdrawals) at or below their level first; otherwise each group from theirs down passes its lowest-Elo pair one group down. Organizer reviews in the round switch draft. Spec section 10 | Bottom placement is unfair to beginners (a strong pair crushes them for a phase); plain Elo placement trusts an unproven self-assessment and pushes earlier pairs down without losing a match |
 
 ## Roadmap

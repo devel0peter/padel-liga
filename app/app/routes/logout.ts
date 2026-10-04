@@ -1,6 +1,6 @@
 import { redirect } from "react-router";
 
-import type { Route } from "./+types/kilepes";
+import type { Route } from "./+types/logout";
 import { destroyAllSessions, destroySession, getUser } from "~/lib/auth/session.server";
 
 // POST only, so a link or a prefetch can't log anyone out.
@@ -12,5 +12,5 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export function loader() {
-  return redirect("/fiokom");
+  return redirect("/account");
 }

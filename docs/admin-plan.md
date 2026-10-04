@@ -86,7 +86,7 @@ One pure, unit-tested policy module (`app/lib/permissions.ts`), plus server guar
 ```mermaid
 flowchart LR
   R[request /admin/...] --> M[admin layout middleware]
-  M -->|no session| L[redirect /belepes?vissza=...]
+  M -->|no session| L[redirect /login?returnTo=...]
   M -->|session| P{permissions.ts}
   P -->|allowed| C[child loader / action]
   P -->|denied| F[403 page, Hungarian]
@@ -101,18 +101,18 @@ flowchart LR
 
 | Path | Who | Page |
 |---|---|---|
-| `/belepes` | everyone | "Belépés Google-lel" or enter your email and get a code. First login asks for name and privacy consent |
+| `/login` | everyone | "Belépés Google-lel" or enter your email and get a code. First login asks for name and privacy consent |
 | `/auth/google`, `/auth/google/callback` | everyone | OAuth redirect and callback |
 | `/admin` | Szervező, Főadmin | overview: redirects to your league, or the Főadmin home |
-| `/admin/liga/:league` | Szervező | league overview (later: seasons, pairs, groups, disputes) |
-| `/admin/liga/:league/klubok` | Szervező | the city's clubs (moved from `/admin/klubok`) |
-| `/admin/jelentkezok` | Főadmin | interest list (today's `/admin`) |
-| `/admin/levelek`, `/admin/levelek/uj` | Főadmin | broadcasts (unchanged) |
-| `/admin/forgalom` | Főadmin | traffic (unchanged) |
-| `/admin/ligak` | Főadmin | create a league, appoint and remove Szervezők |
-| `/admin/felhasznalok` | Főadmin | user list, search, roles shown read-only |
+| `/admin/leagues/:league` | Szervező | league overview (later: seasons, pairs, groups, disputes) |
+| `/admin/leagues/:league/clubs` | Szervező | the city's clubs (moved from `/admin/clubs`) |
+| `/admin/signups` | Főadmin | interest list (today's `/admin`) |
+| `/admin/broadcasts`, `/admin/broadcasts/new` | Főadmin | broadcasts (unchanged) |
+| `/admin/traffic` | Főadmin | traffic (unchanged) |
+| `/admin/leagues` | Főadmin | create a league, appoint and remove Szervezők |
+| `/admin/users` | Főadmin | user list, search, roles shown read-only |
 
-Old paths (`/admin/klubok`) redirect. `/admin/plakat` and `/admin/export.csv` stay where they are, behind the same guard.
+Old paths (`/admin/clubs`) redirect. `/admin/poster` and `/admin/export.csv` stay where they are, behind the same guard.
 
 Sidebar groups, filtered by role. A group you can't access isn't rendered at all:
 
@@ -136,14 +136,14 @@ Read as: an internal admin tool for 1–5 organizers, mostly used on a phone lin
 
 ```mermaid
 flowchart TD
-  A["1 · Accounts<br/>email code + Google login,<br/>sessions, /belepes (#14, #15)"]
+  A["1 · Accounts<br/>email code + Google login,<br/>sessions, /login (#14, #15)"]
   B["2 · Roles + shell<br/>schema, permissions.ts, middleware,<br/>sidebar, pages moved; Access still in front (#17)"]
-  C["3 · Leagues + users<br/>/admin/ligak, /admin/felhasznalok,<br/>audit log (#18)"]
+  C["3 · Leagues + users<br/>/admin/leagues, /admin/users,<br/>audit log (#18)"]
   D["4 · Retire Access<br/>remove JWT code + vars;<br/>Peter deletes the Access app"]
   A --> B --> C --> D
 ```
 
-1. **Accounts.** Email code (template in `templates.ts`, sent at once, ahead of the daily-limit queue) and Google login, sessions, `/belepes` and first-login profile (name, privacy consent), privacy page updated for accounts (Google as a login option). Sign-up is **invite-only until 2 Nov**: an unknown email or Google account gets in only with an invite token. The same invite later serves the interest-list invites (#20). Peter: create the OAuth client in Google Cloud Console (consent screen with the privacy page URL), and add the Cloudflare rate-limiting rule.
+1. **Accounts.** Email code (template in `templates.ts`, sent at once, ahead of the daily-limit queue) and Google login, sessions, `/login` and first-login profile (name, privacy consent), privacy page updated for accounts (Google as a login option). Sign-up is **invite-only until 2 Nov**: an unknown email or Google account gets in only with an invite token. The same invite later serves the interest-list invites (#20). Peter: create the OAuth client in Google Cloud Console (consent screen with the privacy page URL), and add the Cloudflare rate-limiting rule.
 2. **Roles and shell.** Schema from section 2, `permissions.ts` with the matrix tests, middleware guard, the 403 page, the sidebar layout, existing pages moved and redirected. CLI: `npm run admin:superadmin -w app -- <email> [--remote]` sets the flag and writes the audit row. During this step Cloudflare Access stays in front of `/admin`, so the admin is protected by both.
 3. **Leagues and users.** Create the Győr league and appoint Szervezők by the email of an existing account (an unknown email gets an invite). The user list shows no phone numbers.
 4. **Retire Access.** After you've logged in on prod as Főadmin: remove `access.server.ts` and the `ACCESS_*` vars, then you delete the Access app in the dashboard.
@@ -154,7 +154,7 @@ Every PR is flagged for human review (auth and personal data).
 
 1. **No passwords.** Google for most people, a one-time email code for the rest. No password hashing to maintain or be responsible for, and it fits the Workers Free plan's 10 ms CPU limit. Better Auth and Workers Paid were considered and dropped.
 2. **Two accounts for Peter.** His work Google account (Psionic Flare Workspace) is the only Főadmin and logs in with Google. His personal account is a normal player and the Szervező of Győr, used day to day. The address is passed to the CLI command, not written in the repo. `admin@padelparbaj.hu` (a Google Group) stays only as the Cloudflare Access login until Access is retired.
-3. **Rate limiting:** a Cloudflare WAF rate-limiting rule on `POST /belepes` and `/auth/*`, by IP (the Free plan includes one rule), set by Peter in the dashboard. Plus at most 5 code requests per email per hour in our own code.
+3. **Rate limiting:** a Cloudflare WAF rate-limiting rule on `POST /login` and `/auth/*`, by IP (the Free plan includes one rule), set by Peter in the dashboard. Plus at most 5 code requests per email per hour in our own code.
 
 ## 8. Email volume (agreed 2026-10-04)
 

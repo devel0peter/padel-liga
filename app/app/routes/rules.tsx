@@ -12,7 +12,7 @@ export function meta({}: Route.MetaArgs) {
     title: "Szabályzat – Padelpárbaj",
     description:
       "A Padelpárbaj liga szabályai: csoportok, egyeztetés, meccsformátum, elmaradt meccsek, feljutás és kiesés.",
-    path: "/szabalyzat",
+    path: "/rules",
   });
 }
 

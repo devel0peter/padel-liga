@@ -25,8 +25,8 @@ describe("textToHtml", () => {
   });
 
   it("links URLs without the trailing punctuation", () => {
-    expect(textToHtml("Nézd: https://padelparbaj.hu/szabalyzat.")).toContain(
-      '<a href="https://padelparbaj.hu/szabalyzat" style="color:#1e5ba8">https://padelparbaj.hu/szabalyzat</a>.',
+    expect(textToHtml("Nézd: https://padelparbaj.hu/rules.")).toContain(
+      '<a href="https://padelparbaj.hu/rules" style="color:#1e5ba8">https://padelparbaj.hu/rules</a>.',
     );
   });
 
@@ -82,12 +82,12 @@ describe("broadcastEmail", () => {
     const e = broadcastEmail(
       { subject: "Indul, {nev}!", body: "Szia {nev}!\n\nHétfőn kezdünk." },
       { name: "Anna" },
-      "https://padelparbaj.hu/leiratkozas?t=abc",
+      "https://padelparbaj.hu/unsubscribe?t=abc",
     );
     expect(e.subject).toBe("Indul, Anna!");
     expect(e.text).toContain("Szia Anna!");
-    expect(e.text).toContain("Leiratkozás: https://padelparbaj.hu/leiratkozas?t=abc");
-    expect(e.html).toContain('href="https://padelparbaj.hu/leiratkozas?t=abc"');
+    expect(e.text).toContain("Leiratkozás: https://padelparbaj.hu/unsubscribe?t=abc");
+    expect(e.html).toContain('href="https://padelparbaj.hu/unsubscribe?t=abc"');
   });
 
   it("escapes HTML the admin types", () => {

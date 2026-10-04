@@ -1,4 +1,4 @@
-// Signed unsubscribe links: /leiratkozas?t=<base64url(email)>.<base64url(hmac)>.
+// Signed unsubscribe links: /unsubscribe?t=<base64url(email)>.<base64url(hmac)>.
 // No database lookup is needed to check a link, and links can't be forged
 // for someone else's address. Pure (WebCrypto only).
 
@@ -42,7 +42,7 @@ export async function verifyUnsubscribeToken(token: string, secret: string): Pro
 }
 
 export function unsubscribeUrl(siteUrl: string, token: string): string {
-  return `${siteUrl}/leiratkozas?t=${token}`;
+  return `${siteUrl}/unsubscribe?t=${token}`;
 }
 
 // RFC 8058 one-click unsubscribe, so mail clients can show their own button.

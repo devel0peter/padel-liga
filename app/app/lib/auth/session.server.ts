@@ -58,20 +58,20 @@ export function getUser(request: Request): Promise<User | null> {
 
 function loginRedirect(request: Request, to: string): never {
   const url = new URL(request.url);
-  throw redirect(`${to}?vissza=${encodeURIComponent(url.pathname + url.search)}`);
+  throw redirect(`${to}?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
 }
 
 // Logged in, first-login profile not necessarily done (the profile page itself).
 export async function requireAccount(request: Request): Promise<User> {
   const user = await getUser(request);
-  if (!user) loginRedirect(request, "/belepes");
+  if (!user) loginRedirect(request, "/login");
   return user;
 }
 
 // Logged in with name and privacy consent: every other account page.
 export async function requireUser(request: Request): Promise<User> {
   const user = await requireAccount(request);
-  if (!user.consentAt) loginRedirect(request, "/udvozlunk");
+  if (!user.consentAt) loginRedirect(request, "/welcome");
   return user;
 }
 

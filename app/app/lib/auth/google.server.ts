@@ -29,18 +29,18 @@ function client(request: Request): Google {
   return new Google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, callback);
 }
 
-// Error codes for /belepes?hiba=… (messages in app/routes/belepes.tsx).
-export type GoogleError = "google" | "zarva" | "nem-ellenorzott";
+// Error codes for /login?error=… (messages in app/routes/login.tsx).
+export type GoogleError = "google" | "closed" | "unverified";
 
 function fail(error: GoogleError): never {
-  throw redirect(`/belepes?hiba=${error}`, {
+  throw redirect(`/login?error=${error}`, {
     headers: { "Set-Cookie": serializeCookie(FLOW_COOKIE, "", { maxAgeSeconds: 0, secure: SECURE }) },
   });
 }
 
 export function startGoogleLogin(request: Request): Response {
   if (!googleConfigured()) fail("google");
-  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("vissza"));
+  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("returnTo"));
   const state = generateState();
   const verifier = generateCodeVerifier();
   const url = client(request).createAuthorizationURL(state, verifier, ["openid", "email", "profile"]);
@@ -88,7 +88,7 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
   let userId: string;
   switch (decision.kind) {
     case "refused":
-      fail(decision.reason === "closed" ? "zarva" : "nem-ellenorzott");
+      fail(decision.reason === "closed" ? "closed" : "unverified");
     case "existing":
       userId = decision.userId;
       break;

@@ -1,4 +1,4 @@
-// Landing page traffic per source, for the admin funnel (/admin/forgalom).
+// Landing page traffic per source, for the admin funnel (/admin/traffic).
 // Pure (no I/O); the D1 access lives in traffic.server.ts.
 //
 // A landing is counted per Budapest day and source, nothing else: no IP, no

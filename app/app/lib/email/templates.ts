@@ -47,7 +47,7 @@ ${bodyHtml}
 </html>`;
 }
 
-const privacyLink = `${SITE_URL}/adatkezeles`;
+const privacyLink = `${SITE_URL}/privacy`;
 
 function footer(reason: string, unsubscribeUrl?: string): { html: string; text: string } {
   const html = [

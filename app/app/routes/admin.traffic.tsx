@@ -75,7 +75,7 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
         </div>
         <Button type="submit">Mutasd</Button>
         <Button variant="ghost" asChild>
-          <Link to="/admin/forgalom">Utolsó 30 nap</Link>
+          <Link to="/admin/traffic">Utolsó 30 nap</Link>
         </Button>
       </Form>
 

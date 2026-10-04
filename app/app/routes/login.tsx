@@ -1,6 +1,6 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
-import type { Route } from "./+types/belepes";
+import type { Route } from "./+types/login";
 import { AuthPage, Field, GoogleMark, inputClass, invalid } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -16,19 +16,19 @@ export function meta({}: Route.MetaArgs) {
 
 const GOOGLE_ERRORS: Record<GoogleError, string> = {
   google: "A Google-belépés nem sikerült. Próbáld újra, vagy kérj kódot e-mailben.",
-  zarva: REGISTRATION_CLOSED_MESSAGE,
-  "nem-ellenorzott": "Ennek a Google-fióknak nincs megerősített e-mail-címe. Kérj kódot e-mailben.",
+  closed: REGISTRATION_CLOSED_MESSAGE,
+  "unverified": "Ennek a Google-fióknak nincs megerősített e-mail-címe. Kérj kódot e-mailben.",
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const returnTo = safeReturnTo(url.searchParams.get("vissza"));
+  const returnTo = safeReturnTo(url.searchParams.get("returnTo"));
   if (await getUser(request)) throw redirect(returnTo);
-  const hiba = url.searchParams.get("hiba") as GoogleError | null;
+  const code = url.searchParams.get("error") as GoogleError | null;
   return {
     google: googleConfigured(),
     returnTo,
-    error: hiba && hiba in GOOGLE_ERRORS ? GOOGLE_ERRORS[hiba] : null,
+    error: code && code in GOOGLE_ERRORS ? GOOGLE_ERRORS[code] : null,
   };
 }
 
@@ -37,7 +37,7 @@ type ActionData = { step: "email"; error: string; email: string } | { step: "cod
 export async function action({ request }: Route.ActionArgs): Promise<ActionData | Response> {
   const form = await request.formData();
   const email = String(form.get("email") ?? "");
-  const returnTo = safeReturnTo(String(form.get("vissza") ?? ""));
+  const returnTo = safeReturnTo(String(form.get("returnTo") ?? ""));
 
   if (form.get("intent") === "verify") {
     const result = await verifyLoginCode(email, String(form.get("code") ?? ""));
@@ -71,7 +71,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
       >
         <Form method="post" className="grid gap-4">
           <input type="hidden" name="email" value={actionData.email} />
-          <input type="hidden" name="vissza" value={returnTo} />
+          <input type="hidden" name="returnTo" value={returnTo} />
           <Field name="code" label="Belépőkód" error={actionData.error}>
             <Input
               id="code"
@@ -98,7 +98,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
         </Form>
         <p className="text-sm text-muted-foreground">
           Nem jött meg? Nézd meg a spam mappát is, vagy{" "}
-          <Link to={`/belepes?vissza=${encodeURIComponent(returnTo)}`} className="underline">
+          <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
             adj meg másik címet
           </Link>
           .
@@ -118,7 +118,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
       {google && (
         <>
           <Button asChild variant="outline" className="h-11 gap-3 text-base">
-            <a href={`/auth/google?vissza=${encodeURIComponent(returnTo)}`}>
+            <a href={`/auth/google?returnTo=${encodeURIComponent(returnTo)}`}>
               <GoogleMark />
               Belépés Google-lel
             </a>
@@ -131,7 +131,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
         </>
       )}
       <Form method="post" className="grid gap-4">
-        <input type="hidden" name="vissza" value={returnTo} />
+        <input type="hidden" name="returnTo" value={returnTo} />
         <Field name="email" label="E-mail-cím" error={emailError}>
           <Input
             id="email"

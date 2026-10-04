@@ -9,7 +9,7 @@ export function meta({}: Route.MetaArgs) {
   return pageMeta({
     title: "Adatkezelési tájékoztató – Padelpárbaj",
     description: "Milyen adatokat kezelünk, miért, és mik a jogaid.",
-    path: "/adatkezeles",
+    path: "/privacy",
   });
 }
 

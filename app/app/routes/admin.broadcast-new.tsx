@@ -67,7 +67,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   if (recipients.length === 0) return { error: "Nincs címzett." };
   await createBroadcast({ subject, body, audience: label, recipients, createdBy: admin.email });
   await deliver();
-  return redirect("/admin/levelek");
+  return redirect("/admin/broadcasts");
 }
 
 export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) {
@@ -81,13 +81,13 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
 
   const preview = broadcastEmail({ subject, body }, { name: recipients[0]?.name ?? "Teszt Elek" }, "#");
   const submit = (intent: string) =>
-    fetcher.submit({ intent, subject, body }, { method: "post", action: `/admin/levelek/uj?${params}` });
+    fetcher.submit({ intent, subject, body }, { method: "post", action: `/admin/broadcasts/new?${params}` });
   const perDay = limit - TRANSACTIONAL_RESERVE;
 
   return (
     <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
       <div>
-        <Link to="/admin/levelek" className="text-sm text-muted-foreground underline">
+        <Link to="/admin/broadcasts" className="text-sm text-muted-foreground underline">
           ← Körlevelek
         </Link>
         <h1 className="font-display text-2xl font-extrabold">Új körlevél</h1>

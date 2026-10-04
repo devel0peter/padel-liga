@@ -1,6 +1,6 @@
 import { Form } from "react-router";
 
-import type { Route } from "./+types/fiokom";
+import type { Route } from "./+types/account";
 import { AuthPage } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { hasGoogleLogin } from "~/lib/auth/accounts.server";
@@ -36,7 +36,7 @@ export default function Account({ loaderData }: Route.ComponentProps) {
           <dd>{loaderData.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</dd>
         </div>
       </dl>
-      <Form method="post" action="/kilepes" className="flex flex-wrap gap-3">
+      <Form method="post" action="/logout" className="flex flex-wrap gap-3">
         <Button type="submit" variant="outline" className="h-11 px-5">
           Kilépés
         </Button>

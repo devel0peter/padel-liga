@@ -255,7 +255,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <Link to={`/admin/levelek/uj?${params.toString()}`}>
+            <Link to={`/admin/broadcasts/new?${params.toString()}`}>
               <Mail /> Levél nekik
             </Link>
           </Button>

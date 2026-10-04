@@ -29,13 +29,13 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             <NavLink to="/admin" end className={navClass}>
               Jelentkezők
             </NavLink>
-            <NavLink to="/admin/levelek" className={navClass}>
+            <NavLink to="/admin/broadcasts" className={navClass}>
               Körlevelek
             </NavLink>
-            <NavLink to="/admin/klubok" className={navClass}>
+            <NavLink to="/admin/clubs" className={navClass}>
               Klubok
             </NavLink>
-            <NavLink to="/admin/forgalom" className={navClass}>
+            <NavLink to="/admin/traffic" className={navClass}>
               Forgalom
             </NavLink>
           </nav>

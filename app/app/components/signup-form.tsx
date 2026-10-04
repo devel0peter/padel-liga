@@ -263,7 +263,7 @@ export function SignupForm({
             Hozzájárulok, hogy a megadott adatokat a liga szervezése céljából
             kezeljétek, és e-mailben értesítsetek az indulásról. A hozzájárulás
             bármikor visszavonható. Részletek az{" "}
-            <Link to="/adatkezeles" target="_blank" className="underline">
+            <Link to="/privacy" target="_blank" className="underline">
               adatkezelési tájékoztatóban
             </Link>
             .

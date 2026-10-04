@@ -7,7 +7,7 @@ Decided 2026-10-02:
 - Entry fee: none, players pay only the court. No plans to charge players (2026-10-04). Fine to mention if asked.
 - The ask stays small: one poster with a QR code near reception. The player group post is a bonus.
 - Clubs are not listed on the site (changed 2026-10-04). The club list is internal: each club gets its own poster QR code (`?ref=<club>`), so we can tell them how many players their poster brought in, and the signup form asks (optionally) where players play most.
-- In the admin: add the club at `/admin/klubok`, then print its poster (printer icon, A4). Signups per club (by poster and by "where they play") are on the same page.
+- In the admin: add the club at `/admin/clubs`, then print its poster (printer icon, A4). Signups per club (by poster and by "where they play") are on the same page.
 
 ## 1. Poster request
 

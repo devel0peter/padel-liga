@@ -216,7 +216,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 </div>
               ))}
             </dl>
-            <Link to="/szabalyzat" className="mt-6 inline-block font-bold underline">
+            <Link to="/rules" className="mt-6 inline-block font-bold underline">
               A teljes szabályzat
             </Link>
           </Wrap>

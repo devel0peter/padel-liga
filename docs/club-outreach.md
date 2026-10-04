@@ -6,8 +6,8 @@ Decided 2026-10-02:
 - Start date: depends on demand ("ha összegyűlik 12 pár"), target November 2026. (Was 8 until 2026-10-03.)
 - Entry fee: the first season is free for players (they pay only the court). Fine to mention if asked.
 - The ask stays small: one poster with a QR code near reception. The player group post is a bonus.
-- A club goes on the platform only after the owner says yes to the poster and to being listed on the site. Then it gets its own poster QR code (`?ref=<club>`), so we can later tell them how many players their poster brought in.
-- Built 2026-10-03: add the club at `/admin/klubok` (tick "Megjelenhet a főoldalon" only after the yes), then print its poster (printer icon, A4). The signup count per club is on the same page.
+- Clubs are not listed on the site (changed 2026-10-04). The club list is internal: each club gets its own poster QR code (`?ref=<club>`), so we can tell them how many players their poster brought in, and the signup form asks (optionally) where players play most.
+- In the admin: add the club at `/admin/klubok`, then print its poster (printer icon, A4). Signups per club (by poster and by "where they play") are on the same page.
 
 ## 1. Poster request
 
@@ -21,7 +21,7 @@ Decided 2026-10-02:
 >
 > Kitehetnék nálatok egy plakátot QR-kóddal a recepció mellé? Ha belefér, a játékoscsoportotokban is megosztanám, de ez már csak extra.
 >
-> Ha benne vagy, a klubot az oldalon is feltüntetném a foglalási linketekkel, és a szezon végén megmutatom, hány ligameccset játszottak nálatok. Köszi!
+> Cserébe a szezon végén megmutatom, hányan jelentkeztek a plakátotokról, és hány ligameccset játszottak nálatok. Köszi!
 >
 > Peter
 

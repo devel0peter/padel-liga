@@ -43,7 +43,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
-- Clubs (2026-10-03): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup (source column and filter in the admin, CSV), and the consented clubs listed on the landing page with booking links.
+- Clubs (2026-10-04, internal only): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup, and an optional "Hol játszol a legtöbbet?" field on the signup form. Both show as columns and filters in the signups admin and in the CSV, and as counts per club. The landing page hero lists the cities with a league.
 - Waiting on Peter:
   - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
@@ -117,12 +117,13 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-03 | Login for the MVP: email + password and Google; Facebook after the MVP | Meta verification and app review could miss November |
 | 2026-10-03 | Organizer and platform admin are roles in the app; `/admin` moves in and Cloudflare Access retires | One login; ready for organizers in other cities |
 | 2026-10-03 | First-phase groups: auto by Elo, organizer adjusts; round switch: system drafts, organizer publishes Monday morning | A human check while the rules are new |
-| 2026-10-03 | Venues: an internal list of the city's clubs for recording matches, separate from the consent-based public club listing | Players can play at any club; per-club stats stay complete |
+| 2026-10-03 | Venues: an internal list of the city's clubs for recording matches (the public listing was dropped on 2026-10-04) | Players can play at any club; per-club stats stay complete |
 | 2026-10-03 | Pair withdrawal mid-phase: all its matches are removed from the standings, the group continues | Usual tournament practice; no skewed table |
-| 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed | Consent first; the outreach message stays a simple ask, the club features follow the yes |
+| 2026-10-02 | A club is added to the platform (its city's club list, its own poster QR code) only after the owner agrees to the poster and to being listed (listing dropped 2026-10-04) | Consent first; the outreach message stays a simple ask, the club features follow the yes |
 | 2026-10-02 | CI/CD on GitHub Actions: checks on every PR and push; on `main`, D1 migrations then `wrangler deploy` (environment `production`). Conventional Commits enforced on PR commits by commitlint | Whole pipeline in the repo; a failed migration stops the deploy; Workers Builds runs migrations and tests less naturally |
 | 2026-10-03 | Launch threshold raised from 8 to 12 pairs | 8 pairs is only 2 groups, so the ladder barely moves; 12 gives 3 groups with a middle group that both promotes and relegates |
-| 2026-10-03 | One `clubs` table with a `listed` flag (owner consent) for the public listing; later also the venue list | One list per city; consent stays a visible switch |
+| 2026-10-04 | Clubs are internal only: no public club listing, no booking links. The club list feeds the poster QR codes and an optional "where do you play most" signup field; later also the venue list. Replaces the consent-based listing of 2026-10-02 | Players book wherever they already play; the clubs are only useful as data (which poster works, where players play) |
+| 2026-10-04 | Landing page shows which cities have a league (a line in the hero), not a section per city | Only Győr for now; "Más város" in the form already collects demand |
 | 2026-10-03 | Signup source is any `?ref=` (lowercase slug), stored as typed; a club's slug is its poster's ref. No cookie: the ref only lasts while the landing page is open | Other sources (e.g. a tournament flyer) need no code; no cookie consent needed |
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |

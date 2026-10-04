@@ -1,0 +1,116 @@
+import { env } from "cloudflare:workers";
+import { decodeIdToken, generateCodeVerifier, generateState, Google } from "arctic";
+import { and, eq } from "drizzle-orm";
+import { redirect } from "react-router";
+
+import { db } from "~/db/client.server";
+import { oauthAccounts } from "~/db/schema";
+
+import { createUser, findUserIdByEmail, isInvited } from "./accounts.server";
+import { normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
+import { createSession } from "./session.server";
+import { timingSafeEqual } from "./tokens";
+
+// Google login: OAuth authorization code flow with PKCE and state (arctic).
+// The ID token comes straight from Google's token endpoint over TLS, so its
+// claims can be trusted without checking the signature (OIDC Core 3.1.3.7).
+
+const FLOW_COOKIE = import.meta.env.DEV ? "pp_google" : "__Host-pp_google";
+const SECURE = !import.meta.env.DEV;
+const FLOW_MAX_AGE = 10 * 60;
+
+export function googleConfigured(): boolean {
+  const id: string = env.GOOGLE_CLIENT_ID;
+  return !!id && !!env.GOOGLE_CLIENT_SECRET;
+}
+
+function client(request: Request): Google {
+  const callback = new URL("/auth/google/callback", request.url).toString();
+  return new Google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, callback);
+}
+
+// Error codes for /belepes?hiba=… (messages in app/routes/belepes.tsx).
+export type GoogleError = "google" | "zarva" | "nem-ellenorzott";
+
+function fail(error: GoogleError): never {
+  throw redirect(`/belepes?hiba=${error}`, {
+    headers: { "Set-Cookie": serializeCookie(FLOW_COOKIE, "", { maxAgeSeconds: 0, secure: SECURE }) },
+  });
+}
+
+export function startGoogleLogin(request: Request): Response {
+  if (!googleConfigured()) fail("google");
+  const returnTo = safeReturnTo(new URL(request.url).searchParams.get("vissza"));
+  const state = generateState();
+  const verifier = generateCodeVerifier();
+  const url = client(request).createAuthorizationURL(state, verifier, ["openid", "email", "profile"]);
+  // Lets someone with several Google accounts pick the right one.
+  url.searchParams.set("prompt", "select_account");
+  const flow = [state, verifier, encodeURIComponent(returnTo)].join(".");
+  return redirect(url.toString(), {
+    headers: { "Set-Cookie": serializeCookie(FLOW_COOKIE, flow, { maxAgeSeconds: FLOW_MAX_AGE, secure: SECURE }) },
+  });
+}
+
+type GoogleClaims = { sub: string; email?: string; email_verified?: boolean; name?: string };
+
+export async function finishGoogleLogin(request: Request): Promise<Response> {
+  const params = new URL(request.url).searchParams;
+  const flow = parseCookies(request.headers.get("Cookie")).get(FLOW_COOKIE);
+  const [state, verifier, returnTo] = (flow ?? "").split(".");
+  const code = params.get("code");
+  const gotState = params.get("state") ?? "";
+  if (!code || !state || !verifier || !timingSafeEqual(state, gotState)) fail("google");
+
+  let claims: GoogleClaims;
+  try {
+    const tokens = await client(request).validateAuthorizationCode(code, verifier);
+    claims = decodeIdToken(tokens.idToken()) as GoogleClaims;
+  } catch (error) {
+    console.warn("Google login failed", error);
+    fail("google");
+  }
+  if (!claims.sub || !claims.email) fail("google");
+
+  const email = normalizeEmail(claims.email);
+  const [linked] = await db
+    .select({ userId: oauthAccounts.userId })
+    .from(oauthAccounts)
+    .where(and(eq(oauthAccounts.provider, "google"), eq(oauthAccounts.providerUserId, claims.sub)));
+  const decision = resolveGoogleLogin({
+    linkedUserId: linked?.userId ?? null,
+    emailUserId: await findUserIdByEmail(email),
+    emailVerified: claims.email_verified === true,
+    invited: await isInvited(email),
+    now: new Date(),
+  });
+
+  let userId: string;
+  switch (decision.kind) {
+    case "refused":
+      fail(decision.reason === "closed" ? "zarva" : "nem-ellenorzott");
+    case "existing":
+      userId = decision.userId;
+      break;
+    case "link":
+      userId = decision.userId;
+      await db.insert(oauthAccounts).values({ provider: "google", providerUserId: claims.sub, userId }).onConflictDoNothing();
+      break;
+    case "create":
+      // Google's name pre-fills the first-login page; they can change it there.
+      userId = await createUser(email, (claims.name ?? "").trim().slice(0, 80));
+      await db.insert(oauthAccounts).values({ provider: "google", providerUserId: claims.sub, userId }).onConflictDoNothing();
+      break;
+  }
+
+  const headers = new Headers();
+  headers.append("Set-Cookie", await createSession(userId));
+  headers.append("Set-Cookie", serializeCookie(FLOW_COOKIE, "", { maxAgeSeconds: 0, secure: SECURE }));
+  let back = "";
+  try {
+    back = decodeURIComponent(returnTo ?? "");
+  } catch {
+    // Malformed: safeReturnTo falls back to the default page.
+  }
+  return redirect(safeReturnTo(back), { headers });
+}

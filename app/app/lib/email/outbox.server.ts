@@ -9,8 +9,9 @@ import type { Recipient } from "./audience";
 import { parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { MAX_BATCH, sendBatch } from "./resend.server";
 import { SITE_URL } from "~/lib/site";
+import { CODE_TTL_MS } from "~/lib/auth/rules";
 
-import { broadcastEmail, partnerNotice, signupConfirmation, type Email } from "./templates";
+import { broadcastEmail, loginCode, partnerNotice, signupConfirmation, type Email } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
@@ -92,6 +93,16 @@ export async function queueSignupEmails(signup: InterestSignup): Promise<number[
       messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup) });
   }
   return enqueue(messages);
+}
+
+// A login code goes out at once, ahead of broadcasts (transactional budget).
+// If the provider is down it stays queued like any email, but by the next
+// cron run the code has expired; the person just asks for a new one.
+export async function queueLoginCode(email: string, code: string): Promise<void> {
+  const ids = await enqueue([
+    { kind: "login_code", toEmail: email, ...loginCode(code, CODE_TTL_MS / 60_000) },
+  ]);
+  await deliver(ids);
 }
 
 export async function createBroadcast(input: {

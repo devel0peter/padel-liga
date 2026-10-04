@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { InterestSignup } from "../interest";
-import { broadcastEmail, escapeHtml, partnerNotice, signupConfirmation, textToHtml } from "./templates";
+import { broadcastEmail, escapeHtml, loginCode, partnerNotice, signupConfirmation, textToHtml } from "./templates";
 
 const pair: InterestSignup = {
   city: "gyor",
@@ -94,5 +94,19 @@ describe("broadcastEmail", () => {
     expect(broadcastEmail({ subject: "x", body: "<img src=x>" }, { name: "A" }, "#").html).toContain(
       escapeHtml("<img src=x>"),
     );
+  });
+});
+
+describe("loginCode", () => {
+  it("shows the code, split for reading, in the subject and the body", () => {
+    const e = loginCode("012345", 10);
+    expect(e.subject).toContain("012 345");
+    expect(e.text).toContain("A belépőkódod: 012 345");
+    expect(e.text).toContain("10 percig");
+    expect(e.html).toContain("012 345");
+  });
+
+  it("has no unsubscribe link: it is a transactional email", () => {
+    expect(loginCode("123456", 10).text).not.toContain("Leiratkozás");
   });
 });

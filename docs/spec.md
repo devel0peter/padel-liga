@@ -10,17 +10,23 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 |---|---|
 | Visitor | See the landing page, rules and public standings |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
-| Organizer | Create and configure a league and season, approve pairs, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs |
-| Platform admin | Create cities/leagues, appoint organizers, see the interest list, send broadcasts (Peter) |
+| Organizer ("Szervező") | Per league: create and configure seasons, approve pairs, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
+| Platform admin ("Főadmin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users (Peter) |
 
 Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).
+- Code names: `player`, `league_admin`, `superadmin`; UI labels: Játékos, Szervező, Főadmin (2026-10-04).
+- Organizer rights are granted per league (a row per league and account), so one account can organize one league and not another.
+- Platform admin is a flag on the account, set only by a CLI command; no screen can grant or remove it. Peter's work Google account is the platform admin; his personal account is a player and the Győr organizer.
+- Design and delivery: `docs/admin-plan.md`.
 
 ## 3. Authentication
-- Email + password, with email confirmation and password reset.
-- Google login.
+- **No passwords** (2026-10-04): log in with Google, or with a one-time 6-digit code sent by email (valid 10 minutes, at most 5 tries, single use). Nothing to hash, reset or leak.
+- Sessions last 90 days and are extended while used; platform admin sessions 12 hours. Logout, and logout on every device.
+- Until registration opens (2 Nov 2026), only invited emails can create an account.
+- First login asks for a name and privacy consent.
 - Facebook login: after the MVP (Meta business verification and app review take weeks).
 - Onboarding from the interest list: when registration opens, everyone on the interest list (the person who signed up, not the partner they entered) gets one invite email with a registration link, their email pre-filled. Pairs are then formed in the app (section 4), not taken from the signup.
-- Linking several login methods to one account (same email = same account, after confirmation).
+- Same email = same account, whichever way they log in. A Google login links to an existing account only if Google reports the email as verified.
 - Profile:
   - Required: name, email.
   - Optional: phone number (visible only to opponents in the current round, never public; collected at registration, not on the interest form), self-assessed level.
@@ -176,7 +182,7 @@ Dates are Europe/Budapest.
 
 | Milestone | Date | Must work |
 |---|---|---|
-| Registration opens | Mon 2 Nov 2026 | Accounts (email + password, Google), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
+| Registration opens | Mon 2 Nov 2026 | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
 | Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling, results and confirmation, disputes, public standings, emails and reminders, daily backup |
 | First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, account deletion |
 

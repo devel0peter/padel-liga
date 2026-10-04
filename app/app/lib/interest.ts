@@ -49,7 +49,7 @@ const MAX_NAME = 100;
 const MAX_EMAIL = 254;
 const MAX_NOTE = 1000;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function str(form: FormData, key: string): string {
   const value = form.get(key);

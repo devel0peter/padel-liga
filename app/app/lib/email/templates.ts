@@ -136,3 +136,19 @@ export function broadcastEmail(
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
   );
 }
+
+// One-time login code (app/lib/auth). The code is in the subject too, so it
+// shows in the phone's notification.
+export function loginCode(code: string, validMinutes: number): Email {
+  const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
+  return build(
+    `${spaced} a belépőkódod – ${SITE_NAME}`,
+    [
+      `Szia!`,
+      `A belépőkódod: ${spaced}`,
+      `${validMinutes} percig érvényes, és csak egyszer használható.`,
+      `Ha nem te kérted, nem kell tenned semmit: a kód nélkül senki nem tud belépni.`,
+    ].join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}

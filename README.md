@@ -58,6 +58,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | `docs/monetization.md` | Monetization ideas, running costs, things to keep in mind (ideas only, not scheduled) |
 | `docs/club-outreach.md` | Messenger drafts for the club owners (poster request, feedback ask) and answers to likely questions |
 | `docs/open-questions.md` | Undecided items to resolve before or while building |
+| `docs/admin-plan.md` | Plan for accounts, roles and the admin area (login, sidebar, delivery order) |
 | `app/` | Web app: React Router on Cloudflare Workers, shadcn/ui, D1 + Drizzle. Includes the Phase 0 landing page (`/`) and privacy page (`/adatkezeles`) |
 | `packages/rules/` | Rules engine: pure TypeScript functions with Vitest tests |
 
@@ -131,6 +132,12 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |
 | 2026-10-02 | Broadcasts go only to the person who signed up, never to the partner they entered; signed one-click unsubscribe links, unsubscribes kept in `email_suppressions` | Spec section 17 (nothing else to the partner until they register); RFC 8058 for Gmail and Yahoo bulk-sender rules |
 | 2026-10-04 | Match format changed to short sets: 2 sets to 4 (win by 2, tie-break at 4-4), super tie-break to 10 at 1-1, golden point. 60-minute booking; walkovers 4-0 4-0, both inactive 0-4 0-4. Replaces the sets-to-6 format of 2026-10-02 | Győr clubs only take 60-minute bookings, and sets to 6 often don't fit. Short sets to 4 with a 4-4 tie-break are the standard short padel format (LTA tours), not tennis Fast4 (3-3). Typical match about 45–50 min; the rare overrun continues in a new slot |
+| 2026-10-04 | Roles: player, league admin ("Szervező", per league), superadmin ("Főadmin", a CLI-only flag). Szervezők also edit their city's clubs; the interest list, broadcasts, traffic, leagues and users are Főadmin only. Admin navigation is a sidebar (`docs/admin-plan.md`) | Right from the start for more cities and organizers; no screen can create a superadmin |
+| 2026-10-04 | No passwords: Google login, or a one-time email code. Our own small auth module, no Better Auth. Replaces email + password from 2026-10-01 and 2026-10-03 | Password hashing doesn't fit the Workers Free CPU limit (10 ms), and we don't want to maintain or be responsible for it; nearly everyone has a Google account |
+| 2026-10-04 | Sessions 90 days, extended while used (players and Szervezők); Főadmin 12 hours. Peter's work Google account is the only Főadmin; his personal account plays and organizes Győr | Few logins means few code emails; platform-wide powers stay off the everyday login |
+| 2026-10-04 | Account creation is invite-only until registration opens on 2 Nov (`npm run auth:invite -w app`) | Lets organizers and testers in before the public opening |
+| 2026-10-04 | Lean notifications: one new-phase email per phase, "action needed" only to the pair who must act, a deadline reminder only for unscheduled matches, at most one digest per player per day (about 4–5 per player per phase). Stay on Resend free; when it becomes the bottleneck, a bigger Resend plan or Workers Paid + Cloudflare Email Service. No SMS | Keeps inboxes quiet and the email bill at zero for a pet project; SMS costs over 100× an email |
+| 2026-10-04 | Login brute force: a Cloudflare WAF rate-limiting rule on the login routes (the Free plan includes one), plus at most 5 codes per email per hour in our code | No extra infrastructure |
 
 ## Roadmap
 

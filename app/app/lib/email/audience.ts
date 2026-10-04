@@ -34,6 +34,7 @@ export function audienceLabel(f: Filters): string {
     f.level ? levelLabel(f.level) : undefined,
     f.mode === "pair" ? "Pár" : f.mode === "solo" ? "Egyéni" : undefined,
     f.ref === NO_REF ? "Forrás nélkül" : f.ref ? `Forrás: ${f.ref}` : undefined,
+    f.club === NO_REF ? "Klub nélkül" : f.club ? `Klub: ${f.club}` : undefined,
     f.q ? `„${f.q}”` : undefined,
   ].filter(Boolean);
   return parts.length ? `Jelentkezők: ${parts.join(" · ")}` : "Minden jelentkező";

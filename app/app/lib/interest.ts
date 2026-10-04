@@ -2,7 +2,7 @@
 // Pure (no I/O) so it runs on both server and client and can be unit tested.
 
 import { findCity, isCity, OTHER_CITY, type CitySlug } from "./cities";
-import { normalizeRef } from "./clubs";
+import { normalizeRef, OTHER_CLUB } from "./clubs";
 
 export const LEVELS = {
   kezdo: "Kezdő – most ismerkedünk a játékkal",
@@ -26,6 +26,8 @@ export type InterestSignup = {
   note: string | null;
   // Signup source from the landing page link (`?ref=`), see clubs.ts.
   ref: string | null;
+  // Club slug where they play most, OTHER_CLUB, or null (optional field).
+  homeClub: string | null;
 };
 
 export type InterestField =
@@ -58,7 +60,9 @@ function isLevel(value: string): value is Level {
   return Object.hasOwn(LEVELS, value);
 }
 
-export function parseInterest(form: FormData): InterestResult {
+// `clubs`: slugs of the city's clubs; an unknown home club is dropped, not an
+// error, since the field is optional and the list can change under the form.
+export function parseInterest(form: FormData, clubs: readonly string[] = []): InterestResult {
   let city = str(form, "city");
   let cityOther = city === OTHER_CITY ? str(form, "cityOther") : "";
   // Someone typed a city we already support: file it there.
@@ -124,6 +128,13 @@ export function parseInterest(form: FormData): InterestResult {
       level: level as Level,
       note: note || null,
       ref: normalizeRef(str(form, "ref")),
+      homeClub: parseHomeClub(str(form, "homeClub"), city, clubs),
     },
   };
+}
+
+function parseHomeClub(value: string, city: string, clubs: readonly string[]): string | null {
+  if (city === OTHER_CITY) return null;
+  if (value === OTHER_CLUB || clubs.includes(value)) return value;
+  return null;
 }

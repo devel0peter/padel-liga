@@ -1,9 +1,10 @@
 // Clubs and signup sources. Pure (no I/O); the D1 access lives in
-// clubs.server.ts.
+// clubs.server.ts. Clubs are internal: nothing about them is public.
 //
-// A club's slug is the `?ref=` on its poster QR code, so signups from that
-// poster can be counted. Any other ref (e.g. "verseny" for a tournament flyer)
-// is kept as typed and shown as is.
+// Two signals per club:
+// - poster: a club's slug is the `?ref=` on its poster QR code. Any other ref
+//   (e.g. "verseny" for a tournament flyer) is kept as typed and shown as is.
+// - home club: the optional "where do you play most" answer on the signup form.
 
 import { isCity, type CitySlug } from "./cities";
 import { SITE_URL } from "./site";
@@ -13,18 +14,18 @@ export type Club = {
   slug: string;
   city: string;
   name: string;
-  address: string | null;
-  bookingUrl: string | null;
-  listed: boolean;
   adminNote: string | null;
 };
 
-// What the landing page shows: no admin fields.
-export type PublicClub = Pick<Club, "slug" | "name" | "address" | "bookingUrl">;
+// What the signup form gets: no admin fields.
+export type ClubOption = Pick<Club, "slug" | "city" | "name">;
 
-export function toPublicClub({ slug, name, address, bookingUrl }: Club): PublicClub {
-  return { slug, name, address, bookingUrl };
+export function toClubOption({ slug, city, name }: Club): ClubOption {
+  return { slug, city, name };
 }
+
+// "Máshol / vegyesen" answer to "where do you play most".
+export const OTHER_CLUB = "other";
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
@@ -57,14 +58,12 @@ export function posterUrl(slug: string): string {
 }
 
 export type ClubInput = Omit<Club, "id">;
-export type ClubField = "name" | "slug" | "city" | "address" | "bookingUrl" | "adminNote";
+export type ClubField = "name" | "slug" | "city" | "adminNote";
 export type ClubResult =
   | { ok: true; data: ClubInput }
   | { ok: false; errors: Partial<Record<ClubField, string>> };
 
 const MAX_NAME = 100;
-const MAX_ADDRESS = 200;
-const MAX_URL = 500;
 const MAX_NOTE = 2000;
 
 function str(form: FormData, key: string): string {
@@ -72,34 +71,19 @@ function str(form: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
 // Admin club form. An empty slug is made from the name.
 export function parseClub(form: FormData): ClubResult {
   const name = str(form, "name");
   const slug = (str(form, "slug") || slugify(name)).toLowerCase();
   const city = str(form, "city");
-  const address = str(form, "address");
-  const bookingUrl = str(form, "bookingUrl");
   const adminNote = str(form, "adminNote");
-  const listed = form.get("listed") != null;
 
   const errors: Partial<Record<ClubField, string>> = {};
   if (!name) errors.name = "Add meg a klub nevét.";
   else if (name.length > MAX_NAME) errors.name = "Ez a név túl hosszú.";
-  if (!isSlug(slug))
+  if (!isSlug(slug) || slug === OTHER_CLUB)
     errors.slug = "Csak kisbetű, szám és kötőjel lehet benne, legfeljebb 40 karakter.";
   if (!isCity(city)) errors.city = "Válaszd ki a várost.";
-  if (address.length > MAX_ADDRESS) errors.address = "Ez a cím túl hosszú.";
-  if (bookingUrl && (bookingUrl.length > MAX_URL || !isHttpUrl(bookingUrl)))
-    errors.bookingUrl = "Adj meg egy érvényes linket (https://…).";
   if (adminNote.length > MAX_NOTE) errors.adminNote = `Legfeljebb ${MAX_NOTE} karakter.`;
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -109,18 +93,22 @@ export function parseClub(form: FormData): ClubResult {
       name,
       slug,
       city: city as CitySlug,
-      address: address || null,
-      bookingUrl: bookingUrl || null,
-      listed,
       adminNote: adminNote || null,
     },
   };
 }
 
-// Signups per ref, e.g. { "gyor-padel": 3, "": 10 }; "" is no ref.
-export function countByRef(rows: { ref: string | null }[]): Record<string, number> {
+// Signups per value, e.g. countBy(rows, "ref") -> { "gyor-padel": 3, "": 10 };
+// "" is no value.
+export function countBy<K extends string>(
+  rows: Partial<Record<K, string | null>>[],
+  key: K,
+): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const r of rows) counts[r.ref ?? ""] = (counts[r.ref ?? ""] ?? 0) + 1;
+  for (const r of rows) {
+    const value = r[key] ?? "";
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
   return counts;
 }
 
@@ -128,4 +116,11 @@ export function countByRef(rows: { ref: string | null }[]): Record<string, numbe
 export function refLabel(ref: string | null, clubs: Pick<Club, "slug" | "name">[]): string {
   if (!ref) return "";
   return clubs.find((c) => c.slug === ref)?.name ?? ref;
+}
+
+// How the admin shows where a signup plays most.
+export function homeClubLabel(homeClub: string | null, clubs: Pick<Club, "slug" | "name">[]): string {
+  if (!homeClub) return "";
+  if (homeClub === OTHER_CLUB) return "Máshol / vegyesen";
+  return clubs.find((c) => c.slug === homeClub)?.name ?? homeClub;
 }

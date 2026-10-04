@@ -18,6 +18,8 @@ export const interestSignups = sqliteTable("interest_signups", {
   // Where the signup came from: the `?ref=` of the landing page link, e.g. a
   // club slug from that club's poster QR code (app/lib/clubs.ts).
   ref: text("ref"),
+  // Club slug where they play most (optional), or "other"; see clubs.ts.
+  homeClub: text("home_club"),
   consentAt: integer("consent_at", { mode: "timestamp" }).notNull(),
   // Admin-only fields, see app/lib/signups-admin.ts.
   status: text("status", { enum: ["new", "contacted", "paired", "withdrawn"] })
@@ -88,19 +90,14 @@ export const emailSuppressions = sqliteTable("email_suppressions", {
     .default(sql`(unixepoch())`),
 });
 
-// The city's padel clubs. Listed publicly on the landing page (with the booking
-// link) only when `listed` is set, i.e. after the owner agreed to the poster and
-// the listing (README decision log, 2026-10-02). The slug is the poster's
-// `?ref=`. Later also the venue list for recording matches (spec: Venue).
+// The city's padel clubs. Internal only: never listed publicly. Used to count
+// signups per club, by poster (`?ref=<slug>`) and by where players say they
+// play most. Later also the venue list for recording matches (spec: Venue).
 export const clubs = sqliteTable("clubs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   slug: text("slug").notNull().unique(),
   city: text("city").notNull(),
   name: text("name").notNull(),
-  address: text("address"),
-  bookingUrl: text("booking_url"),
-  listed: integer("listed", { mode: "boolean" }).notNull().default(false),
-  // Admin-only, e.g. when and how the owner agreed.
   adminNote: text("admin_note"),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })

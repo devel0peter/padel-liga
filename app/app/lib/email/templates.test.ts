@@ -14,6 +14,7 @@ const pair: InterestSignup = {
   level: "kezdo",
   note: null,
   ref: null,
+  homeClub: null,
 };
 
 describe("textToHtml", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countByRef, normalizeRef, parseClub, posterUrl, refLabel, slugify, toPublicClub } from "./clubs";
+import { countBy, homeClubLabel, normalizeRef, parseClub, posterUrl, refLabel, slugify, toClubOption } from "./clubs";
 
 function form(fields: Record<string, string>): FormData {
   const fd = new FormData();
@@ -12,8 +12,6 @@ const club = {
   name: "Győr Padel Klub",
   slug: "",
   city: "gyor",
-  address: "",
-  bookingUrl: "https://sportmate.hu/klub",
   adminNote: "",
 };
 
@@ -43,23 +41,15 @@ describe("normalizeRef", () => {
 
 describe("parseClub", () => {
   it("accepts a valid club and makes the slug from the name", () => {
-    expect(parseClub(form({ ...club, listed: "on" }))).toEqual({
+    expect(parseClub(form(club))).toEqual({
       ok: true,
-      data: {
-        name: "Győr Padel Klub",
-        slug: "gyor-padel-klub",
-        city: "gyor",
-        address: null,
-        bookingUrl: "https://sportmate.hu/klub",
-        listed: true,
-        adminNote: null,
-      },
+      data: { name: "Győr Padel Klub", slug: "gyor-padel-klub", city: "gyor", adminNote: null },
     });
   });
 
-  it("is not listed unless the box is ticked", () => {
-    const r = parseClub(form(club));
-    expect(r.ok && r.data.listed).toBe(false);
+  it("rejects 'other' as a slug, since it means 'Máshol / vegyesen'", () => {
+    const r = parseClub(form({ ...club, slug: "other" }));
+    expect(r.ok).toBe(false);
   });
 
   it("keeps a typed slug, lowercased", () => {
@@ -67,16 +57,16 @@ describe("parseClub", () => {
     expect(r.ok && r.data.slug).toBe("gyp");
   });
 
-  it("rejects a missing name, bad slug, unknown city and non-http link", () => {
-    const r = parseClub(form({ name: "", slug: "a b", city: "pest", bookingUrl: "javascript:alert(1)" }));
+  it("rejects a missing name, bad slug and unknown city", () => {
+    const r = parseClub(form({ name: "", slug: "a b", city: "pest" }));
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["bookingUrl", "city", "name", "slug"]);
+    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["city", "name", "slug"]);
   });
 });
 
-describe("countByRef", () => {
-  it("counts signups per ref, with no ref under the empty key", () => {
-    expect(countByRef([{ ref: "a" }, { ref: null }, { ref: "a" }, { ref: "b" }])).toEqual({ a: 2, b: 1, "": 1 });
+describe("countBy", () => {
+  it("counts signups per value, with no value under the empty key", () => {
+    expect(countBy([{ ref: "a" }, { ref: null }, { ref: "a" }, { ref: "b" }], "ref")).toEqual({ a: 2, b: 1, "": 1 });
   });
 });
 
@@ -87,12 +77,18 @@ describe("refLabel", () => {
     expect(refLabel("verseny", clubs)).toBe("verseny");
     expect(refLabel(null, clubs)).toBe("");
   });
+
+  it("names the home club, 'other', or nothing", () => {
+    expect(homeClubLabel("gyp", clubs)).toBe("Győr Padel");
+    expect(homeClubLabel("other", clubs)).toBe("Máshol / vegyesen");
+    expect(homeClubLabel(null, clubs)).toBe("");
+  });
 });
 
-describe("public club data", () => {
-  it("leaves out the admin fields", () => {
-    const pub = toPublicClub({ id: 1, slug: "gyp", city: "gyor", name: "GYP", address: null, bookingUrl: null, listed: true, adminNote: "secret" });
-    expect(pub).toEqual({ slug: "gyp", name: "GYP", address: null, bookingUrl: null });
+describe("club data", () => {
+  it("gives the signup form no admin fields", () => {
+    const option = toClubOption({ id: 1, slug: "gyp", city: "gyor", name: "GYP", adminNote: "secret" });
+    expect(option).toEqual({ slug: "gyp", city: "gyor", name: "GYP" });
   });
 
   it("builds the poster link from the slug", () => {

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "98e93fb8-f227-4682-a6d1-dade5a06775f",
+  "id": "cf3e4da9-fbb4-408c-b801-cfcdf3b8ff29",
   "prevId": "7a27f412-c2bc-4abb-ae07-19d1aa93a2df",
   "tables": {
     "broadcasts": {
@@ -94,28 +94,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "address": {
-          "name": "address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "booking_url": {
-          "name": "booking_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "listed": {
-          "name": "listed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "admin_note": {
           "name": "admin_note",
@@ -417,6 +395,13 @@
         },
         "ref": {
           "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "home_club": {
+          "name": "home_club",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

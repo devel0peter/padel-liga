@@ -14,9 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
@@ -37,7 +35,7 @@ import {
 import { Textarea } from "~/components/ui/textarea";
 import { requireAdmin } from "~/lib/access.server";
 import { CITIES } from "~/lib/cities";
-import { countByRef, parseClub, posterUrl, type Club, type ClubField } from "~/lib/clubs";
+import { countBy, OTHER_CLUB, parseClub, posterUrl, type Club, type ClubField } from "~/lib/clubs";
 import { createClub, deleteClub, listClubs, slugTaken, updateClub } from "~/lib/clubs.server";
 import { cityLabel, NO_REF } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
@@ -45,11 +43,20 @@ import { listSignups } from "~/lib/signups-admin.server";
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const [clubs, signups] = await Promise.all([listClubs(), listSignups()]);
-  const counts = countByRef(signups);
+  const refs = countBy(signups, "ref");
+  const plays = countBy(signups, "homeClub");
   const clubSlugs = new Set(clubs.map((c) => c.slug));
   // Refs that aren't a club, e.g. a tournament flyer's "?ref=verseny".
-  const otherRefs = Object.entries(counts).filter(([ref]) => ref !== "" && !clubSlugs.has(ref));
-  return { clubs, counts, otherRefs, noRef: counts[""] ?? 0 };
+  const otherRefs = Object.entries(refs).filter(([ref]) => ref !== "" && !clubSlugs.has(ref));
+  return {
+    clubs,
+    refs,
+    plays,
+    otherRefs,
+    noRef: refs[""] ?? 0,
+    playsOther: plays[OTHER_CLUB] ?? 0,
+    playsUnknown: plays[""] ?? 0,
+  };
 }
 
 type ActionData = { errors: Partial<Record<ClubField, string>> };
@@ -134,22 +141,9 @@ function ClubForm({ club, errors }: { club?: Club; errors: Partial<Record<ClubFi
             </SelectContent>
           </Select>
         </Field>
-        <Field name="address" label="Cím" hint="Nem kötelező, a főoldalon látszik." error={errors.address}>
-          <Input id="address" name="address" defaultValue={club?.address ?? ""} maxLength={200} />
-        </Field>
-        <Field name="bookingUrl" label="Foglalási link" hint="Pl. a SportMate-oldaluk." error={errors.bookingUrl}>
-          <Input id="bookingUrl" name="bookingUrl" type="url" defaultValue={club?.bookingUrl ?? ""} maxLength={500} />
-        </Field>
-        <Field name="adminNote" label="Jegyzet" hint="Csak te látod, pl. mikor és hogyan egyezett bele." error={errors.adminNote}>
+        <Field name="adminNote" label="Jegyzet" hint="Pl. kint van-e a plakát, mióta." error={errors.adminNote}>
           <Textarea id="adminNote" name="adminNote" defaultValue={club?.adminNote ?? ""} maxLength={2000} className="min-h-9" />
         </Field>
-      </div>
-      <div className="flex items-start gap-3">
-        <Checkbox id="listed" name="listed" defaultChecked={club?.listed ?? false} className="mt-0.5" />
-        <Label htmlFor="listed" className="block leading-relaxed font-normal">
-          <strong>Megjelenhet a főoldalon.</strong> Csak akkor pipáld be, ha a tulajdonos
-          beleegyezett a plakátba és a megjelenésbe.
-        </Label>
       </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={busy}>
@@ -177,8 +171,8 @@ function DeleteClub({ club }: { club: Club }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Törlöd a klubot?</AlertDialogTitle>
           <AlertDialogDescription>
-            {club.name} lekerül a listáról és a főoldalról. A jelentkezések megmaradnak, a
-            forrásuk „{club.slug}” lesz.
+            {club.name} lekerül a listáról és a jelentkezési űrlapról. A jelentkezések
+            megmaradnak, ahol ez a klub szerepel, ott „{club.slug}” lesz.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -197,7 +191,7 @@ function DeleteClub({ club }: { club: Club }) {
 }
 
 export default function AdminClubs({ loaderData, actionData }: Route.ComponentProps) {
-  const { clubs, counts, otherRefs, noRef } = loaderData;
+  const { clubs, refs, plays, otherRefs, noRef, playsOther, playsUnknown } = loaderData;
   const [params] = useSearchParams();
   const editing = clubs.find((c) => c.slug === params.get("edit"));
 
@@ -207,8 +201,9 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
         <div>
           <h1 className="font-display text-2xl font-extrabold">Klubok</h1>
           <p className="text-sm text-muted-foreground">
-            A plakát QR-kódja a klub azonosítójával viszi a főoldalra, így látszik, hány
-            jelentkezést hozott.
+            Csak te látod. A jelentkezési űrlapon a város klubjai közül választhatnak, hol
+            játszanak a legtöbbet; a plakát QR-kódja pedig a klub azonosítójával viszi a
+            főoldalra, így látszik, hány jelentkezést hozott.
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -227,8 +222,8 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
               <TableRow>
                 <TableHead>Klub</TableHead>
                 <TableHead>Város</TableHead>
-                <TableHead>Főoldalon</TableHead>
-                <TableHead>Jelentkezés</TableHead>
+                <TableHead>Itt játszik</TableHead>
+                <TableHead>Plakátról jött</TableHead>
                 <TableHead>Jegyzet</TableHead>
                 <TableHead>
                   <span className="sr-only">Műveletek</span>
@@ -241,19 +236,16 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
                   <TableCell>
                     <div className="font-medium">{club.name}</div>
                     <div className="text-xs text-muted-foreground">{posterUrl(club.slug)}</div>
-                    {club.bookingUrl && (
-                      <a href={club.bookingUrl} target="_blank" rel="noopener noreferrer" className="text-xs underline">
-                        Foglalás
-                      </a>
-                    )}
                   </TableCell>
                   <TableCell>{cityLabel({ city: club.city, cityOther: null })}</TableCell>
                   <TableCell>
-                    {club.listed ? <Badge>Igen</Badge> : <Badge variant="secondary">Nem</Badge>}
+                    <Link to={`/admin?club=${club.slug}`} className="underline">
+                      {plays[club.slug] ?? 0}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <Link to={`/admin?ref=${club.slug}`} className="underline">
-                      {counts[club.slug] ?? 0}
+                      {refs[club.slug] ?? 0}
                     </Link>
                   </TableCell>
                   <TableCell className="max-w-56 text-sm whitespace-normal">{club.adminNote}</TableCell>
@@ -277,6 +269,16 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
         </div>
       )}
 
+      <p className="text-sm text-muted-foreground">
+        Máshol / vegyesen játszik:{" "}
+        <Link to={`/admin?club=${OTHER_CLUB}`} className="underline">
+          {playsOther}
+        </Link>
+        {" · "}Nem adta meg:{" "}
+        <Link to={`/admin?club=${NO_REF}`} className="underline">
+          {playsUnknown}
+        </Link>
+      </p>
       <p className="text-sm text-muted-foreground">
         Forrás nélkül:{" "}
         <Link to={`/admin?ref=${NO_REF}`} className="underline">

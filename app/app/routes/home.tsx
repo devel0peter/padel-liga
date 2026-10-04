@@ -11,8 +11,8 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { CITIES } from "~/lib/cities";
-import { normalizeRef, toPublicClub } from "~/lib/clubs";
-import { listListedClubs } from "~/lib/clubs.server";
+import { normalizeRef, toClubOption } from "~/lib/clubs";
+import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
@@ -28,10 +28,9 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  // Only Győr has a league so far; with more cities this follows the picker.
-  const city = CITIES[0];
-  const clubs = (await listListedClubs(city.slug)).map(toPublicClub);
-  return { ref: normalizeRef(new URL(request.url).searchParams.get("ref")), city: city.name, clubs };
+  // Clubs only feed the optional "where do you play most" field.
+  const clubs = (await listClubs()).map(toClubOption);
+  return { ref: normalizeRef(new URL(request.url).searchParams.get("ref")), clubs };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -41,7 +40,11 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const honeypot = form.get("website");
   if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
 
-  const result = parseInterest(form);
+  const clubs = await listClubs();
+  const result = parseInterest(
+    form,
+    clubs.filter((c) => c.city === form.get("city")).map((c) => c.slug),
+  );
   if (!result.ok) return result;
 
   try {
@@ -106,7 +109,7 @@ const FAQ = [
 ];
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { ref, city, clubs } = loaderData;
+  const { ref, clubs } = loaderData;
   return (
     <>
       <SiteHeader />
@@ -129,6 +132,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   Hogyan működik?
                 </a>
               </div>
+              <p className="text-muted-foreground">
+                <span className="font-bold text-foreground">Ligák: </span>
+                {CITIES.map((c) => c.name).join(", ")}. Máshol játszol?{" "}
+                <a href="#jelentkezes" className="underline">
+                  Jelentkezz
+                </a>
+                , és szólunk, ha nálatok is indul.
+              </p>
             </div>
             <LadderDemo />
           </Wrap>
@@ -152,35 +163,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </Wrap>
         </section>
 
-
-        {clubs.length > 0 && (
-          <section id="klubok" className="scroll-mt-4 py-16">
-            <Wrap>
-              <SectionHead
-                title={`Hol játszhattok? (${city})`}
-                lede="A pályát ti foglaljátok, bármelyik klubban, ahol nektek és az ellenfélnek jó."
-              />
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {clubs.map((club) => (
-                  <li key={club.slug} className="grid content-start gap-1 rounded-2xl border-2 p-5">
-                    <h3 className="font-display text-xl font-bold">{club.name}</h3>
-                    {club.address && <p className="text-muted-foreground">{club.address}</p>}
-                    {club.bookingUrl && (
-                      <a
-                        href={club.bookingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 font-bold underline"
-                      >
-                        Pályafoglalás
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Wrap>
-          </section>
-        )}
 
         <section className="bg-muted py-16">
           <Wrap>
@@ -222,7 +204,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm signupRef={ref} />
+            <SignupForm signupRef={ref} clubs={clubs} />
           </Wrap>
         </section>
       </main>

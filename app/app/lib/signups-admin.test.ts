@@ -24,6 +24,7 @@ function row(over: Partial<SignupRow>): SignupRow {
     level: "kezdo",
     note: null,
     ref: null,
+    homeClub: null,
     status: "new",
     adminNote: null,
     consentAt: new Date("2026-10-01T12:00:00Z"),
@@ -34,7 +35,7 @@ function row(over: Partial<SignupRow>): SignupRow {
 }
 
 const rows = [
-  row({ id: 1 }),
+  row({ id: 1, homeClub: "other" }),
   row({ id: 2, mode: "solo", name1: "Szabó Csaba", email1: "csaba@example.com", name2: null, level: "halado", status: "contacted" }),
   row({ id: 3, city: "other", cityOther: "Szeged", name1: "Tóth Dóra", email1: "dora@example.com", name2: "Varga Éva", ref: "gyp" }),
 ];
@@ -56,6 +57,11 @@ describe("filterSignups", () => {
   it("filters by source, including signups without one", () => {
     expect(filterSignups(rows, { ...none, ref: "gyp" }).map((r) => r.id)).toEqual([3]);
     expect(filterSignups(rows, { ...none, ref: NO_REF }).map((r) => r.id)).toEqual([1, 2]);
+  });
+
+  it("filters by home club, including signups without one", () => {
+    expect(filterSignups(rows, { ...none, club: "other" }).map((r) => r.id)).toEqual([1]);
+    expect(filterSignups(rows, { ...none, club: NO_REF }).map((r) => r.id)).toEqual([2, 3]);
   });
 
   it("searches names, emails and the other city, ignoring case and accents", () => {
@@ -88,9 +94,10 @@ describe("toCsv", () => {
     expect(line).toContain(";Új;");
   });
 
-  it("writes the source through the given label function", () => {
-    const line = toCsv([row({ ref: "gyp" })], (r) => (r === "gyp" ? "Győr Padel" : "")).split("\r\n")[1];
-    expect(line).toContain(";Kezdő;;Győr Padel;Új;");
+  it("writes the source and home club through the given labels", () => {
+    const name = (s: string | null) => (s === "gyp" ? "Győr Padel" : "");
+    const line = toCsv([row({ ref: "gyp", homeClub: "gyp" })], { ref: name, homeClub: name }).split("\r\n")[1];
+    expect(line).toContain(";Kezdő;;Győr Padel;Győr Padel;Új;");
   });
 });
 

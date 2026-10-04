@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { clubs } from "~/db/schema";
@@ -7,15 +7,6 @@ import type { Club, ClubInput } from "./clubs";
 
 export async function listClubs(): Promise<Club[]> {
   return db.select().from(clubs).orderBy(asc(clubs.city), asc(clubs.name));
-}
-
-// Only clubs whose owner agreed to be listed.
-export async function listListedClubs(city: string): Promise<Club[]> {
-  return db
-    .select()
-    .from(clubs)
-    .where(and(eq(clubs.city, city), eq(clubs.listed, true)))
-    .orderBy(asc(clubs.name));
 }
 
 export async function getClub(slug: string): Promise<Club | undefined> {

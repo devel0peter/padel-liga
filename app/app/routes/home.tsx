@@ -132,14 +132,37 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   Hogyan működik?
                 </a>
               </div>
-              <p className="text-muted-foreground">
-                <span className="font-bold text-foreground">Ligák: </span>
-                {CITIES.map((c) => c.name).join(", ")}. Máshol játszol?{" "}
-                <a href="#jelentkezes" className="underline">
-                  Jelentkezz
-                </a>
-                , és szólunk, ha nálatok is indul.
-              </p>
+              <div className="grid gap-2">
+                <span className="text-sm font-extrabold tracking-wider text-muted-foreground uppercase">
+                  Ligák
+                </span>
+                <ul className="flex flex-wrap gap-2">
+                  {CITIES.map((c) => (
+                    <li key={c.slug}>
+                      <a
+                        href="#jelentkezes"
+                        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
+                      >
+                        <span className="relative flex size-2.5">
+                          <span className="absolute inline-flex size-full rounded-full bg-ball opacity-75 motion-safe:animate-ping" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-ball" />
+                        </span>
+                        {c.name}
+                        <span className="text-sm font-medium opacity-80">· jelentkezés nyitva</span>
+                      </a>
+                    </li>
+                  ))}
+                  <li>
+                    <a
+                      href="#jelentkezes"
+                      title="Szólunk, ha nálatok is indul"
+                      className="inline-flex items-center rounded-full border-[1.5px] border-dashed px-4 py-2 font-bold text-muted-foreground no-underline"
+                    >
+                      + A te városod?
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
             <LadderDemo />
           </Wrap>

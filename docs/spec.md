@@ -68,11 +68,11 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 
 ## 7. Recording results
 - Format (league default, one format per league, no per-match variants; see section 12):
-  - Best of 2 sets. A set goes to 6 games; at 6-6 a regular tie-break to 7 (win by 2).
+  - Best of 2 sets. Short sets: a set goes to 4 games (win by 2); at 4-4 a regular tie-break to 7 (win by 2).
   - At 1-1 in sets, a super tie-break to 10 (win by 2) replaces the third set.
   - Golden point: no advantage at deuce, one point decides; the receiving pair chooses which player receives.
   - For set and game difference the super tie-break counts as one set and as a 1-0 game (ITF convention).
-- Court booking: 90 minutes recommended; 60 minutes is often not enough.
+- Court booking: 60 minutes is usually enough (Győr clubs only take 60-minute bookings).
 - Court time runs out: the match is unfinished. The pairs note the score and finish it from there in a new slot before the deadline. Only the final result is recorded.
 - One pair records the result, and the other confirms or disputes it.
 - Not confirmed within 48 hours: the result is accepted automatically.
@@ -84,9 +84,9 @@ The deadline is the end of the phase (section 5), so a match missed in its sched
 
 | Situation | Outcome |
 |---|---|
-| One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 6-0 6-0 |
+| One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 4-0 4-0 |
 | Both active, no agreement | Unplayed: 0 points for both sides, no Elo change, not counted in set and game difference. The organizer may award a walkover if the log shows one side clearly blocked the match |
-| Neither side active | Both sides get a loss, recorded as 0-6 0-6 for each (counts in set and game difference, 0 points) |
+| Neither side active | Both sides get a loss, recorded as 0-4 0-4 for each (counts in set and game difference, 0 points) |
 | Late cancellation, then not played by the deadline | The cancelling side counts as inactive: walkover for the other side (section 6) |
 | Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover |
 

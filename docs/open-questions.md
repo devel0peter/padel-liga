@@ -10,7 +10,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 5. ~~**Season start**~~ ✅ When 12 pairs have signed up (raised from 8 on 2026-10-03); target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
 
 ## Rules
-6. ~~Match format~~ ✅ 2 sets to 6 (tie-break at 6-6), super tie-break to 10 as the decider, golden point; one format per league; 90-minute booking recommended; unfinished matches continue in a new slot. See spec section 7.
+6. ~~Match format~~ ✅ 2 short sets to 4 (tie-break at 4-4), super tie-break to 10 as the decider, golden point; one format per league; 60-minute booking (changed from sets to 6 on 2026-10-04); unfinished matches continue in a new slot. See spec section 7.
 7. ~~Phase length~~ ✅ 3 weeks, back to back, no catch-up week; new groups emailed on the Monday morning. Revisit if the first week turns out to be lost to late scheduling (the catch-up week stays a league setting).
 8. ~~Both active, no agreement~~ ✅ Unplayed, 0 points for both, no Elo change; the organizer may award a walkover if one side clearly blocked the match.
 9. ~~Late cancellation~~ ✅ Not an immediate walkover: the cancelling side must re-propose; if the match isn't played by the deadline, it counts as the inactive side.

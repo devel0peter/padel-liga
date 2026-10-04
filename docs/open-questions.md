@@ -16,7 +16,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 9. ~~Late cancellation~~ ✅ Not an immediate walkover: the cancelling side must re-propose; if the match isn't played by the deadline, it counts as the inactive side.
 10. ~~Scoring~~ ✅ 3/1/0: win 3, played loss 1, walkover loss 0.
 11. ~~Pair count not divisible by 4~~ ✅ 3-pair groups fill the gap (2 matches each, one week off); no waiting list.
-12. ~~Entry fee~~ ✅ The first season is free (already on the landing page).
+12. ~~Entry fee~~ ✅ No entry fee; players pay only the court. No plans to charge players (2026-10-04, replaces "first season free").
 - ~~Elo starting values~~ ✅ kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
 - ~~Home pair~~ ✅ No home pair: either side may propose first (changed 2026-10-03; was alternating home).
 

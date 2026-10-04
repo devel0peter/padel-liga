@@ -99,7 +99,7 @@ const RULES = [
 ];
 
 const FAQ = [
-  ["Mennyibe kerül?", "Az első szezonban a részvétel ingyenes, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
+  ["Mennyibe kerül?", "Nevezési díj nincs, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
   ["Mikor indul?", "Amint összegyűlik legalább 12 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],

@@ -26,7 +26,6 @@ const POINTS = [
   "Szint szerinti négyes csoportok",
   "Heti egy meccs, amikor nektek jó",
   "Három hetente feljutás és kiesés",
-  "Az első szezon ingyenes, csak a pályát fizetitek",
 ];
 
 export default function Poster({ loaderData }: Route.ComponentProps) {
@@ -64,9 +63,15 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
             Ki a legjobb páros a városban?
           </h1>
           <p className="text-[7mm] leading-snug text-[#4a5b70]">
-            Padelliga pároknak{city ? ` ${city === "Győr" ? "Győrben" : city}` : ""}. Bármelyik klubban
-            játszhattok.
+            Padelliga pároknak{city ? ` ${city === "Győr" ? "Győrben" : city}` : ""}.
           </p>
+          <div className="grid gap-[2mm] border-l-[1.5mm] border-[#1e5ba8] pl-[5mm] text-[6.5mm] leading-snug">
+            <p className="font-bold">Unod már, hogy mindig ugyanazokkal játszol?</p>
+            <p className="font-bold">Nehéz hétről hétre meccset szervezni?</p>
+            <p>
+              Jelentkezz a {SITE_NAME}ra, és minden héten új ellenfelet kapsz.
+            </p>
+          </div>
         </header>
 
         <ul className="grid gap-[3.5mm] text-[6.5mm] font-semibold">

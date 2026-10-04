@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
@@ -104,3 +104,16 @@ export const clubs = sqliteTable("clubs", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+// Landing page views per Budapest day and source (app/lib/traffic.ts). Counts
+// only: nothing about the visitor is stored.
+export const landingViews = sqliteTable(
+  "landing_views",
+  {
+    day: text("day").notNull(), // "2026-10-05"
+    // `?ref=` or `?utm_source=`; "" is no source (a NULL can't be in the key).
+    ref: text("ref").notNull().default(""),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.ref] })],
+);

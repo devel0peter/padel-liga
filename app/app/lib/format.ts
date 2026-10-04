@@ -16,3 +16,22 @@ const dateTime = new Intl.DateTimeFormat("hu-HU", {
 export function formatDateTime(date: Date): string {
   return dateTime.format(date);
 }
+
+const percent = new Intl.NumberFormat("hu-HU", { style: "percent", maximumFractionDigits: 1 });
+
+// 0.125 -> "12,5%"
+export function formatPercent(ratio: number): string {
+  return percent.format(ratio);
+}
+
+const shortDay = new Intl.DateTimeFormat("hu-HU", {
+  timeZone: "UTC",
+  month: "short",
+  day: "numeric",
+  weekday: "long",
+});
+
+// "2026-10-05" -> "okt. 5., hétfő"
+export function formatDay(day: string): string {
+  return shortDay.format(new Date(`${day}T00:00:00Z`));
+}

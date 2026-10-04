@@ -39,11 +39,11 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - After the MVP: Facebook login (devel0peter/padel-liga#40).
 - Backlog (ideas from 2026-10-02, not scheduled):
   - Signup counter on the landing page: "X pár jelentkezett, 12 kell az induláshoz".
-  - Cloudflare Web Analytics (cookieless, no consent banner), switched on at go-live.
   - Resend bounce and complaint webhooks → `email_suppressions` (Resend already suppresses hard bounces on its side).
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
 - Clubs (2026-10-04, internal only): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup, and an optional "Hol játszol a legtöbbet?" field on the signup form. Both show as columns and filters in the signups admin and in the CSV, and as counts per club. The landing page hero lists the cities with a league.
+- Analytics (2026-10-04, devel0peter/padel-liga#45): Cloudflare Web Analytics beacon on public pages (site `padelparbaj.hu`, manual snippet, token in `app/wrangler.jsonc`), plus landing views per source vs signups at `/admin/forgalom`. Ad links: `https://padelparbaj.hu/?ref=<source>` (e.g. `fb-hirdetes`); a bare `utm_source` also works.
 - Waiting on Peter:
   - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
@@ -125,6 +125,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-04 | Clubs are internal only: no public club listing, no booking links. The club list feeds the poster QR codes and an optional "where do you play most" signup field; later also the venue list. Replaces the consent-based listing of 2026-10-02 | Players book wherever they already play; the clubs are only useful as data (which poster works, where players play) |
 | 2026-10-04 | No entry fee for players, and no plans to charge them; "first season free" dropped from the site and the poster | Charging players isn't the goal; "first season free" implied a fee later |
 | 2026-10-04 | Landing page shows which cities have a league (a line in the hero), not a section per city | Only Győr for now; "Más város" in the form already collects demand |
+| 2026-10-04 | Analytics without cookies (devel0peter/padel-liga#45): Cloudflare Web Analytics on public pages (not `/admin`) for visits, referrers, devices; plus our own count of landing page views per Budapest day and source in D1 (counts only, from the browser, bots skipped), shown against signups at `/admin/forgalom`. A link's source is `?ref=`, else `?utm_source=`, for landings and signups alike | Ads start 2026-10-05 and we need conversion per source; Web Analytics drops query strings, so it can't split by ad. No ad pixels: they'd need a consent banner |
 | 2026-10-03 | Signup source is any `?ref=` (lowercase slug), stored as typed; a club's slug is its poster's ref. No cookie: the ref only lasts while the landing page is open | Other sources (e.g. a tournament flyer) need no code; no cookie consent needed |
 | 2026-10-02 | Our D1 is the mailing list; Resend only delivers. Broadcasts are written in the admin (`/admin/levelek`) to the filtered signup list; later audiences (e.g. active players) are added as queries | One list, no sync with Resend Audiences; any audience is just a filter on our own data |
 | 2026-10-02 | Every email goes through an outbox table, sent at once and by an hourly cron, within the daily quota (`EMAIL_DAILY_LIMIT`, Resend free = 100/day, 15 kept for signup emails) | Free plan is enough; a big broadcast spreads over days and never blocks signup confirmations; failed sends retry |

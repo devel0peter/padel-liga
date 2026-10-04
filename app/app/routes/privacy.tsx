@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 03.";
+const EFFECTIVE_FROM = "2026. 10. 05.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -66,6 +66,10 @@ export default function Privacy() {
                 ha egy klub plakátjáról (QR-kóddal) érkeztél, a klub neve, hogy
                 lássuk, melyik plakát hoz jelentkezőket,
               </li>
+              <li>
+                ha hirdetésből vagy más megjelölt linkről érkeztél, a link
+                forrása (pl. „facebook”), hogy lássuk, mi hoz jelentkezőket,
+              </li>
               <li>a jelentkezés és a hozzájárulás időpontja.</li>
             </ul>
             <p>
@@ -119,6 +123,19 @@ export default function Privacy() {
             </p>
           </Section>
 
+          <Section title="Látogatási statisztika">
+            <p>
+              Az oldal látogatottságát a Cloudflare Web Analytics méri. Nem
+              használ sütit, nem követ más oldalakon, és nem azonosít téged: csak
+              összesített számokat látunk (hány látogatás, melyik oldal, honnan
+              érkeztek, milyen eszközről).
+            </p>
+            <p>
+              A főoldal megnyitásait mi is megszámoljuk naponta és forrásonként
+              (pl. plakát vagy hirdetés), de rólad semmit nem tárolunk hozzá.
+            </p>
+          </Section>
+
           <Section title="Hol tároljuk?">
             <p>
               Az adatok a Cloudflare szerverein vannak, nyugat-európai
@@ -126,7 +143,7 @@ export default function Privacy() {
               adatokhoz (adatfeldolgozók):
             </p>
             <ul className={list}>
-              <li>Cloudflare, Inc. – tárhely és adatbázis,</li>
+              <li>Cloudflare, Inc. – tárhely, adatbázis és látogatási statisztika,</li>
               <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók,</li>
               <li>Resend – a liga e-mailjeinek kiküldése.</li>
             </ul>

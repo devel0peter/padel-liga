@@ -5,10 +5,32 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
+  useRouteLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { webAnalyticsToken } from "./lib/web-analytics.server";
+
+export function loader() {
+  return { webAnalyticsToken: webAnalyticsToken() };
+}
+
+// Cloudflare Web Analytics: cookieless, so no consent banner (README decision
+// log). Public pages only; the admin isn't counted.
+function WebAnalytics() {
+  const token = useRouteLoaderData<typeof loader>("root")?.webAnalyticsToken;
+  const { pathname } = useLocation();
+  if (!token || pathname.startsWith("/admin")) return null;
+  return (
+    <script
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon={JSON.stringify({ token, spa: true })}
+    />
+  );
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,6 +45,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
+        <WebAnalytics />
       </body>
     </html>
   );

@@ -10,6 +10,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { CITIES } from "~/lib/cities";
+import { normalizeRef, toClubOption } from "~/lib/clubs";
+import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
@@ -19,9 +22,15 @@ export function meta({}: Route.MetaArgs) {
   return pageMeta({
     title: "Padelpárbaj – Ki a legjobb páros a városban?",
     description:
-      "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
+      "Padelpárbaj: szint szerinti 4-es csoportok pároknak, heti egy meccs, feljutás és kiesés. Jelentkezz!",
     path: "/",
   });
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  // Clubs only feed the optional "where do you play most" field.
+  const clubs = (await listClubs()).map(toClubOption);
+  return { ref: normalizeRef(new URL(request.url).searchParams.get("ref")), clubs };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -31,7 +40,11 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const honeypot = form.get("website");
   if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
 
-  const result = parseInterest(form);
+  const clubs = await listClubs();
+  const result = parseInterest(
+    form,
+    clubs.filter((c) => c.city === form.get("city")).map((c) => c.slug),
+  );
   if (!result.ok) return result;
 
   try {
@@ -86,8 +99,8 @@ const RULES = [
 ];
 
 const FAQ = [
-  ["Mennyibe kerül?", "Az első szezonban a részvétel ingyenes, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor indul?", "Amint összegyűlik legalább 8 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
+  ["Mennyibe kerül?", "Nevezési díj nincs, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
+  ["Mikor indul?", "Amint összegyűlik legalább 12 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
@@ -95,7 +108,8 @@ const FAQ = [
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 
-export default function Home() {
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { ref, clubs } = loaderData;
   return (
     <>
       <SiteHeader />
@@ -118,6 +132,14 @@ export default function Home() {
                   Hogyan működik?
                 </a>
               </div>
+              <p className="text-muted-foreground">
+                <span className="font-bold text-foreground">Ligák: </span>
+                {CITIES.map((c) => c.name).join(", ")}. Máshol játszol?{" "}
+                <a href="#jelentkezes" className="underline">
+                  Jelentkezz
+                </a>
+                , és szólunk, ha nálatok is indul.
+              </p>
             </div>
             <LadderDemo />
           </Wrap>
@@ -182,7 +204,7 @@ export default function Home() {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm />
+            <SignupForm signupRef={ref} clubs={clubs} />
           </Wrap>
         </section>
       </main>

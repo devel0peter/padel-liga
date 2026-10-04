@@ -15,6 +15,7 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { CITIES, OTHER_CITY } from "~/lib/cities";
+import { OTHER_CLUB, type ClubOption } from "~/lib/clubs";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
 import { CONTACT_EMAIL } from "~/lib/site";
 
@@ -59,11 +60,18 @@ function Field({
 
 const inputClass = "h-11 bg-background text-base";
 
-export function SignupForm() {
+export function SignupForm({
+  signupRef,
+  clubs = [],
+}: {
+  signupRef?: string | null;
+  clubs?: ClubOption[];
+}) {
   const fetcher = useFetcher<SignupActionData>();
   const [mode, setMode] = useState<Mode>("pair");
   const [city, setCity] = useState<string>(CITIES[0].slug);
   const otherCity = city === OTHER_CITY;
+  const cityClubs = clubs.filter((c) => c.city === city);
   const doneRef = useRef<HTMLDivElement>(null);
 
   const data = fetcher.data;
@@ -210,6 +218,25 @@ export function SignupForm() {
         </Select>
       </Field>
 
+      {cityClubs.length > 0 && (
+        <Field name="homeClub" label="Hol játszol a legtöbbet?" hint="nem kötelező">
+          {/* Keyed by city, so a club from another city isn't kept. */}
+          <Select key={city} name="homeClub">
+            <SelectTrigger id="homeClub" className="h-11! w-full bg-background text-base">
+              <SelectValue placeholder="Válassz…" />
+            </SelectTrigger>
+            <SelectContent>
+              {cityClubs.map((c) => (
+                <SelectItem key={c.slug} value={c.slug}>
+                  {c.name}
+                </SelectItem>
+              ))}
+              <SelectItem value={OTHER_CLUB}>Máshol / vegyesen</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
+
       <Field
         name="note"
         label="Megjegyzés"
@@ -218,6 +245,8 @@ export function SignupForm() {
       >
         <Textarea id="note" name="note" maxLength={1000} className="min-h-20 bg-background text-base" {...invalid("note")} />
       </Field>
+
+      {signupRef && <input type="hidden" name="ref" value={signupRef} />}
 
       {/* Honeypot for bots; hidden from people and screen readers. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 overflow-hidden">

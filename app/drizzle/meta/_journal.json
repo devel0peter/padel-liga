@@ -36,6 +36,13 @@
       "when": 1790935893162,
       "tag": "0004_email",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791102139543,
+      "tag": "0005_clubs",
+      "breakpoints": true
     }
   ]
 }

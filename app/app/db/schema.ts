@@ -15,6 +15,11 @@ export const interestSignups = sqliteTable("interest_signups", {
   email2: text("email2"),
   level: text("level").notNull(),
   note: text("note"),
+  // Where the signup came from: the `?ref=` of the landing page link, e.g. a
+  // club slug from that club's poster QR code (app/lib/clubs.ts).
+  ref: text("ref"),
+  // Club slug where they play most (optional), or "other"; see clubs.ts.
+  homeClub: text("home_club"),
   consentAt: integer("consent_at", { mode: "timestamp" }).notNull(),
   // Admin-only fields, see app/lib/signups-admin.ts.
   status: text("status", { enum: ["new", "contacted", "paired", "withdrawn"] })
@@ -80,6 +85,21 @@ export const broadcasts = sqliteTable("broadcasts", {
 export const emailSuppressions = sqliteTable("email_suppressions", {
   email: text("email").primaryKey(),
   reason: text("reason", { enum: ["unsubscribed", "bounced", "complained"] }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// The city's padel clubs. Internal only: never listed publicly. Used to count
+// signups per club, by poster (`?ref=<slug>`) and by where players say they
+// play most. Later also the venue list for recording matches (spec: Venue).
+export const clubs = sqliteTable("clubs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  slug: text("slug").notNull().unique(),
+  city: text("city").notNull(),
+  name: text("name").notNull(),
+  adminNote: text("admin_note"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

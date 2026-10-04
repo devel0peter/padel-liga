@@ -35,8 +35,28 @@ describe("parseInterest", () => {
         email2: null,
         level: "kozephalado",
         note: null,
+        ref: null,
+        homeClub: null,
       },
     });
+  });
+
+  it("keeps a known home club or 'other' and drops anything else", () => {
+    const clubs = ["gyp", "arkad"];
+    expect(parseInterest(form({ ...pair, homeClub: "gyp" }), clubs)).toMatchObject({ ok: true, data: { homeClub: "gyp" } });
+    expect(parseInterest(form({ ...pair, homeClub: "other" }), clubs)).toMatchObject({ ok: true, data: { homeClub: "other" } });
+    expect(parseInterest(form({ ...pair, homeClub: "nope" }), clubs)).toMatchObject({ ok: true, data: { homeClub: null } });
+    expect(parseInterest(form({ ...pair, homeClub: "gyp" }))).toMatchObject({ ok: true, data: { homeClub: null } });
+  });
+
+  it("ignores the home club for a city without a league", () => {
+    const r = parseInterest(form({ ...pair, city: "other", cityOther: "Szeged", homeClub: "gyp" }), ["gyp"]);
+    expect(r).toMatchObject({ ok: true, data: { homeClub: null } });
+  });
+
+  it("keeps a valid ref and drops a malformed one", () => {
+    expect(parseInterest(form({ ...pair, ref: "Gyor-Padel" }))).toMatchObject({ ok: true, data: { ref: "gyor-padel" } });
+    expect(parseInterest(form({ ...pair, ref: "<b>" }))).toMatchObject({ ok: true, data: { ref: null } });
   });
 
   it("drops partner fields for a solo signup", () => {

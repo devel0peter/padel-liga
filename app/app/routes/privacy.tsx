@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 02.";
+const EFFECTIVE_FROM = "2026. 10. 03.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -61,6 +61,11 @@ export default function Privacy() {
               <li>a város, ahol játszanál,</li>
               <li>ha párral jelentkezel, a párod neve és (ha megadod) az e-mail-címe,</li>
               <li>a szint, amit megadsz, és a megjegyzésed,</li>
+              <li>ha megadod, melyik klubban játszol a legtöbbet,</li>
+              <li>
+                ha egy klub plakátjáról (QR-kóddal) érkeztél, a klub neve, hogy
+                lássuk, melyik plakát hoz jelentkezőket,
+              </li>
               <li>a jelentkezés és a hozzájárulás időpontja.</li>
             </ul>
             <p>

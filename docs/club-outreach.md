@@ -3,10 +3,11 @@
 Messenger messages to the 3 Győr club owners (informal, "tegező"). Part of the organizer playbook (`go-to-market.md`). Replace the `[…]` parts before sending.
 
 Decided 2026-10-02:
-- Start date: depends on demand ("ha összegyűlik 8 pár"), target November 2026.
-- Entry fee: the first season is free for players (they pay only the court). Fine to mention if asked.
+- Start date: depends on demand ("ha összegyűlik 12 pár"), target November 2026. (Was 8 until 2026-10-03.)
+- Entry fee: none, players pay only the court. No plans to charge players (2026-10-04). Fine to mention if asked.
 - The ask stays small: one poster with a QR code near reception. The player group post is a bonus.
-- A club goes on the platform only after the owner says yes to the poster and to being listed on the site. Then it gets its own poster QR code (`?ref=<club>`), so we can later tell them how many players their poster brought in.
+- Clubs are not listed on the site (changed 2026-10-04). The club list is internal: each club gets its own poster QR code (`?ref=<club>`), so we can tell them how many players their poster brought in, and the signup form asks (optionally) where players play most.
+- In the admin: add the club at `/admin/klubok`, then print its poster (printer icon, A4). Signups per club (by poster and by "where they play") are on the same page.
 
 ## 1. Poster request
 
@@ -16,11 +17,11 @@ Decided 2026-10-02:
 >
 > A párok maguk foglalnak pályát a meccseikhez, bármelyik győri klubban. Így hétköznap is többen jönnek játszani, nem csak a versenyekre.
 >
-> Ha összegyűlik legalább 8 pár, november körül indulunk. Most gyűjtjük a jelentkezőket: https://padelparbaj.hu
+> Ha összegyűlik legalább 12 pár, november körül indulunk. Most gyűjtjük a jelentkezőket: https://padelparbaj.hu
 >
 > Kitehetnék nálatok egy plakátot QR-kóddal a recepció mellé? Ha belefér, a játékoscsoportotokban is megosztanám, de ez már csak extra.
 >
-> Ha benne vagy, a klubot az oldalon is feltüntetném a foglalási linketekkel, és a szezon végén megmutatom, hány ligameccset játszottak nálatok. Köszi!
+> Cserébe a szezon végén megmutatom, hányan jelentkeztek a plakátotokról, és hány ligameccset játszottak nálatok. Köszi!
 >
 > Peter
 
@@ -42,5 +43,5 @@ Questions worth asking over coffee:
 - **"Ez nem a konkurenciának visz játékost?"** It's a city league, not a club competition. Every club gets bookings, and no club is exclusive. The match venue is recorded, so each club sees its own numbers.
 - **"Mennyibe kerül a klubnak?"** Nothing. The ask is a poster.
 - **"Mi a különbség a Piramisbajnoksághoz képest?"** Pairs, fixed weekly rhythm, a local organizer, and scheduling on the site, with a walkover rule for pairs that don't respond.
-- **"Mikor indul?"** When 8 pairs have signed up; target November.
-- **"Fizetnek a játékosok?"** The first season is free; players only pay for the court, at the club.
+- **"Mikor indul?"** When 12 pairs have signed up; target November.
+- **"Fizetnek a játékosok?"** No entry fee; players only pay for the court, at the club.

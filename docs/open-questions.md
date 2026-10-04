@@ -7,7 +7,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
 3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
 4. ~~**Contact details**~~ ✅ The interest form stays as it is (names, emails, level, comment). Phone number only at registration, optional (see #15).
-5. ~~**Season start**~~ ✅ When 8 pairs have signed up; target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
+5. ~~**Season start**~~ ✅ When 12 pairs have signed up (raised from 8 on 2026-10-03); target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
 
 ## Rules
 6. ~~Match format~~ ✅ 2 sets to 6 (tie-break at 6-6), super tie-break to 10 as the decider, golden point; one format per league; 90-minute booking recommended; unfinished matches continue in a new slot. See spec section 7.
@@ -16,7 +16,7 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 9. ~~Late cancellation~~ ✅ Not an immediate walkover: the cancelling side must re-propose; if the match isn't played by the deadline, it counts as the inactive side.
 10. ~~Scoring~~ ✅ 3/1/0: win 3, played loss 1, walkover loss 0.
 11. ~~Pair count not divisible by 4~~ ✅ 3-pair groups fill the gap (2 matches each, one week off); no waiting list.
-12. ~~Entry fee~~ ✅ The first season is free (already on the landing page).
+12. ~~Entry fee~~ ✅ No entry fee; players pay only the court. No plans to charge players (2026-10-04, replaces "first season free").
 - ~~Elo starting values~~ ✅ kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
 - ~~Home pair~~ ✅ No home pair: either side may propose first (changed 2026-10-03; was alternating home).
 

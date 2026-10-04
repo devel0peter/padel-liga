@@ -30,7 +30,7 @@ Takeaway: keep the infrastructure on free tiers as long as possible. The first r
 Ordered roughly by how realistic they are for us.
 
 ### 1. Player entry fee per season
-- The most direct model. Landing page already says *"Az első szezonban a részvétel ingyenes"*, which leaves room for a fee from season 2.
+- The most direct model, but off the table for now: no plans to charge players (2026-10-04). The landing page says *"Nevezési díj nincs"*.
 - Guess: 3,000–6,000 Ft per player per season (about the price of one or two court bookings).
 - Value to sell: organized weekly matches, fair walkover rules, rankings, Elo, prizes, season finals.
 - Options: early-bird price, discount for returning pairs, free spot for whoever brings a new pair.
@@ -101,7 +101,7 @@ Cheap now, expensive to retrofit later:
 - **Keep recording the venue per match.** Club booking reports are the basis of any club deal.
 - **Reserve space for sponsor visibility** in the layout (standings, emails, share images), without building it yet.
 - **Track reach**: player counts, page views (Cloudflare Web Analytics), social followers. Sponsors ask for these numbers.
-- **Don't promise "free forever"** anywhere. The current "first season is free" wording is fine.
+- **Don't promise "free forever"** anywhere. "Nevezési díj nincs" states the present, nothing more.
 - **Personal data stays with us.** Never sell or share player data with sponsors; any sponsor email needs explicit opt-in consent. Needs review against the privacy page (`/adatkezeles`).
 - **Keep hosting on free tiers** and avoid paid services until there's income.
 

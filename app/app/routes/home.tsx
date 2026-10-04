@@ -22,7 +22,7 @@ export function meta({}: Route.MetaArgs) {
   return pageMeta({
     title: "Padelpárbaj – Ki a legjobb páros a városban?",
     description:
-      "Padelbajnokság pároknak. Szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Jelentkezz!",
+      "Padelpárbaj: szint szerinti 4-es csoportok pároknak, heti egy meccs, feljutás és kiesés. Jelentkezz!",
     path: "/",
   });
 }

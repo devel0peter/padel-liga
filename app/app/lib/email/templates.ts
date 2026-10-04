@@ -113,7 +113,7 @@ export function partnerNotice(s: InterestSignup): Email {
     [
       `Szia ${s.name2}!`,
       `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s)}), és megadta a neved és az e-mail-címed.`,
-      `A ${SITE_NAME} padelbajnokság pároknak: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
+      `A ${SITE_NAME} párosoknak szól: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
       `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Ezen kívül nem írunk neked, amíg magad nem regisztrálsz.`,
       SIGNATURE,
     ].join("\n\n"),

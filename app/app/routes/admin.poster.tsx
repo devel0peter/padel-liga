@@ -18,14 +18,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   const ref = normalizeRef(new URL(request.url).searchParams.get("ref"));
   const club = ref ? await getClub(ref) : undefined;
   const url = ref ? posterUrl(ref) : SITE_URL;
-  const city = CITIES.find((c) => c.slug === club?.city)?.name ?? null;
+  // The general poster is for the first (so far only) city.
+  const city = (CITIES.find((c) => c.slug === club?.city) ?? CITIES[0]).name;
   return { url, qr: renderSVG(url, { border: 0 }), club: club?.name ?? null, ref, city };
 }
 
-const POINTS = [
-  "Szint szerinti négyes csoportok",
-  "Heti egy meccs, amikor nektek jó",
-  "Három hetente feljutás és kiesés",
+// Same steps as the landing page's "Hogyan működik?", in short.
+const STEPS = [
+  ["Négyes csoportok", "Szint szerint, kiegyenlített meccsekkel."],
+  ["Heti egy meccs", "Akkor és ott, amikor nektek jó."],
+  ["Feljutás, kiesés", "Három hetente új kör, új ellenfelek."],
 ];
 
 export default function Poster({ loaderData }: Route.ComponentProps) {
@@ -53,35 +55,35 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
       </div>
 
       {/* Fixed light colours: the poster prints the same in dark mode. */}
-      <article className="mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[12mm] text-[#10233d] print:h-[297mm] print:max-w-none">
-        <header className="grid gap-[6mm]">
-          <div className="flex items-center gap-[3mm] text-[7mm] font-extrabold [font-stretch:120%]">
-            <span className="inline-block size-[6mm] rounded-full bg-[#dceb3c] shadow-[inset_-1.5mm_-1mm_0_rgba(0,0,0,0.12)]" />
+      <article className="mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[14mm] text-[#10233d] print:h-[297mm] print:max-w-none">
+        <header className="grid gap-[9mm]">
+          {/* Brand: the league is "Padelpárbaj <city>". */}
+          <div className="flex items-baseline gap-[3mm] text-[8mm] font-extrabold [font-stretch:120%]">
+            <span className="inline-block size-[6.5mm] self-center rounded-full bg-[#dceb3c] shadow-[inset_-1.5mm_-1mm_0_rgba(0,0,0,0.12)]" />
             {SITE_NAME}
+            <span className="text-[#1e5ba8]">{city}</span>
           </div>
-          <h1 className="font-display text-[17mm] leading-[1.02] font-black tracking-tight">
+          <h1 className="font-display text-[16.5mm] leading-[1.02] font-black tracking-tight">
             Ki a legjobb páros a városban?
           </h1>
-          <p className="text-[7mm] leading-snug text-[#4a5b70]">
-            Padelliga pároknak{city ? ` ${city === "Győr" ? "Győrben" : city}` : ""}.
+          <p className="max-w-[160mm] text-[7.5mm] leading-snug">
+            <strong>Unod már, hogy mindig ugyanazokkal játszol? Nehéz hétről hétre meccset
+            szervezni?</strong>{" "}
+            <span className="text-[#4a5b70]">A {SITE_NAME}ban minden héten új ellenfelet kapsz.</span>
           </p>
-          <div className="grid gap-[2mm] border-l-[1.5mm] border-[#1e5ba8] pl-[5mm] text-[6.5mm] leading-snug">
-            <p className="font-bold">Unod már, hogy mindig ugyanazokkal játszol?</p>
-            <p className="font-bold">Nehéz hétről hétre meccset szervezni?</p>
-            <p>
-              Jelentkezz a {SITE_NAME}ra, és minden héten új ellenfelet kapsz.
-            </p>
-          </div>
         </header>
 
-        <ul className="grid gap-[3.5mm] text-[6.5mm] font-semibold">
-          {POINTS.map((p) => (
-            <li key={p} className="flex items-center gap-[4mm]">
-              <span className="inline-block size-[4mm] shrink-0 rounded-full bg-[#1e5ba8]" />
-              {p}
+        <ol className="grid grid-cols-3 gap-[6mm]">
+          {STEPS.map(([title, text], i) => (
+            <li key={title} className="grid content-start gap-[2mm] border-t-[1.2mm] border-[#1e5ba8] pt-[4mm]">
+              <span className="font-display text-[13mm] leading-none font-black text-[#1e5ba8] [font-stretch:125%]">
+                {i + 1}
+              </span>
+              <span className="text-[6.5mm] leading-tight font-bold">{title}</span>
+              <span className="text-[5mm] leading-snug text-[#4a5b70]">{text}</span>
             </li>
           ))}
-        </ul>
+        </ol>
 
         <footer className="grid grid-cols-[1fr_62mm] items-end gap-[8mm] rounded-[6mm] bg-[#dceb3c] p-[8mm]">
           <div className="grid gap-[3mm]">

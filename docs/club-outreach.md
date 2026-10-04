@@ -45,3 +45,10 @@ Questions worth asking over coffee:
 - **"Mi a különbség a Piramisbajnoksághoz képest?"** Pairs, fixed weekly rhythm, a local organizer, and scheduling on the site, with a walkover rule for pairs that don't respond.
 - **"Mikor indul?"** When 12 pairs have signed up; target November.
 - **"Fizetnek a játékosok?"** No entry fee; players only pay for the court, at the club.
+- **"Tele vagyunk, nincs szükségünk több foglalásra."** Fine: the league isn't a bookings deal, it's for the players (new opponents every week, a city ranking). The ask is still just a poster. (Padel Club Győr, 2026-10-04.)
+
+## Outreach log
+
+| Date | Club | Outcome | Follow-up |
+|---|---|---|---|
+| 2026-10-04 | Padel Club Győr | Owner supportive, likes the idea; was considering a similar competition himself. Nearly fully booked, so no booking benefit for them. OK to put up the poster and post on their Facebook page; offered to post it himself as page owner | Print and put up their poster (`/admin/klubok`). Send him the post text and the club's poster link (`?ref=`) so signups are counted. Court availability: league pairs may struggle to book there, so expect matches at the other clubs |

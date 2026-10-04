@@ -22,7 +22,7 @@
   - A helyettes értékszáma változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja.
-- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, a szervező jóváhagyja. Ha a szezon már elindult, a következő kör elején kapcsolódtok be.
+- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, a szervező jóváhagyja. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban).
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
@@ -74,11 +74,17 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 ## 7. Feljutás és kiesés
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
+- **Új párok a szezon közben** (később nevezők és párcsere után):
+  - Az értékszámotok alapján soroljuk be a párt. Aki még nem játszott értékelt meccset, annál 100 ponttal kevesebbel számolunk, mert a szintje még csak saját becslés.
+  - Új pár nem kerülhet a legfelső csoportba, oda fel kell jutni.
+  - Először a szabad helyekre kerültök (3 páros csoport, visszalépett pár helye), a szinteteken vagy alatta.
+  - Ha nincs szabad hely, a csoportotokból és az alattatok lévő csoportokból a legalacsonyabb értékszámú pár egy csoporttal lejjebb kerül. A felettetek lévő csoportok nem változnak.
+  - A beosztást a kör indulása előtt a szervező átnézi.
 
 ## 8. Egyéni értékszám
 - Minden játékosnak van egyéni értékszáma, amely minden lejátszott meccs után változik.
 - A kezdő értékszám a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
-- Párcserénél ez alapján kerül az új pár a megfelelő csoportba.
+- Párcserénél és késői nevezésnél ez alapján kerül az új pár a megfelelő csoportba (7. pont).
 - A játék nélküli győzelem nem változtat az értékszámon.
 
 ## 9. Fair play

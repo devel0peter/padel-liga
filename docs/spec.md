@@ -38,7 +38,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
 - **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases. It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break.
-- **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by Elo.
+- **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by the late-joiner rules (section 10).
 - **Venue:** the city's padel clubs, an internal list the organizer maintains, used when recording where a match was booked (and for per-club statistics). Never listed publicly; the same list feeds the poster QR codes and the optional "where do you play most" signup field (README decision log, 2026-10-04).
 - **Phase:** 3 weeks, back to back: the next phase starts on the Monday after the deadline, and new groups are emailed that Monday morning. Group composition is fixed within a phase. (A catch-up week exists as a league setting, off by default; revisit if the first week of a phase turns out to be lost.)
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest). When the number of pairs isn't divisible by 4, some groups have 3 pairs (9 = 3+3+3, 10 = 4+3+3, 11 = 4+4+3); no waiting list. 3-pair groups go at the bottom unless the organizer places them otherwise.
@@ -116,8 +116,14 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 
 ## 10. Promotion and relegation
 - At the end of a phase, 1st place moves up a group and last place (4th, or 3rd in a group of 3) moves down. The top group has no promotion and the bottom group has no relegation.
-- New pairs: placed by the average Elo of the pair, or by self-assessed level if they have no rating.
-- First phase of a season: the system sorts the approved pairs by average Elo into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
+- **New pairs after the first phase** (late entries and pairs re-formed by a partner change) are placed by these rules, so they neither start at the bottom nor push earlier pairs down for free (README decision log, 2026-10-04):
+  1. **Placement rating:** each player's Elo, minus 100 if the player has no rated match yet (their rating is still only the self-assessed starting value; a match as a substitute counts as rated). Pair placement rating = average of the two.
+  2. **Target group:** the highest group, other than the top group, whose average pair Elo is at most the new pair's placement rating; the bottom group if there is none. With a single group, that group.
+  3. **Free spot first:** if the target group has fewer than 4 pairs, the new pair goes there. Otherwise into the nearest group below it with fewer than 4 pairs (a 3-pair group or a spot left by a withdrawal).
+  4. **No free spot at or below the target:** the new pair goes into the target group, and from there down each group passes its lowest-Elo pair one group down; the bottom groups are re-cut to the sizes in section 4. Groups above the target don't change.
+  5. Several new pairs are placed one by one, highest placement rating first, after promotion and relegation of the continuing pairs.
+  6. The result is part of the round switch draft; the organizer can move pairs before publishing.
+- First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
 - **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
 - Pair count not divisible by 4: groups of 3 fill the gap (section 4).

@@ -138,6 +138,7 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
 | 2026-10-04 | Account creation is invite-only until registration opens on 2 Nov (`npm run auth:invite -w app`) | Lets organizers and testers in before the public opening |
 | 2026-10-04 | Lean notifications: one new-phase email per phase, "action needed" only to the pair who must act, a deadline reminder only for unscheduled matches, at most one digest per player per day (about 4–5 per player per phase). Stay on Resend free; when it becomes the bottleneck, a bigger Resend plan or Workers Paid + Cloudflare Email Service. No SMS | Keeps inboxes quiet and the email bill at zero for a pet project; SMS costs over 100× an email |
 | 2026-10-04 | Login brute force: a Cloudflare WAF rate-limiting rule on the login routes (the Free plan includes one), plus at most 5 codes per email per hour in our code | No extra infrastructure |
+| 2026-10-04 | Pairs joining after the first phase (late entries, partner changes): placed by Elo, minus 100 per player with no rated match; never into the top group; free spots (3-pair groups, withdrawals) at or below their level first; otherwise each group from theirs down passes its lowest-Elo pair one group down. Organizer reviews in the round switch draft. Spec section 10 | Bottom placement is unfair to beginners (a strong pair crushes them for a phase); plain Elo placement trusts an unproven self-assessment and pushes earlier pairs down without losing a match |
 
 ## Roadmap
 

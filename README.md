@@ -43,9 +43,8 @@ Owner and Győr organizer: Peter. Built 100% AI-driven (vibe coded). The UI is *
   - Turnstile on the signup form, so bots can't burn the daily email quota.
   - Rename the `app/` workspace to `web/` (the nested `app/app/` comes from React Router's default `appDirectory`). Do it when no other session is mid-change.
 - Clubs (2026-10-04, internal only): `/admin/klubok` to add clubs, a printable A4 poster per club with a QR code (`/admin/plakat?ref=<club>`, plus a general one), `?ref=` stored with each signup, and an optional "Hol játszol a legtöbbet?" field on the signup form. Both show as columns and filters in the signups admin and in the CSV, and as counts per club. The landing page hero lists the cities with a league.
-- Analytics (2026-10-04, devel0peter/padel-liga#45): Cloudflare Web Analytics beacon on public pages, plus landing views per source vs signups at `/admin/forgalom`. Ad links: `https://padelparbaj.hu/?ref=<source>` (e.g. `fb-hirdetes`); a bare `utm_source` also works.
+- Analytics (2026-10-04, devel0peter/padel-liga#45): Cloudflare Web Analytics beacon on public pages (site `padelparbaj.hu`, manual snippet, token in `app/wrangler.jsonc`), plus landing views per source vs signups at `/admin/forgalom`. Ad links: `https://padelparbaj.hu/?ref=<source>` (e.g. `fb-hirdetes`); a bare `utm_source` also works.
 - Waiting on Peter:
-  - Cloudflare dashboard → Web Analytics → Add a site → `padelparbaj.hu`, manual JS snippet (not automatic setup, which would also tag `/admin`); put its token in `CF_WEB_ANALYTICS_TOKEN` in `app/wrangler.jsonc`.
   - Messages to the 3 club owners (`docs/club-outreach.md`), including winter court capacity.
 
 ## Docs

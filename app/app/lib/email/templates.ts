@@ -1,6 +1,7 @@
 // Email content. Pure (no I/O) so it can be unit tested and previewed in the
 // browser. Every email has an HTML and a plain-text version.
 
+import type { City } from "../cities";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
@@ -77,10 +78,12 @@ function build(subject: string, bodyText: string, foot: { html: string; text: st
 
 const SIGNATURE = `Peter\n${SITE_NAME}`;
 
-export function signupConfirmation(s: InterestSignup): Email {
+type Cities = readonly Pick<City, "slug" | "name">[];
+
+export function signupConfirmation(s: InterestSignup, cities: Cities = []): Email {
   const otherCity = s.cityOther != null;
   const lines = [
-    `Város: ${cityLabel(s)}`,
+    `Város: ${cityLabel(s, cities)}`,
     s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel",
     `Szint: ${levelLabel(s.level)}`,
   ];
@@ -106,13 +109,13 @@ export function signupConfirmation(s: InterestSignup): Email {
 
 // Spec section 17: the partner gets exactly one email, so they know about the
 // signup and can ask for deletion.
-export function partnerNotice(s: InterestSignup): Email {
+export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
   if (!s.name2) throw new Error("partnerNotice needs a partner");
   return build(
     `${s.name1} jelentkeztetett titeket a ${SITE_NAME}ra`,
     [
       `Szia ${s.name2}!`,
-      `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s)}), és megadta a neved és az e-mail-címed.`,
+      `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,
       `A ${SITE_NAME} pároknak szól: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
       `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Ezen kívül nem írunk neked, amíg magad nem regisztrálsz.`,
       SIGNATURE,

@@ -23,6 +23,7 @@ const platformOnly: Permission[] = [
   { kind: "broadcasts.send" },
   { kind: "traffic.view" },
   { kind: "leagues.manage" },
+  { kind: "cities.manage" },
   { kind: "users.view" },
   { kind: "clubs.manage" },
 ];
@@ -85,6 +86,7 @@ describe("sidebar", () => {
     expect(nav[0].items.map((i) => i.to)).toEqual(["/admin/leagues/gyor", "/admin/leagues/gyor/clubs"]);
     expect(nav[1].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
+      "/admin/cities",
       "/admin/users",
       "/admin/signups",
       "/admin/broadcasts",

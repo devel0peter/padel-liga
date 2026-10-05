@@ -179,6 +179,18 @@ export const accountInvites = sqliteTable("account_invites", {
     .default(sql`(unixepoch())`),
 });
 
+// Cities (tenants), managed by the Admin at /admin/cities. Signups, clubs and
+// leagues refer to a city by slug. `listed`: offered on the public signup
+// form and the landing page (only cities with an organizer, spec section 4).
+export const cities = sqliteTable("cities", {
+  slug: text("slug").primaryKey(),
+  name: text("name").notNull(),
+  listed: integer("listed", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // A league in a city, e.g. "Padelpárbaj Győr" (spec section 4).
 export const leagues = sqliteTable("leagues", {
   id: integer("id").primaryKey({ autoIncrement: true }),

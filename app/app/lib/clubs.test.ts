@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { countBy, homeClubLabel, normalizeRef, parseClub, posterUrl, refLabel, slugify, toClubOption } from "./clubs";
 
+const GYOR = [{ slug: "gyor", name: "Győr" }];
+
 function form(fields: Record<string, string>): FormData {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) fd.set(k, v);
@@ -41,24 +43,24 @@ describe("normalizeRef", () => {
 
 describe("parseClub", () => {
   it("accepts a valid club and makes the slug from the name", () => {
-    expect(parseClub(form(club))).toEqual({
+    expect(parseClub(form(club), GYOR)).toEqual({
       ok: true,
       data: { name: "Győr Padel Klub", slug: "gyor-padel-klub", city: "gyor", adminNote: null },
     });
   });
 
   it("rejects 'other' as a slug, since it means 'Máshol / vegyesen'", () => {
-    const r = parseClub(form({ ...club, slug: "other" }));
+    const r = parseClub(form({ ...club, slug: "other" }), GYOR);
     expect(r.ok).toBe(false);
   });
 
   it("keeps a typed slug, lowercased", () => {
-    const r = parseClub(form({ ...club, slug: "GYP" }));
+    const r = parseClub(form({ ...club, slug: "GYP" }), GYOR);
     expect(r.ok && r.data.slug).toBe("gyp");
   });
 
   it("rejects a missing name, bad slug and unknown city", () => {
-    const r = parseClub(form({ name: "", slug: "a b", city: "pest" }));
+    const r = parseClub(form({ name: "", slug: "a b", city: "pest" }), GYOR);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["city", "name", "slug"]);
   });

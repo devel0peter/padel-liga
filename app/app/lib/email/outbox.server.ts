@@ -10,6 +10,7 @@ import { parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { MAX_BATCH, sendBatch } from "./resend.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
+import { listCities } from "~/lib/cities.server";
 
 import { broadcastEmail, loginCode, partnerNotice, signupConfirmation, type Email } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
@@ -77,8 +78,9 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
 
 // Signup confirmation, plus the one-time partner notice (spec section 17).
 export async function queueSignupEmails(signup: InterestSignup): Promise<number[]> {
+  const cities = await listCities();
   const messages: NewMessage[] = [
-    { kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup) },
+    { kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) },
   ];
   if (signup.mode === "pair" && signup.name2 && signup.email2) {
     const partner = signup.email2.toLowerCase();
@@ -90,7 +92,7 @@ export async function queueSignupEmails(signup: InterestSignup): Promise<number[
       db.select({ n: count() }).from(emailSuppressions).where(eq(emailSuppressions.email, partner)),
     ]);
     if (notified.n === 0 && suppressed.n === 0)
-      messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup) });
+      messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup, cities) });
   }
   return enqueue(messages);
 }

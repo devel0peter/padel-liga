@@ -31,14 +31,15 @@ import {
 import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
 import { filterSignups, parseFilters } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
+import { listCities } from "~/lib/cities.server";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
   const filters = parseFilters(params);
-  const [rows, suppressed] = await Promise.all([listSignups(), suppressedSet()]);
-  return { label: audienceLabel(filters), ...signupRecipients(filterSignups(rows, filters), suppressed) };
+  const [rows, suppressed, cities] = await Promise.all([listSignups(), suppressedSet(), listCities()]);
+  return { label: audienceLabel(filters, cities), ...signupRecipients(filterSignups(rows, filters), suppressed) };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

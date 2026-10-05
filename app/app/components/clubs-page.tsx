@@ -32,9 +32,9 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
-import { CITIES } from "~/lib/cities";
+import { cityName, type City } from "~/lib/cities";
 import { OTHER_CLUB, posterUrl, type Club, type ClubField } from "~/lib/clubs";
-import { cityLabel, NO_REF } from "~/lib/signups-admin";
+import { NO_REF } from "~/lib/signups-admin";
 
 // The clubs page, shared by /admin/clubs (Admin, every city) and
 // /admin/leagues/:league/clubs (a Szervező: their league's city only). Data and
@@ -54,6 +54,7 @@ export type ClubsScope = {
 
 export type ClubsData = {
   scope: ClubsScope;
+  cities: Pick<City, "slug" | "name">[];
   clubs: Club[];
   refs: Record<string, number>;
   plays: Record<string, number>;
@@ -99,7 +100,17 @@ function Field({
   );
 }
 
-function ClubForm({ club, errors, scope }: { club?: Club; errors: Partial<Record<ClubField, string>>; scope: ClubsScope }) {
+function ClubForm({
+  club,
+  errors,
+  scope,
+  cities,
+}: {
+  club?: Club;
+  errors: Partial<Record<ClubField, string>>;
+  scope: ClubsScope;
+  cities: Pick<City, "slug" | "name">[];
+}) {
   const busy = useNavigation().state === "submitting";
   return (
     // Keyed by club, so switching between clubs resets the fields.
@@ -126,12 +137,12 @@ function ClubForm({ club, errors, scope }: { club?: Club; errors: Partial<Record
           <input type="hidden" name="city" value={scope.city} />
         ) : (
         <Field name="city" label="Város" error={errors.city}>
-          <Select name="city" defaultValue={club?.city ?? CITIES[0].slug}>
+          <Select name="city" defaultValue={club?.city ?? cities[0]?.slug}>
             <SelectTrigger id="city" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CITIES.map((c) => (
+              {cities.map((c) => (
                 <SelectItem key={c.slug} value={c.slug}>
                   {c.name}
                 </SelectItem>
@@ -190,7 +201,7 @@ function DeleteClub({ club }: { club: Club }) {
 }
 
 export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: ClubsActionData }) {
-  const { scope, clubs, refs, plays, otherRefs, noRef, playsOther, playsUnknown } = data;
+  const { scope, cities, clubs, refs, plays, otherRefs, noRef, playsOther, playsUnknown } = data;
   const linked = scope.canSeeSignups;
   const [params] = useSearchParams();
   const editing = clubs.find((c) => c.slug === params.get("edit"));
@@ -240,7 +251,7 @@ export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: 
                     <div className="font-medium">{club.name}</div>
                     <div className="text-xs text-muted-foreground">{posterUrl(club.slug)}</div>
                   </TableCell>
-                  {!scope.city && <TableCell>{cityLabel({ city: club.city, cityOther: null })}</TableCell>}
+                  {!scope.city && <TableCell>{cityName(club.city, cities)}</TableCell>}
                   <TableCell>
                     <Count n={plays[club.slug] ?? 0} to={`/admin/signups?club=${club.slug}`} linked={linked} />
                   </TableCell>
@@ -286,7 +297,7 @@ export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: 
         ))}
       </p>
 
-      <ClubForm club={editing} errors={actionData?.errors ?? {}} scope={scope} />
+      <ClubForm club={editing} errors={actionData?.errors ?? {}} scope={scope} cities={cities} />
     </AppPage>
   );
 }

@@ -1,8 +1,8 @@
 // Leagues (spec section 4): a city's league, e.g. "Padelpárbaj Győr". Pure
 // (no I/O); the database side is leagues.server.ts.
 
-import { isCity } from "./cities";
-import { isSlug, slugify } from "./clubs";
+import { isCity, type City } from "./cities";
+import { isSlug, slugify } from "./slug";
 
 export type LeagueInput = { city: string; name: string; slug: string };
 export type LeagueField = keyof LeagueInput;
@@ -12,13 +12,13 @@ const MAX_NAME = 80;
 
 // The slug is the league's address (/admin/leagues/gyor, later the public
 // league pages); empty means "made from the name".
-export function parseLeague(form: FormData): LeagueResult {
+export function parseLeague(form: FormData, cities: readonly Pick<City, "slug">[]): LeagueResult {
   const city = String(form.get("city") ?? "");
   const name = String(form.get("name") ?? "").trim().replace(/\s+/g, " ");
   const rawSlug = String(form.get("slug") ?? "").trim().toLowerCase();
   const slug = rawSlug || slugify(name);
   const errors: Partial<Record<LeagueField, string>> = {};
-  if (!isCity(city)) errors.city = "Válassz várost.";
+  if (!isCity(city, cities)) errors.city = "Válassz várost.";
   if (name.length < 2) errors.name = "Add meg a liga nevét.";
   else if (name.length > MAX_NAME) errors.name = `Legfeljebb ${MAX_NAME} karakter.`;
   if (!isSlug(slug)) errors.slug = "Csak kisbetű, szám és kötőjel, legfeljebb 40 karakter.";

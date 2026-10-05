@@ -1,4 +1,4 @@
-import { BarChart3, Check, ChevronsUpDown, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
+import { BarChart3, Building2, Check, ChevronsUpDown, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -71,6 +71,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   clubs: MapPin,
   traffic: BarChart3,
   leagues: Trophy,
+  cities: Building2,
   users: UserCog,
 };
 

@@ -23,6 +23,7 @@ export type Permission =
   | { kind: "broadcasts.send" }
   | { kind: "traffic.view" }
   | { kind: "leagues.manage" }
+  | { kind: "cities.manage" }
   | { kind: "users.view" }
   // A city's clubs (venues): its Szervezők. Without a city: every city's.
   | { kind: "clubs.manage"; city?: string }
@@ -53,12 +54,13 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "overview" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "users";
+export type NavIcon = "overview" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 export type NavSection = { label: string; items: NavItem[] };
 
 const PLATFORM_ITEMS: NavItem[] = [
   { label: "Ligák", to: "/admin/leagues", icon: "leagues", permission: { kind: "leagues.manage" } },
+  { label: "Városok", to: "/admin/cities", icon: "cities", permission: { kind: "cities.manage" } },
   { label: "Felhasználók", to: "/admin/users", icon: "users", permission: { kind: "users.view" } },
   { label: "Jelentkezők", to: "/admin/signups", icon: "signups", permission: { kind: "signups.manage" } },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },

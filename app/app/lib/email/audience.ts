@@ -5,7 +5,7 @@
 // (spec section 17: nothing else goes to the partner until they register).
 // Later audiences (e.g. active league players) get their own function here.
 
-import { CITIES, OTHER_CITY } from "../cities";
+import { cityName, OTHER_CITY, type City } from "../cities";
 import { levelLabel, NO_REF, STATUSES, type Filters, type SignupRow } from "../signups-admin";
 
 export type Recipient = { email: string; name: string };
@@ -27,9 +27,9 @@ export function signupRecipients(
   return { recipients, suppressed: skipped };
 }
 
-export function audienceLabel(f: Filters): string {
+export function audienceLabel(f: Filters, cities: readonly Pick<City, "slug" | "name">[] = []): string {
   const parts = [
-    f.city === OTHER_CITY ? "Más város" : CITIES.find((c) => c.slug === f.city)?.name,
+    f.city === OTHER_CITY ? "Más város" : f.city ? cityName(f.city, cities) : undefined,
     f.status ? (STATUSES as Record<string, string>)[f.status] : undefined,
     f.level ? levelLabel(f.level) : undefined,
     f.mode === "pair" ? "Pár" : f.mode === "solo" ? "Egyéni" : undefined,

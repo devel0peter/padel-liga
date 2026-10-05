@@ -10,7 +10,8 @@ import { Label } from "~/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { isValidEmail, normalizeEmail } from "~/lib/auth/rules";
-import { CITIES } from "~/lib/cities";
+import { cityName } from "~/lib/cities";
+import { listCities } from "~/lib/cities.server";
 import { parseLeague, type LeagueField } from "~/lib/leagues";
 import {
   cancelOrganizerInvite,
@@ -27,14 +28,15 @@ import {
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "leagues.manage" });
-  const [leagues, organizers] = await Promise.all([listLeagues(), organizersByLeague()]);
+  const [leagues, organizers, cities] = await Promise.all([listLeagues(), organizersByLeague(), listCities()]);
   return {
     leagues: leagues.map((l) => ({
       ...l,
-      cityName: CITIES.find((c) => c.slug === l.city)?.name ?? l.city,
+      cityName: cityName(l.city, cities),
       organizers: organizers.get(l.id)?.active ?? [],
       pending: organizers.get(l.id)?.pending ?? [],
     })),
+    cities: cities.map(({ slug, name }) => ({ slug, name })),
   };
 }
 
@@ -55,7 +57,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   const intent = form.get("intent");
 
   if (intent === "create") {
-    const result = parseLeague(form);
+    const result = parseLeague(form, await listCities());
     if (!result.ok) return { intent, errors: result.errors };
     if (await leagueSlugTaken(result.data.slug))
       return { intent, errors: { slug: "Ez az azonosító már egy másik ligáé." } };
@@ -188,12 +190,12 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
           </div>
           <div className="grid content-start gap-1.5">
             <Label htmlFor="city">Város</Label>
-            <Select name="city" defaultValue={CITIES[0].slug}>
+            <Select name="city" defaultValue={loaderData.cities[0]?.slug}>
               <SelectTrigger id="city" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CITIES.map((c) => (
+                {loaderData.cities.map((c) => (
                   <SelectItem key={c.slug} value={c.slug}>
                     {c.name}
                   </SelectItem>

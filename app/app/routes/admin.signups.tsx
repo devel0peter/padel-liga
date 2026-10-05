@@ -35,7 +35,8 @@ import {
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { CITIES, OTHER_CITY } from "~/lib/cities";
+import { OTHER_CITY } from "~/lib/cities";
+import { listCities } from "~/lib/cities.server";
 import { formatDateTime } from "~/lib/format";
 import { homeClubLabel, OTHER_CLUB, refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
@@ -58,9 +59,10 @@ const MAX_ADMIN_NOTE = 2000;
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
-  const [all, clubs] = await Promise.all([listSignups(), listClubs()]);
+  const [all, clubs, cities] = await Promise.all([listSignups(), listClubs(), listCities()]);
   const rows = filterSignups(all, filters).map((r) => ({
     ...r,
+    cityText: cityLabel(r, cities),
     source: refLabel(r.ref, clubs),
     plays: homeClubLabel(r.homeClub, clubs),
   }));
@@ -68,7 +70,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const refs = new Map<string, string>(clubs.map((c) => [c.slug, c.name]));
   for (const r of all) if (r.ref && !refs.has(r.ref)) refs.set(r.ref, r.ref);
   const clubOptions = clubs.map((c) => [c.slug, c.name] as [string, string]);
-  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs], clubOptions };
+  const cityOptions = cities.map((c) => [c.slug, c.name] as [string, string]);
+  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs], clubOptions, cityOptions };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -148,7 +151,7 @@ function Player({ name, email }: { name: string; email: string | null }) {
   );
 }
 
-function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: string } }) {
+function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: string; cityText: string } }) {
   const fetcher = useFetcher();
   const [note, setNote] = useState(row.adminNote ?? "");
   const saving = fetcher.state !== "idle";
@@ -162,7 +165,7 @@ function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: str
       <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
         {formatDateTime(new Date(row.createdAt))}
       </TableCell>
-      <TableCell>{cityLabel(row)}</TableCell>
+      <TableCell>{row.cityText}</TableCell>
       <TableCell className="min-w-56">
         <div className="grid gap-2">
           <Player name={row.name1} email={row.email1} />
@@ -239,7 +242,7 @@ function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: str
 }
 
 export default function AdminSignups({ loaderData }: Route.ComponentProps) {
-  const { rows, counts, total, refs, clubOptions } = loaderData;
+  const { rows, counts, total, refs, clubOptions, cityOptions } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
 
@@ -286,7 +289,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         <FilterSelect
           name="city"
           label="Város"
-          options={[...CITIES.map((c) => [c.slug, c.name] as [string, string]), [OTHER_CITY, "Más város"]]}
+          options={[...cityOptions, [OTHER_CITY, "Más város"]]}
         />
         <FilterSelect name="status" label="Állapot" options={Object.entries(STATUSES)} />
         <FilterSelect

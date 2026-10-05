@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { InterestSignup } from "../interest";
 import { broadcastEmail, escapeHtml, loginCode, partnerNotice, signupConfirmation, textToHtml } from "./templates";
 
+const GYOR = [{ slug: "gyor", name: "Győr" }];
+
 const pair: InterestSignup = {
   city: "gyor",
   cityOther: null,
@@ -37,7 +39,7 @@ describe("textToHtml", () => {
 
 describe("signupConfirmation", () => {
   it("greets the signer and summarises the signup", () => {
-    const e = signupConfirmation(pair);
+    const e = signupConfirmation(pair, GYOR);
     expect(e.subject).toBe("Megkaptuk a jelentkezésed – Padelpárbaj");
     expect(e.text).toContain("Szia Nagy Anna!");
     expect(e.text).toContain("Párod: Kovács Béla");
@@ -65,7 +67,7 @@ describe("signupConfirmation", () => {
 
 describe("partnerNotice", () => {
   it("names who signed them up and how to ask for deletion", () => {
-    const e = partnerNotice(pair);
+    const e = partnerNotice(pair, GYOR);
     expect(e.subject).toBe("Nagy Anna jelentkeztetett titeket a Padelpárbajra");
     expect(e.text).toContain("Szia Kovács Béla!");
     expect(e.text).toContain("töröljük az adataidat");

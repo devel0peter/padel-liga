@@ -6,7 +6,8 @@ import { db } from "~/db/client.server";
 import { clubs as clubsTable } from "~/db/schema";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
-import { CITIES } from "~/lib/cities";
+import { cityName } from "~/lib/cities";
+import { listCities } from "~/lib/cities.server";
 import { countBy, OTHER_CLUB, parseClub } from "~/lib/clubs";
 import { createClub, deleteClub, listClubs, slugTaken, updateClub } from "~/lib/clubs.server";
 import { getLeague } from "~/lib/leagues.server";
@@ -23,7 +24,7 @@ export async function clubsScope(request: Request, leagueSlug?: string): Promise
     const actor = await requirePermission(request, { kind: "clubs.manage", city: league.city });
     return {
       city: league.city,
-      cityName: CITIES.find((c) => c.slug === league.city)?.name ?? league.city,
+      cityName: cityName(league.city, await listCities()),
       base: `/admin/leagues/${league.slug}/clubs`,
       canSeeSignups: can(actor, { kind: "signups.manage" }),
       canPrintGeneral: can(actor, { kind: "signups.manage" }),
@@ -34,7 +35,7 @@ export async function clubsScope(request: Request, leagueSlug?: string): Promise
 }
 
 export async function clubsData(scope: ClubsScope): Promise<ClubsData> {
-  const [allClubs, allSignups] = await Promise.all([listClubs(), listSignups()]);
+  const [allClubs, allSignups, cities] = await Promise.all([listClubs(), listSignups(), listCities()]);
   const inScope = <T extends { city: string }>(rows: T[]) => (scope.city ? rows.filter((r) => r.city === scope.city) : rows);
   const clubs = inScope(allClubs);
   const signups = inScope(allSignups);
@@ -45,6 +46,7 @@ export async function clubsData(scope: ClubsScope): Promise<ClubsData> {
   const otherRefs = Object.entries(refs).filter(([ref]) => ref !== "" && !clubSlugs.has(ref));
   return {
     scope,
+    cities: cities.map(({ slug, name }) => ({ slug, name })),
     clubs,
     refs,
     plays,
@@ -76,7 +78,7 @@ export async function clubsAction(request: Request, scope: ClubsScope): Promise<
     return redirect(scope.base);
   }
 
-  const result = parseClub(form);
+  const result = parseClub(form, await listCities());
   if (!result.ok) return { errors: result.errors };
   if (await slugTaken(result.data.slug, id || undefined))
     return { errors: { slug: "Ez az azonosító már egy másik klubé." } };

@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { CITIES } from "~/lib/cities";
+import { listedCities } from "~/lib/cities.server";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
@@ -32,7 +32,8 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
   const clubs = (await listClubs()).map(toClubOption);
-  return { ref: landingSource(new URL(request.url).searchParams), clubs };
+  const cities = (await listedCities()).map(({ slug, name }) => ({ slug, name }));
+  return { ref: landingSource(new URL(request.url).searchParams), clubs, cities };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -42,10 +43,11 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const honeypot = form.get("website");
   if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
 
-  const clubs = await listClubs();
+  const [clubs, cities] = await Promise.all([listClubs(), listedCities()]);
   const result = parseInterest(
     form,
     clubs.filter((c) => c.city === form.get("city")).map((c) => c.slug),
+    cities,
   );
   if (!result.ok) return result;
 
@@ -123,7 +125,7 @@ function useLandingCount() {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { ref, clubs } = loaderData;
+  const { ref, clubs, cities } = loaderData;
   useLandingCount();
   return (
     <>
@@ -152,7 +154,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   Ligák
                 </span>
                 <ul className="flex flex-wrap gap-2">
-                  {CITIES.map((c) => (
+                  {cities.map((c) => (
                     <li key={c.slug}>
                       <a
                         href="#jelentkezes"
@@ -242,7 +244,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm signupRef={ref} clubs={clubs} />
+            <SignupForm signupRef={ref} clubs={clubs} cities={cities} />
           </Wrap>
         </section>
       </main>

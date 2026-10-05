@@ -2,7 +2,7 @@ import { renderSVG } from "uqr";
 
 import type { Route } from "./+types/admin.poster";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { CITIES } from "~/lib/cities";
+import { listCities, listedCities } from "~/lib/cities.server";
 import { normalizeRef, posterUrl } from "~/lib/clubs";
 import { getClub } from "~/lib/clubs.server";
 import { SITE_NAME, SITE_URL } from "~/lib/site";
@@ -20,8 +20,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // (or a ref that isn't a club): the Admin.
   await requirePermission(request, club ? { kind: "clubs.manage", city: club.city } : { kind: "clubs.manage" });
   const url = ref ? posterUrl(ref) : SITE_URL;
-  // The general poster is for the first (so far only) city.
-  const city = (CITIES.find((c) => c.slug === club?.city) ?? CITIES[0]).name;
+  // A club's poster names its city; the general one the first listed city.
+  const city = club
+    ? ((await listCities()).find((c) => c.slug === club.city)?.name ?? club.city)
+    : ((await listedCities())[0]?.name ?? "");
   return { url, qr: renderSVG(url, { border: 0 }), club: club?.name ?? null, ref, city };
 }
 

@@ -94,7 +94,7 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
           <div className="grid gap-[3mm]">
             <p className="font-display text-[11mm] leading-none font-black">Jelentkezz!</p>
             <p className="text-[5.5mm] leading-snug">
-              Novemberben indulunk. Nevezési díj nincs, és a jelentkezés nem kötelez semmire.
+              Novemberben indulunk, ha összegyűlik legalább 12 pár. Nevezési díj nincs, és a jelentkezés nem kötelez semmire.
             </p>
             <p className="text-[6.5mm] font-extrabold">padelparbaj.hu</p>
           </div>

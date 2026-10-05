@@ -1,6 +1,6 @@
 # Plan: accounts, roles and the admin area
 
-Status: agreed (2026-10-04). PR 1 (accounts): devel0peter/padel-liga#47. PR 2 (roles + shell) and PR 3 (leagues + users): on the same branch, in review. Covers devel0peter/padel-liga#14, #17, #18 and #15. Player pages come after this plan.
+Status: done (2026-10-05). PRs 1–3 shipped together in devel0peter/padel-liga#47; PR 4 (Access retired) right after. Covers devel0peter/padel-liga#14, #17, #18 and #15. Player pages come after this plan.
 
 ## 1. Decisions (2026-10-04)
 

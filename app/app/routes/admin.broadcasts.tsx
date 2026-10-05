@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/admin.broadcasts";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -25,18 +25,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
   const { broadcasts, unsubscribed, limit } = loaderData;
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold">Körlevelek</h1>
-          <p className="text-sm text-muted-foreground">
-            {unsubscribed} leiratkozott cím, nekik nem megy körlevél.
-          </p>
-        </div>
+    <AppPage
+      title="Körlevelek"
+      description={<>{unsubscribed} leiratkozott cím, nekik nem megy körlevél.</>}
+      actions={
         <Button asChild>
           <Link to="/admin/broadcasts/new">Új körlevél</Link>
         </Button>
-      </div>
+      }
+    >
       <p className="text-sm text-muted-foreground">
         Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
         onnan a „Levél nekik” gombbal. Naponta legfeljebb {limit} levél megy ki; a többi a következő
@@ -77,6 +74,6 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
-    </Wrap>
+    </AppPage>
   );
 }

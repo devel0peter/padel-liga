@@ -1,7 +1,7 @@
 import { Form } from "react-router";
 
 import type { Route } from "./+types/profile";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { hasGoogleLogin } from "~/lib/auth/accounts.server";
@@ -43,25 +43,25 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default function Profile({ loaderData: d }: Route.ComponentProps) {
   return (
-    <Wrap className="grid max-w-2xl gap-8">
+    <AppPage title="Profil">
       <div className="flex items-center gap-4">
         <Avatar className="size-16">
           {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
           <AvatarFallback className="bg-nav-active-bg text-lg font-bold text-nav-active">{d.initials}</AvatarFallback>
         </Avatar>
         <div className="grid gap-0.5">
-          <h1 className="font-display text-2xl font-extrabold">{d.name}</h1>
+          <p className="font-display text-xl font-extrabold">{d.name}</p>
           <p className="text-muted-foreground">{d.role}</p>
         </div>
       </div>
 
-      <dl className="grid gap-4">
+      <dl className="grid max-w-2xl gap-4">
         <Row label="E-mail-cím">{d.email}</Row>
         <Row label="Belépés">{d.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</Row>
         {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}
       </dl>
 
-      <div className="grid gap-3 border-t pt-6">
+      <div className="grid max-w-2xl gap-3 border-t pt-6">
         <p className="text-sm text-muted-foreground">
           Ha egy eszközödet elhagytad, vagy idegen gépen felejtetted bejelentkezve, lépj ki mindenhonnan.
         </p>
@@ -71,6 +71,6 @@ export default function Profile({ loaderData: d }: Route.ComponentProps) {
           </Button>
         </Form>
       </div>
-    </Wrap>
+    </AppPage>
   );
 }

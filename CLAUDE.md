@@ -26,6 +26,7 @@
 - TypeScript everywhere, npm workspaces.
 - `app/`: React Router v8 (framework mode, server-rendered) on **Cloudflare Workers**.
 - UI: Tailwind CSS v4 + **shadcn/ui** (`app/app/components/ui`). Prefer an existing shadcn component over custom markup: `npx shadcn@latest add <name>` in `app/`.
+- Pages behind login live in the app shell (`app/app/routes/app.tsx`, sidebar) and wrap their content in `AppPage` (`app/app/components/app-page.tsx`: full width, one header with title, description and actions). No own container or `<h1>` on those pages.
 - Data: **Cloudflare D1** (SQLite) + **Drizzle ORM**. Schema in `app/app/db/schema.ts`, migrations in `app/drizzle/`. Access the DB only from `*.server.ts` modules.
 - Auth: **Better Auth** (email + password, Google, Facebook). Not installed yet.
 - Email: **Resend** (EU), called with plain `fetch`, no SDK. All mail goes through the outbox in `app/app/lib/email/outbox.server.ts`; templates are pure functions in `templates.ts`. Secrets: `RESEND_API_KEY`, `EMAIL_SECRET` (local: `app/.dev.vars`; without a key, dev logs emails to the console).

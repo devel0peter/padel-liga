@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, redirect, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.broadcast-new";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,13 +85,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
   const perDay = limit - TRANSACTIONAL_RESERVE;
 
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div>
-        <Link to="/admin/broadcasts" className="text-sm text-muted-foreground underline">
-          ← Körlevelek
-        </Link>
-        <h1 className="font-display text-2xl font-extrabold">Új körlevél</h1>
-      </div>
+    <AppPage title="Új körlevél" back={{ to: "/admin/broadcasts", label: "Körlevelek" }}>
 
       <div className="rounded-lg border p-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -179,6 +173,6 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
           <iframe title="Előnézet" srcDoc={preview.html} sandbox="" className="h-[32rem] w-full rounded-lg border bg-white" />
         </div>
       </div>
-    </Wrap>
+    </AppPage>
   );
 }

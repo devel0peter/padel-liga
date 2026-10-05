@@ -15,7 +15,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -110,14 +109,7 @@ function NavMenu({ nav }: { nav: NavSection[] }) {
   ));
 }
 
-function currentTitle(nav: NavSection[], pathname: string): string {
-  if (isCurrent(pathname, "/profile")) return "Profil";
-  for (const s of nav) for (const i of s.items) if (isCurrent(pathname, i.to)) return i.label;
-  return SITE_NAME;
-}
-
 export default function AppShell({ loaderData }: Route.ComponentProps) {
-  const { pathname } = useLocation();
   const { nav, sidebarOpen, ...profile } = loaderData;
   return (
     <TooltipProvider>
@@ -153,11 +145,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <span className="text-sm font-semibold">{currentTitle(nav, pathname)}</span>
-          </header>
-          <main className="py-6">
+          <main>
             <Outlet />
           </main>
         </SidebarInset>

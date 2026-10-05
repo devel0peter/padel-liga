@@ -2,7 +2,7 @@ import { Pencil, Printer, Trash2 } from "lucide-react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.clubs";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -196,22 +196,23 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
   const editing = clubs.find((c) => c.slug === params.get("edit"));
 
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold">Klubok</h1>
-          <p className="text-sm text-muted-foreground">
-            Csak te látod. A jelentkezési űrlapon a város klubjai közül választhatnak, hol
-            játszanak a legtöbbet; a plakát QR-kódja pedig a klub azonosítójával viszi a
-            főoldalra, így látszik, hány jelentkezést hozott.
-          </p>
-        </div>
+    <AppPage
+      title="Klubok"
+      description={
+        <>
+          Csak te látod. A jelentkezési űrlapon a város klubjai közül választhatnak, hol játszanak a
+          legtöbbet; a plakát QR-kódja pedig a klub azonosítójával viszi a főoldalra, így látszik, hány
+          jelentkezést hozott.
+        </>
+      }
+      actions={
         <Button variant="outline" asChild>
           <Link to="/admin/poster" target="_blank">
             <Printer /> Általános plakát
           </Link>
         </Button>
-      </div>
+      }
+    >
 
       {clubs.length === 0 ? (
         <p className="py-6 text-center text-muted-foreground">Még nincs klub.</p>
@@ -296,6 +297,6 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
       </p>
 
       <ClubForm club={editing} errors={actionData?.errors ?? {}} />
-    </Wrap>
+    </AppPage>
   );
 }

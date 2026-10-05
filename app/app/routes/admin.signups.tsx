@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.signups";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -244,16 +244,16 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
   const filtered = [...params.keys()].length > 0;
 
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold">Jelentkezők</h1>
-          <p className="text-sm text-muted-foreground">
-            {counts.signups} jelentkezés{filtered && ` (összesen ${total})`} · {counts.pairs} pár ·{" "}
-            {counts.solo} egyéni · {counts.players} játékos
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <AppPage
+      title="Jelentkezők"
+      description={
+        <>
+          {counts.signups} jelentkezés{filtered && ` (összesen ${total})`} · {counts.pairs} pár ·{" "}
+          {counts.solo} egyéni · {counts.players} játékos
+        </>
+      }
+      actions={
+        <>
           <Button variant="outline" asChild>
             <Link to={`/admin/broadcasts/new?${params.toString()}`}>
               <Mail /> Levél nekik
@@ -264,8 +264,9 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
               <Download /> CSV letöltése
             </a>
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       <div className="flex flex-wrap gap-2">
         <Form method="get" className="w-full sm:w-64">
@@ -345,6 +346,6 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
-    </Wrap>
+    </AppPage>
   );
 }

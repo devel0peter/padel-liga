@@ -15,6 +15,8 @@ export type Actor = {
 };
 
 export type Permission =
+  // Any logged-in account: the app home, the profile.
+  | { kind: "app.enter" }
   // See the admin area at all.
   | { kind: "admin.enter" }
   // Admin (superadmin) only: the interest list (and its CSV), broadcasts, traffic,
@@ -34,6 +36,8 @@ export function can(actor: Actor | null, permission: Permission): boolean {
   if (!actor) return false;
   if (actor.platformRole === "superadmin") return true;
   switch (permission.kind) {
+    case "app.enter":
+      return true;
     case "admin.enter":
       return actor.leagues.length > 0;
     case "clubs.manage":
@@ -54,7 +58,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "overview" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "overview" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -86,7 +90,10 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 // section with nothing in it isn't shown.
 export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
-  const sections: NavSection[] = [];
+  // First, unlabelled: the app home, for everyone.
+  const sections: NavSection[] = [
+    { label: "", items: [{ label: "Kezdőlap", to: "/home", icon: "home", permission: { kind: "app.enter" } }] },
+  ];
   if (league) sections.push({ label: league.name, items: leagueItems(league) });
   sections.push({ label: "Admin", items: PLATFORM_ITEMS });
   return sections

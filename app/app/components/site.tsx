@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
@@ -31,20 +31,29 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
+// `cta`: the "Jelentkezem" button (landing and rules). Someone logged in
+// gets "Saját oldalam" instead, on every public page.
 export function SiteHeader({ cta = true }: { cta?: boolean }) {
+  const signedIn = useRouteLoaderData<{ signedIn?: boolean }>("root")?.signedIn ?? false;
   return (
     <header className="py-4">
       <Wrap className="flex items-center justify-between gap-4">
         <Link to="/" className="text-lg no-underline" aria-label={SITE_NAME}>
           <Logo />
         </Link>
-        {cta && (
-          <a
-            href="/#jelentkezes"
-            className="rounded-full border-2 border-foreground px-5 py-2 font-bold no-underline"
-          >
-            Jelentkezem
-          </a>
+        {signedIn ? (
+          <Link to="/home" className="rounded-full border-2 border-foreground px-5 py-2 font-bold no-underline">
+            Saját oldalam
+          </Link>
+        ) : (
+          cta && (
+            <a
+              href="/#jelentkezes"
+              className="rounded-full border-2 border-foreground px-5 py-2 font-bold no-underline"
+            >
+              Jelentkezem
+            </a>
+          )
         )}
       </Wrap>
     </header>

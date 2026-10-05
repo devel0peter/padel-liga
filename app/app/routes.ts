@@ -15,6 +15,7 @@ export default [
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
+    route("home", "routes/app.home.tsx"),
     route("profile", "routes/profile.tsx"),
     layout("routes/admin.tsx", [
       route("admin", "routes/admin._index.tsx"),

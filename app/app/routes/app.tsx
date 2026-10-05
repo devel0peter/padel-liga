@@ -1,4 +1,4 @@
-import { BarChart3, Building2, Check, ChevronsUpDown, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
+import { BarChart3, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -66,6 +66,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
+  home: House,
   overview: LayoutDashboard,
   signups: Users,
   broadcasts: Mail,
@@ -144,13 +145,13 @@ function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) 
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   const active = activeItem(nav, pathname);
-  return nav.map((section, index) => (
+  return nav.map((section) => (
     <SidebarGroup key={section.label}>
-      {/* The league section (first) gets a switcher when there are more. */}
-      {index === 0 && leagues.length > 1 && leagues.some((l) => l.name === section.label) ? (
+      {/* The league section gets a switcher when there are more leagues. */}
+      {leagues.length > 1 && leagues.some((l) => l.name === section.label) ? (
         <LeagueSwitcher leagues={leagues} current={section.label} />
       ) : (
-        <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+        section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
       )}
       <SidebarMenu>
         {section.items.map((item) => {
@@ -182,8 +183,8 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
           <SidebarHeader className="gap-3">
             <div className="flex items-center gap-2 pt-1 group-data-[collapsible=icon]:justify-center">
               <Link
-                to="/"
-                aria-label={SITE_NAME}
+                to="/home"
+                aria-label={`${SITE_NAME}: kezdőlap`}
                 className="min-w-0 px-2 text-base no-underline group-data-[collapsible=icon]:hidden"
               >
                 <Logo />
@@ -197,6 +198,23 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
           </SidebarContent>
           <SidebarFooter>
             <SidebarMenu>
+              {/* The public site, e.g. to reread how it works or the rules. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild size="sm" className="text-muted-foreground" tooltip="Padelpárbaj főoldal">
+                  <Link to="/" className="no-underline">
+                    <Globe />
+                    <span>Padelpárbaj főoldal</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild size="sm" className="text-muted-foreground" tooltip="Szabályzat">
+                  <Link to="/rules" className="no-underline">
+                    <BookOpen />
+                    <span>Szabályzat</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <Form method="post" action="/logout">
                   <SidebarMenuButton type="submit" className="text-muted-foreground" tooltip="Kilépés">

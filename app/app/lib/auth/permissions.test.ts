@@ -29,6 +29,11 @@ const platformOnly: Permission[] = [
 ];
 
 describe("permissions", () => {
+  it("lets every account into the app, nobody logged out", () => {
+    expect(can(player, { kind: "app.enter" })).toBe(true);
+    expect(can(null, { kind: "app.enter" })).toBe(false);
+  });
+
   it("lets nobody in when logged out", () => {
     expect(can(null, { kind: "admin.enter" })).toBe(false);
     for (const p of platformOnly) expect(can(null, p)).toBe(false);
@@ -82,9 +87,10 @@ describe("role labels", () => {
 describe("sidebar", () => {
   it("shows the Admin the league section and every Admin page", () => {
     const nav = appNav(superadmin, [gyor, debrecen]);
-    expect(nav.map((s) => s.label)).toEqual(["Padelpárbaj Győr", "Admin"]);
-    expect(nav[0].items.map((i) => i.to)).toEqual(["/admin/leagues/gyor", "/admin/leagues/gyor/clubs"]);
-    expect(nav[1].items.map((i) => i.to)).toEqual([
+    expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr", "Admin"]);
+    expect(nav[0].items.map((i) => i.to)).toEqual(["/home"]);
+    expect(nav[1].items.map((i) => i.to)).toEqual(["/admin/leagues/gyor", "/admin/leagues/gyor/clubs"]);
+    expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
       "/admin/cities",
       "/admin/users",
@@ -97,8 +103,8 @@ describe("sidebar", () => {
 
   it("follows the league in the URL", () => {
     const nav = appNav(superadmin, [gyor, debrecen], "debrecen");
-    expect(nav[0].label).toBe("Padelpárbaj Debrecen");
-    expect(nav[0].items[1].to).toBe("/admin/leagues/debrecen/clubs");
+    expect(nav[1].label).toBe("Padelpárbaj Debrecen");
+    expect(nav[1].items[1].to).toBe("/admin/leagues/debrecen/clubs");
   });
 
   it("offers the Admin every league, a Szervező only their own", () => {
@@ -108,18 +114,18 @@ describe("sidebar", () => {
 
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
-    expect(nav.map((s) => s.label)).toEqual(["Padelpárbaj Győr"]);
-    expect(nav[0].items.map((i) => i.label)).toEqual(["Áttekintés", "Klubok"]);
+    expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Klubok"]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 
   it("ignores a URL league the Szervező doesn't organize", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]), "debrecen");
-    expect(nav[0].label).toBe("Padelpárbaj Győr");
+    expect(nav[1].label).toBe("Padelpárbaj Győr");
   });
 
-  it("shows a player nothing", () => {
-    expect(appNav(player, navLeagues(player, [gyor]))).toEqual([]);
+  it("shows a player only the app home", () => {
+    expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home"]]);
     expect(adminHome(player)).toBeNull();
   });
 });

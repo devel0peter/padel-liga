@@ -9,7 +9,7 @@ export function meta({}: Route.MetaArgs) {
   return pageMeta({
     title: "Adatkezelési tájékoztató – Padelpárbaj",
     description: "Milyen adatokat kezelünk, miért, és mik a jogaid.",
-    path: "/adatkezeles",
+    path: "/privacy",
   });
 }
 
@@ -72,10 +72,18 @@ export default function Privacy() {
               </li>
               <li>a jelentkezés és a hozzájárulás időpontja.</li>
             </ul>
+            <p>Ha fiókot hozol létre:</p>
+            <ul className={list}>
+              <li>a neved és az e-mail-címed,</li>
+              <li>
+                ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
+                tudjuk, hogy te vagy) és a profilképed,
+              </li>
+              <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja.</li>
+            </ul>
             <p>
-              Ha elindul a liga és regisztrálsz, ehhez jön még a fiókod adatai,
-              egy nem kötelező telefonszám, a meccseid eredményei és az
-              értékszámod. Erről a regisztráció előtt frissítjük ezt az oldalt.
+              Amikor elindul a liga, ehhez jön még egy nem kötelező
+              telefonszám, a meccseid eredményei és az értékszámod.
             </p>
           </Section>
 
@@ -123,6 +131,24 @@ export default function Privacy() {
             </p>
           </Section>
 
+          <Section title="Belépés és süti">
+            <p>
+              Jelszót nem kérünk és nem tárolunk. Belépni Google-lel vagy egy
+              e-mailben küldött, 10 percig érvényes kóddal lehet.
+            </p>
+            <p>
+              Belépés után egy sütit (cookie) teszünk a böngésződbe, hogy 90
+              napig ne kelljen újra belépned. Ez a működéshez szükséges, nem
+              követ, és nem ad ki rólad semmit. Kilépéskor töröljük.
+            </p>
+            <p>
+              Ha Google-lel lépsz be, a Google átadja nekünk a neved, az
+              e-mail-címed, a fiókod azonosítóját és a profilképed címét. A
+              profilképet csak a fiókodban mutatjuk, és a Google szerveréről
+              töltődik be. Ezen kívül a Google semmit nem tud meg rólad tőlünk.
+            </p>
+          </Section>
+
           <Section title="Látogatási statisztika">
             <p>
               Az oldal látogatottságát a Cloudflare Web Analytics méri. Nem
@@ -156,7 +182,7 @@ export default function Privacy() {
                 töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
-                <strong>Fiókok</strong> (később): amíg nem kéred a törlést. Utána
+                <strong>Fiókok:</strong> amíg nem kéred a törlést. Utána
                 anonimizáljuk, hogy a korábbi eredmények megmaradjanak, de ne
                 lehessen hozzád kötni őket.
               </li>

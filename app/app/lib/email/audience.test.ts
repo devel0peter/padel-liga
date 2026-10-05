@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { audienceLabel, signupRecipients } from "./audience";
 
+const GYOR = [{ slug: "gyor", name: "Győr" }];
+
 const none = { city: "", status: "", level: "", mode: "", ref: "", club: "", q: "" };
 
 describe("signupRecipients", () => {
@@ -40,7 +42,7 @@ describe("audienceLabel", () => {
   });
 
   it("lists the filters in Hungarian", () => {
-    expect(audienceLabel({ ...none, city: "gyor", status: "new", level: "kezdo", mode: "solo" })).toBe(
+    expect(audienceLabel({ ...none, city: "gyor", status: "new", level: "kezdo", mode: "solo" }, GYOR)).toBe(
       "Jelentkezők: Győr · Új · Kezdő · Egyéni",
     );
     expect(audienceLabel({ ...none, city: "other", q: "pécs" })).toBe("Jelentkezők: Más város · „pécs”");

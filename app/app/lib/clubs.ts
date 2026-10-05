@@ -6,7 +6,7 @@
 //   (e.g. "verseny" for a tournament flyer) is kept as typed and shown as is.
 // - home club: the optional "where do you play most" answer on the signup form.
 
-import { isCity, type CitySlug } from "./cities";
+import { isCity, type City } from "./cities";
 import { SITE_URL } from "./site";
 
 export type Club = {
@@ -27,31 +27,8 @@ export function toClubOption({ slug, city, name }: Club): ClubOption {
 // "Máshol / vegyesen" answer to "where do you play most".
 export const OTHER_CLUB = "other";
 
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
-
-// Lowercase letters, digits and inner hyphens, at most 40 characters.
-export function isSlug(value: string): boolean {
-  return SLUG_RE.test(value);
-}
-
-// The `?ref=` of a landing page link, or null if missing or malformed.
-// Case-insensitive, so a hand-typed "?ref=Klub" still counts.
-export function normalizeRef(value: string | null | undefined): string | null {
-  const ref = (value ?? "").trim().toLowerCase();
-  return isSlug(ref) ? ref : null;
-}
-
-// "Győr Padel Klub" -> "gyor-padel-klub"
-export function slugify(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
-    .replace(/-+$/, "");
-}
+export { isSlug, normalizeRef, slugify } from "./slug";
+import { isSlug, slugify } from "./slug";
 
 export function posterUrl(slug: string): string {
   return `${SITE_URL}/?ref=${slug}`;
@@ -71,8 +48,9 @@ function str(form: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-// Admin club form. An empty slug is made from the name.
-export function parseClub(form: FormData): ClubResult {
+// Admin club form. An empty slug is made from the name. `cities`: the known
+// cities (cities.server.ts listCities).
+export function parseClub(form: FormData, cities: readonly Pick<City, "slug">[]): ClubResult {
   const name = str(form, "name");
   const slug = (str(form, "slug") || slugify(name)).toLowerCase();
   const city = str(form, "city");
@@ -83,7 +61,7 @@ export function parseClub(form: FormData): ClubResult {
   else if (name.length > MAX_NAME) errors.name = "Ez a név túl hosszú.";
   if (!isSlug(slug) || slug === OTHER_CLUB)
     errors.slug = "Csak kisbetű, szám és kötőjel lehet benne, legfeljebb 40 karakter.";
-  if (!isCity(city)) errors.city = "Válaszd ki a várost.";
+  if (!isCity(city, cities)) errors.city = "Válaszd ki a várost.";
   if (adminNote.length > MAX_NOTE) errors.adminNote = `Legfeljebb ${MAX_NOTE} karakter.`;
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -92,7 +70,7 @@ export function parseClub(form: FormData): ClubResult {
     data: {
       name,
       slug,
-      city: city as CitySlug,
+      city,
       adminNote: adminNote || null,
     },
   };

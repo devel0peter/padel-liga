@@ -22,6 +22,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-bg: var(--nav-active-bg);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -84,14 +86,18 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* App sidebar (app/routes/app.tsx): a shade off the page, brand blue for
+     the current page. */
+  --sidebar: #f2f6fa;
+  --sidebar-foreground: #10233d;
+  --sidebar-primary: #1e5ba8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e4ecf5;
+  --sidebar-accent-foreground: #10233d;
+  --sidebar-border: color-mix(in srgb, #10233d 12%, transparent);
+  --sidebar-ring: #1e5ba8;
+  --nav-active: #174a8c;
+  --nav-active-bg: #d6e4f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -116,6 +122,16 @@
     --border: color-mix(in srgb, #e8eef5 15%, transparent);
     --input: color-mix(in srgb, #e8eef5 35%, transparent);
     --ring: #5b9be6;
+    --sidebar: #0a1626;
+    --sidebar-foreground: #e8eef5;
+    --sidebar-primary: #2a6cc0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #16273f;
+    --sidebar-accent-foreground: #e8eef5;
+    --sidebar-border: color-mix(in srgb, #e8eef5 12%, transparent);
+    --sidebar-ring: #5b9be6;
+    --nav-active: #b9d6f8;
+    --nav-active-bg: #1c3a60;
   }
 }
 
@@ -123,8 +139,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Public pages are header, main, footer straight in <body>: main takes the
+     spare height, so the footer sits at the bottom of a short page. */
   body {
-    @apply bg-background text-foreground;
+    @apply flex min-h-dvh flex-col bg-background text-foreground;
+  }
+  body > main {
+    flex: 1 0 auto;
   }
   html {
     @apply font-sans;

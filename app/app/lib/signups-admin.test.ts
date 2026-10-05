@@ -11,6 +11,8 @@ import {
   type SignupRow,
 } from "./signups-admin";
 
+const GYOR = [{ slug: "gyor", name: "Győr" }];
+
 function row(over: Partial<SignupRow>): SignupRow {
   return {
     id: 1,
@@ -79,14 +81,14 @@ describe("countSignups", () => {
 
 describe("cityLabel", () => {
   it("names supported and other cities", () => {
-    expect(cityLabel(rows[0])).toBe("Győr");
-    expect(cityLabel(rows[2])).toBe("Szeged (más város)");
+    expect(cityLabel(rows[0], GYOR)).toBe("Győr");
+    expect(cityLabel(rows[2], GYOR)).toBe("Szeged (más város)");
   });
 });
 
 describe("toCsv", () => {
   it("writes a BOM, a header and semicolon-separated rows with quoting", () => {
-    const csv = toCsv([row({ note: 'hétfő; "este"' })]);
+    const csv = toCsv([row({ note: 'hétfő; "este"' })], undefined, GYOR);
     expect(csv.startsWith("﻿Azonosító;")).toBe(true);
     const line = csv.split("\r\n")[1];
     expect(line).toContain("Győr;Pár;Nagy Anna;anna@example.com;Kovács Béla;;Kezdő;");

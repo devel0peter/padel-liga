@@ -9,8 +9,10 @@ import type { Recipient } from "./audience";
 import { parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { MAX_BATCH, sendBatch } from "./resend.server";
 import { SITE_URL } from "~/lib/site";
+import { CODE_TTL_MS } from "~/lib/auth/rules";
+import { listCities } from "~/lib/cities.server";
 
-import { broadcastEmail, partnerNotice, signupConfirmation, type Email } from "./templates";
+import { broadcastEmail, loginCode, partnerNotice, signupConfirmation, type Email } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
@@ -76,8 +78,9 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
 
 // Signup confirmation, plus the one-time partner notice (spec section 17).
 export async function queueSignupEmails(signup: InterestSignup): Promise<number[]> {
+  const cities = await listCities();
   const messages: NewMessage[] = [
-    { kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup) },
+    { kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) },
   ];
   if (signup.mode === "pair" && signup.name2 && signup.email2) {
     const partner = signup.email2.toLowerCase();
@@ -89,9 +92,19 @@ export async function queueSignupEmails(signup: InterestSignup): Promise<number[
       db.select({ n: count() }).from(emailSuppressions).where(eq(emailSuppressions.email, partner)),
     ]);
     if (notified.n === 0 && suppressed.n === 0)
-      messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup) });
+      messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup, cities) });
   }
   return enqueue(messages);
+}
+
+// A login code goes out at once, ahead of broadcasts (transactional budget).
+// If the provider is down it stays queued like any email, but by the next
+// cron run the code has expired; the person just asks for a new one.
+export async function queueLoginCode(email: string, code: string): Promise<void> {
+  const ids = await enqueue([
+    { kind: "login_code", toEmail: email, ...loginCode(code, CODE_TTL_MS / 60_000) },
+  ]);
+  await deliver(ids);
 }
 
 export async function createBroadcast(input: {

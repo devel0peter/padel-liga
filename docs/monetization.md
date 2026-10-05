@@ -102,7 +102,7 @@ Cheap now, expensive to retrofit later:
 - **Reserve space for sponsor visibility** in the layout (standings, emails, share images), without building it yet.
 - **Track reach**: player counts, page views (Cloudflare Web Analytics), social followers. Sponsors ask for these numbers.
 - **Don't promise "free forever"** anywhere. "Nevezési díj nincs" states the present, nothing more.
-- **Personal data stays with us.** Never sell or share player data with sponsors; any sponsor email needs explicit opt-in consent. Needs review against the privacy page (`/adatkezeles`).
+- **Personal data stays with us.** Never sell or share player data with sponsors; any sponsor email needs explicit opt-in consent. Needs review against the privacy page (`/privacy`).
 - **Keep hosting on free tiers** and avoid paid services until there's income.
 
 ## Open questions (for later)

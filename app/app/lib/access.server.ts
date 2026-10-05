@@ -16,7 +16,9 @@ function forbidden(): never {
   throw new Response("Nincs hozzáférésed ehhez az oldalhoz.", { status: 403 });
 }
 
-export async function requireAdmin(request: Request): Promise<Admin> {
+// Until PR 4 of docs/admin-plan.md retires Access, admin pages need both this
+// and an app session with the right role (app/lib/auth/admin.server.ts).
+export async function requireAccess(request: Request): Promise<Admin> {
   // Local dev has no Access in front of it.
   if (import.meta.env.DEV) return { email: "dev@localhost" };
 

@@ -1,7 +1,7 @@
 import { Form, Link } from "react-router";
 
 import type { Route } from "./+types/admin.traffic";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { formatDay, formatPercent } from "~/lib/format";
@@ -24,7 +24,7 @@ import { listLandings, listSignupStamps } from "~/lib/traffic.server";
 const CF_WEB_ANALYTICS = "https://dash.cloudflare.com/?to=/:account/web-analytics";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "traffic.view" });
   const period = parsePeriod(new URL(request.url).searchParams, new Date());
   const [landings, signups, clubs] = await Promise.all([
     listLandings(period),
@@ -51,18 +51,19 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
   const { period, total, sources, days } = loaderData;
 
   return (
-    <Wrap className="grid grid-cols-1 gap-6 [&>*]:min-w-0">
-      <div className="grid gap-1">
-        <h1 className="font-display text-2xl font-extrabold">Forgalom</h1>
-        <p className="text-sm text-muted-foreground">
-          Látogatás: a főoldal megnyitása böngészőben, forrásonként (<code>?ref=</code>, vagy ha
-          nincs, <code>?utm_source=</code>). Minden más (oldalak, honnan jöttek, eszközök):{" "}
+    <AppPage
+      title="Forgalom"
+      description={
+        <>
+          Látogatás: a főoldal megnyitása böngészőben, forrásonként (<code>?ref=</code>, vagy ha nincs,{" "}
+          <code>?utm_source=</code>). Minden más (oldalak, honnan jöttek, eszközök):{" "}
           <a href={CF_WEB_ANALYTICS} target="_blank" rel="noreferrer" className="underline">
             Cloudflare Web Analytics
           </a>
           .
-        </p>
-      </div>
+        </>
+      }
+    >
 
       <Form method="get" className="flex flex-wrap items-end gap-3">
         <div className="grid gap-1.5">
@@ -75,7 +76,7 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
         </div>
         <Button type="submit">Mutasd</Button>
         <Button variant="ghost" asChild>
-          <Link to="/admin/forgalom">Utolsó 30 nap</Link>
+          <Link to="/admin/traffic">Utolsó 30 nap</Link>
         </Button>
       </Form>
 
@@ -151,6 +152,6 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
           </TableBody>
         </Table>
       </section>
-    </Wrap>
+    </AppPage>
   );
 }

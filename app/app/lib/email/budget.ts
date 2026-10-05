@@ -4,7 +4,7 @@
 // Kept free for signup confirmations, so a large broadcast can't block them.
 export const TRANSACTIONAL_RESERVE = 15;
 
-export type MessageKind = "signup_confirmation" | "partner_notice" | "broadcast";
+export type MessageKind = "signup_confirmation" | "partner_notice" | "broadcast" | "login_code";
 
 export function sendBudget(dailyLimit: number, sentLast24h: number, kind: MessageKind): number {
   const reserve = kind === "broadcast" ? TRANSACTIONAL_RESERVE : 0;

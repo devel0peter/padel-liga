@@ -1,7 +1,7 @@
 // Admin view of the Phase 0 interest list: filtering, counts and CSV export.
 // Pure (no I/O); the D1 access lives in signups-admin.server.ts.
 
-import { CITIES, OTHER_CITY } from "./cities";
+import { cityName, OTHER_CITY, type City } from "./cities";
 import { formatDateTime } from "./format";
 import { LEVELS } from "./interest";
 
@@ -94,9 +94,10 @@ export function countSignups(rows: SignupRow[]): Counts {
   return { signups: rows.length, pairs, solo, players: pairs * 2 + solo };
 }
 
-export function cityLabel(r: Pick<SignupRow, "city" | "cityOther">): string {
+// `cities`: the known cities (cities.server.ts); an unknown slug shows as is.
+export function cityLabel(r: Pick<SignupRow, "city" | "cityOther">, cities: readonly Pick<City, "slug" | "name">[] = []): string {
   if (r.city === OTHER_CITY) return r.cityOther ? `${r.cityOther} (más város)` : "Más város";
-  return CITIES.find((c) => c.slug === r.city)?.name ?? r.city;
+  return cityName(r.city, cities);
 }
 
 export function levelLabel(level: string): string {
@@ -112,6 +113,7 @@ export function toCsv(
     ref: (r) => r ?? "",
     homeClub: (c) => c ?? "",
   },
+  cities: readonly Pick<City, "slug" | "name">[] = [],
 ): string {
   const header = [
     "Azonosító", "Jelentkezett", "Város", "Mód", "Név 1", "E-mail 1", "Név 2", "E-mail 2",
@@ -125,7 +127,7 @@ export function toCsv(
     [
       r.id,
       formatDateTime(r.createdAt),
-      cityLabel(r),
+      cityLabel(r, cities),
       r.mode === "pair" ? "Pár" : "Egyéni",
       r.name1,
       r.email1,

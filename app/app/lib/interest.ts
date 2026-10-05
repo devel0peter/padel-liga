@@ -1,7 +1,7 @@
 // Phase 0 interest signup: parsing and validation of the landing page form.
 // Pure (no I/O) so it runs on both server and client and can be unit tested.
 
-import { findCity, isCity, OTHER_CITY, type CitySlug } from "./cities";
+import { findCity, isCity, OTHER_CITY, type City } from "./cities";
 import { normalizeRef, OTHER_CLUB } from "./clubs";
 
 export const LEVELS = {
@@ -15,7 +15,8 @@ export type Level = keyof typeof LEVELS;
 export type Mode = "pair" | "solo";
 
 export type InterestSignup = {
-  city: CitySlug | typeof OTHER_CITY;
+  // A listed city's slug, or OTHER_CITY.
+  city: string;
   cityOther: string | null;
   mode: Mode;
   name1: string;
@@ -49,7 +50,7 @@ const MAX_NAME = 100;
 const MAX_EMAIL = 254;
 const MAX_NOTE = 1000;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function str(form: FormData, key: string): string {
   const value = form.get(key);
@@ -62,11 +63,16 @@ function isLevel(value: string): value is Level {
 
 // `clubs`: slugs of the city's clubs; an unknown home club is dropped, not an
 // error, since the field is optional and the list can change under the form.
-export function parseInterest(form: FormData, clubs: readonly string[] = []): InterestResult {
+// `cities`: the listed cities (cities.server.ts listedCities).
+export function parseInterest(
+  form: FormData,
+  clubs: readonly string[],
+  cities: readonly Pick<City, "slug" | "name">[],
+): InterestResult {
   let city = str(form, "city");
   let cityOther = city === OTHER_CITY ? str(form, "cityOther") : "";
   // Someone typed a city we already support: file it there.
-  const typed = cityOther ? findCity(cityOther) : null;
+  const typed = cityOther ? findCity(cityOther, cities) : null;
   if (typed) {
     city = typed;
     cityOther = "";
@@ -85,7 +91,7 @@ export function parseInterest(form: FormData, clubs: readonly string[] = []): In
   if (city === OTHER_CITY) {
     if (!cityOther) errors.cityOther = "Írd be, melyik városban játszanál.";
     else if (cityOther.length > MAX_NAME) errors.cityOther = "Ez a városnév túl hosszú.";
-  } else if (!isCity(city)) errors.city = "Válaszd ki a várost.";
+  } else if (!isCity(city, cities)) errors.city = "Válaszd ki a várost.";
 
   if (!name1) errors.name1 = "Add meg a neved.";
   else if (name1.length > MAX_NAME) errors.name1 = "Ez a név túl hosszú.";
@@ -118,7 +124,7 @@ export function parseInterest(form: FormData, clubs: readonly string[] = []): In
   return {
     ok: true,
     data: {
-      city: city as CitySlug | typeof OTHER_CITY,
+      city,
       cityOther: cityOther || null,
       mode,
       name1,

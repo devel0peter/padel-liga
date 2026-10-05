@@ -11,7 +11,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { CITIES } from "~/lib/cities";
+import { listedCities } from "~/lib/cities.server";
+import { STEPS } from "~/lib/how-it-works";
+import { withoutTracking } from "~/lib/traffic";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
@@ -32,7 +34,8 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
   const clubs = (await listClubs()).map(toClubOption);
-  return { ref: landingSource(new URL(request.url).searchParams), clubs };
+  const cities = (await listedCities()).map(({ slug, name }) => ({ slug, name }));
+  return { ref: landingSource(new URL(request.url).searchParams), clubs, cities };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -42,10 +45,11 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const honeypot = form.get("website");
   if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
 
-  const clubs = await listClubs();
+  const [clubs, cities] = await Promise.all([listClubs(), listedCities()]);
   const result = parseInterest(
     form,
     clubs.filter((c) => c.city === form.get("city")).map((c) => c.slug),
+    cities,
   );
   if (!result.ok) return result;
 
@@ -81,12 +85,6 @@ function SectionHead({ title, lede }: { title: string; lede?: string }) {
   );
 }
 
-const STEPS = [
-  ["Jelentkeztek párban", "Ha még nincs párod, írd fel magad egyedül, és segítünk párt találni."],
-  ["Csoportba kerültök", "Szint szerint négy pár kerül egy csoportba, hogy kiegyenlített meccsek legyenek."],
-  ["Hetente egy meccs", "Az időpontot az oldalon egyeztetitek az ellenféllel, a pályát bármelyik klubban lefoglalhatjátok a városotokban."],
-  ["Feljutás, kiesés", "Három hét után a csoport első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör."],
-];
 
 
 const RULES = [
@@ -113,17 +111,22 @@ const FAQ = [
 // One landing count per page load, not per client-side visit back to "/".
 let landingCounted = false;
 
-// Counts the landing per source for the admin funnel (app/lib/traffic.ts).
+// Counts the landing per source for the admin funnel (app/lib/traffic.ts),
+// then takes ?ref= and ad tags out of the address bar. The signup form already
+// has the source from the loader, so a signup still records it.
 function useLandingCount() {
   useEffect(() => {
     if (landingCounted) return;
     landingCounted = true;
-    navigator.sendBeacon?.(`/api/landing${window.location.search}`);
+    const { search, pathname, hash } = window.location;
+    navigator.sendBeacon?.(`/api/landing${search}`);
+    const clean = withoutTracking(search);
+    if (clean !== search) window.history.replaceState(window.history.state, "", `${pathname}${clean}${hash}`);
   }, []);
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { ref, clubs } = loaderData;
+  const { ref, clubs, cities } = loaderData;
   useLandingCount();
   return (
     <>
@@ -152,7 +155,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   Ligák
                 </span>
                 <ul className="flex flex-wrap gap-2">
-                  {CITIES.map((c) => (
+                  {cities.map((c) => (
                     <li key={c.slug}>
                       <a
                         href="#jelentkezes"
@@ -216,7 +219,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 </div>
               ))}
             </dl>
-            <Link to="/szabalyzat" className="mt-6 inline-block font-bold underline">
+            <Link to="/rules" className="mt-6 inline-block font-bold underline">
               A teljes szabályzat
             </Link>
           </Wrap>
@@ -242,7 +245,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm signupRef={ref} clubs={clubs} />
+            <SignupForm signupRef={ref} clubs={clubs} cities={cities} />
           </Wrap>
         </section>
       </main>

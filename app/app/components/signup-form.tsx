@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
-import { CITIES, OTHER_CITY } from "~/lib/cities";
+import { OTHER_CITY, type City } from "~/lib/cities";
 import { OTHER_CLUB, type ClubOption } from "~/lib/clubs";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
 import { CONTACT_EMAIL } from "~/lib/site";
@@ -63,13 +63,16 @@ const inputClass = "h-11 bg-background text-base";
 export function SignupForm({
   signupRef,
   clubs = [],
+  cities,
 }: {
   signupRef?: string | null;
   clubs?: ClubOption[];
+  // The listed cities (cities.server.ts); "Más város" is always offered.
+  cities: Pick<City, "slug" | "name">[];
 }) {
   const fetcher = useFetcher<SignupActionData>();
   const [mode, setMode] = useState<Mode>("pair");
-  const [city, setCity] = useState<string>(CITIES[0].slug);
+  const [city, setCity] = useState<string>(cities[0]?.slug ?? OTHER_CITY);
   const otherCity = city === OTHER_CITY;
   const cityClubs = clubs.filter((c) => c.city === city);
   const doneRef = useRef<HTMLDivElement>(null);
@@ -123,7 +126,7 @@ export function SignupForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CITIES.map((c) => (
+            {cities.map((c) => (
               <SelectItem key={c.slug} value={c.slug}>
                 {c.name}
               </SelectItem>
@@ -263,7 +266,7 @@ export function SignupForm({
             Hozzájárulok, hogy a megadott adatokat a liga szervezése céljából
             kezeljétek, és e-mailben értesítsetek az indulásról. A hozzájárulás
             bármikor visszavonható. Részletek az{" "}
-            <Link to="/adatkezeles" target="_blank" className="underline">
+            <Link to="/privacy" target="_blank" className="underline">
               adatkezelési tájékoztatóban
             </Link>
             .

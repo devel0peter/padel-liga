@@ -11,10 +11,16 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Forbidden } from "./components/forbidden";
+import { getUser } from "./lib/auth/session.server";
 import { webAnalyticsToken } from "./lib/web-analytics.server";
 
-export function loader() {
-  return { webAnalyticsToken: webAnalyticsToken() };
+export async function loader({ request }: Route.LoaderArgs) {
+  return {
+    webAnalyticsToken: webAnalyticsToken(),
+    // The public header shows "Saját oldalam" instead of "Jelentkezem".
+    signedIn: !!(await getUser(request)),
+  };
 }
 
 // Cloudflare Web Analytics: cookieless, so no consent banner (README decision
@@ -56,6 +62,7 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  if (isRouteErrorResponse(error) && error.status === 403) return <Forbidden />;
   let message = "Hoppá!";
   let details = "Váratlan hiba történt.";
   let stack: string | undefined;

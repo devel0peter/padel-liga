@@ -1,50 +1,32 @@
-import { Link, NavLink, Outlet } from "react-router";
+import { isRouteErrorResponse, Outlet } from "react-router";
 
 import type { Route } from "./+types/admin";
-import { Wrap } from "~/components/site";
-import { requireAdmin } from "~/lib/access.server";
+import { Forbidden } from "~/components/forbidden";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { SITE_NAME } from "~/lib/site";
+
+// The admin section of the app shell (app.tsx). No UI of its own: it only
+// guards. Every admin loader and action also checks its own permission.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Admin – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const admin = await requireAdmin(request);
-  return { email: admin.email };
+// Runs before every admin loader and action, including direct data requests,
+// so no admin page is reachable without a session and an admin role.
+export const middleware: Route.MiddlewareFunction[] = [
+  async ({ request }) => {
+    await requirePermission(request, { kind: "admin.enter" });
+  },
+];
+
+export default function AdminSection() {
+  return <Outlet />;
 }
 
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  isActive ? "font-semibold no-underline" : "text-muted-foreground no-underline";
-
-export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  return (
-    <>
-      <header className="border-b py-3">
-        <Wrap className="flex items-center justify-between gap-4 text-sm">
-          <nav className="flex items-center gap-4">
-            <Link to="/admin" className="font-display text-base font-extrabold no-underline">
-              {SITE_NAME} admin
-            </Link>
-            <NavLink to="/admin" end className={navClass}>
-              Jelentkezők
-            </NavLink>
-            <NavLink to="/admin/levelek" className={navClass}>
-              Körlevelek
-            </NavLink>
-            <NavLink to="/admin/klubok" className={navClass}>
-              Klubok
-            </NavLink>
-            <NavLink to="/admin/forgalom" className={navClass}>
-              Forgalom
-            </NavLink>
-          </nav>
-          <span className="text-muted-foreground">{loaderData.email}</span>
-        </Wrap>
-      </header>
-      <main className="py-6">
-        <Outlet />
-      </main>
-    </>
-  );
+// 403 from a child loader or action; a 403 from the middleware reaches the
+// root error boundary instead (it runs before any loader).
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  if (isRouteErrorResponse(error) && error.status === 403) return <Forbidden />;
+  throw error;
 }

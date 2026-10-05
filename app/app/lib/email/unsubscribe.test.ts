@@ -36,9 +36,9 @@ describe("unsubscribe tokens", () => {
 
   it("builds one-click unsubscribe headers", () => {
     const url = unsubscribeUrl("https://padelparbaj.hu", "tok");
-    expect(url).toBe("https://padelparbaj.hu/leiratkozas?t=tok");
+    expect(url).toBe("https://padelparbaj.hu/unsubscribe?t=tok");
     expect(unsubscribeHeaders(url)).toEqual({
-      "List-Unsubscribe": "<https://padelparbaj.hu/leiratkozas?t=tok>",
+      "List-Unsubscribe": "<https://padelparbaj.hu/unsubscribe?t=tok>",
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     });
   });

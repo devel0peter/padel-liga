@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, redirect, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.broadcast-new";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { audienceLabel, signupRecipients } from "~/lib/email/audience";
 import { TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
 import {
@@ -31,26 +31,27 @@ import {
 import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
 import { filterSignups, parseFilters } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
+import { listCities } from "~/lib/cities.server";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
   const filters = parseFilters(params);
-  const [rows, suppressed] = await Promise.all([listSignups(), suppressedSet()]);
-  return { label: audienceLabel(filters), ...signupRecipients(filterSignups(rows, filters), suppressed) };
+  const [rows, suppressed, cities] = await Promise.all([listSignups(), suppressedSet(), listCities()]);
+  return { label: audienceLabel(filters, cities), ...signupRecipients(filterSignups(rows, filters), suppressed) };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const admin = await requireAdmin(request);
+  const actor = await requirePermission(request, { kind: "broadcasts.send" });
   const { label, recipients, suppressed } = await audience(new URL(request.url).searchParams);
-  return { label, recipients, suppressed, adminEmail: admin.email, limit: dailyLimit() };
+  return { label, recipients, suppressed, adminEmail: actor.email, limit: dailyLimit() };
 }
 
 type ActionData = { error?: string; tested?: string };
 
 export async function action({ request }: Route.ActionArgs): Promise<ActionData | Response> {
-  const admin = await requireAdmin(request);
+  const actor = await requirePermission(request, { kind: "broadcasts.send" });
   const form = await request.formData();
   const subject = String(form.get("subject") ?? "").trim();
   const body = String(form.get("body") ?? "").trim();
@@ -58,16 +59,16 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   if (!body || body.length > MAX_BODY) return { error: "Írd meg a levelet." };
 
   if (form.get("intent") === "test") {
-    const result = await sendTestBroadcast({ subject, body }, { email: admin.email, name: "Teszt Elek" });
-    return result.ok ? { tested: admin.email } : { error: `Nem ment ki a tesztlevél: ${result.error}` };
+    const result = await sendTestBroadcast({ subject, body }, { email: actor.email, name: "Teszt Elek" });
+    return result.ok ? { tested: actor.email } : { error: `Nem ment ki a tesztlevél: ${result.error}` };
   }
 
   // Recomputed from the same filters, so the list is current at send time.
   const { label, recipients } = await audience(new URL(request.url).searchParams);
   if (recipients.length === 0) return { error: "Nincs címzett." };
-  await createBroadcast({ subject, body, audience: label, recipients, createdBy: admin.email });
+  await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email });
   await deliver();
-  return redirect("/admin/levelek");
+  return redirect("/admin/broadcasts");
 }
 
 export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) {
@@ -81,17 +82,11 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
 
   const preview = broadcastEmail({ subject, body }, { name: recipients[0]?.name ?? "Teszt Elek" }, "#");
   const submit = (intent: string) =>
-    fetcher.submit({ intent, subject, body }, { method: "post", action: `/admin/levelek/uj?${params}` });
+    fetcher.submit({ intent, subject, body }, { method: "post", action: `/admin/broadcasts/new?${params}` });
   const perDay = limit - TRANSACTIONAL_RESERVE;
 
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div>
-        <Link to="/admin/levelek" className="text-sm text-muted-foreground underline">
-          ← Körlevelek
-        </Link>
-        <h1 className="font-display text-2xl font-extrabold">Új körlevél</h1>
-      </div>
+    <AppPage title="Új körlevél" back={{ to: "/admin/broadcasts", label: "Körlevelek" }}>
 
       <div className="rounded-lg border p-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -100,7 +95,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             {suppressed > 0 && ` (${suppressed} leiratkozottat kihagyunk)`}
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/admin?${params.toString()}`}>Szűrők módosítása</Link>
+            <Link to={`/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>
           </Button>
         </div>
         <p className="mt-2 text-muted-foreground">
@@ -179,6 +174,6 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
           <iframe title="Előnézet" srcDoc={preview.html} sandbox="" className="h-[32rem] w-full rounded-lg border bg-white" />
         </div>
       </div>
-    </Wrap>
+    </AppPage>
   );
 }

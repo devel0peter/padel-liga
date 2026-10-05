@@ -1,18 +1,43 @@
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
+// Paths are English; everything on the page is Hungarian (CLAUDE.md).
 export default [
   index("routes/home.tsx"),
-  route("szabalyzat", "routes/rules.tsx"),
-  route("adatkezeles", "routes/privacy.tsx"),
-  route("leiratkozas", "routes/unsubscribe.tsx"),
+  route("rules", "routes/rules.tsx"),
+  route("privacy", "routes/privacy.tsx"),
+  route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
-  layout("routes/admin.tsx", [
-    route("admin", "routes/admin.signups.tsx"),
-    route("admin/levelek", "routes/admin.broadcasts.tsx"),
-    route("admin/levelek/uj", "routes/admin.broadcast-new.tsx"),
-    route("admin/klubok", "routes/admin.clubs.tsx"),
-    route("admin/forgalom", "routes/admin.traffic.tsx"),
+  route("login", "routes/login.tsx"),
+  route("welcome", "routes/welcome.tsx"),
+  route("logout", "routes/logout.ts"),
+  route("auth/google", "routes/auth.google.ts"),
+  route("auth/google/callback", "routes/auth.google.callback.ts"),
+  // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
+  // section inside it has its own guard (admin.tsx).
+  layout("routes/app.tsx", [
+    route("home", "routes/app.home.tsx"),
+    route("profile", "routes/profile.tsx"),
+    layout("routes/admin.tsx", [
+      route("admin", "routes/admin._index.tsx"),
+      route("admin/signups", "routes/admin.signups.tsx"),
+      route("admin/broadcasts", "routes/admin.broadcasts.tsx"),
+      route("admin/broadcasts/new", "routes/admin.broadcast-new.tsx"),
+      route("admin/clubs", "routes/admin.clubs.tsx"),
+      route("admin/traffic", "routes/admin.traffic.tsx"),
+      route("admin/leagues", "routes/admin.leagues.tsx"),
+      route("admin/cities", "routes/admin.cities.tsx"),
+      route("admin/users", "routes/admin.users.tsx"),
+      route("admin/leagues/:league", "routes/admin.league.tsx"),
+      route("admin/leagues/:league/clubs", "routes/admin.league-clubs.tsx"),
+    ]),
   ]),
-  route("admin/plakat", "routes/admin.poster.tsx"),
+  route("admin/poster", "routes/admin.poster.tsx"),
   route("admin/export.csv", "routes/admin.export.ts"),
+
+  // Hungarian paths from before 2026-10-04, still in sent emails and shared
+  // links. Unsubscribe links are POSTed by mail clients (RFC 8058), which
+  // don't follow redirects, so that one keeps serving the page itself.
+  route("leiratkozas", "routes/unsubscribe.tsx", { id: "unsubscribe-legacy" }),
+  route("szabalyzat", "routes/legacy-redirect.ts", { id: "legacy-rules" }),
+  route("adatkezeles", "routes/legacy-redirect.ts", { id: "legacy-privacy" }),
 ] satisfies RouteConfig;

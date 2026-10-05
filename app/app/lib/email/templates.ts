@@ -1,6 +1,7 @@
 // Email content. Pure (no I/O) so it can be unit tested and previewed in the
 // browser. Every email has an HTML and a plain-text version.
 
+import type { City } from "../cities";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
@@ -31,13 +32,16 @@ export function textToHtml(text: string): string {
     .join("\n");
 }
 
+// The wordmark (components/site.tsx): "Padel" heavy, "párbaj" light.
+const WORDMARK_HTML = `<span style="font-weight:800">Padel</span><span style="font-weight:300">párbaj</span>`;
+
 function layout(bodyHtml: string, footerHtml: string): string {
   return `<!doctype html>
 <html lang="hu">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background:#f4f6f9">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.5;color:#10233d">
-<div style="font-weight:800;font-size:18px;margin-bottom:16px"><span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:#dceb3c;margin-right:8px"></span>${SITE_NAME}</div>
+<div style="font-weight:800;font-size:18px;margin-bottom:16px"><span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:#dceb3c;margin-right:8px"></span>${WORDMARK_HTML}</div>
 <div style="background:#ffffff;border-radius:12px;padding:24px">
 ${bodyHtml}
 </div>
@@ -47,7 +51,7 @@ ${bodyHtml}
 </html>`;
 }
 
-const privacyLink = `${SITE_URL}/adatkezeles`;
+const privacyLink = `${SITE_URL}/privacy`;
 
 function footer(reason: string, unsubscribeUrl?: string): { html: string; text: string } {
   const html = [
@@ -77,10 +81,12 @@ function build(subject: string, bodyText: string, foot: { html: string; text: st
 
 const SIGNATURE = `Peter\n${SITE_NAME}`;
 
-export function signupConfirmation(s: InterestSignup): Email {
+type Cities = readonly Pick<City, "slug" | "name">[];
+
+export function signupConfirmation(s: InterestSignup, cities: Cities = []): Email {
   const otherCity = s.cityOther != null;
   const lines = [
-    `Város: ${cityLabel(s)}`,
+    `Város: ${cityLabel(s, cities)}`,
     s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel",
     `Szint: ${levelLabel(s.level)}`,
   ];
@@ -106,13 +112,13 @@ export function signupConfirmation(s: InterestSignup): Email {
 
 // Spec section 17: the partner gets exactly one email, so they know about the
 // signup and can ask for deletion.
-export function partnerNotice(s: InterestSignup): Email {
+export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
   if (!s.name2) throw new Error("partnerNotice needs a partner");
   return build(
     `${s.name1} jelentkeztetett titeket a ${SITE_NAME}ra`,
     [
       `Szia ${s.name2}!`,
-      `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s)}), és megadta a neved és az e-mail-címed.`,
+      `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,
       `A ${SITE_NAME} pároknak szól: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
       `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Ezen kívül nem írunk neked, amíg magad nem regisztrálsz.`,
       SIGNATURE,
@@ -134,5 +140,21 @@ export function broadcastEmail(
     fill(draft.subject),
     fill(draft.body),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
+  );
+}
+
+// One-time login code (app/lib/auth). The code is in the subject too, so it
+// shows in the phone's notification.
+export function loginCode(code: string, validMinutes: number): Email {
+  const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
+  return build(
+    `${spaced} a belépőkódod – ${SITE_NAME}`,
+    [
+      `Szia!`,
+      `A belépőkódod: ${spaced}`,
+      `${validMinutes} percig érvényes, és csak egyszer használható.`,
+      `Ha nem te kérted, nem kell tenned semmit: a kód nélkül senki nem tud belépni.`,
+    ].join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

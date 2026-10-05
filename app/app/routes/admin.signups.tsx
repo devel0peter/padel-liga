@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.signups";
-import { Wrap } from "~/components/site";
+import { AppPage } from "~/components/app-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +34,9 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
-import { requireAdmin } from "~/lib/access.server";
-import { CITIES, OTHER_CITY } from "~/lib/cities";
+import { requirePermission } from "~/lib/auth/admin.server";
+import { OTHER_CITY } from "~/lib/cities";
+import { listCities } from "~/lib/cities.server";
 import { formatDateTime } from "~/lib/format";
 import { homeClubLabel, OTHER_CLUB, refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
@@ -56,11 +57,12 @@ import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.ser
 const MAX_ADMIN_NOTE = 2000;
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
-  const [all, clubs] = await Promise.all([listSignups(), listClubs()]);
+  const [all, clubs, cities] = await Promise.all([listSignups(), listClubs(), listCities()]);
   const rows = filterSignups(all, filters).map((r) => ({
     ...r,
+    cityText: cityLabel(r, cities),
     source: refLabel(r.ref, clubs),
     plays: homeClubLabel(r.homeClub, clubs),
   }));
@@ -68,11 +70,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const refs = new Map<string, string>(clubs.map((c) => [c.slug, c.name]));
   for (const r of all) if (r.ref && !refs.has(r.ref)) refs.set(r.ref, r.ref);
   const clubOptions = clubs.map((c) => [c.slug, c.name] as [string, string]);
-  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs], clubOptions };
+  const cityOptions = cities.map((c) => [c.slug, c.name] as [string, string]);
+  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs], clubOptions, cityOptions };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "signups.manage" });
   const form = await request.formData();
   const id = Number(form.get("id"));
   if (!Number.isInteger(id) || id <= 0) throw new Response("Hibás azonosító.", { status: 400 });
@@ -148,7 +151,7 @@ function Player({ name, email }: { name: string; email: string | null }) {
   );
 }
 
-function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: string } }) {
+function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: string; cityText: string } }) {
   const fetcher = useFetcher();
   const [note, setNote] = useState(row.adminNote ?? "");
   const saving = fetcher.state !== "idle";
@@ -162,7 +165,7 @@ function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: str
       <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
         {formatDateTime(new Date(row.createdAt))}
       </TableCell>
-      <TableCell>{cityLabel(row)}</TableCell>
+      <TableCell>{row.cityText}</TableCell>
       <TableCell className="min-w-56">
         <div className="grid gap-2">
           <Player name={row.name1} email={row.email1} />
@@ -239,23 +242,23 @@ function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: str
 }
 
 export default function AdminSignups({ loaderData }: Route.ComponentProps) {
-  const { rows, counts, total, refs, clubOptions } = loaderData;
+  const { rows, counts, total, refs, clubOptions, cityOptions } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
 
   return (
-    <Wrap className="grid grid-cols-1 gap-5 [&>*]:min-w-0">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold">Jelentkezők</h1>
-          <p className="text-sm text-muted-foreground">
-            {counts.signups} jelentkezés{filtered && ` (összesen ${total})`} · {counts.pairs} pár ·{" "}
-            {counts.solo} egyéni · {counts.players} játékos
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <AppPage
+      title="Jelentkezők"
+      description={
+        <>
+          {counts.signups} jelentkezés{filtered && ` (összesen ${total})`} · {counts.pairs} pár ·{" "}
+          {counts.solo} egyéni · {counts.players} játékos
+        </>
+      }
+      actions={
+        <>
           <Button variant="outline" asChild>
-            <Link to={`/admin/levelek/uj?${params.toString()}`}>
+            <Link to={`/admin/broadcasts/new?${params.toString()}`}>
               <Mail /> Levél nekik
             </Link>
           </Button>
@@ -264,8 +267,9 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
               <Download /> CSV letöltése
             </a>
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       <div className="flex flex-wrap gap-2">
         <Form method="get" className="w-full sm:w-64">
@@ -285,7 +289,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         <FilterSelect
           name="city"
           label="Város"
-          options={[...CITIES.map((c) => [c.slug, c.name] as [string, string]), [OTHER_CITY, "Más város"]]}
+          options={[...cityOptions, [OTHER_CITY, "Más város"]]}
         />
         <FilterSelect name="status" label="Állapot" options={Object.entries(STATUSES)} />
         <FilterSelect
@@ -309,7 +313,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         <FilterSelect name="ref" label="Forrás" options={[...refs, [NO_REF, "Forrás nélkül"]]} />
         {filtered && (
           <Button variant="ghost" asChild>
-            <Link to="/admin">Szűrők törlése</Link>
+            <Link to="/admin/signups">Szűrők törlése</Link>
           </Button>
         )}
       </div>
@@ -345,6 +349,6 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
-    </Wrap>
+    </AppPage>
   );
 }

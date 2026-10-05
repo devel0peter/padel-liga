@@ -14,7 +14,8 @@ export default [
   route("auth/google", "routes/auth.google.ts"),
   route("auth/google/callback", "routes/auth.google.callback.ts"),
   layout("routes/admin.tsx", [
-    route("admin", "routes/admin.signups.tsx"),
+    route("admin", "routes/admin._index.tsx"),
+    route("admin/signups", "routes/admin.signups.tsx"),
     route("admin/broadcasts", "routes/admin.broadcasts.tsx"),
     route("admin/broadcasts/new", "routes/admin.broadcast-new.tsx"),
     route("admin/clubs", "routes/admin.clubs.tsx"),

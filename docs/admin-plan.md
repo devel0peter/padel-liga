@@ -1,6 +1,6 @@
 # Plan: accounts, roles and the admin area
 
-Status: agreed (2026-10-04); PR 1 (accounts) in progress. Covers devel0peter/padel-liga#14, #17, #18 and #15. Player pages come after this plan.
+Status: agreed (2026-10-04). PR 1 (accounts): devel0peter/padel-liga#47. PR 2 (roles + shell): in review. Covers devel0peter/padel-liga#14, #17, #18 and #15. Player pages come after this plan.
 
 ## 1. Decisions (2026-10-04)
 

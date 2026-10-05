@@ -6,10 +6,10 @@ import {
   codeSendDecision,
   CODE_TTL_MS,
   DEFAULT_RETURN_TO,
-  extendedExpiry,
   isValidEmail,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_WINDOW,
+  nextExpiry,
   normalizeCode,
   normalizeEmail,
   parseCookies,
@@ -20,6 +20,7 @@ import {
   serializeCookie,
   sessionExpiry,
   SESSION_TTL_MS,
+  SUPERADMIN_SESSION_TTL_MS,
   validateProfile,
   type CodeRecord,
 } from "./rules";
@@ -53,21 +54,33 @@ describe("emails and codes", () => {
 });
 
 describe("sessions", () => {
-  it("last 90 days", () => {
-    expect(sessionExpiry(now).getTime() - now.getTime()).toBe(SESSION_TTL_MS);
+  it("last 90 days, 12 hours for the Főadmin", () => {
     expect(SESSION_TTL_MS).toBe(90 * day);
+    expect(SUPERADMIN_SESSION_TTL_MS).toBe(12 * 60 * min);
+    expect(sessionExpiry(now).getTime() - now.getTime()).toBe(SESSION_TTL_MS);
+    expect(sessionExpiry(now, "superadmin").getTime() - now.getTime()).toBe(SUPERADMIN_SESSION_TTL_MS);
   });
 
   it("are not rewritten within a day of the last extension", () => {
     const expires = new Date(now.getTime() + SESSION_TTL_MS - 23 * 60 * min);
-    expect(extendedExpiry(expires, now)).toBeNull();
+    expect(nextExpiry(expires, now)).toBeNull();
   });
 
   it("are extended to a full 90 days once a day has passed", () => {
     const expires = new Date(now.getTime() + SESSION_TTL_MS - day);
-    expect(extendedExpiry(expires, now)).toEqual(sessionExpiry(now));
+    expect(nextExpiry(expires, now)).toEqual(sessionExpiry(now));
     const nearlyOver = new Date(now.getTime() + min);
-    expect(extendedExpiry(nearlyOver, now)).toEqual(sessionExpiry(now));
+    expect(nextExpiry(nearlyOver, now)).toEqual(sessionExpiry(now));
+  });
+
+  it("extend a Főadmin session every few minutes of use, to 12 hours", () => {
+    const fresh = sessionExpiry(now, "superadmin");
+    expect(nextExpiry(new Date(fresh.getTime() - 5 * min), now, "superadmin")).toBeNull();
+    expect(nextExpiry(new Date(fresh.getTime() - 8 * min), now, "superadmin")).toEqual(fresh);
+  });
+
+  it("shrink a long session at once when the account becomes Főadmin", () => {
+    expect(nextExpiry(sessionExpiry(now), now, "superadmin")).toEqual(sessionExpiry(now, "superadmin"));
   });
 });
 

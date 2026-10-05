@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { formatDay, formatPercent } from "~/lib/format";
@@ -24,7 +24,7 @@ import { listLandings, listSignupStamps } from "~/lib/traffic.server";
 const CF_WEB_ANALYTICS = "https://dash.cloudflare.com/?to=/:account/web-analytics";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "traffic.view" });
   const period = parsePeriod(new URL(request.url).searchParams, new Date());
   const [landings, signups, clubs] = await Promise.all([
     listLandings(period),

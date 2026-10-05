@@ -1,7 +1,7 @@
 import { renderSVG } from "uqr";
 
 import type { Route } from "./+types/admin.poster";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { CITIES } from "~/lib/cities";
 import { normalizeRef, posterUrl } from "~/lib/clubs";
 import { getClub } from "~/lib/clubs.server";
@@ -14,7 +14,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "clubs.manage" });
   const ref = normalizeRef(new URL(request.url).searchParams.get("ref"));
   const club = ref ? await getClub(ref) : undefined;
   const url = ref ? posterUrl(ref) : SITE_URL;

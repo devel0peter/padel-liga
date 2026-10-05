@@ -57,6 +57,13 @@
       "when": 1791147378065,
       "tag": "0007_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791206873244,
+      "tag": "0008_roles",
+      "breakpoints": true
     }
   ]
 }

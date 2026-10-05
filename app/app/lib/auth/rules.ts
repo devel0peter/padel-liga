@@ -9,8 +9,8 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export const SESSION_TTL_MS = 90 * DAY;
-// A session is extended on use, but written at most once a day.
-const SESSION_EXTEND_AFTER_MS = DAY;
+// The Főadmin account: 12 hours of inactivity (docs/admin-plan.md).
+export const SUPERADMIN_SESSION_TTL_MS = 12 * HOUR;
 
 export const CODE_TTL_MS = 10 * MINUTE;
 export const MAX_CODE_ATTEMPTS = 5;
@@ -41,13 +41,23 @@ export function normalizeCode(input: string): string | null {
 
 // --- Sessions ---------------------------------------------------------------
 
-export function sessionExpiry(now: Date): Date {
-  return new Date(now.getTime() + SESSION_TTL_MS);
+export function sessionTtl(role: "player" | "superadmin"): number {
+  return role === "superadmin" ? SUPERADMIN_SESSION_TTL_MS : SESSION_TTL_MS;
 }
 
-// The new expiry when a session in use should be extended, otherwise null.
-export function extendedExpiry(expiresAt: Date, now: Date): Date | null {
-  return now.getTime() + SESSION_TTL_MS - expiresAt.getTime() >= SESSION_EXTEND_AFTER_MS ? sessionExpiry(now) : null;
+export function sessionExpiry(now: Date, role: "player" | "superadmin" = "player"): Date {
+  return new Date(now.getTime() + sessionTtl(role));
+}
+
+// The new expiry of a session in use, or null when it needn't be written.
+// Extended to a full TTL from now, but written at most once per 1/90 of the
+// TTL (a day for 90-day sessions, 8 minutes for 12-hour ones). Shortened at
+// once if the role now has a shorter TTL (e.g. just made Főadmin).
+export function nextExpiry(expiresAt: Date, now: Date, role: "player" | "superadmin" = "player"): Date | null {
+  const ttl = sessionTtl(role);
+  const target = now.getTime() + ttl;
+  if (expiresAt.getTime() > target) return new Date(target);
+  return target - expiresAt.getTime() >= ttl / 90 ? new Date(target) : null;
 }
 
 // --- Login codes ------------------------------------------------------------

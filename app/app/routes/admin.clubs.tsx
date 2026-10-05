@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { CITIES } from "~/lib/cities";
 import { countBy, OTHER_CLUB, parseClub, posterUrl, type Club, type ClubField } from "~/lib/clubs";
 import { createClub, deleteClub, listClubs, slugTaken, updateClub } from "~/lib/clubs.server";
@@ -41,7 +41,7 @@ import { cityLabel, NO_REF } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "clubs.manage" });
   const [clubs, signups] = await Promise.all([listClubs(), listSignups()]);
   const refs = countBy(signups, "ref");
   const plays = countBy(signups, "homeClub");
@@ -62,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 type ActionData = { errors: Partial<Record<ClubField, string>> };
 
 export async function action({ request }: Route.ActionArgs): Promise<ActionData | Response> {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "clubs.manage" });
   const form = await request.formData();
   const id = Number(form.get("id") || 0);
   if (!Number.isInteger(id) || id < 0) throw new Response("Hibás azonosító.", { status: 400 });
@@ -239,12 +239,12 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
                   </TableCell>
                   <TableCell>{cityLabel({ city: club.city, cityOther: null })}</TableCell>
                   <TableCell>
-                    <Link to={`/admin?club=${club.slug}`} className="underline">
+                    <Link to={`/admin/signups?club=${club.slug}`} className="underline">
                       {plays[club.slug] ?? 0}
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Link to={`/admin?ref=${club.slug}`} className="underline">
+                    <Link to={`/admin/signups?ref=${club.slug}`} className="underline">
                       {refs[club.slug] ?? 0}
                     </Link>
                   </TableCell>
@@ -271,24 +271,24 @@ export default function AdminClubs({ loaderData, actionData }: Route.ComponentPr
 
       <p className="text-sm text-muted-foreground">
         Máshol / vegyesen játszik:{" "}
-        <Link to={`/admin?club=${OTHER_CLUB}`} className="underline">
+        <Link to={`/admin/signups?club=${OTHER_CLUB}`} className="underline">
           {playsOther}
         </Link>
         {" · "}Nem adta meg:{" "}
-        <Link to={`/admin?club=${NO_REF}`} className="underline">
+        <Link to={`/admin/signups?club=${NO_REF}`} className="underline">
           {playsUnknown}
         </Link>
       </p>
       <p className="text-sm text-muted-foreground">
         Forrás nélkül:{" "}
-        <Link to={`/admin?ref=${NO_REF}`} className="underline">
+        <Link to={`/admin/signups?ref=${NO_REF}`} className="underline">
           {noRef}
         </Link>
         {otherRefs.map(([ref, n]) => (
           <span key={ref}>
             {" · "}
             {ref}:{" "}
-            <Link to={`/admin?ref=${ref}`} className="underline">
+            <Link to={`/admin/signups?ref=${ref}`} className="underline">
               {n}
             </Link>
           </span>

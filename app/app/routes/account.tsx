@@ -1,9 +1,11 @@
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 
 import type { Route } from "./+types/account";
 import { AuthPage } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { hasGoogleLogin } from "~/lib/auth/accounts.server";
+import { getActor } from "~/lib/auth/admin.server";
+import { can, roleLabel } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -16,7 +18,14 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  return { name: user.name, email: user.email, google: await hasGoogleLogin(user.id) };
+  const actor = await getActor(request);
+  return {
+    name: user.name,
+    email: user.email,
+    google: await hasGoogleLogin(user.id),
+    role: actor ? roleLabel(actor) : "Játékos",
+    admin: can(actor, { kind: "admin.enter" }),
+  };
 }
 
 export default function Account({ loaderData }: Route.ComponentProps) {
@@ -35,7 +44,20 @@ export default function Account({ loaderData }: Route.ComponentProps) {
           <dt className="text-sm text-muted-foreground">Belépés</dt>
           <dd>{loaderData.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</dd>
         </div>
+        <div className="grid gap-0.5">
+          <dt className="text-sm text-muted-foreground">Szerep</dt>
+          <dd>{loaderData.role}</dd>
+        </div>
       </dl>
+      {loaderData.admin && (
+        <div>
+          <Button asChild className="h-11 px-6 text-base">
+            <Link to="/admin" className="no-underline">
+              Admin felület
+            </Link>
+          </Button>
+        </div>
+      )}
       <Form method="post" action="/logout" className="flex flex-wrap gap-3">
         <Button type="submit" variant="outline" className="h-11 px-5">
           Kilépés

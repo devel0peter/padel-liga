@@ -4,11 +4,11 @@ import { redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { sessions, users } from "~/db/schema";
 
-import { extendedExpiry, parseCookies, serializeCookie, sessionExpiry } from "./rules";
+import { nextExpiry, parseCookies, serializeCookie, sessionExpiry } from "./rules";
 import { randomToken, sha256Hex } from "./tokens";
 
 // Session cookie: a random token; the database keeps only its hash and the
-// expiry, which is the real limit. The cookie itself lives as long as browsers
+// expiry, which is the real limit (90 days, Főadmin 12 hours: rules.ts). The cookie itself lives as long as browsers
 // allow (~400 days), so extending a session needs no new cookie.
 // __Host- makes the browser refuse it unless Secure, Path=/ and no Domain.
 const COOKIE = import.meta.env.DEV ? "pp_session" : "__Host-pp_session";
@@ -27,7 +27,9 @@ function sessionToken(request: Request): string | null {
 // Returns the Set-Cookie header to send with the response.
 export async function createSession(userId: string): Promise<string> {
   const token = randomToken();
-  await db.insert(sessions).values({ idHash: await sha256Hex(token), userId, expiresAt: sessionExpiry(new Date()) });
+  const [user] = await db.select({ role: users.platformRole }).from(users).where(eq(users.id, userId));
+  const expiresAt = sessionExpiry(new Date(), user?.role);
+  await db.insert(sessions).values({ idHash: await sha256Hex(token), userId, expiresAt });
   return serializeCookie(COOKIE, token, { maxAgeSeconds: COOKIE_MAX_AGE, secure: SECURE });
 }
 
@@ -42,7 +44,7 @@ async function lookup(request: Request): Promise<User | null> {
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.idHash, idHash), gt(sessions.expiresAt, now)));
   if (!row) return null;
-  const extended = extendedExpiry(row.expiresAt, now);
+  const extended = nextExpiry(row.expiresAt, now, row.user.platformRole);
   if (extended) await db.update(sessions).set({ expiresAt: extended }).where(eq(sessions.idHash, idHash));
   return row.user;
 }
@@ -58,7 +60,12 @@ export function getUser(request: Request): Promise<User | null> {
 
 function loginRedirect(request: Request, to: string): never {
   const url = new URL(request.url);
-  throw redirect(`${to}?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
+  // A client navigation fetches /page.data (/_root.data for "/"); come back
+  // to the page itself, without React Router's own query parameters.
+  const path = url.pathname.replace(/^\/_root\.data$/, "/").replace(/\.data$/, "");
+  url.searchParams.delete("_routes");
+  const back = path + (url.searchParams.size ? `?${url.searchParams}` : "");
+  throw redirect(`${to}?returnTo=${encodeURIComponent(back)}`);
 }
 
 // Logged in, first-login profile not necessarily done (the profile page itself).

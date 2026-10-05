@@ -12,12 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { dailyLimit, listBroadcasts, suppressedSet } from "~/lib/email/outbox.server";
 import { formatDateTime } from "~/lib/format";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "broadcasts.send" });
   const [broadcasts, suppressed] = await Promise.all([listBroadcasts(), suppressedSet()]);
   return { broadcasts, unsubscribed: suppressed.size, limit: dailyLimit() };
 }
@@ -38,7 +38,7 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Címzetteket a <Link to="/admin" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
+        Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
         onnan a „Levél nekik” gombbal. Naponta legfeljebb {limit} levél megy ki; a többi a következő
         napokon automatikusan.
       </p>

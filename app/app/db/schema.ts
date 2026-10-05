@@ -112,6 +112,9 @@ export const users = sqliteTable("users", {
   // Lowercased; the same email is the same account whichever way they log in.
   email: text("email").notNull().unique(),
   name: text("name").notNull().default(""),
+  // "superadmin" (Főadmin) is set only by `npm run auth:superadmin -w app`;
+  // no request handler writes this column. Organizer rights: league_admins.
+  platformRole: text("platform_role", { enum: ["player", "superadmin"] }).notNull().default("player"),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -169,6 +172,47 @@ export const accountInvites = sqliteTable("account_invites", {
   email: text("email").primaryKey(),
   note: text("note"),
   createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// A league in a city, e.g. "Padelpárbaj Győr" (spec section 4).
+export const leagues = sqliteTable("leagues", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  city: text("city").notNull(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// Organizer ("Szervező") rights: one row per league and account.
+export const leagueAdmins = sqliteTable(
+  "league_admins",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    grantedBy: text("granted_by").references(() => users.id, { onDelete: "set null" }),
+    grantedAt: integer("granted_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.userId] }), index("league_admins_user_idx").on(t.userId)],
+);
+
+// Who changed roles and leagues, and when. actor_id is null for the CLI.
+export const auditLog = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // e.g. "superadmin.grant", "league_admin.grant"
+  target: text("target").notNull(), // e.g. an email or "league:gyor"
+  detail: text("detail"),
+  at: integer("at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
 });

@@ -11,6 +11,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Forbidden } from "./components/forbidden";
 import { webAnalyticsToken } from "./lib/web-analytics.server";
 
 export function loader() {
@@ -56,6 +57,7 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  if (isRouteErrorResponse(error) && error.status === 403) return <Forbidden />;
   let message = "Hoppá!";
   let details = "Váratlan hiba történt.";
   let stack: string | undefined;

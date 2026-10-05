@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Textarea } from "~/components/ui/textarea";
-import { requireAdmin } from "~/lib/access.server";
+import { requirePermission } from "~/lib/auth/admin.server";
 import { CITIES, OTHER_CITY } from "~/lib/cities";
 import { formatDateTime } from "~/lib/format";
 import { homeClubLabel, OTHER_CLUB, refLabel } from "~/lib/clubs";
@@ -56,7 +56,7 @@ import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.ser
 const MAX_ADMIN_NOTE = 2000;
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
   const [all, clubs] = await Promise.all([listSignups(), listClubs()]);
   const rows = filterSignups(all, filters).map((r) => ({
@@ -72,7 +72,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  await requirePermission(request, { kind: "signups.manage" });
   const form = await request.formData();
   const id = Number(form.get("id"));
   if (!Number.isInteger(id) || id <= 0) throw new Response("Hibás azonosító.", { status: 400 });
@@ -309,7 +309,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         <FilterSelect name="ref" label="Forrás" options={[...refs, [NO_REF, "Forrás nélkül"]]} />
         {filtered && (
           <Button variant="ghost" asChild>
-            <Link to="/admin">Szűrők törlése</Link>
+            <Link to="/admin/signups">Szűrők törlése</Link>
           </Button>
         )}
       </div>

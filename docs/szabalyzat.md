@@ -9,6 +9,7 @@
 - A kör végén a csoport **első helyezettje feljebb lép**, az **utolsó lejjebb kerül**.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
 - Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
+- Egy szezon **4 körből** áll. A szezon végéről a 10. pontban olvashatsz.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
@@ -90,3 +91,13 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 ## 9. Fair play
 - Az egyeztetésnél légy korrekt: ne ajánlj olyan időpontot, amelyről tudod, hogy az ellenfél számára elfogadhatatlan.
 - A szervező visszaélés esetén felülbírálhatja az automatikus döntést.
+
+## 10. A szezon vége
+- Egy szezon 4 körből, vagyis 12 hétből áll. Utána 1–2 hét szünet jön, és indul a következő szezon.
+- A liga folyamatos: nincs díj és nincs bajnoki cím. Amit nyersz, az minden héten egy szervezett meccs hozzád illő ellenfelekkel. Az első szezon bemelegítés.
+- A szezon végeredménye: az utolsó kör csoportja és helyezése.
+- A szezon végén e-mailben küldjük az összesítődet: lejátszott és megnyert meccsek, szett- és játékkülönbség, az értékszámod a szezon elején és végén, és hogy melyik körben melyik csoportban játszottál. A lezárt szezonok tabellái az oldalon visszanézhetők.
+- **Folytatás:** a következő szezonra a „Nevezünk újra” gombbal neveztek, a jelentkezési határidőig. Aki nem nevez újra, kimarad. Ha inkább a szervezőnek szólsz, ő is benevezhet titeket.
+- **Az értékszámod és a csoportod is megmarad:** a következő szezon az utolsó kör feljutása és kiesése utáni csoportokkal indul. A kimaradó párok helyére az alattuk lévők lépnek feljebb. A beosztást a szervező átnézi.
+- Ha párt cseréltek a két szezon között, az új párt új nevezőként soroljuk be (7. pont).
+- Ha a szezon utolsó körében neveztek, a következő szezon elején automatikusan bekapcsolódtok, nem kell újra neveznetek.

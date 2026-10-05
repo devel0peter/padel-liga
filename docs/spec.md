@@ -37,8 +37,8 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 ## 4. Domain model (simplified)
 - **City (tenant):** slug and name. Signups, leagues and organizers belong to a city. Only cities with an organizer can be picked; in the MVP that is Győr alone. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
-- **Season:** a run of the league (e.g. "2027 tavasz"), made up of phases. It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break.
-- **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by the late-joiner rules (section 10).
+- **Season:** a run of the league (e.g. "2026/27 tél", free text set by the organizer), made up of **4 phases** (12 weeks). It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break. Seasons follow each other with a 1–2 week gap, set by the organizer. The league is continuous: a season is a checkpoint (an end date, a recap, a re-entry point), not a competition with prizes. Season end and switch: section 10.
+- **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by the late-joiner rules (section 10). A pair approved during the last phase moves into the next season automatically, without re-entering.
 - **Venue:** the city's padel clubs, an internal list the organizer maintains, used when recording where a match was booked (and for per-club statistics). Never listed publicly; the same list feeds the poster QR codes and the optional "where do you play most" signup field (README decision log, 2026-10-04).
 - **Phase:** 3 weeks, back to back: the next phase starts on the Monday after the deadline, and new groups are emailed that Monday morning. Group composition is fixed within a phase. (A catch-up week exists as a league setting, off by default; revisit if the first week of a phase turns out to be lost.)
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest). When the number of pairs isn't divisible by 4, some groups have 3 pairs (9 = 3+3+3, 10 = 4+3+3, 11 = 4+4+3); no waiting list. 3-pair groups go at the bottom unless the organizer places them otherwise.
@@ -125,6 +125,13 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
   6. The result is part of the round switch draft; the organizer can move pairs before publishing.
 - First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
 - **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
+- **Season end and switch** (README decision log, 2026-10-05):
+  1. **Final standings:** each pair's group and place in the last phase. No prizes and no champion title.
+  2. **Re-entry:** during the next season's registration window, continuing pairs click "Nevezünk újra"; the organizer can also re-enter a pair by hand. Pairs that don't re-enter leave the league. A pair approved for a season it never played in (approved during the last phase) moves into the next season automatically.
+  3. **Carry-over draft:** apply the last phase's promotion and relegation as at a round switch. List the resulting groups top-down, each group's pairs ordered by last-phase group, then place. Remove pairs that didn't re-enter and pairs whose players changed. Re-cut the remaining order top-down into groups of the section 4 sizes, so pairs below move up into the holes. Then place new pairs and re-formed pairs (partner change) by the late-joiner rules above.
+  4. The organizer adjusts the draft and publishes it on the Monday the new season starts; publishing sends the new-phase emails.
+  5. **Elo carries over** unchanged; no reset or decay.
+  6. **Season archive and recap:** see sections 13 and 14.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
 - Pair count not divisible by 4: groups of 3 fill the gap (section 4).
 
@@ -136,7 +143,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 - Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)
-Group size, phase length in weeks, catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
+Group size, phase length in weeks, phases per season (4), catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
 
 ## 13. Notifications (email, in Hungarian)
 - New phase (Monday morning after the deadline): your group, opponents and the deadline.
@@ -146,6 +153,7 @@ Group size, phase length in weeks, catch-up week on or off, deadline day, slot r
 - Reminder: 3 days before the deadline if the match is still unscheduled.
 - A result is waiting for confirmation.
 - End of a phase, with your new group.
+- End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group in each phase) with a "Nevezünk újra" button for the pair. A reminder 2 days before the registration window closes, to pairs that haven't re-entered.
 - Every notification includes a shareable link ("küldd el a párodnak / ellenfélnek").
 
 Email only in the MVP. A PWA with push notifications later, if players miss emails.
@@ -153,6 +161,7 @@ Email only in the MVP. A PWA with push notifications later, if players miss emai
 ## 14. Public pages
 - League home: groups, standings, matches this week.
 - Pair and player profiles: results and Elo history (no contact details).
+- Season archive: every finished season's groups and standings for each phase (e.g. `/seasons/<slug>`), linked from pair profiles. A per-season recap block on profiles comes later.
 - Rules page (`szabalyzat.md`).
 - Privacy page ("Adatkezelési tájékoztató", section 17), linked from the footer and from every consent checkbox.
 
@@ -191,5 +200,6 @@ Dates are Europe/Budapest.
 | Registration opens | Mon 2 Nov 2026 | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
 | Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling, results and confirmation, disputes, public standings, emails and reminders, daily backup |
 | First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, account deletion |
+| Season end | Thu 31 Dec 2026 | 4-phase seasons, re-entry ("Nevezünk újra", organizer re-entry by hand), carrying approvals into the next season, season switch draft (carry-over, compaction, re-formed pairs as late joiners), season archive page, season recap email and re-entry reminder |
 
-First season: phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec, break 21 Dec – 3 Jan, phase 3 starts 4 Jan 2027. Until substitutes are built, the organizer handles them by hand.
+First season: phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec, break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.

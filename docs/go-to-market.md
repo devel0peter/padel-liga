@@ -23,12 +23,85 @@
 4. **Launch threshold:** 12 pairs (3 groups), decided 2026-10-03; was 8. With 2 groups the ladder barely moves.
 
 ## Social media
-- Not allowed: an agent posting in Facebook groups. It would be flagged as spam and burn local trust.
-- Group posts and recruiting are done by Peter in person.
-- Automated, on our own channels:
-  - A league Facebook page and Instagram account, posting via API.
-  - After each round: results, standings image, promotions and relegations, "a hét meccse".
+
+### Launch posts (decided 2026-10-05)
+- No paid ads and no league Facebook page for now. Peter posts from his **own profile** (set to **Public**) and in 2–3 local padel groups.
+- All 3 clubs agreed to post on their own pages. Send each club the club text, an image and its own link. They **post it natively**, not as a share of Peter's post: a shared personal post reaches few people and doesn't feel like the club's own.
+- A separate `?ref=` per channel, so `/admin/traffic` shows what worked:
+  - Peter's profile: `?ref=fb-peter`
+  - Groups: `?ref=fb-csoport`
+  - Clubs: `?ref=<klub>-fb` (`-fb` keeps it apart from the club's poster QR)
+- Groups:
+  - Check each group's rules, or ask the admin first.
+  - Spread the posts over a few days.
+  - Reply to every comment quickly. Comments push the post up the feed.
+- Image: a real photo of a Győr court or of Peter playing beats any graphic. Don't post without an image. Feed format: 1080×1350 (4:5).
+- Best time: weekday evening, 19–21h.
+
+### Schedule until launch
+1. **Now:** announcement (post 1, post 2 for the clubs).
+2. **~26 Oct:** social proof + urgency (post 3).
+3. **2 Nov:** registration opens (post 4).
+
+### Post 1: Peter's profile and groups
+```
+Padel liga indul Győrben 🎾
+
+Sokan csak a hétvégi versenyeken játszunk tétmeccset, ezen szeretnék változtatni. Elindítom a Padelpárbajt: heti ligát pároknak.
+
+• Hetente 1 meccs, hozzátok hasonló szintű párok ellen
+• Az időpontot ti egyeztetitek, bármelyik győri pályán játszhattok
+• 3 hetente a csoport győztese feljebb lép, az utolsó lejjebb kerül
+• Nincs párod? Jelentkezz egyedül, keresünk neked
+• Nevezési díj nincs, csak a pályadíjat álljátok
+
+Novemberben indulunk, ha összejön 12 pár. Iratkozz fel, és szólunk, amikor nyílik a nevezés:
+👉 padelparbaj.hu/?ref=fb-peter
+
+Kérdés jöhet kommentben vagy üzenetben. Jelöld meg, akivel szívesen neveznél! 👇
+```
+In groups, swap the link to `?ref=fb-csoport`.
+
+### Post 2: for the clubs
+```
+Városi padel liga indul Győrben, nálunk is játszhattok! 🎾
+
+A Padelpárbaj heti liga pároknak:
+• Hetente 1 meccs, a szintetekhez illő párok ellen
+• Időpontot ti egyeztettek, a meccset nálunk is lejátszhatjátok
+• 3 hetente feljutás és kiesés a csoportok között
+• Nincs párod? Jelentkezz egyedül is
+• Nevezési díj nincs
+
+Novemberben indul. Iratkozz fel: 👉 padelparbaj.hu/?ref=<klub>-fb
+
+Jelöld meg a párodat! 👇
+```
+"Jelöld meg a párodat" matters most: it's a pairs league, so every tag brings in a new person.
+
+### Post 3: ~26 Oct (draft)
+```
+Már [X] pár jelentkezett a győri Padelpárbajra 🎾 Még [Y] kell, hogy novemberben induljunk.
+
+Ha eddig halogattad: most iratkozz fel, és jelöld meg a párodat! 👇
+👉 padelparbaj.hu/?ref=fb-peter
+```
+
+### Post 4: 2 Nov (draft)
+```
+Nyílik a nevezés! 🎾
+
+A Padelpárbaj első köre november 9-én indul Győrben. Regisztrálj, nevezz a pároddal, és hétfőn megkapjátok a csoportotokat.
+
+👉 padelparbaj.hu/?ref=fb-peter
+```
+Check the dates against the milestones before posting.
+
+### Later (after launch)
+- A league Facebook page and Instagram account, posting via API.
+- After each round: results, standings image, promotions and relegations, "a hét meccse".
 - Share buttons for players ("feljutottunk az 1. csoportba"), so players do the distribution.
+- Not allowed: an agent posting in Facebook groups. It would be flagged as spam and burn local trust. Group posts are always Peter's, in person.
 
 ## Organizer model (phase 3)
 - Other cities can join only with a local organizer. We provide the platform and the know-how.

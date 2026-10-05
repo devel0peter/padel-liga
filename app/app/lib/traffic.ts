@@ -14,6 +14,19 @@ export function landingSource(params: URLSearchParams): string | null {
   return normalizeRef(params.get("ref")) ?? normalizeRef(params.get("utm_source"));
 }
 
+// Tracking parameters to drop from the address bar once the landing is
+// counted: our source tag, ad tags and Facebook's click id. The page keeps
+// the source it read on load, so nothing is lost; a copied link is just clean.
+const TRACKING = /^(ref|utm_[a-z_]+|fbclid|gclid)$/i;
+
+// The query string without tracking parameters ("" if nothing is left).
+export function withoutTracking(search: string): string {
+  const params = new URLSearchParams(search);
+  for (const key of [...params.keys()]) if (TRACKING.test(key)) params.delete(key);
+  const rest = params.toString();
+  return rest ? `?${rest}` : "";
+}
+
 const dayFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE,
   year: "numeric",

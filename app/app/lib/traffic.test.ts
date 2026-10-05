@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDay, formatPercent } from "./format";
-import { budapestDay, buildFunnel, daysOf, landingSource, parsePeriod } from "./traffic";
+import { budapestDay, buildFunnel, daysOf, landingSource, parsePeriod, withoutTracking } from "./traffic";
 
 const params = (q: string) => new URLSearchParams(q);
 
@@ -128,5 +128,18 @@ describe("formatPercent / formatDay", () => {
 
   it("shows a day as 'okt. 5., hétfő'", () => {
     expect(formatDay("2026-10-05")).toBe("okt. 5., hétfő");
+  });
+});
+
+describe("withoutTracking", () => {
+  it("drops our source tag, ad tags and click ids", () => {
+    expect(withoutTracking("?ref=gyor-padel-klub")).toBe("");
+    expect(withoutTracking("?utm_source=fb&utm_campaign=okt&fbclid=abc")).toBe("");
+    expect(withoutTracking("?REF=x&gclid=1")).toBe("");
+  });
+
+  it("keeps anything else", () => {
+    expect(withoutTracking("?ref=plakat&lang=hu")).toBe("?lang=hu");
+    expect(withoutTracking("")).toBe("");
   });
 });

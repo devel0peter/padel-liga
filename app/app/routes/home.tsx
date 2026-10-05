@@ -13,6 +13,7 @@ import {
 } from "~/components/ui/accordion";
 import { listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
+import { withoutTracking } from "~/lib/traffic";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
@@ -110,12 +111,17 @@ const FAQ = [
 // One landing count per page load, not per client-side visit back to "/".
 let landingCounted = false;
 
-// Counts the landing per source for the admin funnel (app/lib/traffic.ts).
+// Counts the landing per source for the admin funnel (app/lib/traffic.ts),
+// then takes ?ref= and ad tags out of the address bar. The signup form already
+// has the source from the loader, so a signup still records it.
 function useLandingCount() {
   useEffect(() => {
     if (landingCounted) return;
     landingCounted = true;
-    navigator.sendBeacon?.(`/api/landing${window.location.search}`);
+    const { search, pathname, hash } = window.location;
+    navigator.sendBeacon?.(`/api/landing${search}`);
+    const clean = withoutTracking(search);
+    if (clean !== search) window.history.replaceState(window.history.state, "", `${pathname}${clean}${hash}`);
   }, []);
 }
 

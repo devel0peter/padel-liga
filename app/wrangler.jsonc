@@ -26,7 +26,7 @@
 		"CF_WEB_ANALYTICS_TOKEN": "e54368f7d73948ffb95eed22d5ee9a9d",
 		// Google login (app/lib/auth/google.server.ts). The client ID is public;
 		// the secret is GOOGLE_CLIENT_SECRET. Empty: the Google button is hidden.
-		"GOOGLE_CLIENT_ID": ""
+		"GOOGLE_CLIENT_ID": "737552847959-utt48hgu170mu5sar464f0vln28gqkpq.apps.googleusercontent.com"
 	},
 	// Set with `npx wrangler secret put <NAME>`; locally in .dev.vars.
 	// RESEND_API_KEY: sending-only key. EMAIL_SECRET: signs unsubscribe links.

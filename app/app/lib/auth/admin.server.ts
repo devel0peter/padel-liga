@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagueAdmins, leagues } from "~/db/schema";
-import { requireAccess } from "~/lib/access.server";
 
 import { can, type Actor, type Permission } from "./permissions";
 import { getUser, requireUser, type User } from "./session.server";
@@ -40,7 +39,6 @@ export async function getActor(request: Request): Promise<Actor | null> {
 }
 
 export async function requirePermission(request: Request, permission: Permission): Promise<Actor> {
-  await requireAccess(request);
   const user = await requireUser(request);
   const actor = await actorFor(request, user);
   if (!can(actor, permission)) throw data({ forbidden: true }, { status: 403 });

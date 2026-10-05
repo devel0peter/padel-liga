@@ -13,12 +13,7 @@
 	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.
 	"workers_dev": false,
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
-	// Cloudflare Access protecting /admin (see app/lib/access.server.ts).
-	// Access app "Padelpárbaj admin" (padelparbaj.hu/admin, allows admin@padelparbaj.hu
-	// via one-time PIN). The admin returns 403 if either value is empty.
 	"vars": {
-		"ACCESS_TEAM_DOMAIN": "padelparbaj.cloudflareaccess.com",
-		"ACCESS_AUD": "98cc1f4493e4533dcf39fb86ce590ff324474125db12c72b98c642d075957793",
 		// Resend plan's daily quota (free: 100). Raise it after upgrading.
 		"EMAIL_DAILY_LIMIT": "100",
 		// Cloudflare Web Analytics site token (public, it ships in the page).

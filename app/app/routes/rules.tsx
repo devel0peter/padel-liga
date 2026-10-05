@@ -20,9 +20,18 @@ const components: Components = {
   h1: ({ children }) => (
     <h1 className="font-display text-[clamp(2rem,5vw,3rem)] font-black">{children}</h1>
   ),
-  h2: ({ children }) => (
-    <h2 className="font-display mt-6 text-2xl font-extrabold">{children}</h2>
-  ),
+  // "8. Egyéni értékszám" gets id="section-8", the target of the table of contents.
+  h2: ({ children }) => {
+    const number = /^(\d+)\./.exec(String(children))?.[1];
+    return (
+      <h2
+        id={number ? `section-${number}` : undefined}
+        className="font-display mt-6 scroll-mt-6 text-2xl font-extrabold"
+      >
+        {children}
+      </h2>
+    );
+  },
   p: ({ children }) => <p>{children}</p>,
   ul: ({ children }) => <ul className="grid list-disc gap-1.5 pl-5">{children}</ul>,
   ol: ({ children }) => <ol className="grid list-decimal gap-1.5 pl-5">{children}</ol>,

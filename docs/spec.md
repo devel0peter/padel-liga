@@ -67,9 +67,10 @@ Organizer and platform admin are roles on a normal player account, inside the ap
    - **accept** one slot, which schedules the match, or
    - **counter-propose** with a new proposal under the same rules.
    Simply rejecting is not possible.
-3. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration).
-4. Every action is timestamped and logged. This is the evidence for walkovers.
-5. Either side can cancel an accepted slot; this reopens the proposal process.
+3. **Agreed time (README decision log, 2026-10-05):** if the pairs already agreed on a time elsewhere (Messenger, in person), either pair can record that slot directly, without the 3-slot proposal: any future time before the deadline, no lead time, no time window. Optionally with a venue. The other pair confirms it, which schedules the match as if a slot had been accepted, or declines it, which reopens the proposal process. An unconfirmed agreed time lapses when its start passes.
+4. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration).
+5. Every action is timestamped and logged. This is the evidence for walkovers.
+6. Either side can cancel an accepted or confirmed slot; this reopens the proposal process.
    - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal. If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
 
 ## 7. Recording results
@@ -86,7 +87,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 
 ## 8. Unplayed matches (resolved automatically at the deadline)
 The deadline is the end of the phase (section 5), so a match missed in its scheduled week can still be played later in the phase.
-"Valid activity" means a valid proposal or counter-proposal before the deadline.
+"Valid activity" means a valid proposal or counter-proposal, recording an agreed time, or confirming one, before the deadline.
 
 | Situation | Outcome |
 |---|---|
@@ -97,6 +98,17 @@ The deadline is the end of the phase (section 5), so a match missed in its sched
 | Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover |
 
 The organizer can always override the outcome manually.
+
+### Strikes ("fekete pont", README decision log, 2026-10-05)
+- **A strike goes to both players of a pair** when:
+  - it didn't show up at an accepted slot (organizer-confirmed no-show), or
+  - it is the inactive side at the deadline: one side active and this one not, neither side active (both pairs get one), or the late-cancelling side counted as inactive (section 6).
+- **No strike** when both sides were active but didn't agree, for a cancellation more than 24 hours before the slot, or for matches removed by a withdrawal.
+- A substitute (section 4) never gets a strike; the pair's two players do.
+- Strikes belong to the player and follow them across partner changes. They reset at the start of each season.
+- **2nd strike:** a warning email to the player.
+- **3rd strike:** the player's pair leaves the league at the end of the current phase, not immediately, so that phase's results (including the walkovers its opponents won) stand. At the round switch, apply promotion and relegation first, then remove the pair and re-cut the groups top-down so pairs below move up into the hole (as in the season carry-over, section 10). The player's partner may form a new pair (placed as a re-formed pair). The removed player's next season entry is flagged for the organizer, who decides on approval.
+- The organizer can cancel a strike with a reason (illness, a club cancelling the court); the cancellation is logged and the count is recomputed.
 
 ## 9. Standings and tiebreakers
 Points: win 3, loss in a played match 1, walkover loss (or a loss because neither side was active) 0.
@@ -132,6 +144,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
   4. The organizer adjusts the draft and publishes it on the Monday the new season starts; publishing sends the new-phase emails.
   5. **Elo carries over** unchanged; no reset or decay.
   6. **Season archive and recap:** see sections 13 and 14.
+- Pairs removed by strikes (section 8) leave at the round switch, after promotion and relegation; pairs below move up into the hole.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
 - Pair count not divisible by 4: groups of 3 fill the gap (section 4).
 
@@ -148,7 +161,8 @@ Group size, phase length in weeks, phases per season (4), catch-up week on or of
 ## 13. Notifications (email, in Hungarian)
 - New phase (Monday morning after the deadline): your group, opponents and the deadline.
 - Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
-- A proposal arrived, or a slot was accepted.
+- A proposal arrived, a slot was accepted, or an agreed time is waiting for confirmation.
+- A strike: to the pair's players, with the count. The 2nd strike email is the warning; the 3rd says the pair leaves at the end of the phase.
 - Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
 - Reminder: 3 days before the deadline if the match is still unscheduled.
 - A result is waiting for confirmation.
@@ -199,8 +213,8 @@ Dates are Europe/Budapest.
 | Milestone | Date | Must work |
 |---|---|---|
 | Registration opens | Mon 2 Nov 2026 | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
-| Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling, results and confirmation, disputes, public standings, emails and reminders, daily backup |
-| First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, account deletion |
+| Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling (including recording an agreed time), results and confirmation, disputes, public standings, emails and reminders, daily backup |
+| First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, strikes, account deletion |
 | Season end | Thu 31 Dec 2026 | 4-phase seasons, re-entry ("Nevezünk újra", organizer re-entry by hand), carrying approvals into the next season, season switch draft (carry-over, compaction, re-formed pairs as late joiners), season archive page, season recap email and re-entry reminder |
 
 First season: phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec, break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.

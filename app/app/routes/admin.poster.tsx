@@ -6,6 +6,7 @@ import { listCities, listedCities } from "~/lib/cities.server";
 import { normalizeRef, posterUrl } from "~/lib/clubs";
 import { getClub } from "~/lib/clubs.server";
 import { Wordmark } from "~/components/site";
+import { STEPS } from "~/lib/how-it-works";
 import { SITE_NAME, SITE_URL } from "~/lib/site";
 
 // Printable A4 poster with a QR code to the landing page. With `?ref=<club>`
@@ -28,14 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { url, qr: renderSVG(url, { border: 0 }), club: club?.name ?? null, ref, city };
 }
 
-// The landing page's "Hogyan működik?", in short. Deliberately without
-// numbers that may change (group size, round or season length, the pair
-// threshold): those go in the season announcement.
-const STEPS = [
-  ["Méltó ellenfelek", "Szint szerinti csoportok, kezdőtől versenyzőig."],
-  ["Heti egy meccs", "Akkor és ott, amikor nektek jó."],
-  ["Feljutás, kiesés", "A kör végén a legjobb feljebb lép, az utolsó lejjebb."],
-];
+// Steps: the landing page's "Hogyan működik?", word for word (lib/how-it-works.ts).
 
 export default function Poster({ loaderData }: Route.ComponentProps) {
   const { url, qr, club, ref, city } = loaderData;
@@ -63,7 +57,7 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
 
       {/* Fixed light colours: the poster prints the same in dark mode. */}
       <article className="relative mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[14mm] text-[#10233d] print:h-[297mm] print:max-w-none">
-        <header className="grid gap-[9mm]">
+        <header className="grid gap-[7mm]">
           {/* Brand: the league is "Padelpárbaj <city>". */}
           <div className="flex items-baseline gap-[3mm] text-[8mm]">
             <span className="inline-block size-[6.5mm] self-center rounded-full bg-[#dceb3c] shadow-[inset_-1.5mm_-1mm_0_rgba(0,0,0,0.12)]" />
@@ -71,34 +65,37 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
             <span className="font-extrabold text-[#1e5ba8] [font-stretch:120%]">{city}</span>
           </div>
           <h1 className="font-display text-[16.5mm] leading-[1.02] font-black tracking-tight">
-            Ki a legjobb páros a városban?
+            Ki a legjobb páros
+            <br />a városban?
           </h1>
-          <p className="max-w-[160mm] text-[7.5mm] leading-snug">
+          <p className="max-w-[165mm] text-[7mm] leading-snug">
             <strong>Unod már, hogy mindig ugyanazokkal játszol? Nehéz hétről hétre meccset
-            szervezni?</strong>{" "}
+            szervezni?</strong>
+            <br />
             <span className="text-[#4a5b70]">A {SITE_NAME}ban minden héten új ellenfelet kapsz.</span>
           </p>
         </header>
 
-        <ol className="grid grid-cols-3 gap-[6mm]">
+        <ol className="grid grid-cols-2 gap-x-[8mm] gap-y-[5mm]">
           {STEPS.map(([title, text], i) => (
-            <li key={title} className="grid content-start gap-[2mm] border-t-[1.2mm] border-[#1e5ba8] pt-[4mm]">
-              <span className="font-display text-[13mm] leading-none font-black text-[#1e5ba8] [font-stretch:125%]">
-                {i + 1}
+            <li key={title} className="grid content-start gap-[1.5mm] border-t-[1mm] border-[#1e5ba8] pt-[3mm]">
+              <span className="flex items-baseline gap-[2.5mm]">
+                <span className="font-display text-[9mm] leading-none font-black text-[#1e5ba8] [font-stretch:125%]">
+                  {i + 1}
+                </span>
+                <span className="text-[6mm] leading-tight font-bold">{title}</span>
               </span>
-              <span className="text-[6.5mm] leading-tight font-bold">{title}</span>
-              <span className="text-[5mm] leading-snug text-[#4a5b70]">{text}</span>
+              <span className="text-[4.6mm] leading-snug text-[#4a5b70]">{text}</span>
             </li>
           ))}
         </ol>
 
-        <footer className="grid grid-cols-[1fr_62mm] items-end gap-[8mm] rounded-[6mm] bg-[#dceb3c] p-[8mm]">
+        <footer className="grid grid-cols-[1fr_58mm] items-end gap-[8mm] rounded-[6mm] bg-[#dceb3c] p-[7mm]">
           <div className="grid gap-[3mm]">
             <p className="font-display text-[11mm] leading-none font-black">Jelentkezz!</p>
             <p className="text-[5.5mm] leading-snug">
               Novemberben indulunk. Nevezési díj nincs, és a jelentkezés nem kötelez semmire.
             </p>
-            <p className="text-[5.5mm] leading-snug font-bold">Nincs párod? Jelentkezz egyedül, segítünk.</p>
             <p className="text-[6.5mm] font-extrabold">padelparbaj.hu</p>
           </div>
           <div className="grid gap-[2mm] text-center">

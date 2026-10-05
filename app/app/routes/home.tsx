@@ -12,6 +12,7 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { listedCities } from "~/lib/cities.server";
+import { STEPS } from "~/lib/how-it-works";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
@@ -83,12 +84,6 @@ function SectionHead({ title, lede }: { title: string; lede?: string }) {
   );
 }
 
-const STEPS = [
-  ["Jelentkeztek párban", "Ha még nincs párod, írd fel magad egyedül, és segítünk párt találni."],
-  ["Csoportba kerültök", "Szint szerint négy pár kerül egy csoportba, hogy kiegyenlített meccsek legyenek."],
-  ["Hetente egy meccs", "Az időpontot az oldalon egyeztetitek az ellenféllel, a pályát bármelyik klubban lefoglalhatjátok a városotokban."],
-  ["Feljutás, kiesés", "Három hét után a csoport első helyezettje feljebb lép, a negyedik lejjebb kerül, és indul a következő kör."],
-];
 
 
 const RULES = [

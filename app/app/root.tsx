@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigation,
   useRouteLoaderData,
 } from "react-router";
 
@@ -57,8 +58,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// A thin bar at the top while the next page loads, so a click shows at once.
+// It only appears after 120 ms, so fast navigations don't flicker.
+function NavigationProgress() {
+  const busy = useNavigation().state !== "idle";
+  return (
+    <div
+      aria-hidden="true"
+      className={`nav-progress pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 bg-ball ${busy ? "is-busy" : ""}`}
+    />
+  );
+}
+
 export default function App() {
-  return <Outlet />;
+  return (
+    <>
+      <NavigationProgress />
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

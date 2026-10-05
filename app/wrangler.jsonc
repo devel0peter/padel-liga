@@ -12,6 +12,10 @@
 	"upload_source_maps": true,
 	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.
 	"workers_dev": false,
+	// Run the Worker near the D1 database rather than near the visitor: a page
+	// behind login makes several database round trips, which then take a few
+	// ms each instead of ~45 ms (measured 2026-10-05).
+	"placement": { "mode": "smart" },
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
 	"vars": {
 		// Resend plan's daily quota (free: 100). Raise it after upgrading.

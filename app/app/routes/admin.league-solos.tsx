@@ -142,10 +142,11 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
     setSelected((s) => (on ? [...s.filter((x) => x !== id), id].slice(-2) : s.filter((x) => x !== id)));
 
   const pair = () => {
-    fetcher.submit(
-      { intent: "pair", id: chosen.map((r) => String(r.id)) },
-      { method: "post" },
-    );
+    // FormData, not an object: an array value would be sent as one "11,12" field.
+    const form = new FormData();
+    form.set("intent", "pair");
+    for (const r of chosen) form.append("id", String(r.id));
+    fetcher.submit(form, { method: "post" });
     setSelected([]);
   };
 

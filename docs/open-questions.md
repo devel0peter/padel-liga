@@ -25,4 +25,5 @@ All resolved on 2026-10-02 unless noted. Decisions are also in the decision log 
 14. ~~Email provider~~ ✅ Resend.
 15. ~~Phone numbers~~ ✅ Optional, visible only to the current round's opponents, never public. Scheduling stays on the platform.
 16. ~~Players without a partner~~ ✅ The organizer pairs them by hand in the first season (admin status "Párosítva"). A "keresek párt" list later, if there are many.
-17. ~~PWA~~ ✅ Email only in the MVP; a PWA with push later if players miss emails.
+17. ~~PWA~~ ✅ Web push (PWA, opt-in) by the first round switch; instant emails only for items that need action, the rest in a daily digest (2026-10-05).
+18. **Little movement in the top and bottom groups.** With 1 up / 1 down, 3 of 4 pairs stay in the edge groups each round. Kept for season 1 (2026-10-06). If it gets boring, options: 2 up / 2 down, or 6-pair groups (5 where needed) with 5-week rounds, 3 rounds a season and 2 up / 2 down. All groups in a league must share the round length, so 4-pair and 6-pair groups can't mix in one season.

@@ -123,10 +123,10 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 - **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik.
   - Esély: `E = 1 / (1 + 10^((ellenfél − ti) / 400))`
   - Változás: `K × (eredmény − E)`, ahol az eredmény győzelemnél 1, vereségnél 0.
-  - `K` = 32 az első 20 meccseden, utána 16.
+  - `K` = 40 az első 10 meccseden, utána 20.
   - A pár mindkét tagja ugyanannyit kap vagy veszít.
   - Csak az számít, ki nyert, az eredmény aránya nem.
-- **Példa:** 1200-as pár játszik egy 1400-as ellen. Az esélyük 24%. Ha nyernek, +24 pontot kapnak, ha kikapnak, −8 pontot (kerekítve, K = 32).
+- **Példa:** 1200-as pár játszik egy 1400-as ellen. Az esélyük 24%. Ha nyernek, +30 pontot kapnak, ha kikapnak, −10 pontot (kerekítve, K = 40).
 - A játék nélküli győzelem és az elmaradt meccs nem változtat az értékszámon.
 - Az értékszám alapján soroljuk be az új párokat (7. pont), és ez az utolsó holtversenydöntő (6. pont).
 

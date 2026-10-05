@@ -12,5 +12,5 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export function loader() {
-  return redirect("/account");
+  return redirect("/profile");
 }

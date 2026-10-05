@@ -9,17 +9,21 @@ export default [
   route("api/landing", "routes/landing-beacon.ts"),
   route("login", "routes/login.tsx"),
   route("welcome", "routes/welcome.tsx"),
-  route("account", "routes/account.tsx"),
   route("logout", "routes/logout.ts"),
   route("auth/google", "routes/auth.google.ts"),
   route("auth/google/callback", "routes/auth.google.callback.ts"),
-  layout("routes/admin.tsx", [
-    route("admin", "routes/admin._index.tsx"),
-    route("admin/signups", "routes/admin.signups.tsx"),
-    route("admin/broadcasts", "routes/admin.broadcasts.tsx"),
-    route("admin/broadcasts/new", "routes/admin.broadcast-new.tsx"),
-    route("admin/clubs", "routes/admin.clubs.tsx"),
-    route("admin/traffic", "routes/admin.traffic.tsx"),
+  // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
+  // section inside it has its own guard (admin.tsx).
+  layout("routes/app.tsx", [
+    route("profile", "routes/profile.tsx"),
+    layout("routes/admin.tsx", [
+      route("admin", "routes/admin._index.tsx"),
+      route("admin/signups", "routes/admin.signups.tsx"),
+      route("admin/broadcasts", "routes/admin.broadcasts.tsx"),
+      route("admin/broadcasts/new", "routes/admin.broadcast-new.tsx"),
+      route("admin/clubs", "routes/admin.clubs.tsx"),
+      route("admin/traffic", "routes/admin.traffic.tsx"),
+    ]),
   ]),
   route("admin/poster", "routes/admin.poster.tsx"),
   route("admin/export.csv", "routes/admin.export.ts"),

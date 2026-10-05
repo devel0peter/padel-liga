@@ -6,6 +6,8 @@ import {
   codeSendDecision,
   CODE_TTL_MS,
   DEFAULT_RETURN_TO,
+  googlePicture,
+  initials,
   isValidEmail,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_WINDOW,
@@ -54,7 +56,7 @@ describe("emails and codes", () => {
 });
 
 describe("sessions", () => {
-  it("last 90 days, 12 hours for the Főadmin", () => {
+  it("last 90 days, 12 hours for the Admin", () => {
     expect(SESSION_TTL_MS).toBe(90 * day);
     expect(SUPERADMIN_SESSION_TTL_MS).toBe(12 * 60 * min);
     expect(sessionExpiry(now).getTime() - now.getTime()).toBe(SESSION_TTL_MS);
@@ -73,13 +75,13 @@ describe("sessions", () => {
     expect(nextExpiry(nearlyOver, now)).toEqual(sessionExpiry(now));
   });
 
-  it("extend a Főadmin session every few minutes of use, to 12 hours", () => {
+  it("extend a Admin session every few minutes of use, to 12 hours", () => {
     const fresh = sessionExpiry(now, "superadmin");
     expect(nextExpiry(new Date(fresh.getTime() - 5 * min), now, "superadmin")).toBeNull();
     expect(nextExpiry(new Date(fresh.getTime() - 8 * min), now, "superadmin")).toEqual(fresh);
   });
 
-  it("shrink a long session at once when the account becomes Főadmin", () => {
+  it("shrink a long session at once when the account becomes Admin", () => {
     expect(nextExpiry(sessionExpiry(now), now, "superadmin")).toEqual(sessionExpiry(now, "superadmin"));
   });
 });
@@ -229,5 +231,26 @@ describe("cookies", () => {
       "s=v; Path=/; Max-Age=60; HttpOnly; SameSite=Lax; Secure",
     );
     expect(serializeCookie("s", "", { maxAgeSeconds: 0, secure: false })).toBe("s=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+  });
+});
+
+describe("profile picture", () => {
+  it("keeps Google's image URL, sized for the sidebar", () => {
+    expect(googlePicture("https://lh3.googleusercontent.com/a/ACg8oc=s96-c")).toBe(
+      "https://lh3.googleusercontent.com/a/ACg8oc=s128-c",
+    );
+    expect(googlePicture("https://lh3.googleusercontent.com/a/ACg8oc")).toBe("https://lh3.googleusercontent.com/a/ACg8oc");
+  });
+
+  it("ignores anything not on Google's image host", () => {
+    for (const u of [undefined, "", "http://lh3.googleusercontent.com/a/x", "https://evil.com/x.png", "https://googleusercontent.com.evil.com/x", "javascript:alert(1)"])
+      expect(googlePicture(u)).toBeNull();
+  });
+
+  it("falls back to initials", () => {
+    expect(initials("Kiss Anna", "a@x.hu")).toBe("KA");
+    expect(initials("Kovács Béla Péter", "a@x.hu")).toBe("KP");
+    expect(initials("Anna", "a@x.hu")).toBe("AN");
+    expect(initials("  ", "zoli@x.hu")).toBe("ZO");
   });
 });

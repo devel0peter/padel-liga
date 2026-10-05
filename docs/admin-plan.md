@@ -7,13 +7,13 @@ Status: agreed (2026-10-04). PR 1 (accounts): devel0peter/padel-liga#47. PR 2 (r
 | Topic | Decision |
 |---|---|
 | Roles | `player` (everyone), `league_admin` (per league), `superadmin` |
-| UI labels | Játékos / Szervező / Főadmin |
+| UI labels | Játékos / Szervező / Admin |
 | League-admin scope | Per league. Clubs (venues) belong to a city; any Szervező of a league in that city can edit them |
 | Superadmin | DB flag on the user, set only by a CLI command. No screen can grant or remove it. Only Peter's work Google account (Psionic Flare); his personal account is Szervező of Győr |
-| Who sees what | Főadmin: interest list, broadcasts, traffic, leagues, users. Szervező: their league + their city's clubs |
+| Who sees what | Admin: interest list, broadcasts, traffic, leagues, users. Szervező: their league + their city's clubs |
 | Navigation | Sidebar (shadcn `sidebar`); off-canvas sheet on mobile |
 | Login | **No passwords.** Google, or a one-time 6-digit code by email. Same email = same account. No Better Auth: our own small module |
-| Sessions | 90 days, extended while active, for players and Szervezők. Főadmin (work account, rarely used) 12 hours |
+| Sessions | 90 days, extended while active, for players and Szervezők. Admin (work account, rarely used) 12 hours |
 
 These go into the README decision log, spec section 2 and spec section 3 (email + password replaced) with the first PR.
 
@@ -103,23 +103,26 @@ flowchart LR
 |---|---|---|
 | `/login` | everyone | "Belépés Google-lel" or enter your email and get a code. First login asks for name and privacy consent |
 | `/auth/google`, `/auth/google/callback` | everyone | OAuth redirect and callback |
-| `/admin` | Szervező, Főadmin | overview: redirects to your league, or the Főadmin home |
+| `/profile` | every logged-in user | profile: picture, name, role, login methods, logout everywhere. A page in the app shell like any other |
+| `/admin` | Szervező, Admin | overview: redirects to your league, or the Admin home |
 | `/admin/leagues/:league` | Szervező | league overview (later: seasons, pairs, groups, disputes) |
 | `/admin/leagues/:league/clubs` | Szervező | the city's clubs (moved from `/admin/clubs`) |
-| `/admin/signups` | Főadmin | interest list (today's `/admin`) |
-| `/admin/broadcasts`, `/admin/broadcasts/new` | Főadmin | broadcasts (unchanged) |
-| `/admin/traffic` | Főadmin | traffic (unchanged) |
-| `/admin/leagues` | Főadmin | create a league, appoint and remove Szervezők |
-| `/admin/users` | Főadmin | user list, search, roles shown read-only |
+| `/admin/signups` | Admin | interest list (today's `/admin`) |
+| `/admin/broadcasts`, `/admin/broadcasts/new` | Admin | broadcasts (unchanged) |
+| `/admin/traffic` | Admin | traffic (unchanged) |
+| `/admin/leagues` | Admin | create a league, appoint and remove Szervezők |
+| `/admin/users` | Admin | user list, search, roles shown read-only |
 
 Old paths (`/admin/clubs`) redirect. `/admin/poster` and `/admin/export.csv` stay where they are, behind the same guard.
 
-Sidebar groups, filtered by role. A group you can't access isn't rendered at all:
+The sidebar is one app shell for every logged-in user (2026-10-05). Sections are filtered by role; a section you can't access isn't rendered at all:
 
-- **League switcher** at the top (only with 2+ leagues; with one league, just its name).
+- **Top:** logo, then the profile button (Google picture or initials, name, role), which opens `/profile`.
+- **League switcher** (later, only with 2+ leagues).
 - **Liga:** Áttekintés, Klubok. Seasons and the rest are added here by later tickets.
-- **Főadmin:** Jelentkezők, Körlevelek, Forgalom, Ligák, Felhasználók.
-- **Footer:** your name and role badge, "Vissza az oldalra", Kilépés.
+- **Admin:** Jelentkezők, Körlevelek, Klubok, Forgalom (later also Ligák, Felhasználók).
+- **Bottom:** Kilépés.
+- The current page is marked with a brand-blue tint (`--nav-active`, `--nav-active-bg`), in light and dark mode.
 
 ## 5. Design direction
 
@@ -146,14 +149,14 @@ flowchart TD
 1. **Accounts.** Email code (template in `templates.ts`, sent at once, ahead of the daily-limit queue) and Google login, sessions, `/login` and first-login profile (name, privacy consent), privacy page updated for accounts (Google as a login option). Sign-up is **invite-only until 2 Nov**: an unknown email or Google account gets in only with an invite token. The same invite later serves the interest-list invites (#20). Peter: create the OAuth client in Google Cloud Console (consent screen with the privacy page URL), and add the Cloudflare rate-limiting rule.
 2. **Roles and shell.** Schema from section 2, `permissions.ts` with the matrix tests, middleware guard, the 403 page, the sidebar layout, existing pages moved and redirected. CLI: `npm run admin:superadmin -w app -- <email> [--remote]` sets the flag and writes the audit row. During this step Cloudflare Access stays in front of `/admin`, so the admin is protected by both.
 3. **Leagues and users.** Create the Győr league and appoint Szervezők by the email of an existing account (an unknown email gets an invite). The user list shows no phone numbers.
-4. **Retire Access.** After you've logged in on prod as Főadmin: remove `access.server.ts` and the `ACCESS_*` vars, then you delete the Access app in the dashboard.
+4. **Retire Access.** After you've logged in on prod as Admin: remove `access.server.ts` and the `ACCESS_*` vars, then you delete the Access app in the dashboard.
 
 Every PR is flagged for human review (auth and personal data).
 
 ## 7. Settled points (2026-10-04)
 
 1. **No passwords.** Google for most people, a one-time email code for the rest. No password hashing to maintain or be responsible for, and it fits the Workers Free plan's 10 ms CPU limit. Better Auth and Workers Paid were considered and dropped.
-2. **Two accounts for Peter.** His work Google account (Psionic Flare Workspace) is the only Főadmin and logs in with Google. His personal account is a normal player and the Szervező of Győr, used day to day. The address is passed to the CLI command, not written in the repo. `admin@padelparbaj.hu` (a Google Group) stays only as the Cloudflare Access login until Access is retired.
+2. **Two accounts for Peter.** His work Google account (Psionic Flare Workspace) is the only Admin and logs in with Google. His personal account is a normal player and the Szervező of Győr, used day to day. The address is passed to the CLI command, not written in the repo. `admin@padelparbaj.hu` (a Google Group) stays only as the Cloudflare Access login until Access is retired.
 3. **Rate limiting:** a Cloudflare WAF rate-limiting rule on `POST /login` and `/auth/*`, by IP (the Free plan includes one rule), set by Peter in the dashboard. Plus at most 5 code requests per email per hour in our own code.
 
 ## 8. Email volume (agreed 2026-10-04)

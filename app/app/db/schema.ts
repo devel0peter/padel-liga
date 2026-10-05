@@ -112,7 +112,10 @@ export const users = sqliteTable("users", {
   // Lowercased; the same email is the same account whichever way they log in.
   email: text("email").notNull().unique(),
   name: text("name").notNull().default(""),
-  // "superadmin" (Főadmin) is set only by `npm run auth:superadmin -w app`;
+  // Profile picture URL from Google (refreshed at each Google login); none for
+  // email-code accounts, which show initials.
+  imageUrl: text("image_url"),
+  // "superadmin" (Admin) is set only by `npm run auth:superadmin -w app`;
   // no request handler writes this column. Organizer rights: league_admins.
   platformRole: text("platform_role", { enum: ["player", "superadmin"] }).notNull().default("player"),
   // Set on the first-login page; until then the account can't use the app.

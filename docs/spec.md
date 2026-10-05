@@ -11,10 +11,10 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 | Visitor | See the landing page, rules and public standings |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
 | Organizer ("Szervező") | Per league: create and configure seasons, approve pairs, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
-| Platform admin ("Főadmin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users (Peter) |
+| Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users (Peter) |
 
 Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).
-- Code names: `player`, `league_admin`, `superadmin`; UI labels: Játékos, Szervező, Főadmin (2026-10-04).
+- Code names: `player`, `league_admin`, `superadmin`; UI labels: Játékos, Szervező, Admin (2026-10-04).
 - Organizer rights are granted per league (a row per league and account), so one account can organize one league and not another.
 - Platform admin is a flag on the account, set only by a CLI command; no screen can grant or remove it. Peter's work Google account is the platform admin; his personal account is a player and the Győr organizer.
 - Design and delivery: `docs/admin-plan.md`.

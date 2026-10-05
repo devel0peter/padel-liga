@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminHome, adminNav, can, roleLabel, type Actor, type Permission } from "./permissions";
+import { adminHome, appNav, can, roleLabel, type Actor, type Permission } from "./permissions";
 
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 const debrecen = { id: 2, slug: "debrecen", city: "debrecen", name: "Padelpárbaj Debrecen" };
@@ -51,7 +51,7 @@ describe("permissions", () => {
     expect(can(organizer, { kind: "clubs.manage", city: "debrecen" })).toBe(false);
   });
 
-  it("keeps a Szervező off the Főadmin pages", () => {
+  it("keeps a Szervező off the Admin pages", () => {
     for (const p of platformOnly) expect(can(organizer, p)).toBe(false);
   });
 
@@ -62,7 +62,7 @@ describe("permissions", () => {
     expect(can(both, { kind: "league.manage", league: "szeged" })).toBe(false);
   });
 
-  it("lets the Főadmin do everything, also in leagues they don't organize", () => {
+  it("lets the Admin do everything, also in leagues they don't organize", () => {
     expect(can(superadmin, { kind: "admin.enter" })).toBe(true);
     for (const p of platformOnly) expect(can(superadmin, p)).toBe(true);
     expect(can(superadmin, { kind: "league.manage", league: "debrecen" })).toBe(true);
@@ -74,14 +74,14 @@ describe("role labels", () => {
   it("names the highest role", () => {
     expect(roleLabel(player)).toBe("Játékos");
     expect(roleLabel(organizer)).toBe("Szervező");
-    expect(roleLabel(actor({ platformRole: "superadmin", leagues: [gyor] }))).toBe("Főadmin");
+    expect(roleLabel(actor({ platformRole: "superadmin", leagues: [gyor] }))).toBe("Admin");
   });
 });
 
 describe("sidebar", () => {
-  it("shows the Főadmin everything", () => {
-    const nav = adminNav(superadmin);
-    expect(nav.map((s) => s.label)).toEqual(["Főadmin"]);
+  it("shows the Admin everything", () => {
+    const nav = appNav(superadmin);
+    expect(nav.map((s) => s.label)).toEqual(["Admin"]);
     expect(nav[0].items.map((i) => i.to)).toEqual([
       "/admin/signups",
       "/admin/broadcasts",
@@ -91,12 +91,12 @@ describe("sidebar", () => {
     expect(adminHome(superadmin)).toBe("/admin/signups");
   });
 
-  it("hides the Főadmin section from a Szervező", () => {
-    expect(adminNav(organizer)).toEqual([]);
+  it("hides the Admin section from a Szervező", () => {
+    expect(appNav(organizer)).toEqual([]);
     expect(adminHome(organizer)).toBeNull();
   });
 
   it("shows a player nothing", () => {
-    expect(adminNav(player)).toEqual([]);
+    expect(appNav(player)).toEqual([]);
   });
 });

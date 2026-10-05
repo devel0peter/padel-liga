@@ -17,7 +17,7 @@ export type Actor = {
 export type Permission =
   // See the admin area at all.
   | { kind: "admin.enter" }
-  // Főadmin only: the interest list (and its CSV), broadcasts, traffic,
+  // Admin (superadmin) only: the interest list (and its CSV), broadcasts, traffic,
   // leagues and Szervező appointments, the user list.
   | { kind: "signups.manage" }
   | { kind: "broadcasts.send" }
@@ -44,10 +44,10 @@ export function can(actor: Actor | null, permission: Permission): boolean {
   }
 }
 
-export type RoleLabel = "Főadmin" | "Szervező" | "Játékos";
+export type RoleLabel = "Admin" | "Szervező" | "Játékos";
 
 export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleLabel {
-  if (actor.platformRole === "superadmin") return "Főadmin";
+  if (actor.platformRole === "superadmin") return "Admin";
   return actor.leagues.length > 0 ? "Szervező" : "Játékos";
 }
 
@@ -65,8 +65,8 @@ const PLATFORM_ITEMS: NavItem[] = [
 ];
 
 // Only what the actor may open; a section with nothing in it isn't shown.
-export function adminNav(actor: Actor): NavSection[] {
-  const sections: NavSection[] = [{ label: "Főadmin", items: PLATFORM_ITEMS }];
+export function appNav(actor: Actor): NavSection[] {
+  const sections: NavSection[] = [{ label: "Admin", items: PLATFORM_ITEMS }];
   return sections
     .map((s) => ({ ...s, items: s.items.filter((i) => can(actor, i.permission)) }))
     .filter((s) => s.items.length > 0);
@@ -74,5 +74,5 @@ export function adminNav(actor: Actor): NavSection[] {
 
 // Where /admin sends you: the first page you may open.
 export function adminHome(actor: Actor): string | null {
-  return adminNav(actor)[0]?.items[0]?.to ?? null;
+  return appNav(actor)[0]?.items[0]?.to ?? null;
 }

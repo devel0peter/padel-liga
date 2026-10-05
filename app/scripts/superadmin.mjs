@@ -1,4 +1,4 @@
-// Makes an existing account Főadmin (superadmin), or takes it back. The only
+// Makes an existing account Admin (superadmin), or takes it back. The only
 // way to change this role: no page or request can (docs/admin-plan.md).
 //   npm run auth:superadmin -w app -- <email> [--remote] [--revoke]
 // The person must have logged in once, so the account exists.
@@ -33,4 +33,4 @@ d1(
   `UPDATE users SET platform_role = '${role}' WHERE email = ${q(email)}; ` +
     `INSERT INTO audit_log (actor_id, action, target, detail) VALUES (NULL, '${action}', ${q(email)}, 'cli');`,
 );
-console.log(`${email} is now ${revoke ? "a player (Főadmin removed)" : "Főadmin"}${remote ? " (remote)" : " (local)"}.`);
+console.log(`${email} is now ${revoke ? "a player (Admin removed)" : "Admin"}${remote ? " (remote)" : " (local)"}.`);

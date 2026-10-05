@@ -9,7 +9,7 @@ import { CONTACT_EMAIL } from "~/lib/site";
 // the admin layout's boundary otherwise.
 export function Forbidden() {
   return (
-    <AuthPage title="Ehhez nincs jogod" intro="Ezt az oldalt csak a szervezők és a főadmin látják.">
+    <AuthPage title="Ehhez nincs jogod" intro="Ezt az oldalt csak a szervezők és az admin látják.">
       <p className="text-muted-foreground">
         Ha szerinted tévedés, írj a{" "}
         <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
@@ -19,7 +19,7 @@ export function Forbidden() {
       </p>
       <div>
         <Button asChild variant="outline" className="h-11 px-5">
-          <Link to="/account">Vissza a fiókodhoz</Link>
+          <Link to="/profile">Vissza a profilodhoz</Link>
         </Button>
       </div>
     </AuthPage>

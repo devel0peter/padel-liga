@@ -9,7 +9,7 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export const SESSION_TTL_MS = 90 * DAY;
-// The Főadmin account: 12 hours of inactivity (docs/admin-plan.md).
+// The Admin account: 12 hours of inactivity (docs/admin-plan.md).
 export const SUPERADMIN_SESSION_TTL_MS = 12 * HOUR;
 
 export const CODE_TTL_MS = 10 * MINUTE;
@@ -21,7 +21,7 @@ export const MAX_CODES_PER_WINDOW = 5;
 // Before that only invited emails can create an account.
 export const REGISTRATION_OPENS_AT = new Date("2026-11-01T23:00:00Z");
 
-export const DEFAULT_RETURN_TO = "/account";
+export const DEFAULT_RETURN_TO = "/profile";
 const MAX_NAME = 80;
 const MAX_EMAIL = 254;
 
@@ -52,7 +52,7 @@ export function sessionExpiry(now: Date, role: "player" | "superadmin" = "player
 // The new expiry of a session in use, or null when it needn't be written.
 // Extended to a full TTL from now, but written at most once per 1/90 of the
 // TTL (a day for 90-day sessions, 8 minutes for 12-hour ones). Shortened at
-// once if the role now has a shorter TTL (e.g. just made Főadmin).
+// once if the role now has a shorter TTL (e.g. just made Admin).
 export function nextExpiry(expiresAt: Date, now: Date, role: "player" | "superadmin" = "player"): Date | null {
   const ttl = sessionTtl(role);
   const target = now.getTime() + ttl;
@@ -132,6 +132,26 @@ export function resolveGoogleLogin(input: {
   if (input.emailUserId) return { kind: "link", userId: input.emailUserId };
   if (!canCreateAccount(input)) return { kind: "refused", reason: "closed" };
   return { kind: "create" };
+}
+
+// Google's profile picture, only from Google's own image host, at a size that
+// stays sharp in the sidebar (the URL ends in a size suffix like "=s96-c").
+export function googlePicture(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" || !u.hostname.endsWith(".googleusercontent.com")) return null;
+    return u.toString().replace(/=s\d+(-c)?$/, "=s128-c");
+  } catch {
+    return null;
+  }
+}
+
+// "Kiss Anna" -> "KA"; for the avatar when there is no picture.
+export function initials(name: string, email: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? email).slice(0, 2);
+  return letters.toUpperCase();
 }
 
 export const REGISTRATION_CLOSED_MESSAGE =

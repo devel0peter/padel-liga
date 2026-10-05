@@ -8,7 +8,7 @@ import { nextExpiry, parseCookies, serializeCookie, sessionExpiry } from "./rule
 import { randomToken, sha256Hex } from "./tokens";
 
 // Session cookie: a random token; the database keeps only its hash and the
-// expiry, which is the real limit (90 days, Főadmin 12 hours: rules.ts). The cookie itself lives as long as browsers
+// expiry, which is the real limit (90 days, Admin 12 hours: rules.ts). The cookie itself lives as long as browsers
 // allow (~400 days), so extending a session needs no new cookie.
 // __Host- makes the browser refuse it unless Secure, Path=/ and no Domain.
 const COOKIE = import.meta.env.DEV ? "pp_session" : "__Host-pp_session";

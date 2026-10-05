@@ -77,7 +77,7 @@ export default function Privacy() {
               <li>a neved és az e-mail-címed,</li>
               <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
-                tudjuk, hogy te vagy),
+                tudjuk, hogy te vagy) és a profilképed,
               </li>
               <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja.</li>
             </ul>
@@ -143,8 +143,9 @@ export default function Privacy() {
             </p>
             <p>
               Ha Google-lel lépsz be, a Google átadja nekünk a neved, az
-              e-mail-címed és a fiókod azonosítóját. Ezen kívül a Google semmit
-              nem tud meg rólad tőlünk.
+              e-mail-címed, a fiókod azonosítóját és a profilképed címét. A
+              profilképet csak a fiókodban mutatjuk, és a Google szerveréről
+              töltődik be. Ezen kívül a Google semmit nem tud meg rólad tőlünk.
             </p>
           </Section>
 

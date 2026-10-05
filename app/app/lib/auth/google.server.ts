@@ -6,8 +6,8 @@ import { redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { oauthAccounts } from "~/db/schema";
 
-import { createUser, findUserIdByEmail, isInvited } from "./accounts.server";
-import { normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
+import { createUser, findUserIdByEmail, isInvited, setProfileImage } from "./accounts.server";
+import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
 import { createSession } from "./session.server";
 import { timingSafeEqual } from "./tokens";
 
@@ -52,7 +52,7 @@ export function startGoogleLogin(request: Request): Response {
   });
 }
 
-type GoogleClaims = { sub: string; email?: string; email_verified?: boolean; name?: string };
+type GoogleClaims = { sub: string; email?: string; email_verified?: boolean; name?: string; picture?: string };
 
 export async function finishGoogleLogin(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
@@ -102,6 +102,8 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
       await db.insert(oauthAccounts).values({ provider: "google", providerUserId: claims.sub, userId }).onConflictDoNothing();
       break;
   }
+
+  await setProfileImage(userId, googlePicture(claims.picture));
 
   const headers = new Headers();
   headers.append("Set-Cookie", await createSession(userId));

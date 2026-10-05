@@ -64,6 +64,13 @@
       "when": 1791206873244,
       "tag": "0008_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791207919983,
+      "tag": "0009_profile_image",
+      "breakpoints": true
     }
   ]
 }

@@ -39,7 +39,7 @@
 - `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
 - Deploys are automatic: every push to `main` runs GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests, build, then remote D1 migrations, then deploy. Work on a branch and open a PR; merging to `main` ships it, so ask before merging.
 - `npm run deploy`: manual fallback only (CI down). Ask first.
-- Accounts: `npm run auth:invite -w app -- <email> [--remote]` (sign-up before 2 Nov), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Főadmin).
+- Accounts: `npm run auth:invite -w app -- <email> [--remote]` (sign-up before 2 Nov), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Admin).
 
 ## Commits
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`, `refactor:`, `test:`), lowercase subject, e.g. `fix: accept the Access cookie on admin data requests`. CI runs commitlint on every PR's commits; check locally with `echo "<msg>" | npx commitlint`.

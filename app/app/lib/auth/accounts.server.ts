@@ -37,3 +37,7 @@ export async function hasGoogleLogin(userId: string): Promise<boolean> {
   const [row] = await db.select({ p: oauthAccounts.provider }).from(oauthAccounts).where(eq(oauthAccounts.userId, userId)).limit(1);
   return !!row;
 }
+
+export async function setProfileImage(userId: string, imageUrl: string | null): Promise<void> {
+  await db.update(users).set({ imageUrl }).where(eq(users.id, userId));
+}

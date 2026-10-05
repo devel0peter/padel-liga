@@ -28,11 +28,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { url, qr: renderSVG(url, { border: 0 }), club: club?.name ?? null, ref, city };
 }
 
-// Same steps as the landing page's "Hogyan működik?", in short.
+// The landing page's "Hogyan működik?", in short. Deliberately without
+// numbers that may change (group size, round or season length, the pair
+// threshold): those go in the season announcement.
 const STEPS = [
-  ["Négyes csoportok", "Szint szerint, kiegyenlített meccsekkel."],
+  ["Szinted szerint", "Kezdőtől versenyzőig, hozzátok illő ellenfelekkel."],
   ["Heti egy meccs", "Akkor és ott, amikor nektek jó."],
-  ["Feljutás, kiesés", "Három hetente új kör, új ellenfelek."],
+  ["Feljutás, kiesés", "A kör végén a legjobb feljebb lép, az utolsó lejjebb."],
 ];
 
 export default function Poster({ loaderData }: Route.ComponentProps) {
@@ -60,7 +62,7 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
       </div>
 
       {/* Fixed light colours: the poster prints the same in dark mode. */}
-      <article className="mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[14mm] text-[#10233d] print:h-[297mm] print:max-w-none">
+      <article className="relative mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[14mm] text-[#10233d] print:h-[297mm] print:max-w-none">
         <header className="grid gap-[9mm]">
           {/* Brand: the league is "Padelpárbaj <city>". */}
           <div className="flex items-baseline gap-[3mm] text-[8mm]">
@@ -94,13 +96,20 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
           <div className="grid gap-[3mm]">
             <p className="font-display text-[11mm] leading-none font-black">Jelentkezz!</p>
             <p className="text-[5.5mm] leading-snug">
-              Novemberben indulunk, ha összegyűlik legalább 12 pár. A jelentkezés nem kötelez
-              semmire.
+              Novemberben indulunk. Nevezési díj nincs, és a jelentkezés nem kötelez semmire.
             </p>
+            <p className="text-[5.5mm] leading-snug font-bold">Nincs párod? Jelentkezz egyedül, segítünk.</p>
             <p className="text-[6.5mm] font-extrabold">padelparbaj.hu</p>
           </div>
-          <div className="poster-qr rounded-[3mm] bg-white p-[4mm]" dangerouslySetInnerHTML={{ __html: qr }} />
+          <div className="grid gap-[2mm] text-center">
+            <div className="poster-qr rounded-[3mm] bg-white p-[4mm]" dangerouslySetInnerHTML={{ __html: qr }} />
+            <span className="text-[4mm] font-bold">Olvasd be!</span>
+          </div>
         </footer>
+
+        {/* Which poster this is, for sorting the prints: the club's ref, small
+            and grey in the bottom margin. */}
+        <span className="absolute right-[14mm] bottom-[5mm] text-[3mm] text-[#9aa7b6]">{ref ?? "általános"}</span>
       </article>
     </>
   );

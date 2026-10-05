@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { accountInvites, oauthAccounts, users } from "~/db/schema";
+import { accountInvites, auditLog, leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
 
 import { canCreateAccount, type ProfileInput } from "./rules";
 
@@ -26,7 +26,23 @@ export async function createUser(email: string, name = ""): Promise<string> {
   const id = crypto.randomUUID();
   // onConflictDoNothing: two logins racing for a new email end up in one account.
   await db.insert(users).values({ id, email, name }).onConflictDoNothing();
-  return (await findUserIdByEmail(email)) ?? id;
+  const userId = (await findUserIdByEmail(email)) ?? id;
+  await acceptOrganizerInvites(userId, email);
+  return userId;
+}
+
+// Szervező appointments made before this email had an account
+// (leagues.server.ts grantOrganizer).
+async function acceptOrganizerInvites(userId: string, email: string): Promise<void> {
+  const invites = await db.select().from(leagueAdminInvites).where(eq(leagueAdminInvites.email, email));
+  for (const inv of invites) {
+    await db
+      .insert(leagueAdmins)
+      .values({ leagueId: inv.leagueId, userId, grantedBy: inv.invitedBy })
+      .onConflictDoNothing();
+    await db.insert(auditLog).values({ actorId: inv.invitedBy, action: "league_admin.grant", target: email, detail: `invite:${inv.leagueId}` });
+  }
+  if (invites.length) await db.delete(leagueAdminInvites).where(eq(leagueAdminInvites.email, email));
 }
 
 export async function saveProfile(userId: string, profile: ProfileInput): Promise<void> {

@@ -14,9 +14,11 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requirePermission(request, { kind: "clubs.manage" });
   const ref = normalizeRef(new URL(request.url).searchParams.get("ref"));
   const club = ref ? await getClub(ref) : undefined;
+  // A club's poster: whoever manages that city's clubs. The general poster
+  // (or a ref that isn't a club): the Admin.
+  await requirePermission(request, club ? { kind: "clubs.manage", city: club.city } : { kind: "clubs.manage" });
   const url = ref ? posterUrl(ref) : SITE_URL;
   // The general poster is for the first (so far only) city.
   const city = (CITIES.find((c) => c.slug === club?.city) ?? CITIES[0]).name;

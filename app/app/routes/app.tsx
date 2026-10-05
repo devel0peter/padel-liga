@@ -1,5 +1,6 @@
-import { BarChart3, LogOut, Mail, MapPin, Users } from "lucide-react";
+import { BarChart3, Check, ChevronsUpDown, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
+
 
 import type { Route } from "./+types/app";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -18,11 +19,20 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "~/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { getActor } from "~/lib/auth/admin.server";
-import { appNav, roleLabel, type NavIcon, type NavSection } from "~/lib/auth/permissions";
+import { appNav, navLeagues, roleLabel, type LeagueRef, type NavIcon, type NavSection } from "~/lib/auth/permissions";
 import { initials, parseCookies } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
+import { leagueFromPath, switchLeaguePath } from "~/lib/leagues";
+import { listLeagues } from "~/lib/leagues.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The app shell: one sidebar layout for every page of a logged-in user. The
@@ -44,7 +54,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     imageUrl: user.imageUrl,
     initials: initials(user.name, user.email),
     role: roleLabel(actor),
-    nav: appNav(actor),
+    // The nav is built in the component from the URL (current league), with
+    // the same pure function; the actor is the user's own data.
+    actor,
+    leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
     // The sidebar remembers open/closed in a cookie; read it so the first
     // render matches.
     sidebarOpen: parseCookies(request.headers.get("Cookie")).get("sidebar_state") !== "false",
@@ -52,13 +65,53 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
+  overview: LayoutDashboard,
   signups: Users,
   broadcasts: Mail,
   clubs: MapPin,
   traffic: BarChart3,
+  leagues: Trophy,
+  users: UserCog,
 };
 
 const isCurrent = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);
+
+// The one nav item to highlight: the longest path the URL starts with, so
+// /admin/leagues/gyor/clubs marks Klubok, not also Áttekintés.
+function activeItem(nav: NavSection[], pathname: string): string | null {
+  let best: string | null = null;
+  for (const s of nav)
+    for (const i of s.items) if (isCurrent(pathname, i.to) && (!best || i.to.length > best.length)) best = i.to;
+  return best;
+}
+
+function LeagueSwitcher({ leagues, current }: { leagues: LeagueRef[]; current: string }) {
+  const { pathname } = useLocation();
+  const { setOpenMobile } = useSidebar();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarGroupLabel asChild>
+          <button type="button" className="w-full justify-between hover:bg-sidebar-accent">
+            <span className="truncate">{current}</span>
+            <ChevronsUpDown className="ml-1" />
+          </button>
+        </SidebarGroupLabel>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Liga váltása</DropdownMenuLabel>
+        {leagues.map((l) => (
+          <DropdownMenuItem key={l.slug} asChild>
+            <Link to={switchLeaguePath(pathname, l.slug)} onClick={() => setOpenMobile(false)} className="no-underline">
+              <span className="flex-1">{l.name}</span>
+              {l.name === current && <Check />}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 type ProfileProps = { name: string; email: string; imageUrl: string | null; initials: string; role: string };
 
@@ -85,18 +138,24 @@ function ProfileButton({ name, email, imageUrl, initials, role }: ProfileProps) 
   );
 }
 
-function NavMenu({ nav }: { nav: NavSection[] }) {
+function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
-  return nav.map((section) => (
+  const active = activeItem(nav, pathname);
+  return nav.map((section, index) => (
     <SidebarGroup key={section.label}>
-      <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+      {/* The league section (first) gets a switcher when there are more. */}
+      {index === 0 && leagues.length > 1 && leagues.some((l) => l.name === section.label) ? (
+        <LeagueSwitcher leagues={leagues} current={section.label} />
+      ) : (
+        <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+      )}
       <SidebarMenu>
         {section.items.map((item) => {
           const Icon = ICONS[item.icon];
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={isCurrent(pathname, item.to)} tooltip={item.label}>
+              <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label}>
                 <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
                   <span>{item.label}</span>
@@ -111,7 +170,9 @@ function NavMenu({ nav }: { nav: NavSection[] }) {
 }
 
 export default function AppShell({ loaderData }: Route.ComponentProps) {
-  const { nav, sidebarOpen, ...profile } = loaderData;
+  const { actor, leagues, sidebarOpen, ...profile } = loaderData;
+  const { pathname } = useLocation();
+  const nav = appNav(actor, leagues, leagueFromPath(pathname));
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={sidebarOpen}>
@@ -133,7 +194,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
             <ProfileButton {...profile} />
           </SidebarHeader>
           <SidebarContent>
-            <NavMenu nav={nav} />
+            <NavMenu nav={nav} leagues={leagues} />
           </SidebarContent>
           <SidebarFooter>
             <SidebarMenu>

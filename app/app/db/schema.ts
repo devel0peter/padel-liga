@@ -208,6 +208,23 @@ export const leagueAdmins = sqliteTable(
   (t) => [primaryKey({ columns: [t.leagueId, t.userId] }), index("league_admins_user_idx").on(t.userId)],
 );
 
+// A Szervező appointment for an email without an account yet. Turned into a
+// league_admins row when that email's account is created (accounts.server.ts).
+export const leagueAdminInvites = sqliteTable(
+  "league_admin_invites",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    invitedBy: text("invited_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.email] })],
+);
+
 // Who changed roles and leagues, and when. actor_id is null for the CLI.
 export const auditLog = sqliteTable("audit_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),

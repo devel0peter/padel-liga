@@ -53,26 +53,49 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "signups" | "broadcasts" | "clubs" | "traffic";
+export type NavIcon = "overview" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 export type NavSection = { label: string; items: NavItem[] };
 
 const PLATFORM_ITEMS: NavItem[] = [
+  { label: "Ligák", to: "/admin/leagues", icon: "leagues", permission: { kind: "leagues.manage" } },
+  { label: "Felhasználók", to: "/admin/users", icon: "users", permission: { kind: "users.view" } },
   { label: "Jelentkezők", to: "/admin/signups", icon: "signups", permission: { kind: "signups.manage" } },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
-  { label: "Klubok", to: "/admin/clubs", icon: "clubs", permission: { kind: "clubs.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
 ];
 
-// Only what the actor may open; a section with nothing in it isn't shown.
-export function appNav(actor: Actor): NavSection[] {
-  const sections: NavSection[] = [{ label: "Admin", items: PLATFORM_ITEMS }];
+function leagueItems(league: LeagueRef): NavItem[] {
+  const base = `/admin/leagues/${league.slug}`;
+  return [
+    { label: "Áttekintés", to: base, icon: "overview", permission: { kind: "league.manage", league: league.slug } },
+    { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
+  ];
+}
+
+// The leagues the sidebar offers: the Admin sees every league, a Szervező
+// their own.
+export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
+  return actor.platformRole === "superadmin" ? allLeagues : actor.leagues;
+}
+
+// The league section shows the current league (from the URL, else the first);
+// the switcher above it lists the others. Only what the actor may open; a
+// section with nothing in it isn't shown.
+export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
+  const league = leagues.find((l) => l.slug === current) ?? leagues[0];
+  const sections: NavSection[] = [];
+  if (league) sections.push({ label: league.name, items: leagueItems(league) });
+  sections.push({ label: "Admin", items: PLATFORM_ITEMS });
   return sections
     .map((s) => ({ ...s, items: s.items.filter((i) => can(actor, i.permission)) }))
     .filter((s) => s.items.length > 0);
 }
 
-// Where /admin sends you: the first page you may open.
+// Where /admin sends you: the Admin to the signups, a Szervező to their
+// (first) league. Null: nothing to open yet.
 export function adminHome(actor: Actor): string | null {
-  return appNav(actor)[0]?.items[0]?.to ?? null;
+  if (actor.platformRole === "superadmin") return "/admin/signups";
+  const league = actor.leagues[0];
+  return league ? `/admin/leagues/${league.slug}` : null;
 }

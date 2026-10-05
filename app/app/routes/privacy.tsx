@@ -117,7 +117,10 @@ export default function Privacy() {
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
-                kerül belőle nyilvánosságra.
+                kerül belőle nyilvánosságra. A városod ligájának szervezője az
+                egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol
+                játszanak a legtöbbet, hogy párt találjon nekik; az
+                e-mail-címüket nem.
               </li>
             </ul>
           </Section>
@@ -128,6 +131,16 @@ export default function Privacy() {
               jelentkezésről, és kérhesse az adatai törlését. Ezen kívül semmit
               nem küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
               meg a párod adatait, ha ő is benne van.
+            </p>
+          </Section>
+
+          <Section title="Ha egyedül jelentkezel">
+            <p>
+              Ha a szervező talál neked hasonló szintű párt a többi egyedül
+              jelentkező közül, egy e-mailben elküldjük nektek egymás nevét,
+              szintjét és e-mail-címét, hogy megbeszélhessétek. Mást nem adunk át,
+              és a szervező sem látja az e-mail-címedet. Ha ezt nem szeretnéd,
+              írd meg a megjegyzésben, vagy írj nekünk.
             </p>
           </Section>
 

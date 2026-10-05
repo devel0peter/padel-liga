@@ -190,6 +190,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Interest list: deleted after the first season starts, unless the person registers.
   - Accounts: kept until deletion, then anonymized (section 3).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address.
+- **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
 - **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion. Nothing else is sent to them until they register themselves.
 
 ## 18. MVP plan and calendar (decided 2026-10-03)

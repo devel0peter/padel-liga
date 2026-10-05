@@ -85,6 +85,13 @@
       "when": 1791220660211,
       "tag": "0011_cities",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791231183576,
+      "tag": "0012_solo_pairing",
+      "breakpoints": true
     }
   ]
 }

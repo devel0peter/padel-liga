@@ -12,7 +12,7 @@ import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { listCities } from "~/lib/cities.server";
 
-import { broadcastEmail, loginCode, partnerNotice, signupConfirmation, type Email } from "./templates";
+import { broadcastEmail, loginCode, pairIntro, partnerNotice, signupConfirmation, type Email, type PairIntroPerson } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
@@ -94,6 +94,19 @@ export async function queueSignupEmails(signup: InterestSignup): Promise<number[
     if (notified.n === 0 && suppressed.n === 0)
       messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup, cities) });
   }
+  return enqueue(messages);
+}
+
+// Two solo signups a Szervező paired: each gets the other's name and email.
+// An unsubscribed address gets nothing.
+export async function queuePairIntros(a: PairIntroPerson, b: PairIntroPerson, city: string): Promise<number[]> {
+  const suppressed = await suppressedSet();
+  const messages: NewMessage[] = [
+    [a, b],
+    [b, a],
+  ]
+    .filter(([to]) => !suppressed.has(to.email.toLowerCase()))
+    .map(([to, partner]) => ({ kind: "pair_intro", toEmail: to.email, ...pairIntro(to, partner, city) }));
   return enqueue(messages);
 }
 

@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
+import { BarChart3, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -68,6 +68,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
   overview: LayoutDashboard,
+  solos: HeartHandshake,
   signups: Users,
   broadcasts: Mail,
   clubs: MapPin,

@@ -60,8 +60,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
   const [all, clubs, cities] = await Promise.all([listSignups(), listClubs(), listCities()]);
+  const names = new Map(all.map((r) => [r.id, r.name1]));
   const rows = filterSignups(all, filters).map((r) => ({
     ...r,
+    pairedName: r.pairedWith != null ? (names.get(r.pairedWith) ?? null) : null,
     cityText: cityLabel(r, cities),
     source: refLabel(r.ref, clubs),
     plays: homeClubLabel(r.homeClub, clubs),
@@ -151,7 +153,11 @@ function Player({ name, email }: { name: string; email: string | null }) {
   );
 }
 
-function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: string; cityText: string } }) {
+function SignupTableRow({
+  row,
+}: {
+  row: SignupRow & { source: string; plays: string; cityText: string; pairedName: string | null };
+}) {
   const fetcher = useFetcher();
   const [note, setNote] = useState(row.adminNote ?? "");
   const saving = fetcher.state !== "idle";
@@ -171,6 +177,8 @@ function SignupTableRow({ row }: { row: SignupRow & { source: string; plays: str
           <Player name={row.name1} email={row.email1} />
           {row.mode === "pair" && row.name2 ? (
             <Player name={row.name2} email={row.email2} />
+          ) : row.pairedName ? (
+            <Badge variant="secondary">Párja: {row.pairedName}</Badge>
           ) : (
             <Badge variant="secondary">Egyéni, párt keres</Badge>
           )}

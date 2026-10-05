@@ -32,7 +32,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 // numbers that may change (group size, round or season length, the pair
 // threshold): those go in the season announcement.
 const STEPS = [
-  ["Szinted szerint", "Kezdőtől versenyzőig, hozzátok illő ellenfelekkel."],
+  ["Méltó ellenfelek", "Szint szerinti csoportok, kezdőtől versenyzőig."],
   ["Heti egy meccs", "Akkor és ott, amikor nektek jó."],
   ["Feljutás, kiesés", "A kör végén a legjobb feljebb lép, az utolsó lejjebb."],
 ];
@@ -107,9 +107,9 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
           </div>
         </footer>
 
-        {/* Which poster this is, for sorting the prints: the club's ref, small
-            and grey in the bottom margin. */}
-        <span className="absolute right-[14mm] bottom-[5mm] text-[3mm] text-[#9aa7b6]">{ref ?? "általános"}</span>
+        {/* Which poster this is, for sorting the prints: the club's name (or a
+            ref that isn't a club), small and grey in the bottom margin. */}
+        <span className="absolute right-[14mm] bottom-[5mm] text-[3mm] text-[#9aa7b6]">{club ?? ref ?? "általános"}</span>
       </article>
     </>
   );

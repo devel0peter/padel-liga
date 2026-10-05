@@ -88,16 +88,30 @@ function activeItem(nav: NavSection[], pathname: string): string | null {
   return best;
 }
 
-function LeagueSwitcher({ leagues, current }: { leagues: LeagueRef[]; current: string }) {
+// A section's title with its role tag (Szervező / Admin) on the right.
+function SectionLabel({ label, role }: { label: string; role?: string }) {
+  return (
+    <>
+      <span className="truncate">{label}</span>
+      {role && (
+        <span className="ml-auto shrink-0 rounded-full bg-nav-active-bg px-1.5 py-px text-[10px] font-semibold tracking-wide text-nav-active uppercase">
+          {role}
+        </span>
+      )}
+    </>
+  );
+}
+
+function LeagueSwitcher({ leagues, current, role }: { leagues: LeagueRef[]; current: string; role?: string }) {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarGroupLabel asChild>
-          <button type="button" className="w-full justify-between hover:bg-sidebar-accent">
-            <span className="truncate">{current}</span>
-            <ChevronsUpDown className="ml-1" />
+          <button type="button" className="w-full gap-1.5 hover:bg-sidebar-accent">
+            <SectionLabel label={current} role={role} />
+            <ChevronsUpDown className="shrink-0" />
           </button>
         </SidebarGroupLabel>
       </DropdownMenuTrigger>
@@ -149,9 +163,13 @@ function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) 
     <SidebarGroup key={section.label}>
       {/* The league section gets a switcher when there are more leagues. */}
       {leagues.length > 1 && leagues.some((l) => l.name === section.label) ? (
-        <LeagueSwitcher leagues={leagues} current={section.label} />
+        <LeagueSwitcher leagues={leagues} current={section.label} role={section.role} />
       ) : (
-        section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+        section.label && (
+          <SidebarGroupLabel className="gap-1.5">
+            <SectionLabel label={section.label} role={section.role} />
+          </SidebarGroupLabel>
+        )
       )}
       <SidebarMenu>
         {section.items.map((item) => {

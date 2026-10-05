@@ -21,7 +21,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const actor = (await getActor(request))!;
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []));
   return {
-    shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, items: s.items.map(({ label, to }) => ({ label, to })) })),
+    shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
 }
 
@@ -40,7 +40,14 @@ export default function AppHome({ loaderData: d }: Route.ComponentProps) {
       </section>
       {d.shortcuts.map((s) => (
         <section key={s.label} className="grid gap-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">{s.label}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            {s.label}
+            {s.role && (
+              <span className="rounded-full bg-nav-active-bg px-1.5 py-px text-[10px] font-semibold tracking-wide text-nav-active uppercase">
+                {s.role}
+              </span>
+            )}
+          </h2>
           <ul className="flex flex-wrap gap-2">
             {s.items.map((i) => (
               <li key={i.to}>

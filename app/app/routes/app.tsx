@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarTrigger,
   useSidebar,
 } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -67,7 +68,7 @@ function ProfileButton({ name, email, imageUrl, initials, role }: ProfileProps) 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton asChild size="lg" isActive={isCurrent(pathname, "/profile")}>
+        <SidebarMenuButton asChild size="lg" isActive={isCurrent(pathname, "/profile")} tooltip="Profil">
           <NavLink to="/profile" onClick={() => setOpenMobile(false)} className="no-underline">
             <Avatar className="size-8">
               {imageUrl && <AvatarImage src={imageUrl} alt="" referrerPolicy="no-referrer" />}
@@ -95,7 +96,7 @@ function NavMenu({ nav }: { nav: NavSection[] }) {
           const Icon = ICONS[item.icon];
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={isCurrent(pathname, item.to)}>
+              <SidebarMenuButton asChild isActive={isCurrent(pathname, item.to)} tooltip={item.label}>
                 <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
                   <span>{item.label}</span>
@@ -114,18 +115,21 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={sidebarOpen}>
-        <Sidebar>
+        <Sidebar collapsible="icon">
           <SidebarHeader className="gap-3">
-            <Link
-              to="/"
-              className="flex items-center gap-2 px-2 pt-1.5 text-base font-extrabold no-underline [font-stretch:120%]"
-            >
-              <span
-                aria-hidden="true"
-                className="inline-block size-3 rounded-full bg-ball shadow-[inset_-3px_-2px_0_rgba(0,0,0,0.12)]"
-              />
-              {SITE_NAME}
-            </Link>
+            <div className="flex items-center gap-2 pt-1 group-data-[collapsible=icon]:justify-center">
+              <Link
+                to="/"
+                className="flex min-w-0 items-center gap-2 px-2 text-base font-extrabold no-underline [font-stretch:120%] group-data-[collapsible=icon]:hidden"
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-block size-3 shrink-0 rounded-full bg-ball shadow-[inset_-3px_-2px_0_rgba(0,0,0,0.12)]"
+                />
+                {SITE_NAME}
+              </Link>
+              <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:ml-0" />
+            </div>
             <ProfileButton {...profile} />
           </SidebarHeader>
           <SidebarContent>
@@ -135,7 +139,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <Form method="post" action="/logout">
-                  <SidebarMenuButton type="submit" className="text-muted-foreground">
+                  <SidebarMenuButton type="submit" className="text-muted-foreground" tooltip="Kilépés">
                     <LogOut />
                     <span>Kilépés</span>
                   </SidebarMenuButton>

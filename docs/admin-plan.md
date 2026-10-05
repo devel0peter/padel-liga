@@ -117,11 +117,12 @@ Old paths (`/admin/clubs`) redirect. `/admin/poster` and `/admin/export.csv` sta
 
 The sidebar is one app shell for every logged-in user (2026-10-05). Sections are filtered by role; a section you can't access isn't rendered at all:
 
-- **Top:** logo, then the profile button (Google picture or initials, name, role), which opens `/profile`.
+- **Top:** logo and the collapse button, then the profile button (Google picture or initials, name, role), which opens `/profile`.
 - **League switcher** (later, only with 2+ leagues).
 - **Liga:** Áttekintés, Klubok. Seasons and the rest are added here by later tickets.
 - **Admin:** Jelentkezők, Körlevelek, Klubok, Forgalom (later also Ligák, Felhasználók).
 - **Bottom:** Kilépés.
+- Collapsed (desktop): a narrow icon strip with tooltips; the collapse button stays at its top. Phones: a slide-in panel opened from the page header.
 - The current page is marked with a brand-blue tint (`--nav-active`, `--nav-active-bg`), in light and dark mode.
 
 ## 5. Design direction

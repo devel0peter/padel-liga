@@ -12,9 +12,9 @@
 	"upload_source_maps": true,
 	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.
 	"workers_dev": false,
-	// Run the Worker near the D1 database rather than near the visitor: a page
-	// behind login makes several database round trips, which then take a few
-	// ms each instead of ~45 ms (measured 2026-10-05).
+	// Smart Placement may run the Worker near the D1 database once there is
+	// enough traffic to measure (a page behind login makes several database
+	// round trips). With the database in Prague, the default edge is close too.
 	"placement": { "mode": "smart" },
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
 	"vars": {
@@ -35,8 +35,11 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "padel-liga",
-			"database_id": "ab926c11-5f24-483d-a8d3-c21ff40bb41e",
+			// EU jurisdiction (data stays in the EU), primary in Prague, near the
+			// Hungarian players. Replaced the London database "padel-liga" on
+			// 2026-10-05.
+			"database_name": "padel-liga-eu",
+			"database_id": "97e08846-1351-4eb3-8397-67cded56adc2",
 			"migrations_dir": "drizzle"
 		}
 	]

@@ -5,6 +5,7 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { listCities, listedCities } from "~/lib/cities.server";
 import { normalizeRef, posterUrl } from "~/lib/clubs";
 import { getClub } from "~/lib/clubs.server";
+import { Wordmark } from "~/components/site";
 import { SITE_NAME, SITE_URL } from "~/lib/site";
 
 // Printable A4 poster with a QR code to the landing page. With `?ref=<club>`
@@ -62,10 +63,10 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
       <article className="mx-auto flex aspect-[210/297] w-full max-w-[210mm] flex-col justify-between bg-white p-[14mm] text-[#10233d] print:h-[297mm] print:max-w-none">
         <header className="grid gap-[9mm]">
           {/* Brand: the league is "Padelpárbaj <city>". */}
-          <div className="flex items-baseline gap-[3mm] text-[8mm] font-extrabold [font-stretch:120%]">
+          <div className="flex items-baseline gap-[3mm] text-[8mm]">
             <span className="inline-block size-[6.5mm] self-center rounded-full bg-[#dceb3c] shadow-[inset_-1.5mm_-1mm_0_rgba(0,0,0,0.12)]" />
-            {SITE_NAME}
-            <span className="text-[#1e5ba8]">{city}</span>
+            <Wordmark />
+            <span className="font-extrabold text-[#1e5ba8] [font-stretch:120%]">{city}</span>
           </div>
           <h1 className="font-display text-[16.5mm] leading-[1.02] font-black tracking-tight">
             Ki a legjobb páros a városban?

@@ -32,13 +32,16 @@ export function textToHtml(text: string): string {
     .join("\n");
 }
 
+// The wordmark (components/site.tsx): "Padel" heavy, "párbaj" light.
+const WORDMARK_HTML = `<span style="font-weight:800">Padel</span><span style="font-weight:300">párbaj</span>`;
+
 function layout(bodyHtml: string, footerHtml: string): string {
   return `<!doctype html>
 <html lang="hu">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background:#f4f6f9">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.5;color:#10233d">
-<div style="font-weight:800;font-size:18px;margin-bottom:16px"><span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:#dceb3c;margin-right:8px"></span>${SITE_NAME}</div>
+<div style="font-weight:800;font-size:18px;margin-bottom:16px"><span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:#dceb3c;margin-right:8px"></span>${WORDMARK_HTML}</div>
 <div style="background:#ffffff;border-radius:12px;padding:24px">
 ${bodyHtml}
 </div>

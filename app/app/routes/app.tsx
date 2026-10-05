@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { Logo } from "~/components/site";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues, roleLabel, type LeagueRef, type NavIcon, type NavSection } from "~/lib/auth/permissions";
 import { initials, parseCookies } from "~/lib/auth/rules";
@@ -182,13 +183,10 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
             <div className="flex items-center gap-2 pt-1 group-data-[collapsible=icon]:justify-center">
               <Link
                 to="/"
-                className="flex min-w-0 items-center gap-2 px-2 text-base font-extrabold no-underline [font-stretch:120%] group-data-[collapsible=icon]:hidden"
+                aria-label={SITE_NAME}
+                className="min-w-0 px-2 text-base no-underline group-data-[collapsible=icon]:hidden"
               >
-                <span
-                  aria-hidden="true"
-                  className="inline-block size-3 shrink-0 rounded-full bg-ball shadow-[inset_-3px_-2px_0_rgba(0,0,0,0.12)]"
-                />
-                {SITE_NAME}
+                <Logo />
               </Link>
               <SidebarTrigger className="ml-auto group-data-[collapsible=icon]:ml-0" />
             </div>

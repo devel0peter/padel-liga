@@ -3,17 +3,32 @@ import { Label } from "~/components/ui/label";
 
 // Shared frame and form bits for the login and account pages.
 
-export function AuthPage({ title, intro, children }: { title: string; intro?: React.ReactNode; children: React.ReactNode }) {
+// A short task on its own (log in, first-login profile, 403): one panel in
+// the middle of the window, an optional line under it.
+export function AuthPage({
+  title,
+  intro,
+  children,
+  below,
+}: {
+  title: string;
+  intro?: React.ReactNode;
+  children: React.ReactNode;
+  below?: React.ReactNode;
+}) {
   return (
     <>
       <SiteHeader cta={false} />
-      <main className="py-10 sm:py-16">
-        <Wrap className="grid max-w-md gap-6">
-          <div className="grid gap-2">
-            <h1 className="font-display text-3xl font-black">{title}</h1>
-            {intro && <p className="text-muted-foreground">{intro}</p>}
+      <main className="grid place-items-center py-10 sm:py-16">
+        <Wrap className="grid max-w-md gap-4">
+          <div className="grid gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(16_35_61/0.06),0_8px_24px_-12px_rgb(16_35_61/0.18)] sm:p-8">
+            <div className="grid gap-2">
+              <h1 className="font-display text-3xl font-black">{title}</h1>
+              {intro && <p className="text-muted-foreground">{intro}</p>}
+            </div>
+            {children}
           </div>
-          {children}
+          {below && <p className="text-center text-sm text-muted-foreground">{below}</p>}
         </Wrap>
       </main>
       <SiteFooter />

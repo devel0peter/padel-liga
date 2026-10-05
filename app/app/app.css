@@ -139,8 +139,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Public pages are header, main, footer straight in <body>: main takes the
+     spare height, so the footer sits at the bottom of a short page. */
   body {
-    @apply bg-background text-foreground;
+    @apply flex min-h-dvh flex-col bg-background text-foreground;
+  }
+  body > main {
+    flex: 1 0 auto;
   }
   html {
     @apply font-sans;

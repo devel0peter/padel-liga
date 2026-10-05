@@ -109,7 +109,23 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
 
   const emailError = actionData?.step === "email" ? actionData.error : undefined;
   return (
-    <AuthPage title="Belépés" intro="Nincs jelszó: lépj be Google-lel, vagy küldünk egy kódot e-mailben.">
+    <AuthPage
+      title="Belépés"
+      intro={
+        <>
+          Nincs jelszó: lépj be Google-lel, vagy kérj egy belépőkódot{" "}
+          <span className="whitespace-nowrap">e-mailben</span>.
+        </>
+      }
+      below={
+        <>
+          Még nem jelentkeztél?{" "}
+          <Link to="/#jelentkezes" className="underline">
+            Jelentkezz a ligába
+          </Link>
+        </>
+      }
+    >
       {error && (
         <p role="alert" className="font-semibold text-destructive">
           {error}
@@ -145,7 +161,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
           />
         </Field>
         <div>
-          <Button type="submit" name="intent" value="send" disabled={busy} className="h-11 px-6 text-base">
+          <Button type="submit" name="intent" value="send" disabled={busy} className="h-11 w-full text-base">
             {busy ? "Küldés…" : "Kódot kérek"}
           </Button>
         </div>

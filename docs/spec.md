@@ -151,26 +151,37 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 ## 11. Rating (Elo)
 - Individual Elo, starting value based on self-assessed level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600; the same levels as the signup form).
 - Pair rating = average of the two players.
-- After a match, both players receive the same delta. K = 32 at first, 16 after 20 matches.
+- After a match, both players receive the same delta. K = 40 for a player's first 10 rated matches, 20 after (README decision log, 2026-10-05).
 - Walkovers don't change Elo.
 - Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)
 Group size, phase length in weeks, phases per season (4), catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
 
-## 13. Notifications (email, in Hungarian)
-- New phase (Monday morning after the deadline): your group, opponents and the deadline.
-- Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
-- A proposal arrived, a slot was accepted, or an agreed time is waiting for confirmation.
-- A strike: to the pair's players, with the count. The 2nd strike email is the warning; the 3rd says the pair leaves at the end of the phase.
-- Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
-- Reminder: 3 days before the deadline if the match is still unscheduled.
-- A result is waiting for confirmation.
-- End of a phase, with your new group.
-- End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group in each phase) with a "Nevezünk újra" button for the pair. A reminder 2 days before the registration window closes, to pairs that haven't re-entered.
-- Every notification includes a shareable link ("küldd el a párodnak / ellenfélnek").
+## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
+Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
 
-Email only in the MVP. A PWA with push notifications later, if players miss emails.
+**Instant** (email and push), only when someone has to act soon or the groups change:
+- New phase (Monday morning after the deadline): your group, opponents and the deadline.
+- A proposal arrived, or an agreed time is waiting for confirmation.
+- A result is waiting for confirmation.
+- The match is tomorrow (the evening before an accepted slot).
+- A 3rd strike: the pair leaves at the end of the phase.
+- End of a phase, with your new group.
+- End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group in each phase) with a "Nevezünk újra" button for the pair.
+
+**Daily digest** (one email in the morning, only on days with something in it; push gets the same items one by one):
+- A slot was accepted, a time was cancelled, a result was confirmed.
+- Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
+- Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
+- Reminder 3 days before the deadline if the match is still unscheduled.
+- A 1st or 2nd strike, with the count (the 2nd is the warning).
+- Reminder 2 days before the registration window closes, to pairs that haven't re-entered.
+
+**Rules for all notifications:**
+- Every notification has a one-tap action link (accept, confirm, record a time) and a shareable link ("küldd el a párodnak / ellenfélnek").
+- The home screen shows the same open items as a "Teendők" list.
+- Web push: offered after the first login ("Kérsz értesítést?"), opt-in, can be turned off. On iPhone it needs iOS 16.4+ and the site added to the home screen; the app explains this. Push never replaces email for instant items.
 
 ## 14. Public pages
 - League home: groups, standings, matches this week.
@@ -180,7 +191,7 @@ Email only in the MVP. A PWA with push notifications later, if players miss emai
 - Privacy page ("Adatkezelési tájékoztató", section 17), linked from the footer and from every consent checkbox.
 
 ## 15. Out of MVP scope
-Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2), Facebook login, PWA and push notifications, a "keresek párt" list.
+Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2), Facebook login, native mobile app push, a "keresek párt" list.
 
 ## 16. Non-functional requirements
 - Mobile-first; most usage will be from a phone link.
@@ -214,7 +225,7 @@ Dates are Europe/Budapest.
 |---|---|---|
 | Registration opens | Mon 2 Nov 2026 | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
 | Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling (including recording an agreed time), results and confirmation, disputes, public standings, emails and reminders, daily backup |
-| First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, strikes, account deletion |
+| First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, strikes, web push and the daily digest, account deletion |
 | Season end | Thu 31 Dec 2026 | 4-phase seasons, re-entry ("Nevezünk újra", organizer re-entry by hand), carrying approvals into the next season, season switch draft (carry-over, compaction, re-formed pairs as late joiners), season archive page, season recap email and re-entry reminder |
 
 First season: phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec, break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.

@@ -164,9 +164,9 @@ export default function Privacy() {
 
           <Section title="Hol tároljuk?">
             <p>
-              Az adatok a Cloudflare szerverein vannak, nyugat-európai
-              helyszínű adatbázisban. Akik a nevünkben hozzáférhetnek az
-              adatokhoz (adatfeldolgozók):
+              Az adatok a Cloudflare szerverein vannak, az adatbázis az Európai
+              Unióban (Prágában). Akik a nevünkben hozzáférhetnek az adatokhoz
+              (adatfeldolgozók):
             </p>
             <ul className={list}>
               <li>Cloudflare, Inc. – tárhely, adatbázis és látogatási statisztika,</li>

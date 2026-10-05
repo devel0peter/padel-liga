@@ -26,6 +26,9 @@ export const interestSignups = sqliteTable("interest_signups", {
     .notNull()
     .default("new"),
   adminNote: text("admin_note"),
+  // A solo signup a Szervező paired with another solo (app/lib/solo-pairing.ts);
+  // both rows point at each other.
+  pairedWith: integer("paired_with"),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -39,7 +42,7 @@ export const emailMessages = sqliteTable(
   "email_messages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    kind: text("kind", { enum: ["signup_confirmation", "partner_notice", "broadcast", "login_code"] }).notNull(),
+    kind: text("kind", { enum: ["signup_confirmation", "partner_notice", "broadcast", "login_code", "pair_intro"] }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
     toEmail: text("to_email").notNull(),
     subject: text("subject").notNull(),

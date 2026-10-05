@@ -33,6 +33,7 @@ export type SignupRow = {
   homeClub: string | null;
   status: Status;
   adminNote: string | null;
+  pairedWith: number | null;
   consentAt: Date;
   createdAt: Date;
   updatedAt: Date | null;

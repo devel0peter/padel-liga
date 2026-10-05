@@ -23,11 +23,16 @@ export async function updateSignup(
 }
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").
-// Also removes the stored emails sent to them; an unsubscribe is kept.
+// Also removes the stored emails sent to them; an unsubscribe is kept. A solo
+// paired with them goes back to the waiting list.
 export async function deleteSignup(id: number): Promise<void> {
   const [row] = await db
     .delete(interestSignups)
     .where(eq(interestSignups.id, id))
     .returning({ email1: interestSignups.email1, email2: interestSignups.email2 });
+  await db
+    .update(interestSignups)
+    .set({ pairedWith: null, status: "new", updatedAt: new Date() })
+    .where(eq(interestSignups.pairedWith, id));
   if (row) await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
 }

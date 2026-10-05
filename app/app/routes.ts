@@ -28,6 +28,7 @@ export default [
       route("admin/cities", "routes/admin.cities.tsx"),
       route("admin/users", "routes/admin.users.tsx"),
       route("admin/leagues/:league", "routes/admin.league.tsx"),
+      route("admin/leagues/:league/solos", "routes/admin.league-solos.tsx"),
       route("admin/leagues/:league/clubs", "routes/admin.league-clubs.tsx"),
     ]),
   ]),

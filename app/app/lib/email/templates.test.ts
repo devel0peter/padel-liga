@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { InterestSignup } from "../interest";
-import { broadcastEmail, escapeHtml, loginCode, partnerNotice, signupConfirmation, textToHtml } from "./templates";
+import { broadcastEmail, escapeHtml, loginCode, pairIntro, partnerNotice, signupConfirmation, textToHtml } from "./templates";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
@@ -110,5 +110,34 @@ describe("loginCode", () => {
 
   it("has no unsubscribe link: it is a transactional email", () => {
     expect(loginCode("123456", 10).text).not.toContain("Leiratkozás");
+  });
+});
+
+describe("signupConfirmation share link", () => {
+  it("asks to pass the page on, with the email's own source", () => {
+    expect(signupConfirmation(pair, GYOR).text).toContain("Küldd el neki: https://padelparbaj.hu/?ref=megosztas-email");
+    expect(signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null }, GYOR).text).toContain(
+      "aki szívesen játszana veled",
+    );
+    expect(signupConfirmation({ ...pair, city: "other", cityOther: "Pécs" }).text).toContain("a helyi padeleseknek");
+  });
+});
+
+describe("pairIntro", () => {
+  const anna = { name: "Nagy Anna", email: "anna@example.com", level: "kozephalado" };
+  const bela = { name: "Kovács Béla", email: "bela@example.com", level: "halado" };
+
+  it("gives the partner's name, level and email", () => {
+    const e = pairIntro(anna, bela, "Győr");
+    expect(e.subject).toBe("Találtunk neked párt – Padelpárbaj");
+    expect(e.text).toContain("Szia Nagy Anna!");
+    expect(e.text).toContain("találtunk neked párt: Kovács Béla");
+    expect(e.text).toContain("A szintje: Haladó.");
+    expect(e.text).toContain("Az e-mail-címe: bela@example.com");
+    expect(e.text).not.toContain("anna@example.com");
+  });
+
+  it("escapes names in the HTML", () => {
+    expect(pairIntro(anna, { ...bela, name: "<b>Béla</b>" }, "Győr").html).toContain("&lt;b&gt;Béla&lt;/b&gt;");
   });
 });

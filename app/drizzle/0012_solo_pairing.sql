@@ -1,0 +1,1 @@
+ALTER TABLE `interest_signups` ADD `paired_with` integer;

@@ -29,6 +29,7 @@ function row(over: Partial<SignupRow>): SignupRow {
     homeClub: null,
     status: "new",
     adminNote: null,
+    pairedWith: null,
     consentAt: new Date("2026-10-01T12:00:00Z"),
     createdAt: new Date("2026-10-01T12:00:00Z"),
     updatedAt: null,

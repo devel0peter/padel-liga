@@ -4,6 +4,7 @@
 import type { City } from "../cities";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
+import { SHARE_REFS, shareUrl } from "../share";
 import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
 
 export type Email = { subject: string; html: string; text: string };
@@ -95,6 +96,11 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
     : s.mode === "solo"
       ? "Segítünk párt találni. Amint elég pár összegyűlik, írunk az indulásról."
       : "Amint elég pár összegyűlik, írunk az indulásról és a következő lépésekről.";
+  const share = otherCity
+    ? `Minél többen jelentkeztek, annál hamarabb indulhat nálatok is. Küldd el a helyi padeleseknek: ${shareUrl(SHARE_REFS.email)}`
+    : s.mode === "solo"
+      ? `Ha ismersz valakit, aki szívesen játszana veled, küldd el neki: ${shareUrl(SHARE_REFS.email)}`
+      : `Ismersz még valakit, aki szívesen játszana? Küldd el neki: ${shareUrl(SHARE_REFS.email)}`;
 
   return build(
     `Megkaptuk a jelentkezésed – ${SITE_NAME}`,
@@ -103,6 +109,7 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
       `Köszi, megkaptuk a jelentkezésed.`,
       lines.join("\n"),
       next,
+      share,
       `Ha valamit rosszul adtál meg, vagy meggondoltad magad, csak válaszolj erre a levélre.`,
       SIGNATURE,
     ].join("\n\n"),
@@ -124,6 +131,25 @@ export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
       SIGNATURE,
     ].join("\n\n"),
     footer(`Ezt az egy levelet azért kaptad, mert ${s.name1} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`),
+  );
+}
+
+// A Szervező paired two solo signups (app/lib/solo-pairing.ts): each gets one
+// email with the other's name, level and email, so they can write to each
+// other. Privacy page: "Ha egyedül jelentkezel".
+export type PairIntroPerson = { name: string; email: string; level: string };
+
+export function pairIntro(to: PairIntroPerson, partner: PairIntroPerson, city: string): Email {
+  return build(
+    `Találtunk neked párt – ${SITE_NAME}`,
+    [
+      `Szia ${to.name}!`,
+      `Egyedül jelentkeztél a ${SITE_NAME}ra (${city}), és találtunk neked párt: ${partner.name}, aki szintén párt keres. A szintje: ${levelLabel(partner.level)}.`,
+      `Az e-mail-címe: ${partner.email}\nŐ is megkapta a te nevedet és címedet. Írjatok egymásnak, játsszatok egyet, és ha összejön, az induláskor együtt neveztek.`,
+      `Ha nem jön össze, vagy mégsem szeretnél vele játszani, válaszolj erre a levélre, és keresünk mást.`,
+      SIGNATURE,
+    ].join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert egyedül jelentkeztél a ${SITE_URL.replace("https://", "")} oldalon, és párt kerestél.`),
   );
 }
 

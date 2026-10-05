@@ -1,3 +1,4 @@
+import { Check, Copy, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useFetcher } from "react-router";
 
@@ -17,6 +18,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { OTHER_CITY, type City } from "~/lib/cities";
 import { OTHER_CLUB, type ClubOption } from "~/lib/clubs";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
+import { SHARE_REFS, shareLinks, shareText, shareUrl } from "~/lib/share";
 import { CONTACT_EMAIL } from "~/lib/site";
 
 export type SignupActionData =
@@ -60,6 +62,53 @@ function Field({
 
 const inputClass = "h-11 bg-background text-base";
 
+const shareBtn =
+  "inline-flex items-center gap-2 rounded-full border-[1.5px] border-foreground px-4 py-2 text-sm font-bold no-underline";
+
+// After a signup: pass the page on. The phone's share sheet where there is
+// one, plus WhatsApp, Facebook and copying the link. `?ref=megosztas` shows
+// in /admin/traffic what shares bring in.
+function ShareLinks({ text }: { text: string }) {
+  const url = shareUrl(SHARE_REFS.page);
+  const links = shareLinks(url, text);
+  const [canShare, setCanShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => setCanShare(typeof navigator.share === "function"), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      window.prompt("Másold ki a linket:", url);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {canShare && (
+        <button
+          type="button"
+          onClick={() => navigator.share({ text, url }).catch(() => {})}
+          className={`${shareBtn} border-ball bg-ball text-ball-foreground`}
+        >
+          <Share2 className="size-4" /> Megosztom
+        </button>
+      )}
+      <a href={links.whatsapp} target="_blank" rel="noopener noreferrer" className={shareBtn}>
+        WhatsApp
+      </a>
+      <a href={links.facebook} target="_blank" rel="noopener noreferrer" className={shareBtn}>
+        Facebook
+      </a>
+      <button type="button" onClick={copy} className={shareBtn}>
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+        {copied ? "Kimásolva" : "Link másolása"}
+      </button>
+    </div>
+  );
+}
+
 export function SignupForm({
   signupRef,
   clubs = [],
@@ -88,6 +137,7 @@ export function SignupForm({
   }, [done]);
 
   if (done) {
+    const where = cities.find((c) => c.slug === city)?.name;
     return (
       <div
         ref={doneRef}
@@ -107,6 +157,7 @@ export function SignupForm({
             oldalt annak, akivel szívesen játszanál.
           </p>
         )}
+        <ShareLinks text={shareText(mode, otherCity ? (data.cityOther ?? null) : (where ?? null))} />
       </div>
     );
   }
@@ -174,6 +225,12 @@ export function SignupForm({
             </Label>
           ))}
         </RadioGroup>
+        {mode === "solo" && (
+          <p className="text-sm text-muted-foreground">
+            Ha találunk hozzád illő párt, e-mailben elküldjük nektek egymás nevét
+            és e-mail-címét, hogy megbeszélhessétek.
+          </p>
+        )}
       </fieldset>
 
       <fieldset className="grid gap-3">

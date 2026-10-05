@@ -2,8 +2,9 @@ import { and, eq, gt } from "drizzle-orm";
 import { redirect } from "react-router";
 
 import { db } from "~/db/client.server";
-import { sessions, users } from "~/db/schema";
+import { leagueAdmins, leagues, sessions, users } from "~/db/schema";
 
+import type { LeagueRef } from "./permissions";
 import { nextExpiry, parseCookies, serializeCookie, sessionExpiry } from "./rules";
 import { randomToken, sha256Hex } from "./tokens";
 
@@ -17,8 +18,11 @@ const COOKIE_MAX_AGE = 400 * 24 * 60 * 60;
 
 export type User = typeof users.$inferSelect;
 
-// One lookup per request, however many loaders ask.
-const cache = new WeakMap<Request, Promise<User | null>>();
+// The logged-in user and the leagues they organize (for their roles).
+export type SessionData = { user: User; leagues: LeagueRef[] };
+
+// One lookup per request, however many middlewares and loaders ask.
+const cache = new WeakMap<Request, Promise<SessionData | null>>();
 
 function sessionToken(request: Request): string | null {
   return parseCookies(request.headers.get("Cookie")).get(COOKIE) || null;
@@ -33,29 +37,45 @@ export async function createSession(userId: string): Promise<string> {
   return serializeCookie(COOKIE, token, { maxAgeSeconds: COOKIE_MAX_AGE, secure: SECURE });
 }
 
-async function lookup(request: Request): Promise<User | null> {
+async function lookup(request: Request): Promise<SessionData | null> {
   const token = sessionToken(request);
   if (!token) return null;
   const idHash = await sha256Hex(token);
   const now = new Date();
-  const [row] = await db
-    .select({ user: users, expiresAt: sessions.expiresAt })
-    .from(sessions)
-    .innerJoin(users, eq(users.id, sessions.userId))
-    .where(and(eq(sessions.idHash, idHash), gt(sessions.expiresAt, now)));
+  const valid = and(eq(sessions.idHash, idHash), gt(sessions.expiresAt, now));
+  // One D1 round trip for both: every page behind login needs the user and
+  // their roles, and each round trip to the database is the slow part.
+  const [[row], organized] = await db.batch([
+    db
+      .select({ user: users, expiresAt: sessions.expiresAt })
+      .from(sessions)
+      .innerJoin(users, eq(users.id, sessions.userId))
+      .where(valid),
+    db
+      .select({ id: leagues.id, slug: leagues.slug, city: leagues.city, name: leagues.name })
+      .from(sessions)
+      .innerJoin(leagueAdmins, eq(leagueAdmins.userId, sessions.userId))
+      .innerJoin(leagues, eq(leagues.id, leagueAdmins.leagueId))
+      .where(valid)
+      .orderBy(leagues.name),
+  ]);
   if (!row) return null;
   const extended = nextExpiry(row.expiresAt, now, row.user.platformRole);
   if (extended) await db.update(sessions).set({ expiresAt: extended }).where(eq(sessions.idHash, idHash));
-  return row.user;
+  return { user: row.user, leagues: organized };
 }
 
-export function getUser(request: Request): Promise<User | null> {
-  let user = cache.get(request);
-  if (!user) {
-    user = lookup(request);
-    cache.set(request, user);
+export function getSession(request: Request): Promise<SessionData | null> {
+  let session = cache.get(request);
+  if (!session) {
+    session = lookup(request);
+    cache.set(request, session);
   }
-  return user;
+  return session;
+}
+
+export async function getUser(request: Request): Promise<User | null> {
+  return (await getSession(request))?.user ?? null;
 }
 
 function loginRedirect(request: Request, to: string): never {

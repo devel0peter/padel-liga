@@ -157,3 +157,24 @@
   font-stretch: 115%;
   line-height: 1.08;
 }
+
+/* Page-load bar (root.tsx NavigationProgress): grows towards 90% while busy,
+   fades when done. Hidden when the user prefers less motion: the bar then
+   just appears. */
+.nav-progress {
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  transition: opacity 200ms ease 0ms, transform 200ms ease;
+}
+.nav-progress.is-busy {
+  opacity: 1;
+  transform: scaleX(0.9);
+  transition: opacity 0ms linear 120ms, transform 8s cubic-bezier(0.1, 0.7, 0.2, 1) 120ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress.is-busy {
+    transform: scaleX(1);
+    transition: opacity 0ms linear 120ms;
+  }
+}

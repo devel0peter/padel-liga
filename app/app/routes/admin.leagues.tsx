@@ -46,7 +46,7 @@ const GRANT_MESSAGES = {
   granted: "Kész, mostantól szervező.",
   already: "Már szervező ebben a ligában.",
   invited:
-    "Még nincs fiókja, ezért meghívtuk: amint ezzel a címmel belép (padelparbaj.hu/login), szervező lesz. Szólj neki.",
+    "Még nincs fiókja. Felvettük: amint ezzel a címmel belép (padelparbaj.hu/login), szervező lesz. E-mailt nem küldünk, szólj neki.",
 };
 
 export async function action({ request }: Route.ActionArgs): Promise<ActionData | Response> {
@@ -96,7 +96,7 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
   return (
     <AppPage
       title="Ligák"
-      description="A ligák és a szervezőik. Szervező egy meglévő fiók lehet; akinek még nincs, azt meghívjuk, és az első belépésekor lesz szervező."
+      description="A ligák és a szervezőik. Akinek még nincs fiókja, azt is felveheted: az első belépésekor lesz szervező (e-mailt nem küldünk)."
     >
       {loaderData.leagues.length === 0 && (
         <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
@@ -138,7 +138,7 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
                   {league.pending.map((p) => (
                     <li key={p.email} className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground">{p.email}</span>
-                      <Badge variant="outline">meghívva</Badge>
+                      <Badge variant="outline">még nem lépett be</Badge>
                       <RemoveButton label="Meghívó visszavonása" intent="cancel-invite" league={league.slug} name="email" value={p.email} />
                     </li>
                   ))}

@@ -38,6 +38,7 @@
 - `npm test`: rules engine tests.
 - `npm run typecheck`, `npm run build`.
 - `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
+- `npm run db:read -w app -- "<SELECT ...>" [--local]`: one read-only query, production by default. The script refuses writes. Treat the output as personal data: don't paste emails or names into PRs or public places.
 - Deploys are automatic: every push to `main` runs GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests, build, then remote D1 migrations, then deploy. Work on a branch and open a PR; merging to `main` ships it, so ask before merging.
 - `npm run deploy`: manual fallback only (CI down). Ask first.
 - Accounts: `npm run auth:invite -w app -- <email> [--remote]` (sign-up before 2 Nov), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Admin).

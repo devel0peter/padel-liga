@@ -22,6 +22,7 @@ import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 import { notifyNewSignup } from "~/lib/notifications.server";
+import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -41,7 +42,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const clubs = (await listClubs()).map(toClubOption);
   const cities = (await listedCities()).map(({ slug, name }) => ({ slug, name }));
   const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
-  return { ref, clubs, cities };
+  return { ref, clubs, cities, turnstileSiteKey: turnstileSiteKey() };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -58,6 +59,14 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
     cities,
   );
   if (!result.ok) return result;
+
+  // After the field checks, so a typo doesn't use up the single-use token.
+  if (!(await verifyTurnstile(form, request, "signup"))) {
+    return {
+      ok: false,
+      formError: "Nem sikerült ellenőrizni, hogy nem vagy robot. Várj pár másodpercet, és próbáld újra.",
+    };
+  }
 
   try {
     await saveInterest(result.data);
@@ -264,7 +273,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               title="Jelentkezz az első szezonra"
               lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
             />
-            <SignupForm signupRef={ref} clubs={clubs} cities={cities} />
+            <SignupForm signupRef={ref} clubs={clubs} cities={cities} turnstileSiteKey={loaderData.turnstileSiteKey} />
           </Wrap>
         </section>
       </main>

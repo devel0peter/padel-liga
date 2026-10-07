@@ -4,3 +4,9 @@ RESEND_API_KEY=""
 # Google login: an OAuth client with redirect URI http://localhost:5173/auth/google/callback.
 # Set GOOGLE_CLIENT_ID in wrangler.jsonc vars (or override it here). Empty: no Google button.
 GOOGLE_CLIENT_SECRET=""
+# Turnstile: Cloudflare's test keys (always pass). Leave TURNSTILE_SITE_KEY empty for no widget.
+TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+TURNSTILE_SECRET="1x0000000000000000000000000000000AA"
+TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
+# Resend bounce/complaint webhook (/webhooks/resend). Any whsec_ value works locally.
+RESEND_WEBHOOK_SECRET=""

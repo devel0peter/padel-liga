@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
+import { Turnstile } from "~/components/turnstile";
 import { OTHER_CITY, type City } from "~/lib/cities";
 import { OTHER_CLUB, type ClubOption } from "~/lib/clubs";
 import { LEVELS, type InterestField, type Mode } from "~/lib/interest";
@@ -113,8 +114,11 @@ export function SignupForm({
   signupRef,
   clubs = [],
   cities,
+  turnstileSiteKey,
 }: {
   signupRef?: string | null;
+  // Null: no bot check (app/lib/turnstile.server.ts).
+  turnstileSiteKey?: string | null;
   clubs?: ClubOption[];
   // The listed cities (cities.server.ts); "Más város" is always offered.
   cities: Pick<City, "slug" | "name">[];
@@ -331,6 +335,9 @@ export function SignupForm({
         </div>
         <FieldError id="consent-error" message={errors.consent} />
       </div>
+
+      {/* A form error means the server already used up the token. */}
+      {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} action="signup" resetKey={formError ? data : undefined} />}
 
       {formError && (
         <p role="alert" className="font-semibold text-destructive">

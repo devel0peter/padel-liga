@@ -92,7 +92,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <strong>Címzettek:</strong> {label} · {recipients.length} cím
-            {suppressed > 0 && ` (${suppressed} leiratkozottat kihagyunk)`}
+            {suppressed > 0 && ` (${suppressed} leiratkozott vagy nem kézbesíthető címet kihagyunk)`}
           </div>
           <Button variant="outline" size="sm" asChild>
             <Link to={`/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>

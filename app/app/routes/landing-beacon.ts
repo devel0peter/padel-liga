@@ -1,17 +1,22 @@
 import { isbot } from "isbot";
 
 import type { Route } from "./+types/landing-beacon";
+import { getActor } from "~/lib/auth/admin.server";
+import { roleLabel } from "~/lib/auth/permissions";
 import { landingSource } from "~/lib/traffic";
 import { recordLanding } from "~/lib/traffic.server";
 
 // Counts one landing page view (app/lib/traffic.ts). Sent by the landing page
-// from the browser, so crawlers that don't run scripts aren't counted.
+// from the browser, so crawlers that don't run scripts aren't counted. The page
+// sends the source it worked out (`?ref=`). Admins and Szervezők checking the
+// site aren't visitors, so they aren't counted.
 export async function action({ request }: Route.ActionArgs) {
   if (request.method !== "POST") return new Response(null, { status: 405 });
   if (!isbot(request.headers.get("User-Agent"))) {
     const query = new URL(request.url).searchParams;
     try {
-      await recordLanding(landingSource(query));
+      const actor = await getActor(request);
+      if (!actor || roleLabel(actor) === "Játékos") await recordLanding(landingSource(query));
     } catch (error) {
       console.error("landing count failed", error);
     }

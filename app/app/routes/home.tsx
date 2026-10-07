@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
@@ -13,22 +13,26 @@ import {
 } from "~/components/ui/accordion";
 import { listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
-import { withoutTracking } from "~/lib/traffic";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
-import { landingSource } from "~/lib/traffic";
+import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
+import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 import { notifyNewSignup } from "~/lib/notifications.server";
 
-export function meta({}: Route.MetaArgs) {
+// A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
+// the link preview card to og:url, so a bare one would drop the source.
+export function meta({ location }: Route.MetaArgs) {
+  const ref = normalizeRef(new URLSearchParams(location.search).get("ref"));
   return pageMeta({
     title: "Padelpárbaj – Ki a legjobb páros a városban?",
     description:
       "Padelpárbaj: szint szerinti 4-es csoportok pároknak, heti egy meccs, feljutás és kiesés. Jelentkezz!",
     path: "/",
+    ogQuery: ref ? `?ref=${ref}` : undefined,
   });
 }
 
@@ -36,7 +40,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
   const clubs = (await listClubs()).map(toClubOption);
   const cities = (await listedCities()).map(({ slug, name }) => ({ slug, name }));
-  return { ref: landingSource(new URL(request.url).searchParams), clubs, cities };
+  const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
+  return { ref, clubs, cities };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -119,22 +124,29 @@ const FAQ = [
 let landingCounted = false;
 
 // Counts the landing per source for the admin funnel (app/lib/traffic.ts),
-// then takes ?ref= and ad tags out of the address bar. The signup form already
-// has the source from the loader, so a signup still records it.
-function useLandingCount() {
+// then takes ?ref= and ad tags out of the address bar. A reload or back and
+// forward isn't a new landing: the address no longer has the source, so it
+// would only add to "no source".
+function useLandingCount(source: string | null) {
   useEffect(() => {
     if (landingCounted) return;
     landingCounted = true;
+    const nav = performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (isNewLanding(nav?.type)) {
+      navigator.sendBeacon?.(`/api/landing${source ? `?ref=${encodeURIComponent(source)}` : ""}`);
+    }
     const { search, pathname, hash } = window.location;
-    navigator.sendBeacon?.(`/api/landing${search}`);
     const clean = withoutTracking(search);
     if (clean !== search) window.history.replaceState(window.history.state, "", `${pathname}${clean}${hash}`);
   }, []);
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { ref, clubs, cities } = loaderData;
-  useLandingCount();
+  const { clubs, cities } = loaderData;
+  // The source as the page was opened. Loaders run again later (a "#" link,
+  // back from the rules) on the cleaned address, which has no source.
+  const [ref] = useState(loaderData.ref);
+  useLandingCount(ref);
   return (
     <>
       <SiteHeader />

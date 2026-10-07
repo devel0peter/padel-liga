@@ -16,4 +16,10 @@ describe("pageMeta", () => {
     expect(prop("og:image")).toEqual({ property: "og:image", content: "https://padelparbaj.hu/og.png" });
     expect(prop("og:locale")).toEqual({ property: "og:locale", content: "hu_HU" });
   });
+
+  it("puts the query on og:url only, so a tagged link's preview keeps its tag", () => {
+    const tagged = pageMeta({ title: "Cím", description: "Leírás", path: "/", ogQuery: "?ref=klub-fb" });
+    expect(tagged).toContainEqual({ property: "og:url", content: "https://padelparbaj.hu/?ref=klub-fb" });
+    expect(tagged).toContainEqual({ tagName: "link", rel: "canonical", href: "https://padelparbaj.hu/" });
+  });
 });

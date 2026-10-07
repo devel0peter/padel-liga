@@ -56,7 +56,8 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
       description={
         <>
           Látogatás: a főoldal megnyitása böngészőben, forrásonként (<code>?ref=</code>, vagy ha nincs,{" "}
-          <code>?utm_source=</code>). Minden más (oldalak, honnan jöttek, eszközök):{" "}
+          <code>?utm_source=</code>; címke nélkül a hivatkozó oldal: <code>facebook</code>, <code>instagram</code>,{" "}
+          <code>google</code>). Az újratöltés és a saját (Admin, Szervező) látogatás nem számít. Minden más (oldalak, honnan jöttek, eszközök):{" "}
           <a href={CF_WEB_ANALYTICS} target="_blank" rel="noreferrer" className="underline">
             Cloudflare Web Analytics
           </a>

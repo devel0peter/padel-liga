@@ -17,7 +17,7 @@ import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
-import { pageMeta } from "~/lib/site";
+import { organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
@@ -28,13 +28,16 @@ import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 // the link preview card to og:url, so a bare one would drop the source.
 export function meta({ location }: Route.MetaArgs) {
   const ref = normalizeRef(new URLSearchParams(location.search).get("ref"));
-  return pageMeta({
-    title: "Padelpárbaj – Ki a legjobb páros a városban?",
-    description:
-      "Padelpárbaj: szint szerinti 4-es csoportok pároknak, heti egy meccs, feljutás és kiesés. Jelentkezz!",
-    path: "/",
-    ogQuery: ref ? `?ref=${ref}` : undefined,
-  });
+  return [
+    ...pageMeta({
+      title: "Padelpárbaj – Ki a legjobb páros a városban?",
+      description:
+        "Padelpárbaj: szint szerinti 4-es csoportok pároknak, heti egy meccs, feljutás és kiesés. Jelentkezz!",
+      path: "/",
+      ogQuery: ref ? `?ref=${ref}` : undefined,
+    }),
+    organizationJsonLd(),
+  ];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

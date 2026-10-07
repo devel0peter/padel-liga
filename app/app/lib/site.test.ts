@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pageMeta } from "./site";
+import { organizationJsonLd, pageMeta } from "./site";
 
 describe("pageMeta", () => {
   const meta = pageMeta({ title: "Cím", description: "Leírás", path: "/rules" });
@@ -21,5 +21,24 @@ describe("pageMeta", () => {
     const tagged = pageMeta({ title: "Cím", description: "Leírás", path: "/", ogQuery: "?ref=klub-fb" });
     expect(tagged).toContainEqual({ property: "og:url", content: "https://padelparbaj.hu/?ref=klub-fb" });
     expect(tagged).toContainEqual({ tagName: "link", rel: "canonical", href: "https://padelparbaj.hu/" });
+  });
+});
+
+describe("organizationJsonLd", () => {
+  const { "script:ld+json": data } = organizationJsonLd();
+  const ofType = (t: string) => data["@graph"].find((n) => n["@type"] === t);
+
+  it("describes the league as a sports organization with absolute URLs", () => {
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(ofType("SportsOrganization")).toMatchObject({
+      name: "Padelpárbaj",
+      url: "https://padelparbaj.hu/",
+      logo: "https://padelparbaj.hu/icon-512.png",
+      sport: "Padel",
+    });
+  });
+
+  it("links the website to its publisher", () => {
+    expect(ofType("WebSite")).toMatchObject({ inLanguage: "hu", publisher: { "@id": "https://padelparbaj.hu/#org" } });
   });
 });

@@ -1,0 +1,9 @@
+# Cloudflare prepends its managed content signals to this file.
+User-agent: *
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/
+Disallow: /webhooks/
+Disallow: /notifications/
+
+Sitemap: https://padelparbaj.hu/sitemap.xml

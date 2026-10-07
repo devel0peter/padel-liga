@@ -18,7 +18,7 @@ import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
-import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
+import { landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 import { notifyNewSignup } from "~/lib/notifications.server";
@@ -124,17 +124,13 @@ const FAQ = [
 let landingCounted = false;
 
 // Counts the landing per source for the admin funnel (app/lib/traffic.ts),
-// then takes ?ref= and ad tags out of the address bar. A reload or back and
-// forward isn't a new landing: the address no longer has the source, so it
-// would only add to "no source".
+// then takes ?ref= and ad tags out of the address bar. A reload counts again,
+// with no source: the address no longer has it.
 function useLandingCount(source: string | null) {
   useEffect(() => {
     if (landingCounted) return;
     landingCounted = true;
-    const nav = performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
-    if (isNewLanding(nav?.type)) {
-      navigator.sendBeacon?.(`/api/landing${source ? `?ref=${encodeURIComponent(source)}` : ""}`);
-    }
+    navigator.sendBeacon?.(`/api/landing${source ? `?ref=${encodeURIComponent(source)}` : ""}`);
     const { search, pathname, hash } = window.location;
     const clean = withoutTracking(search);
     if (clean !== search) window.history.replaceState(window.history.state, "", `${pathname}${clean}${hash}`);

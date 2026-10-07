@@ -39,12 +39,6 @@ export function referrerSource(referrer: string | null | undefined): string | nu
   return REFERRERS.find(([re]) => re.test(host))?.[1] ?? null;
 }
 
-// Whether a page load is a new landing: a reload or going back and forward
-// to the page is the same visit again (the Navigation Timing entry's type).
-export function isNewLanding(navigationType: string | undefined): boolean {
-  return navigationType !== "reload" && navigationType !== "back_forward";
-}
-
 // Tracking parameters to drop from the address bar once the landing is
 // counted: our source tag, ad tags and Facebook's click id. The page keeps
 // the source it read on load, so nothing is lost; a copied link is just clean.

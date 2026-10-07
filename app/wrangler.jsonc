@@ -30,9 +30,9 @@
 		// VAPID_PRIVATE_KEY. New pair: `node scripts/vapid-keys.mjs`.
 		"VAPID_PUBLIC_KEY": "BLYFXoQxCtq5TK3RAdMbbZiMM4jEtimuNLftFY8hRIclv9qnlmOn2FoYp3Q1HW1h8XHH6sBrPMGZusBBaYDnTnw",
 		// Turnstile bot check on the signup form (app/lib/turnstile.server.ts).
-		// Widget "Padelpárbaj signup" (managed). The site key is public; the
+		// Managed widget for padelparbaj.hu. The site key is public; the
 		// secret is TURNSTILE_SECRET. Empty site key: no widget and no check.
-		"TURNSTILE_SITE_KEY": "",
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFQr1fGBC5e4lGsw",
 		// Hostnames siteverify must report. Never localhost in production.
 		"TURNSTILE_HOSTNAMES": "padelparbaj.hu"
 	},

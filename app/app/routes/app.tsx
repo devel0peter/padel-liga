@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
+import { BarChart3, Bell, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -13,6 +13,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -34,6 +35,7 @@ import { initials, parseCookies } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
 import { leagueFromPath, switchLeaguePath } from "~/lib/leagues";
 import { listLeagues } from "~/lib/leagues.server";
+import { unreadCount } from "~/lib/notifications.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The app shell: one sidebar layout for every page of a logged-in user. The
@@ -59,6 +61,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     // the same pure function; the actor is the user's own data.
     actor,
     leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
+    // The badge on Értesítések (and the phone header's bell, app-page.tsx).
+    unread: await unreadCount(user.id),
     // The sidebar remembers open/closed in a cookie; read it so the first
     // render matches.
     sidebarOpen: parseCookies(request.headers.get("Cookie")).get("sidebar_state") !== "false",
@@ -67,6 +71,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
+  notifications: Bell,
   overview: LayoutDashboard,
   solos: HeartHandshake,
   signups: Users,
@@ -156,7 +161,7 @@ function ProfileButton({ name, email, imageUrl, initials, role }: ProfileProps) 
   );
 }
 
-function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) {
+function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueRef[]; unread: number }) {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   const active = activeItem(nav, pathname);
@@ -183,6 +188,11 @@ function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) 
                   <span>{item.label}</span>
                 </NavLink>
               </SidebarMenuButton>
+              {item.to === "/notifications" && unread > 0 && (
+                <SidebarMenuBadge className="bg-nav-active text-white peer-hover/menu-button:text-white peer-data-active/menu-button:text-white">
+                  {unread > 99 ? "99+" : unread}
+                </SidebarMenuBadge>
+              )}
             </SidebarMenuItem>
           );
         })}
@@ -192,7 +202,7 @@ function NavMenu({ nav, leagues }: { nav: NavSection[]; leagues: LeagueRef[] }) 
 }
 
 export default function AppShell({ loaderData }: Route.ComponentProps) {
-  const { actor, leagues, sidebarOpen, ...profile } = loaderData;
+  const { actor, leagues, sidebarOpen, unread, ...profile } = loaderData;
   const { pathname } = useLocation();
   const nav = appNav(actor, leagues, leagueFromPath(pathname));
   return (
@@ -213,7 +223,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
             <ProfileButton {...profile} />
           </SidebarHeader>
           <SidebarContent>
-            <NavMenu nav={nav} leagues={leagues} />
+            <NavMenu nav={nav} leagues={leagues} unread={unread} />
           </SidebarContent>
           <SidebarFooter>
             <SidebarMenu>

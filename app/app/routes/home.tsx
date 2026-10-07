@@ -21,6 +21,7 @@ import { saveInterest } from "~/lib/interest.server";
 import { pageMeta } from "~/lib/site";
 import { landingSource } from "~/lib/traffic";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
+import { notifyNewSignup } from "~/lib/notifications.server";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -68,6 +69,12 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
     await deliver(await queueSignupEmails(result.data));
   } catch (error) {
     console.error("signup email failed", error);
+  }
+  // Szervezők and Admins hear about it (in the app and by push); same rule.
+  try {
+    await notifyNewSignup(result.data);
+  } catch (error) {
+    console.error("signup notification failed", error);
   }
   return { ok: true, cityOther: result.data.cityOther };
 }

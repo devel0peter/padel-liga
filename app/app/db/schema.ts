@@ -264,3 +264,59 @@ export const landingViews = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.day, t.ref] })],
 );
+
+// In-app notifications, newest first at /notifications; also sent as web push
+// to the user's subscribed devices (app/lib/notifications.server.ts).
+// Personal data: deleted with the account.
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["new_signup", "test"] }).notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    // A path on this site, opened through /notifications/<id>.
+    url: text("url").notNull(),
+    readAt: integer("read_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.id)],
+);
+
+// One row per browser that allowed push (Push API subscription). Removed when
+// the push service says it's gone, or when the user turns push off there.
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    endpoint: text("endpoint").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);
+
+// Notification kinds a user switched off on the profile page. No row: on.
+export const notificationOptOuts = sqliteTable(
+  "notification_opt_outs",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind] })],
+);

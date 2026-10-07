@@ -58,7 +58,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "overview" | "solos" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "notifications" | "overview" | "solos" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -93,9 +93,15 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 // section with nothing in it isn't shown.
 export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
-  // First, unlabelled: the app home, for everyone.
+  // First, unlabelled: the app home and the notifications, for everyone.
   const sections: NavSection[] = [
-    { label: "", items: [{ label: "Kezdőlap", to: "/home", icon: "home", permission: { kind: "app.enter" } }] },
+    {
+      label: "",
+      items: [
+        { label: "Kezdőlap", to: "/home", icon: "home", permission: { kind: "app.enter" } },
+        { label: "Értesítések", to: "/notifications", icon: "notifications", permission: { kind: "app.enter" } },
+      ],
+    },
   ];
   if (league) sections.push({ label: league.name, role: "Szervező", items: leagueItems(league) });
   sections.push({ label: "Platform", role: "Admin", items: PLATFORM_ITEMS });

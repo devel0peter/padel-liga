@@ -4,7 +4,9 @@ import { env } from "cloudflare:workers";
 // endpoint: up to 100 emails per request.
 // https://resend.com/docs/api-reference/emails/send-batch-emails
 
-export const FROM = "Padelpárbaj <noreply@padelparbaj.hu>";
+// A real, read mailbox (Google Workspace): Resend advises against noreply
+// senders, and people do answer these emails.
+export const FROM = "Padelpárbaj <hello@padelparbaj.hu>";
 export const REPLY_TO = "hello@padelparbaj.hu";
 export const MAX_BATCH = 100;
 

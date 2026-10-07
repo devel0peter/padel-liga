@@ -8,9 +8,9 @@ describe("share", () => {
     expect(shareUrl(SHARE_REFS.email)).toBe("https://padelparbaj.hu/?ref=megosztas-email");
   });
 
-  it("asks for a partner when signed up alone", () => {
+  it("says you can sign up alone when shared by a solo player", () => {
     expect(shareText("solo", "Győr")).toBe(
-      "Párt keresek a Padelpárbajra (Győr), heti padel ligára pároknak. Gyere velem, vagy jelentkezz te is:",
+      "Indul a Padelpárbaj (Győr), heti padel liga pároknak. Párral vagy egyedül is jelentkezhetsz:",
     );
     expect(shareText("pair", "Győr")).toBe("Indul a Padelpárbaj (Győr), heti padel liga pároknak. Jelentkezz te is:");
     expect(shareText("pair", null)).toBe("Indul a Padelpárbaj, heti padel liga pároknak. Jelentkezz te is:");

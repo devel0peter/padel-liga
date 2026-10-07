@@ -117,7 +117,10 @@ describe("signupConfirmation share link", () => {
   it("asks to pass the page on, with the email's own source", () => {
     expect(signupConfirmation(pair, GYOR).text).toContain("Küldd el neki: https://padelparbaj.hu/?ref=megosztas-email");
     expect(signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null }, GYOR).text).toContain(
-      "aki szívesen játszana veled",
+      "könnyebb hozzád illő párt találni",
+    );
+    expect(signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null }, GYOR).text).not.toContain(
+      "játszana veled",
     );
     expect(signupConfirmation({ ...pair, city: "other", cityOther: "Pécs" }).text).toContain("a helyi padeleseknek");
   });

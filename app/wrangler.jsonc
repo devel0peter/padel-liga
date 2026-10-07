@@ -28,12 +28,29 @@
 		"GOOGLE_CLIENT_ID": "737552847959-utt48hgu170mu5sar464f0vln28gqkpq.apps.googleusercontent.com",
 		// Web push (app/lib/push/). Public; the private half is the secret
 		// VAPID_PRIVATE_KEY. New pair: `node scripts/vapid-keys.mjs`.
-		"VAPID_PUBLIC_KEY": "BLYFXoQxCtq5TK3RAdMbbZiMM4jEtimuNLftFY8hRIclv9qnlmOn2FoYp3Q1HW1h8XHH6sBrPMGZusBBaYDnTnw"
+		"VAPID_PUBLIC_KEY": "BLYFXoQxCtq5TK3RAdMbbZiMM4jEtimuNLftFY8hRIclv9qnlmOn2FoYp3Q1HW1h8XHH6sBrPMGZusBBaYDnTnw",
+		// Turnstile bot check on the signup form (app/lib/turnstile.server.ts).
+		// Managed widget for padelparbaj.hu. The site key is public; the
+		// secret is TURNSTILE_SECRET. Empty site key: no widget and no check.
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFQr1fGBC5e4lGsw",
+		// Hostnames siteverify must report. Never localhost in production.
+		"TURNSTILE_HOSTNAMES": "padelparbaj.hu"
 	},
 	// Set with `npx wrangler secret put <NAME>`; locally in .dev.vars.
 	// RESEND_API_KEY: sending-only key. EMAIL_SECRET: signs unsubscribe links.
-	// VAPID_PRIVATE_KEY: web push (app/lib/push/).
-	"secrets": { "required": ["RESEND_API_KEY", "EMAIL_SECRET", "GOOGLE_CLIENT_SECRET", "VAPID_PRIVATE_KEY"] },
+	// VAPID_PRIVATE_KEY: web push (app/lib/push/). TURNSTILE_SECRET: signup bot
+	// check. RESEND_WEBHOOK_SECRET: signs Resend's bounce and complaint events
+	// (/webhooks/resend), "whsec_..." from the Resend webhook page.
+	"secrets": {
+		"required": [
+			"RESEND_API_KEY",
+			"EMAIL_SECRET",
+			"GOOGLE_CLIENT_SECRET",
+			"VAPID_PRIVATE_KEY",
+			"TURNSTILE_SECRET",
+			"RESEND_WEBHOOK_SECRET"
+		]
+	},
 	// Hourly: sends queued emails (retries, broadcasts spread over the daily quota).
 	"triggers": { "crons": ["0 * * * *"] },
 	"d1_databases": [

@@ -182,7 +182,7 @@ export default function Privacy() {
               (adatfeldolgozók):
             </p>
             <ul className={list}>
-              <li>Cloudflare, Inc. – tárhely, adatbázis és látogatási statisztika,</li>
+              <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a jelentkezési űrlap robotszűrője (Turnstile),</li>
               <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók,</li>
               <li>Resend – a liga e-mailjeinek kiküldése.</li>
             </ul>

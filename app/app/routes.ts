@@ -7,6 +7,7 @@ export default [
   route("privacy", "routes/privacy.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
+  route("webhooks/resend", "routes/webhooks.resend.ts"),
   route("login", "routes/login.tsx"),
   route("welcome", "routes/welcome.tsx"),
   route("logout", "routes/logout.ts"),

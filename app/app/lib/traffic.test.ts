@@ -5,6 +5,7 @@ import {
   budapestDay,
   buildFunnel,
   daysOf,
+  isNewLanding,
   landingSource,
   parsePeriod,
   referrerSource,
@@ -77,6 +78,18 @@ describe("referrerSource", () => {
   });
 });
 
+describe("isNewLanding", () => {
+  it("counts a normal navigation and an unknown type", () => {
+    expect(isNewLanding("navigate")).toBe(true);
+    expect(isNewLanding("prerender")).toBe(true);
+    expect(isNewLanding(undefined)).toBe(true);
+  });
+
+  it("skips a reload and back or forward", () => {
+    expect(isNewLanding("reload")).toBe(false);
+    expect(isNewLanding("back_forward")).toBe(false);
+  });
+});
 
 describe("budapestDay", () => {
   it("uses the Budapest calendar day, not UTC", () => {

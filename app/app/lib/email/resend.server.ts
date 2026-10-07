@@ -6,7 +6,8 @@ import { env } from "cloudflare:workers";
 
 // A real, read mailbox (Google Workspace): Resend advises against noreply
 // senders, and people do answer these emails.
-export const FROM = "Padelpárbaj <hello@padelparbaj.hu>";
+// A display name with a comma must be quoted (RFC 5322).
+export const FROM = `"Péter, Padelpárbaj" <hello@padelparbaj.hu>`;
 export const REPLY_TO = "hello@padelparbaj.hu";
 export const MAX_BATCH = 100;
 

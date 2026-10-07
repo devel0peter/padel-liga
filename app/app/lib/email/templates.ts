@@ -80,7 +80,7 @@ function build(subject: string, bodyText: string, foot: { html: string; text: st
   };
 }
 
-const SIGNATURE = `Peter\n${SITE_NAME}`;
+const SIGNATURE = `Péter\n${SITE_NAME}`;
 
 type Cities = readonly Pick<City, "slug" | "name">[];
 
@@ -99,7 +99,7 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
   const share = otherCity
     ? `Minél többen jelentkeztek, annál hamarabb indulhat nálatok is. Küldd el a helyi padeleseknek: ${shareUrl(SHARE_REFS.email)}`
     : s.mode === "solo"
-      ? `Ha ismersz valakit, aki szívesen játszana veled, küldd el neki: ${shareUrl(SHARE_REFS.email)}`
+      ? `Minél többen jelentkeznek, annál könnyebb hozzád illő párt találni. Ha ismersz más padeleseket, küldd el nekik: ${shareUrl(SHARE_REFS.email)}`
       : `Ismersz még valakit, aki szívesen játszana? Küldd el neki: ${shareUrl(SHARE_REFS.email)}`;
 
   return build(

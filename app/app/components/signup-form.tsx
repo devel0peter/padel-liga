@@ -155,6 +155,12 @@ export function SignupForm({
             indul liga. Addig is küldd el az oldalt a többi helyi padelesnek: minél
             többen jelentkeztek, annál hamarabb indulhat.
           </p>
+        ) : mode === "solo" ? (
+          <p>
+            Köszönjük! Segítünk párt találni, és írunk, amint elég pár
+            összegyűlik. Minél többen jelentkeznek, annál könnyebb hozzád illő
+            párt találni, úgyhogy küldd el az oldalt más padeleseknek is.
+          </p>
         ) : (
           <p>
             Köszönjük! Írunk, amint elég pár összegyűlik. Addig is küldd el az

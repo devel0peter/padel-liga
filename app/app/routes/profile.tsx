@@ -1,14 +1,19 @@
-import { Form } from "react-router";
+import { data, Form, Link, useFetcher } from "react-router";
 
 import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 import { hasGoogleLogin } from "~/lib/auth/accounts.server";
 import { getActor } from "~/lib/auth/admin.server";
 import { roleLabel } from "~/lib/auth/permissions";
 import { initials } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
+import { isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
+import { disabledKindsFor, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx). Profile fields (phone, level)
@@ -29,7 +34,46 @@ export async function loader({ request }: Route.LoaderArgs) {
     google: await hasGoogleLogin(user.id),
     role: roleLabel(actor),
     leagues: actor.leagues.map((l) => l.name),
+    vapidPublicKey: vapidPublicKey(),
+    kinds: await (async () => {
+      const disabled = await disabledKindsFor(user.id);
+      return kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) }));
+    })(),
   };
+}
+
+// Switches one notification kind on or off (Értesítések section).
+export async function action({ request }: Route.ActionArgs) {
+  const user = await requireUser(request);
+  const actor = (await getActor(request))!;
+  const form = await request.formData();
+  const kind = form.get("kind");
+  if (!isNotificationKind(kind) || !kindsFor(actor).includes(kind)) return data({ ok: false }, { status: 400 });
+  await setKindEnabled(user.id, kind, form.get("enabled") === "1");
+  return { ok: true };
+}
+
+type Kind = Route.ComponentProps["loaderData"]["kinds"][number];
+
+function KindSwitch({ k }: { k: Kind }) {
+  const fetcher = useFetcher();
+  // Optimistic: show the new value while it saves.
+  const pending = fetcher.formData?.get("enabled");
+  const checked = pending != null ? pending === "1" : k.enabled;
+  return (
+    <div className="flex items-start gap-3">
+      <Switch
+        id={`kind-${k.kind}`}
+        checked={checked}
+        onCheckedChange={(on) => fetcher.submit({ kind: k.kind, enabled: on ? "1" : "0" }, { method: "post" })}
+        className="mt-0.5"
+      />
+      <div className="grid gap-0.5">
+        <Label htmlFor={`kind-${k.kind}`}>{k.label}</Label>
+        <p className="text-sm text-muted-foreground">{k.description}</p>
+      </div>
+    </div>
+  );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -60,6 +104,23 @@ export default function Profile({ loaderData: d }: Route.ComponentProps) {
         <Row label="Belépés">{d.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</Row>
         {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}
       </dl>
+
+      <section id="ertesitesek" className="grid max-w-2xl scroll-mt-6 gap-4 border-t pt-6">
+        <div className="grid gap-1">
+          <h2 className="font-display text-lg font-extrabold">Értesítések</h2>
+          <p className="text-sm text-muted-foreground">
+            Az <Link to="/notifications">Értesítések</Link> oldalon mindet látod. Itt azt állítod, mit kapj meg, és hogy a telefonod is szóljon-e.
+          </p>
+        </div>
+        <PushSettings vapidPublicKey={d.vapidPublicKey} />
+        {d.kinds.length > 0 && (
+          <div className="grid gap-4">
+            {d.kinds.map((k) => (
+              <KindSwitch key={k.kind} k={k} />
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid max-w-2xl gap-3 border-t pt-6">
         <p className="text-sm text-muted-foreground">

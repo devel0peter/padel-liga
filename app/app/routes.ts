@@ -12,11 +12,14 @@ export default [
   route("logout", "routes/logout.ts"),
   route("auth/google", "routes/auth.google.ts"),
   route("auth/google/callback", "routes/auth.google.callback.ts"),
+  route("api/push", "routes/api.push.ts"),
+  route("notifications/:id", "routes/notification-open.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
     route("home", "routes/app.home.tsx"),
     route("profile", "routes/profile.tsx"),
+    route("notifications", "routes/notifications.tsx"),
     layout("routes/admin.tsx", [
       route("admin", "routes/admin._index.tsx"),
       route("admin/signups", "routes/admin.signups.tsx"),

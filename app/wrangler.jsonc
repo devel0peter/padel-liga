@@ -25,11 +25,15 @@
 		"CF_WEB_ANALYTICS_TOKEN": "e54368f7d73948ffb95eed22d5ee9a9d",
 		// Google login (app/lib/auth/google.server.ts). The client ID is public;
 		// the secret is GOOGLE_CLIENT_SECRET. Empty: the Google button is hidden.
-		"GOOGLE_CLIENT_ID": "737552847959-utt48hgu170mu5sar464f0vln28gqkpq.apps.googleusercontent.com"
+		"GOOGLE_CLIENT_ID": "737552847959-utt48hgu170mu5sar464f0vln28gqkpq.apps.googleusercontent.com",
+		// Web push (app/lib/push/). Public; the private half is the secret
+		// VAPID_PRIVATE_KEY. New pair: `node scripts/vapid-keys.mjs`.
+		"VAPID_PUBLIC_KEY": "BLYFXoQxCtq5TK3RAdMbbZiMM4jEtimuNLftFY8hRIclv9qnlmOn2FoYp3Q1HW1h8XHH6sBrPMGZusBBaYDnTnw"
 	},
 	// Set with `npx wrangler secret put <NAME>`; locally in .dev.vars.
 	// RESEND_API_KEY: sending-only key. EMAIL_SECRET: signs unsubscribe links.
-	"secrets": { "required": ["RESEND_API_KEY", "EMAIL_SECRET", "GOOGLE_CLIENT_SECRET"] },
+	// VAPID_PRIVATE_KEY: web push (app/lib/push/).
+	"secrets": { "required": ["RESEND_API_KEY", "EMAIL_SECRET", "GOOGLE_CLIENT_SECRET", "VAPID_PRIVATE_KEY"] },
 	// Hourly: sends queued emails (retries, broadcasts spread over the daily quota).
 	"triggers": { "crons": ["0 * * * *"] },
 	"d1_databases": [

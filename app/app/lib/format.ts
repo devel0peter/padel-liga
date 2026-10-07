@@ -35,3 +35,10 @@ const shortDay = new Intl.DateTimeFormat("hu-HU", {
 export function formatDay(day: string): string {
   return shortDay.format(new Date(`${day}T00:00:00Z`));
 }
+
+const shortDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric" });
+
+// "okt. 1."
+export function formatShortDate(date: Date): string {
+  return shortDate.format(date);
+}

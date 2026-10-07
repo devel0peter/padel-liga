@@ -170,6 +170,9 @@ Channels: email, and web push for players who opt in (PWA). No player gets more 
 - End of a phase, with your new group.
 - End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group in each phase) with a "Nevezünk újra" button for the pair.
 
+**Szervezők and Admins** (in the app and by push, no email):
+- A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
+
 **Daily digest** (one email in the morning, only on days with something in it; push gets the same items one by one):
 - A slot was accepted, a time was cancelled, a result was confirmed.
 - Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
@@ -181,6 +184,7 @@ Channels: email, and web push for players who opt in (PWA). No player gets more 
 **Rules for all notifications:**
 - Every notification has a one-tap action link (accept, confirm, record a time) and a shareable link ("küldd el a párodnak / ellenfélnek").
 - The home screen shows the same open items as a "Teendők" list.
+- Every notification is also kept in the app's notification list (`/notifications`): unread ones first, opening one marks it read. Each kind can be switched off on the profile page.
 - Web push: offered after the first login ("Kérsz értesítést?"), opt-in, can be turned off. On iPhone it needs iOS 16.4+ and the site added to the home screen; the app explains this. Push never replaces email for instant items.
 
 ## 14. Public pages

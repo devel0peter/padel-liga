@@ -8,10 +8,41 @@ import { normalizeRef } from "./clubs";
 
 const TIME_ZONE = "Europe/Budapest";
 
-// The source of a landing page link: `?ref=`, or else `?utm_source=` (ad tools
-// add that one by default). Same rules as a signup's ref, see clubs.ts.
-export function landingSource(params: URLSearchParams): string | null {
-  return normalizeRef(params.get("ref")) ?? normalizeRef(params.get("utm_source"));
+// The source of a landing: `?ref=`, or else `?utm_source=` (ad tools add that
+// one by default), with the same rules as a signup's ref (clubs.ts). Without
+// either, a known referrer, or Facebook's click id (its in-app browser often
+// sends no referrer), so a link that lost its tag still counts as "facebook".
+export function landingSource(params: URLSearchParams, referrer?: string | null): string | null {
+  return (
+    normalizeRef(params.get("ref")) ??
+    normalizeRef(params.get("utm_source")) ??
+    referrerSource(referrer) ??
+    (params.has("fbclid") ? "facebook" : null)
+  );
+}
+
+// Referrer domains worth a source of their own; anything else is no source.
+const REFERRERS: [RegExp, string][] = [
+  [/(^|\.)(facebook\.com|fb\.com|fb\.me|messenger\.com)$/, "facebook"],
+  [/(^|\.)instagram\.com$/, "instagram"],
+  [/(^|\.)google\.[a-z.]+$/, "google"],
+];
+
+// The source of a referrer URL (the Referer header or document.referrer).
+export function referrerSource(referrer: string | null | undefined): string | null {
+  let host: string;
+  try {
+    host = new URL(referrer ?? "").hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  return REFERRERS.find(([re]) => re.test(host))?.[1] ?? null;
+}
+
+// Whether a page load is a new landing: a reload or going back and forward
+// to the page is the same visit again (the Navigation Timing entry's type).
+export function isNewLanding(navigationType: string | undefined): boolean {
+  return navigationType !== "reload" && navigationType !== "back_forward";
 }
 
 // Tracking parameters to drop from the address bar once the landing is

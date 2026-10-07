@@ -84,7 +84,7 @@ padelparbaj.hu/?ref=[klub]-fb
 ```
 Based on Peter's own group post (2026-10-07), minus "Bármelyik klubban játszhattok": a club won't advertise playing at its competitors. No "ha összejön 12 pár" either: it sounds pessimistic.
 
-Image: Facebook shows either an attached photo or the link preview card, not both, and a link left in the text looks messy. So the clubs do what Peter did: paste the text with the link, wait for the card, delete the link text. The card keeps the club's `?ref=`. No own photo (decided 2026-10-07).
+Image: Facebook shows either an attached photo or the link preview card, not both, and a link left in the text looks messy. So the clubs do what Peter did: paste the text with the link, wait for the card, delete the link text. The card keeps the club's `?ref=` (since 2026-10-07 the page puts the `?ref=` in its og:url; before that, card clicks lost it). Keep the link on its own line: on 2026-10-07 the next line's text got glued to it (`?ref=padel-partner-gyor-fbJelöld`) and those clicks lost their source. Open the post's link once after posting to check. No own photo (decided 2026-10-07).
 
 After they post: check `/admin/traffic` for the club's `-fb` ref the next day, and add a line to the outreach log below.
 

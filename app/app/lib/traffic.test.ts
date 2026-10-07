@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDay, formatPercent } from "./format";
-import { budapestDay, buildFunnel, daysOf, landingSource, parsePeriod, withoutTracking } from "./traffic";
+import {
+  budapestDay,
+  buildFunnel,
+  daysOf,
+  isNewLanding,
+  landingSource,
+  parsePeriod,
+  referrerSource,
+  withoutTracking,
+} from "./traffic";
 
 const params = (q: string) => new URLSearchParams(q);
 
@@ -21,8 +30,64 @@ describe("landingSource", () => {
 
   it("is null without a usable source", () => {
     expect(landingSource(params(""))).toBeNull();
-    expect(landingSource(params("fbclid=abc123"))).toBeNull();
     expect(landingSource(params("utm_source=Facebook Ads"))).toBeNull();
+    expect(landingSource(params(""), "https://padelparbaj.hu/rules")).toBeNull();
+    expect(landingSource(params(""), "https://example.com/")).toBeNull();
+  });
+
+  it("falls back to a known referrer when the link has no tag", () => {
+    expect(landingSource(params(""), "https://l.facebook.com/")).toBe("facebook");
+    expect(landingSource(params(""), "https://www.google.hu/")).toBe("google");
+  });
+
+  it("counts a Facebook click id without a tag or referrer as facebook", () => {
+    // Facebook's in-app browser often sends no referrer.
+    expect(landingSource(params("fbclid=abc123"))).toBe("facebook");
+    expect(landingSource(params("fbclid=abc123"), "https://www.instagram.com/")).toBe("instagram");
+  });
+
+  it("prefers the link's tag over the referrer and click id", () => {
+    expect(landingSource(params("ref=megosztas&fbclid=abc"), "https://facebook.com/")).toBe("megosztas");
+    expect(landingSource(params("utm_source=ig"), "https://facebook.com/")).toBe("ig");
+  });
+
+  it("treats text glued to a tag as no tag", () => {
+    // A post where "Jelöld..." stuck to the link: not a slug, so the click id decides.
+    expect(landingSource(params("ref=padel-partner-gyor-fbJel%C3%B6ld&fbclid=x"))).toBe("facebook");
+  });
+});
+
+describe("referrerSource", () => {
+  it("maps Facebook's hosts, including the link shims and Messenger", () => {
+    for (const r of ["https://facebook.com/", "https://l.facebook.com/", "http://m.facebook.com", "https://lm.facebook.com/", "https://www.messenger.com/"]) {
+      expect(referrerSource(r)).toBe("facebook");
+    }
+  });
+
+  it("maps Instagram and Google", () => {
+    expect(referrerSource("https://l.instagram.com/")).toBe("instagram");
+    expect(referrerSource("https://www.google.com/")).toBe("google");
+  });
+
+  it("is null for other sites, our own site, and no or bad referrer", () => {
+    expect(referrerSource("https://notfacebook.com/")).toBeNull();
+    expect(referrerSource("https://padelparbaj.hu/")).toBeNull();
+    expect(referrerSource("")).toBeNull();
+    expect(referrerSource(null)).toBeNull();
+    expect(referrerSource("not a url")).toBeNull();
+  });
+});
+
+describe("isNewLanding", () => {
+  it("counts a normal navigation and an unknown type", () => {
+    expect(isNewLanding("navigate")).toBe(true);
+    expect(isNewLanding("prerender")).toBe(true);
+    expect(isNewLanding(undefined)).toBe(true);
+  });
+
+  it("skips a reload and back or forward", () => {
+    expect(isNewLanding("reload")).toBe(false);
+    expect(isNewLanding("back_forward")).toBe(false);
   });
 });
 

@@ -12,8 +12,19 @@ export const DATA_CONTROLLER = {
 };
 
 // Title, description and link preview (Open Graph) tags for a public page.
-// The image is public/og.png, made from scripts/og-image.html.
-export function pageMeta({ title, description, path }: { title: string; description: string; path: string }) {
+// The image is public/og.png, made from scripts/og-image.html. `ogQuery`
+// (e.g. "?ref=x") goes on og:url only; the canonical link stays bare.
+export function pageMeta({
+  title,
+  description,
+  path,
+  ogQuery = "",
+}: {
+  title: string;
+  description: string;
+  path: string;
+  ogQuery?: string;
+}) {
   const url = `${SITE_URL}${path}`;
   return [
     { title },
@@ -22,7 +33,7 @@ export function pageMeta({ title, description, path }: { title: string; descript
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: SITE_NAME },
     { property: "og:locale", content: "hu_HU" },
-    { property: "og:url", content: url },
+    { property: "og:url", content: `${url}${ogQuery}` },
     { property: "og:title", content: title },
     { property: "og:description", content: description },
     { property: "og:image", content: `${SITE_URL}/og.png` },

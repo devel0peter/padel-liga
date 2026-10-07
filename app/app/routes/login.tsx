@@ -3,12 +3,14 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
 import { AuthPage, Field, GoogleMark, inputClass, invalid } from "~/components/auth";
 import { Button } from "~/components/ui/button";
+import { Turnstile } from "~/components/turnstile";
 import { Input } from "~/components/ui/input";
 import { googleConfigured, type GoogleError } from "~/lib/auth/google.server";
 import { sendLoginCode, verifyLoginCode } from "~/lib/auth/login-code.server";
-import { REGISTRATION_CLOSED_MESSAGE, safeReturnTo } from "~/lib/auth/rules";
+import { REGISTRATION_CLOSED_MESSAGE, registrationOpen, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
 import { SITE_NAME } from "~/lib/site";
+import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Belépés – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -29,6 +31,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     google: googleConfigured(),
     returnTo,
     error: code && code in GOOGLE_ERRORS ? GOOGLE_ERRORS[code] : null,
+    registrationOpen: registrationOpen(new Date()),
+    turnstileSiteKey: turnstileSiteKey(),
   };
 }
 
@@ -45,7 +49,10 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     return redirect(returnTo, { headers: { "Set-Cookie": await createSession(result.userId) } });
   }
 
-  const result = await sendLoginCode(email);
+  // Every code is an email, so sending one needs the bot check.
+  const result = (await verifyTurnstile(form, request, "login"))
+    ? await sendLoginCode(email)
+    : ({ ok: false, error: "Nem sikerült ellenőrizni, hogy nem vagy robot. Várj pár másodpercet, és próbáld újra." } as const);
   if (!result.ok) {
     // A failed resend keeps the code step open; the earlier code may still work.
     return form.get("intent") === "resend" ? { step: "code", email, error: result.error } : { step: "email", email, error: result.error };
@@ -56,7 +63,9 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
 export default function Login({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation();
   const busy = navigation.state !== "idle";
-  const { google, returnTo, error } = loaderData;
+  const { google, returnTo, error, turnstileSiteKey } = loaderData;
+  // A token is single use: a new one after every send or resend.
+  const turnstile = turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} action="login" resetKey={actionData} />;
 
   if (actionData?.step === "code") {
     return (
@@ -87,6 +96,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             />
           </Field>
           {actionData.resent && !actionData.error && <p className="text-sm text-muted-foreground">Új kódot küldtünk.</p>}
+          {turnstile}
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" name="intent" value="verify" disabled={busy} className="h-11 px-6 text-base">
               Belépek
@@ -102,6 +112,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             adj meg másik címet
           </Link>
           .
+          {!loaderData.registrationOpen && " A regisztráció november 2-án nyílik, addig csak meghívott címre küldünk kódot."}
         </p>
       </AuthPage>
     );
@@ -160,6 +171,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             {...invalid("email", emailError)}
           />
         </Field>
+        {turnstile}
         <div>
           <Button type="submit" name="intent" value="send" disabled={busy} className="h-11 w-full text-base">
             {busy ? "Küldés…" : "Kódot kérek"}

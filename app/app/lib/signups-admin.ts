@@ -121,7 +121,9 @@ export function toCsv(
     "Szint", "Megjegyzés", "Forrás", "Hol játszik", "Állapot", "Admin jegyzet",
   ];
   const cell = (v: string | number | null) => {
-    const s = v == null ? "" : String(v);
+    // A leading = + - @ (or tab/CR) would make Excel read user input as a
+    // formula; the quote keeps it text.
+    const s = v == null ? "" : typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v);
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = rows.map((r) =>

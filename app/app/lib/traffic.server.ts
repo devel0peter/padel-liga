@@ -1,14 +1,23 @@
-import { and, gte, lt, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { interestSignups, landingViews } from "~/db/schema";
 
 import { budapestDay, type LandingCount, type Period, type SignupStamp } from "./traffic";
 
+// The beacon is public, so anyone can send made-up sources. Past this many
+// sources in a day, a new one counts as no source instead of adding a row.
+const MAX_REFS_PER_DAY = 50;
+
 export async function recordLanding(ref: string | null, now = new Date()): Promise<void> {
+  const day = budapestDay(now);
+  if (ref) {
+    const refs = await db.select({ ref: landingViews.ref }).from(landingViews).where(eq(landingViews.day, day));
+    if (refs.length >= MAX_REFS_PER_DAY && !refs.some((r) => r.ref === ref)) ref = null;
+  }
   await db
     .insert(landingViews)
-    .values({ day: budapestDay(now), ref: ref ?? "", count: 1 })
+    .values({ day, ref: ref ?? "", count: 1 })
     .onConflictDoUpdate({
       target: [landingViews.day, landingViews.ref],
       set: { count: sql`${landingViews.count} + 1` },

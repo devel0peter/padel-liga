@@ -88,6 +88,13 @@ describe("cityLabel", () => {
 });
 
 describe("toCsv", () => {
+  it("keeps user input that starts like a formula as text", () => {
+    const line = toCsv([row({ name1: "=HYPERLINK(\"x\")", note: "-1", adminNote: "@sum" })], undefined, GYOR).split("\r\n")[1];
+    expect(line).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(line).toContain(";'-1;");
+    expect(line).toContain(";'@sum");
+  });
+
   it("writes a BOM, a header and semicolon-separated rows with quoting", () => {
     const csv = toCsv([row({ note: 'hétfő; "este"' })], undefined, GYOR);
     expect(csv.startsWith("﻿Azonosító;")).toBe(true);

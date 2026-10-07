@@ -29,7 +29,7 @@
 - All 3 clubs agreed to post on their own pages. Send each club the club text, an image and its own link. They **post it natively**, not as a share of Peter's post: a shared personal post reaches few people and doesn't feel like the club's own.
 - A separate `?ref=` per channel, so `/admin/traffic` shows what worked:
   - Peter's profile: `?ref=fb-peter`
-  - Groups: `?ref=fb-csoport`
+  - Groups: one ref per group, `?ref=<csoport>-fb`, so each group shows separately. First: `padel-partner-gyor-fb` (private group, posted 2026-10-07)
   - Clubs: `?ref=<klub>-fb` (`-fb` keeps it apart from the club's poster QR)
 - Groups:
   - Check each group's rules, or ask the admin first.
@@ -60,23 +60,11 @@ Novemberben indulunk, ha összejön 12 pár. Iratkozz fel, és szólunk, amikor 
 
 Kérdés jöhet kommentben vagy üzenetben. Jelöld meg, akivel szívesen neveznél! 👇
 ```
-In groups, swap the link to `?ref=fb-csoport`.
+In groups, swap the link to the group's own ref. The published group version (2026-10-07) opens with "Sziasztok! Elindítottam a Padelpárbajt: heti padel liga pároknak Győrben", adds "Bármelyik klubban játszhattok", drops "ha összejön 12 pár", and keeps only the preview card (link text deleted after the card loaded).
 
 ### Post 2: for the clubs
-```
-Városi padel liga indul Győrben, nálunk is játszhattok! 🎾
+The final text, the requirements message and each club's link are in `club-outreach.md`, section 3 (Facebook post kit).
 
-A Padelpárbaj heti liga pároknak:
-• Hetente 1 meccs, a szintetekhez illő párok ellen
-• Időpontot ti egyeztettek, a meccset nálunk is lejátszhatjátok
-• 3 hetente feljutás és kiesés a csoportok között
-• Nincs párod? Jelentkezz egyedül is
-• Nevezési díj nincs
-
-Novemberben indul. Iratkozz fel: 👉 padelparbaj.hu/?ref=<klub>-fb
-
-Jelöld meg a párodat! 👇
-```
 "Jelöld meg a párodat" matters most: it's a pairs league, so every tag brings in a new person.
 
 ### Post 3: ~26 Oct (draft)

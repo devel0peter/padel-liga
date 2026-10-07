@@ -38,6 +38,56 @@ Questions worth asking over coffee:
 - Would they host a season-end event or finals day?
 - How do they feel about players booking at other clubs too?
 
+## 3. Facebook post kit (for clubs that agreed to post)
+
+Decided 2026-10-05 (`go-to-market.md`): each club posts **natively** on its own page, with its own `?ref=<klub>-fb` link, so `/admin/traffic` shows which club's post brought signups. Send message 3a, then the post text 3b as a **separate message**, so the owner can copy it in one tap.
+
+Per-club links:
+
+| Club | Link in the post |
+|---|---|
+| Padel Club Győr | `padelparbaj.hu/?ref=padel-club-gyor-fb` |
+| Padel Aréna Győr | `padelparbaj.hu/?ref=padel-arena-gyor-fb` |
+| Marcal Teniszcentrum | `padelparbaj.hu/?ref=marcal-teniszcentrum-fb` |
+
+### 3a. Messenger message with the requirements
+
+> Szia [Név]!
+>
+> Köszi, hogy kiteszitek a ligát! A következő üzenetben küldöm a poszt szövegét. Nyugodtan formáljátok a saját stílusotokra, pár kérésem lenne csak:
+>
+> 1. **Saját posztként tegyétek ki** az oldalatokra, ne az enyémet osszátok meg, így sokkal több emberhez jut el.
+> 2. **Ezt a linket használjátok**: padelparbaj.hu/?ref=[klub]-fb. Ebből látom, hányan jelentkeztek a ti posztotokról, és a szezon végén ezt meg is mutatom.
+> 3. **Másold be a posztot a linkkel együtt**, várd meg, amíg betölt a liga képe, aztán a linket kitörölheted a szövegből. A kép megmarad, és rá kattintva a ti linketek nyílik meg. Saját fotót ne csatolj hozzá, mert akkor eltűnik a liga képe, és a link csúnyán látszik a szövegben.
+> 4. Ha belefér, **hétköznap este, 19 és 21 óra között** posztoljátok, ilyenkor látják a legtöbben.
+> 5. **Jelöljetek meg** a posztban, hogy kommentben válaszolni tudjak a kérdésekre.
+>
+> Ha van játékoscsoportotok, oda is mehet, de ez már csak extra. Köszi szépen!
+>
+> Peter
+
+### 3b. The post (send as its own message, with the club's link filled in)
+
+```
+Sziasztok!
+
+Elindul a Padelpárbaj: heti padelliga pároknak Győrben, és a meccseket nálunk is lejátszhatjátok! 🎾
+
+• Szint szerinti csoportok
+• Hetente 1 meccs, az időpontot ti egyeztetitek
+• 3 hetente feljutás és kiesés
+• Nincs párod? Jelentkezz egyedül, keresünk neked
+• Nevezési díj nincs
+
+Novemberben indul. Iratkozz fel, és jelöld meg a párodat! 👇
+padelparbaj.hu/?ref=[klub]-fb
+```
+Based on Peter's own group post (2026-10-07), minus "Bármelyik klubban játszhattok": a club won't advertise playing at its competitors. No "ha összejön 12 pár" either: it sounds pessimistic.
+
+Image: Facebook shows either an attached photo or the link preview card, not both, and a link left in the text looks messy. So the clubs do what Peter did: paste the text with the link, wait for the card, delete the link text. The card keeps the club's `?ref=`. No own photo (decided 2026-10-07).
+
+After they post: check `/admin/traffic` for the club's `-fb` ref the next day, and add a line to the outreach log below.
+
 ## If they ask
 
 - **"Ez nem a konkurenciának visz játékost?"** It's a city league, not a club competition. Every club gets bookings, and no club is exclusive. The match venue is recorded, so each club sees its own numbers.
@@ -52,3 +102,4 @@ Questions worth asking over coffee:
 | Date | Club | Outcome | Follow-up |
 |---|---|---|---|
 | 2026-10-04 | Padel Club Győr | Owner supportive, likes the idea; was considering a similar competition himself. Nearly fully booked, so no booking benefit for them. OK to put up the poster and post on their Facebook page; offered to post it himself as page owner | Print and put up their poster (`/admin/klubok`). Send him the post text and the club's poster link (`?ref=`) so signups are counted. Court availability: league pairs may struggle to book there, so expect matches at the other clubs |
+| 2026-10-07 | Padel Aréna Győr | Agreed to post about the league on their Facebook page | Sent the post kit (section 3) with `?ref=padel-arena-gyor-fb`. Check `/admin/traffic` the day after they post |

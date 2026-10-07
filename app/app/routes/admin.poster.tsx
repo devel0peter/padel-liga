@@ -37,7 +37,15 @@ export default function Poster({ loaderData }: Route.ComponentProps) {
     <>
       <style>{`
         @page { size: A4; margin: 0; }
-        @media print { .no-print { display: none !important; } body { background: white; } }
+        /* Browsers drop background colours when printing unless told not to,
+           so the lime footer, the ball and the QR box would print white. */
+        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @media print {
+          .no-print { display: none !important; }
+          /* One page: the poster is exactly A4, so rounding mustn't spill
+             onto a blank second sheet. */
+          body { background: white; min-height: 0; height: 297mm; overflow: hidden; }
+        }
         .poster-qr svg { width: 100%; height: auto; display: block; }
       `}</style>
 

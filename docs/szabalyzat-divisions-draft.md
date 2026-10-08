@@ -18,4 +18,5 @@
 - **Díjak:** az utolsó kör tabellája dönt.
   - **Divízió győztes:** minden divízió legfelső csoportjának első helyezettje.
   - **Csoportgyőztes:** minden csoport első helyezettje.
+  - Díjat az a pár kaphat, amelynek mindkét tagja legalább 2 körben játszott a szezonban (helyettesként nem számít). Ha a csoportot nem jogosult pár nyeri, a díjat a csoport legjobb jogosult párja kapja.
   - A díjakat és a felajánlókat szezononként hirdetjük meg az oldalon. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.

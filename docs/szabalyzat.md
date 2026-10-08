@@ -1,6 +1,6 @@
 # Padelpárbaj – Szabályzat (tervezet)
 
-*Munkaverzió, 2026. 10. 08.*
+*Munkaverzió, 2026. 10. 05.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
@@ -8,7 +8,6 @@
 - Az időpontot az oldalon egyeztetitek. A kör végéig minden meccset le kell játszani.
 - 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
-- A csoportok három divízióba tartoznak: haladó, középhaladó, kezdő. A szezon végén minden divízió legfelső csoportjának győztese nyer, és minden csoportgyőztes díjat kap.
 
 A részleteket lent találod.
 
@@ -32,10 +31,6 @@ A részleteket lent találod.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
 - Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
 - Egy szezon **4 körből** áll. A szezon végéről a 10. pontban olvashatsz.
-- **Divíziók:** a csoportok sorrendje egyetlen létra, amelyet három egyforma részre osztunk: felül a **haladó**, középen a **középhaladó**, alul a **kezdő** divízió. 15 csoportnál például az 1–5. haladó, a 6–10. középhaladó, a 11–15. kezdő.
-  - A divíziód az, ahol a csoportod éppen van. Ha feljuttok vagy kiestek, átléphettek a szomszéd divízióba.
-  - Ha változik a csoportok száma, a határok is eltolódnak, hogy mindig három nagyjából egyforma divízió legyen.
-  - A divízió a ligán belüli helyed, nem minősítés: a meccseidet, a feljutást és a kiesést nem befolyásolja.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
@@ -114,7 +109,6 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 ## 7. Feljutás és kiesés
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
-- **Az első szezon első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. 3 páros csoport határán ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
 - **Új párok a szezon közben** (később nevezők és párcsere után):
   - Az értékszámotok alapján soroljuk be a párt. Aki még nem játszott értékelt meccset, annál 100 ponttal kevesebbel számolunk, mert a szintje még csak saját becslés.
   - Új pár nem kerülhet a legfelső csoportba, oda fel kell jutni.
@@ -143,10 +137,6 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 ## 10. A szezon vége
 - Egy szezon 4 körből, vagyis 12 hétből áll. Utána 1–2 hét szünet jön, és indul a következő szezon.
 - A szezon végeredménye: az utolsó kör csoportja és helyezése.
-- **Díjak:** az utolsó kör tabellája dönt.
-  - **Divízió győztes:** minden divízió legfelső csoportjának első helyezettje.
-  - **Csoportgyőztes:** minden csoport első helyezettje.
-  - A díjakat és a felajánlókat szezononként hirdetjük meg az oldalon. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.
 - A szezon végén e-mailben küldjük az összesítődet. A lezárt szezonok tabellái az oldalon visszanézhetők.
 - **Folytatás:** a következő szezonra a „Nevezünk újra” gombbal neveztek, a jelentkezési határidőig. Aki nem nevez újra, kimarad. Ha inkább a szervezőnek szólsz, ő is benevezhet titeket.
 - **Az értékszámod és a csoportod is megmarad:** a következő szezon az utolsó kör feljutása és kiesése utáni csoportokkal indul. A kimaradó párok helyére az alattuk lévők lépnek feljebb. A beosztást a szervező átnézi.

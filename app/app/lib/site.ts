@@ -43,3 +43,37 @@ export function pageMeta({
     { name: "twitter:card", content: "summary_large_image" },
   ];
 }
+
+// Structured data (schema.org JSON-LD) for the landing page: who we are, for
+// search engines and AI search. No SportsEvent yet: the start date depends on
+// enough pairs signing up, and a wrong date there is worse than none.
+export function organizationJsonLd() {
+  return {
+    "script:ld+json": {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SportsOrganization",
+          "@id": `${SITE_URL}/#org`,
+          name: SITE_NAME,
+          url: `${SITE_URL}/`,
+          logo: `${SITE_URL}/icon-512.png`,
+          image: `${SITE_URL}/og.png`,
+          email: CONTACT_EMAIL,
+          sport: "Padel",
+          areaServed: { "@type": "Country", name: "Magyarország" },
+          description:
+            "Városi padel liga pároknak: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés.",
+        },
+        {
+          "@type": "WebSite",
+          "@id": `${SITE_URL}/#website`,
+          name: SITE_NAME,
+          url: `${SITE_URL}/`,
+          inLanguage: "hu",
+          publisher: { "@id": `${SITE_URL}/#org` },
+        },
+      ],
+    },
+  };
+}

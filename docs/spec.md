@@ -37,11 +37,15 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 ## 4. Domain model (simplified)
 - **City (tenant):** slug and name, managed by the platform admin at `/admin/cities` (2026-10-05). Signups, clubs, leagues and organizers belong to a city. A city marked "listed" is offered on the signup form and the landing page; only cities with an organizer should be listed (in the MVP, Győr alone). Adding a city files the earlier "Más város" signups that typed its name under it. The signup form also offers "Más város" with a free-text city name, to measure demand where there is no league yet (a typed name matching a supported city is filed under that city). User-facing text never hard-codes a city.
 - **League:** city, name, organizer(s), configuration (see section 12).
-- **Season:** a run of the league (e.g. "2026/27 tél", free text set by the organizer), made up of **4 phases** (12 weeks). It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break. Seasons follow each other with a 1–2 week gap, set by the organizer. The league is continuous: a season is a checkpoint (an end date, a recap, a re-entry point), not a competition with prizes. Season end and switch: section 10.
+- **Season:** a run of the league (e.g. "2026/27 tél", free text set by the organizer), made up of **4 phases** (12 weeks). It has a registration window and a calendar of phases, with optional breaks between phases (e.g. 21 Dec – 3 Jan); no phase runs during a break. Seasons follow each other with a 1–2 week gap, set by the organizer. The league is continuous: a season is a checkpoint (an end date, a recap, a re-entry point, division and group winners). Season end and switch: section 10.
 - **Season entry:** a pair applies to a season ("Nevezünk"); the organizer approves or rejects. Pairs approved after the first phase has started join at the start of the next phase, placed by the late-joiner rules (section 10). A pair approved during the last phase moves into the next season automatically, without re-entering.
 - **Venue:** the city's padel clubs, an internal list the organizer maintains, used when recording where a match was booked (and for per-club statistics). Never listed publicly; the same list feeds the poster QR codes and the optional "where do you play most" signup field (README decision log, 2026-10-04).
 - **Phase:** 3 weeks, back to back: the next phase starts on the Monday after the deadline, and new groups are emailed that Monday morning. Group composition is fixed within a phase. (A catch-up week exists as a league setting, off by default; revisit if the first week of a phase turns out to be lost.)
 - **Group:** 4 pairs, ordered by level (1. csoport = strongest). When the number of pairs isn't divisible by 4, some groups have 3 pairs (9 = 3+3+3, 10 = 4+3+3, 11 = 4+4+3); no waiting list. 3-pair groups go at the bottom unless the organizer places them otherwise.
+- **Division:** a virtual third of the ladder, named like the clubs' levels: **haladó** (top), **középhaladó**, **kezdő** (bottom). Still one ladder: divisions don't change fixtures, promotion or relegation, only labels and season-end prizes (README decision log, 2026-10-08).
+  - Sizes from the number of groups `n` in the phase: each division gets `floor(n / 3)` groups; a remainder of 1 goes to középhaladó, a remainder of 2 to középhaladó and kezdő (15 = 5+5+5, 16 = 5+6+5, 17 = 5+6+6). With fewer than 3 groups, top-down: 1 group = haladó; 2 groups = haladó, középhaladó.
+  - Recalculated every phase, so the borders move as groups are added or removed. A pair's division is the division of its current group.
+  - The signup level "versenyző" has no division of its own.
 - **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. A pair is formed by one player inviting the other by email; the pair exists once the invitee accepts.
 - **Withdrawal:** if a pair drops out mid-phase (injury, moving away), the organizer withdraws it: all its matches in that phase, played or not, are removed from the group's standings, and the group continues without it. No replacement mid-phase.
 - **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
@@ -128,6 +132,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 
 ## 10. Promotion and relegation
 - At the end of a phase, 1st place moves up a group and last place (4th, or 3rd in a group of 3) moves down. The top group has no promotion and the bottom group has no relegation.
+- **Fast calibration after the first phase of a league's first season** (README decision log, 2026-10-08): seeding then rests only on self-assessed levels, so movement is faster once. At each border between two adjacent groups, **2 pairs swap** (the upper group's last two go down, the lower group's top two go up) when both groups have 4 pairs; 1 pair swaps when either group has 3. A group of 4 between two groups of 4 therefore sends its 1st and 2nd up and its 3rd and 4th down. Every later switch is 1 up / 1 down. League setting: the number of fast switches (default 1, the first switch only).
 - **New pairs after the first phase** (late entries and pairs re-formed by a partner change) are placed by these rules, so they neither start at the bottom nor push earlier pairs down for free (README decision log, 2026-10-04):
   1. **Placement rating:** each player's Elo, minus 100 if the player has no rated match yet (their rating is still only the self-assessed starting value; a match as a substitute counts as rated). Pair placement rating = average of the two.
   2. **Target group:** the highest group, other than the top group, whose average pair Elo is at most the new pair's placement rating; the bottom group if there is none. With a single group, that group.
@@ -138,12 +143,16 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 - First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
 - **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - **Season end and switch** (README decision log, 2026-10-05):
-  1. **Final standings:** each pair's group and place in the last phase. No prizes and no champion title.
-  2. **Re-entry:** during the next season's registration window, continuing pairs click "Nevezünk újra"; the organizer can also re-enter a pair by hand. Pairs that don't re-enter leave the league. A pair approved for a season it never played in (approved during the last phase) moves into the next season automatically.
-  3. **Carry-over draft:** apply the last phase's promotion and relegation as at a round switch. List the resulting groups top-down, each group's pairs ordered by last-phase group, then place. Remove pairs that didn't re-enter and pairs whose players changed. Re-cut the remaining order top-down into groups of the section 4 sizes, so pairs below move up into the holes. Then place new pairs and re-formed pairs (partner change) by the late-joiner rules above.
-  4. The organizer adjusts the draft and publishes it on the Monday the new season starts; publishing sends the new-phase emails.
-  5. **Elo carries over** unchanged; no reset or decay.
-  6. **Season archive and recap:** see sections 13 and 14.
+  1. **Final standings:** each pair's group and place in the last phase.
+  2. **Winners** (README decision log, 2026-10-08), from the last phase's standings, before the last promotion and relegation:
+     - **Divízió győztes:** 1st place of each division's top group (with 15 groups: groups 1, 6 and 11).
+     - **Csoportgyőztes:** 1st place of every group. In a division's top group, this is the division winner.
+     - The prizes and their sponsors are set by the organizer per season and division (free text, e.g. "Felajánlja: Padel Club Győr"); the app shows them, nothing is paid or handed out in the app. Prizes are handed over at a short meeting at the sponsor club after the season (group photo, no matches), arranged by the organizer with the club.
+  3. **Re-entry:** during the next season's registration window, continuing pairs click "Nevezünk újra"; the organizer can also re-enter a pair by hand. Pairs that don't re-enter leave the league. A pair approved for a season it never played in (approved during the last phase) moves into the next season automatically.
+  4. **Carry-over draft:** apply the last phase's promotion and relegation as at a round switch. List the resulting groups top-down, each group's pairs ordered by last-phase group, then place. Remove pairs that didn't re-enter and pairs whose players changed. Re-cut the remaining order top-down into groups of the section 4 sizes, so pairs below move up into the holes. Then place new pairs and re-formed pairs (partner change) by the late-joiner rules above.
+  5. The organizer adjusts the draft and publishes it on the Monday the new season starts; publishing sends the new-phase emails.
+  6. **Elo carries over** unchanged; no reset or decay.
+  7. **Season archive and recap:** see sections 13 and 14.
 - Pairs removed by strikes (section 8) leave at the round switch, after promotion and relegation; pairs below move up into the hole.
 - Pairs leaving mid-season and empty spots: the organizer fills them from the waiting list; the rules engine suggests a placement.
 - Pair count not divisible by 4: groups of 3 fill the gap (section 4).
@@ -156,7 +165,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 - Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)
-Group size, phase length in weeks, phases per season (4), catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues.
+Group size, phase length in weeks, phases per season (4), catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues, number of fast-calibration switches (section 10), season prizes and sponsors per division.
 
 ## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
 Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
@@ -168,7 +177,7 @@ Channels: email, and web push for players who opt in (PWA). No player gets more 
 - The match is tomorrow (the evening before an accepted slot).
 - A 3rd strike: the pair leaves at the end of the phase.
 - End of a phase, with your new group.
-- End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group in each phase) with a "Nevezünk újra" button for the pair.
+- End of a season: a recap per player (matches played and won, set and game difference, Elo at the start and end of the season, their group and division in each phase, a division or group win) with a "Nevezünk újra" button for the pair.
 
 **Szervezők and Admins** (in the app and by push, no email):
 - A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
@@ -188,7 +197,8 @@ Channels: email, and web push for players who opt in (PWA). No player gets more 
 - Web push: offered after the first login ("Kérsz értesítést?"), opt-in, can be turned off. On iPhone it needs iOS 16.4+ and the site added to the home screen; the app explains this. Push never replaces email for instant items.
 
 ## 14. Public pages
-- League home: groups, standings, matches this week.
+- League home: groups, standings, matches this week. The ladder is one list with three colored division bands (haladó, középhaladó, kezdő) and a header at each border. In the last phase, each group card shows what is at stake: "Divízió döntő" with the prize and its sponsor on a division's top group, the group-winner prize on the others; earlier phases show a hint instead. A "Hogyan működik?" explainer (3 short points and a picture of the bands) is linked from every badge.
+- Pair home screen: one line with the division, the group and the distance to the division's top group ("Középhaladó divízió, 8. csoport: még 2 feljutás a divízió éléig, 3 kör van hátra"); a note when the pair changes division at a round switch.
 - Pair and player profiles: results and Elo history (no contact details).
 - Season archive: every finished season's groups and standings for each phase (e.g. `/seasons/<slug>`), linked from pair profiles. A per-season recap block on profiles comes later.
 - Rules page (`szabalyzat.md`).

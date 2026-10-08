@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
+import { LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
 
 describe("sendBudget", () => {
-  it("gives signup emails the whole remaining quota", () => {
-    expect(sendBudget(100, 40, "signup_confirmation")).toBe(60);
-    expect(sendBudget(100, 99, "partner_notice")).toBe(1);
+  it("gives login codes the whole remaining quota", () => {
+    expect(sendBudget(100, 40, "login_code")).toBe(60);
+    expect(sendBudget(100, 99, "login_code")).toBe(1);
+  });
+
+  it("keeps a reserve for login codes free from other transactional emails", () => {
+    expect(sendBudget(100, 40, "signup_confirmation")).toBe(60 - LOGIN_RESERVE);
+    expect(sendBudget(100, 100 - LOGIN_RESERVE, "partner_notice")).toBe(0);
+    expect(sendBudget(100, 100 - LOGIN_RESERVE, "login_code")).toBe(LOGIN_RESERVE);
   });
 
   it("keeps a reserve free from broadcasts", () => {
@@ -15,6 +21,7 @@ describe("sendBudget", () => {
 
   it("never goes negative", () => {
     expect(sendBudget(100, 150, "signup_confirmation")).toBe(0);
+    expect(sendBudget(100, 150, "login_code")).toBe(0);
     expect(sendBudget(100, 95, "broadcast")).toBe(0);
   });
 });

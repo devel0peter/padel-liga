@@ -52,3 +52,18 @@ export function parseCity(form: FormData): CityResult {
 export function matchesCity(typed: string | null, city: Pick<City, "slug" | "name">): boolean {
   return !!typed && findCity(typed, [city]) === city.slug;
 }
+
+// Below this many players a city's landing chip says "jelentkezés nyitva"
+// instead of a count: a small number puts people off more than none.
+export const MIN_SHOWN_PLAYERS = 12;
+
+// Players signed up per city for the landing page: a pair counts two, a solo
+// one; withdrawn signups don't count. Cities under MIN_SHOWN_PLAYERS are left out.
+export function playerCounts(
+  rows: readonly { city: string; mode: "pair" | "solo"; n: number }[],
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const r of rows) out.set(r.city, (out.get(r.city) ?? 0) + r.n * (r.mode === "pair" ? 2 : 1));
+  for (const [city, n] of out) if (n < MIN_SHOWN_PLAYERS) out.delete(city);
+  return out;
+}

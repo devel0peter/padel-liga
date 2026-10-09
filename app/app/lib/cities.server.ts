@@ -1,9 +1,9 @@
-import { asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { cities, clubs, interestSignups, leagues } from "~/db/schema";
 
-import { matchesCity, OTHER_CITY, type City, type CityInput } from "./cities";
+import { matchesCity, OTHER_CITY, playerCounts, type City, type CityInput } from "./cities";
 import { audit } from "./leagues.server";
 
 export async function listCities(): Promise<City[]> {
@@ -13,6 +13,17 @@ export async function listCities(): Promise<City[]> {
 // Offered on the public signup form and the landing page.
 export async function listedCities(): Promise<City[]> {
   return (await listCities()).filter((c) => c.listed);
+}
+
+// Players signed up per listed city, for the landing page; see playerCounts.
+export async function landingPlayerCounts(listed: readonly City[]): Promise<Map<string, number>> {
+  if (!listed.length) return new Map();
+  const rows = await db
+    .select({ city: interestSignups.city, mode: interestSignups.mode, n: count() })
+    .from(interestSignups)
+    .where(and(inArray(interestSignups.city, listed.map((c) => c.slug)), ne(interestSignups.status, "withdrawn")))
+    .groupBy(interestSignups.city, interestSignups.mode);
+  return playerCounts(rows);
 }
 
 export async function getCity(slug: string): Promise<City | undefined> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cityName, findCity, isCity, matchesCity, OTHER_CITY, parseCity } from "./cities";
+import { cityName, findCity, isCity, matchesCity, OTHER_CITY, parseCity, playerCounts } from "./cities";
 
 const cities = [
   { slug: "gyor", name: "Győr", listed: true },
@@ -56,5 +56,25 @@ describe("parseCity", () => {
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["name", "slug"]);
     const o = parseCity(form({ name: "Más", slug: "other" }));
     expect(!o.ok && o.errors.slug).toBeTruthy();
+  });
+});
+
+describe("landing player counts", () => {
+  it("counts a pair as two players and a solo as one", () => {
+    const counts = playerCounts([
+      { city: "gyor", mode: "pair", n: 20 },
+      { city: "gyor", mode: "solo", n: 3 },
+    ]);
+    expect(counts.get("gyor")).toBe(43);
+  });
+
+  it("leaves out a city with too few players to show", () => {
+    const counts = playerCounts([
+      { city: "debrecen", mode: "pair", n: 5 },
+      { city: "debrecen", mode: "solo", n: 1 },
+      { city: "szeged", mode: "pair", n: 6 },
+    ]);
+    expect(counts.has("debrecen")).toBe(false);
+    expect(counts.get("szeged")).toBe(12);
   });
 });

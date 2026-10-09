@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cityName, findCity, isCity, matchesCity, OTHER_CITY, parseCity } from "./cities";
+import { cityName, findCity, isCity, matchesCity, OTHER_CITY, pairCounts, parseCity } from "./cities";
 
 const cities = [
   { slug: "gyor", name: "Győr", listed: true },
@@ -56,5 +56,35 @@ describe("parseCity", () => {
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["name", "slug"]);
     const o = parseCity(form({ name: "Más", slug: "other" }));
     expect(!o.ok && o.errors.slug).toBeTruthy();
+  });
+});
+
+describe("landing pair counts", () => {
+  it("counts pair signups and paired solos, not unpaired solos", () => {
+    const counts = pairCounts([
+      { city: "gyor", mode: "pair", paired: false, n: 20 },
+      { city: "gyor", mode: "solo", paired: false, n: 3 },
+    ]);
+    expect(counts.get("gyor")).toBe(20);
+  });
+
+  it("counts two paired solos as one pair", () => {
+    const counts = pairCounts([
+      { city: "gyor", mode: "pair", paired: false, n: 20 },
+      { city: "gyor", mode: "solo", paired: true, n: 2 },
+      { city: "gyor", mode: "solo", paired: false, n: 1 },
+    ]);
+    expect(counts.get("gyor")).toBe(21);
+  });
+
+  it("leaves out a city with too few pairs to show", () => {
+    const counts = pairCounts([
+      { city: "debrecen", mode: "pair", paired: false, n: 5 },
+      { city: "debrecen", mode: "solo", paired: false, n: 4 },
+      { city: "szeged", mode: "pair", paired: false, n: 5 },
+      { city: "szeged", mode: "solo", paired: true, n: 2 },
+    ]);
+    expect(counts.has("debrecen")).toBe(false);
+    expect(counts.get("szeged")).toBe(6);
   });
 });

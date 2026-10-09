@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { landingPlayerCounts, listedCities } from "~/lib/cities.server";
+import { landingPairCounts, listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
 import { toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
@@ -44,8 +44,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
   const clubs = (await listClubs()).map(toClubOption);
   const listed = await listedCities();
-  const players = await landingPlayerCounts(listed);
-  const cities = listed.map(({ slug, name }) => ({ slug, name, players: players.get(slug) ?? null }));
+  const pairs = await landingPairCounts(listed);
+  const cities = listed.map(({ slug, name }) => ({ slug, name, pairs: pairs.get(slug) ?? null }));
   const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
   return { ref, clubs, cities, turnstileSiteKey: turnstileSiteKey() };
 }
@@ -200,7 +200,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         </span>
                         {c.name}
                         <span className="text-sm font-medium opacity-80">
-                          · {c.players ? `${c.players} jelentkező` : "jelentkezés nyitva"}
+                          · {c.pairs ? `${c.pairs} pár jelentkezett` : "jelentkezés nyitva"}
                         </span>
                       </a>
                     </li>

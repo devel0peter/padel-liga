@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, lt, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { broadcasts, emailMessages, emailSuppressions } from "~/db/schema";
@@ -76,12 +76,27 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
   await db.insert(emailSuppressions).values({ email: email.toLowerCase(), reason }).onConflictDoNothing();
 }
 
+// At most one signup confirmation per address per day, so the signup form
+// can't be used to flood someone's inbox.
+const CONFIRMATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 // Signup confirmation, plus the one-time partner notice (spec section 17).
-export async function queueSignupEmails(signup: InterestSignup): Promise<number[]> {
+export async function queueSignupEmails(signup: InterestSignup, now = new Date()): Promise<number[]> {
   const cities = await listCities();
-  const messages: NewMessage[] = [
-    { kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) },
-  ];
+  const [confirmed] = await db
+    .select({ n: count() })
+    .from(emailMessages)
+    .where(
+      and(
+        eq(emailMessages.kind, "signup_confirmation"),
+        eq(emailMessages.toEmail, signup.email1),
+        gt(emailMessages.createdAt, new Date(now.getTime() - CONFIRMATION_INTERVAL_MS)),
+      ),
+    );
+  const messages: NewMessage[] =
+    confirmed.n === 0
+      ? [{ kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) }]
+      : [];
   if (signup.mode === "pair" && signup.name2 && signup.email2) {
     const partner = signup.email2.toLowerCase();
     const [[notified], [suppressed]] = await Promise.all([
@@ -164,7 +179,17 @@ export async function sendTestBroadcast(draft: { subject: string; body: string }
 
 type Claimed = typeof emailMessages.$inferSelect;
 
-async function claim(limit: number, kinds: "transactional" | "broadcast", ids?: number[]): Promise<Claimed[]> {
+// The send order: login codes, other transactional emails, broadcasts. Each
+// group has its own budget (budget.ts).
+const GROUPS = ["login", "transactional", "broadcast"] as const;
+type Group = (typeof GROUPS)[number];
+const GROUP_BUDGET_KIND: Record<Group, MessageKind> = {
+  login: "login_code",
+  transactional: "signup_confirmation",
+  broadcast: "broadcast",
+};
+
+async function claim(limit: number, group: Group, ids?: number[]): Promise<Claimed[]> {
   if (limit <= 0) return [];
   const pending = db
     .select({ id: emailMessages.id })
@@ -172,7 +197,9 @@ async function claim(limit: number, kinds: "transactional" | "broadcast", ids?: 
     .where(
       and(
         eq(emailMessages.status, "pending"),
-        kinds === "broadcast" ? eq(emailMessages.kind, "broadcast") : ne(emailMessages.kind, "broadcast"),
+        group === "transactional"
+          ? notInArray(emailMessages.kind, ["broadcast", "login_code"])
+          : eq(emailMessages.kind, GROUP_BUDGET_KIND[group]),
         ids ? inArray(emailMessages.id, ids) : undefined,
       ),
     )
@@ -226,8 +253,8 @@ async function sendClaimed(rows: Claimed[]): Promise<"ok" | "stop"> {
   return "stop";
 }
 
-// Sends pending emails within the daily budget: signup emails first, then
-// broadcasts. With `ids`, only those messages (used right after a signup).
+// Sends pending emails within the daily budget: login codes first, then
+// signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
 export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   const now = Date.now();
   await db
@@ -242,10 +269,10 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
 
   const limit = dailyLimit();
   let sent = 0;
-  for (const kinds of ["transactional", "broadcast"] as const) {
+  for (const group of GROUPS) {
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
-      const budget = sendBudget(limit, sentLast24h + sent, kinds === "broadcast" ? "broadcast" : "signup_confirmation");
-      const rows = await claim(budget, kinds, ids);
+      const budget = sendBudget(limit, sentLast24h + sent, GROUP_BUDGET_KIND[group]);
+      const rows = await claim(budget, group, ids);
       if (rows.length === 0) break;
       if ((await sendClaimed(rows)) === "stop") return { sent };
       sent += rows.length;

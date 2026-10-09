@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { loginCodes } from "~/db/schema";
@@ -11,6 +11,7 @@ import {
   CODE_TTL_MS,
   codeSendDecision,
   isValidEmail,
+  MAX_CODE_ATTEMPTS,
   normalizeCode,
   normalizeEmail,
   REGISTRATION_CLOSED_MESSAGE,
@@ -28,7 +29,9 @@ export type SendResult = { ok: true; email: string } | { ok: false; error: strin
 export async function sendLoginCode(input: string): Promise<SendResult> {
   const email = normalizeEmail(input);
   if (!isValidEmail(email)) return { ok: false, error: "Ez nem tűnik e-mail-címnek." };
-  if (!(await mayLogIn(email))) return { ok: false, error: REGISTRATION_CLOSED_MESSAGE };
+  // No code and no error for an address that can't log in yet: an error would
+  // tell anyone which addresses have an account or an invite.
+  if (!(await mayLogIn(email))) return { ok: true, email };
 
   const now = new Date();
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
@@ -55,16 +58,21 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
   const code = normalizeCode(codeInput);
   if (!code) return { ok: false, error: "A kód 6 számjegy." };
 
-  const [record] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
-  const matches = !!record && timingSafeEqual(record.codeHash, await codeHash(email, code));
-  const result = checkCode(record ?? null, matches, new Date());
-  if (result === "wrong") {
-    await db
-      .update(loginCodes)
-      .set({ attempts: sql`${loginCodes.attempts} + 1` })
-      .where(eq(loginCodes.email, email));
+  // Uses up an attempt before comparing, in one statement: parallel guesses
+  // each take their own attempt, so no more than MAX_CODE_ATTEMPTS get checked.
+  const now = new Date();
+  const [record] = await db
+    .update(loginCodes)
+    .set({ attempts: sql`${loginCodes.attempts} + 1` })
+    .where(and(eq(loginCodes.email, email), lt(loginCodes.attempts, MAX_CODE_ATTEMPTS), gt(loginCodes.expiresAt, now)))
+    .returning();
+  if (!record) {
+    // Locked, expired or missing: read the row again only for the message.
+    const [row] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
+    const result = checkCode(row ?? null, false, now);
+    return { ok: false, error: CODE_MESSAGES[result === "ok" || result === "wrong" ? "missing" : result] };
   }
-  if (result !== "ok") return { ok: false, error: CODE_MESSAGES[result] };
+  if (!timingSafeEqual(record.codeHash, await codeHash(email, code))) return { ok: false, error: CODE_MESSAGES.wrong };
 
   // Single use. Deleting by the hash we checked means a parallel request with
   // the same code can't also succeed.

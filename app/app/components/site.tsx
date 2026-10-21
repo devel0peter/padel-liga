@@ -1,6 +1,6 @@
 import { Link, useRouteLoaderData } from "react-router";
 
-import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
+import { CONTACT_EMAIL, FACEBOOK_URL, SITE_NAME } from "~/lib/site";
 
 export function Wrap({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-5 ${className}`}>{children}</div>;
@@ -69,6 +69,7 @@ export function SiteFooter() {
           Kapcsolat: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </span>
         <span className="flex gap-4">
+          <a href={FACEBOOK_URL}>Facebook</a>
           <Link to="/rules">Szabályzat</Link>
           <Link to="/privacy">Adatkezelési tájékoztató</Link>
         </span>

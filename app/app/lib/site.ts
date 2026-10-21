@@ -3,6 +3,7 @@
 export const SITE_NAME = "Padelpárbaj";
 export const SITE_URL = "https://padelparbaj.hu";
 export const CONTACT_EMAIL = "hello@padelparbaj.hu";
+export const FACEBOOK_URL = "https://www.facebook.com/padelparbaj";
 
 // Data controller named on the privacy page (README decision log, 2026-10-01).
 export const DATA_CONTROLLER = {
@@ -60,6 +61,7 @@ export function organizationJsonLd() {
           logo: `${SITE_URL}/icon-512.png`,
           image: `${SITE_URL}/og.png`,
           email: CONTACT_EMAIL,
+          sameAs: [FACEBOOK_URL],
           sport: "Padel",
           areaServed: { "@type": "Country", name: "Magyarország" },
           description:

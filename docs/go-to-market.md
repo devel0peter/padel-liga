@@ -86,7 +86,8 @@ A Padelpárbaj első köre november 9-én indul Győrben. Regisztrálj, nevezz a
 Check the dates against the milestones before posting.
 
 ### Later (after launch)
-- A league Facebook page and Instagram account, posting via API.
+- Facebook page: live since 2026-10-21 at `facebook.com/padelparbaj`, platform-wide (not per city). Posting via API needs `pages_manage_posts`, which the Meta app doesn't have yet; post by hand until then.
+- Instagram account.
 - After each round: results, standings image, promotions and relegations, "a hét meccse".
 - Share buttons for players ("feljutottunk az 1. csoportba"), so players do the distribution.
 - Not allowed: an agent posting in Facebook groups. It would be flagged as spam and burn local trust. Group posts are always Peter's, in person.

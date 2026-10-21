@@ -38,6 +38,10 @@ describe("organizationJsonLd", () => {
     });
   });
 
+  it("points to the Facebook page", () => {
+    expect(ofType("SportsOrganization")).toMatchObject({ sameAs: ["https://www.facebook.com/padelparbaj"] });
+  });
+
   it("links the website to its publisher", () => {
     expect(ofType("WebSite")).toMatchObject({ inLanguage: "hu", publisher: { "@id": "https://padelparbaj.hu/#org" } });
   });

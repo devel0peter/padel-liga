@@ -54,6 +54,8 @@ export async function action({ request }: Route.ActionArgs) {
   const actor = (await getActor(request))!;
   const form = await request.formData();
   if (form.get("intent") === "profile") {
+    // A missing phone field must not clear the saved number.
+    if (!form.has("phone")) return data({ saved: false, errors: {} as ProfileErrors }, { status: 400 });
     const result = validateProfile(
       { name: form.get("name"), level: form.get("level"), phone: form.get("phone") },
       { requireConsent: false },

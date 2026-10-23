@@ -125,7 +125,7 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>A telefonszámodat</strong> csak azok látják, akikkel az
-                aktuális fordulóban meccsed van, hogy egyeztetni tudjatok. Más
+                aktuális körben meccsed van, hogy egyeztetni tudjatok. Más
                 játékos nem látja, és a szervezői felületeken sem jelenik meg. Ezt a funkciót a liga
                 indulásával kapcsoljuk be; addig a számod sehol nem jelenik meg.
               </li>

@@ -29,7 +29,8 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Same email = same account, whichever way they log in. A Google login links to an existing account only if Google reports the email as verified.
 - Profile:
   - Required: name, email.
-  - Optional: phone number (visible only to opponents in the current round, never public; collected at registration, not on the interest form), self-assessed level.
+  - Required: self-assessed level (kezdő / középhaladó / haladó / versenyző; asked at first login, prefilled from the interest signup with the same email; accounts that predate it are prompted on the home page, and the level is required to apply for a season).
+  - Optional: phone number (Hungarian numbers only, stored as +36…, shown as `+36 30 123 4567`; visible only to opponents in the current round, never public; collected at registration, not on the interest form). Name, level and phone are editable on the profile page.
 - GDPR:
   - Privacy notice (section 17) and consent at registration.
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".

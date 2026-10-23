@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 05.";
+const EFFECTIVE_FROM = "2026. 10. 23.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -76,14 +76,22 @@ export default function Privacy() {
             <ul className={list}>
               <li>a neved és az e-mail-címed,</li>
               <li>
+                a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
+                állítasz be, és amiből az induló értékszámod lesz,
+              </li>
+              <li>
+                ha megadod, a telefonszámod (magyar szám lehet, nem kötelező, a
+                profilodban bármikor módosíthatod vagy törölheted),
+              </li>
+              <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>
               <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja.</li>
             </ul>
             <p>
-              Amikor elindul a liga, ehhez jön még egy nem kötelező
-              telefonszám, a meccseid eredményei és az értékszámod.
+              Amikor elindul a liga, ehhez jön még a meccseid története
+              (kivel, mikor és milyen eredménnyel játszottál) és az értékszámod.
             </p>
           </Section>
 
@@ -114,6 +122,12 @@ export default function Privacy() {
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
                 telefonszámod.
+              </li>
+              <li>
+                <strong>A telefonszámodat</strong> csak azok látják, akikkel az
+                aktuális fordulóban meccsed van, hogy egyeztetni tudjatok. Más
+                játékos nem látja, és a szervezői felületeken sem jelenik meg. Ezt a funkciót a liga
+                indulásával kapcsoljuk be; addig a számod sehol nem jelenik meg.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
@@ -197,7 +211,8 @@ export default function Privacy() {
               <li>
                 <strong>Fiókok:</strong> amíg nem kéred a törlést. Utána
                 anonimizáljuk, hogy a korábbi eredmények megmaradjanak, de ne
-                lehessen hozzád kötni őket.
+                lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
+                töröljük.
               </li>
             </ul>
           </Section>

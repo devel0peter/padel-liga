@@ -2,10 +2,15 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
+import { PhaseList } from "~/components/season-calendar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
+import { formatDeadline, formatShortDate } from "~/lib/format";
 import { listLeagues } from "~/lib/leagues.server";
+import { currentSeasons } from "~/lib/seasons";
+import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. For now
@@ -19,10 +24,22 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []));
+  const leagues = await listLeagues();
+  const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? leagues : []));
+  // Players don't belong to a league yet: every league's current season.
+  const leagueName = new Map(leagues.map((l) => [l.id, l.name]));
+  const seasons = currentSeasons(await listSeasons(), new Date()).map((s) => ({
+    id: s.id,
+    name: s.name,
+    league: leagueName.get(s.leagueId) ?? "",
+    registrationOpensAt: s.registrationOpensAt,
+    registrationClosesAt: s.registrationClosesAt,
+    phases: s.phases,
+  }));
   return {
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
+    seasons,
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
 }
@@ -41,6 +58,21 @@ export default function AppHome({ loaderData: d }: Route.ComponentProps) {
           </p>
         </section>
       )}
+      {d.seasons.map((s) => (
+        <Card key={s.id} className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">{s.name}</CardTitle>
+            <CardDescription>{s.league}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm">
+            <p>
+              <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} –{" "}
+              {formatDeadline(s.registrationClosesAt)}
+            </p>
+            <PhaseList phases={s.phases} />
+          </CardContent>
+        </Card>
+      ))}
       <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
         <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
         <p className="text-muted-foreground">

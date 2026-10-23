@@ -1,4 +1,4 @@
-import { BarChart3, Bell, BookOpen, Building2, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
+import { BarChart3, Bell, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Trophy, UserCog, Users } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -73,6 +73,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
   notifications: Bell,
   overview: LayoutDashboard,
+  seasons: CalendarDays,
   solos: HeartHandshake,
   signups: Users,
   broadcasts: Mail,

@@ -57,7 +57,8 @@ const dayAndTime = new Intl.DateTimeFormat("hu-HU", {
   weekday: "long",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  // Not hour12: false, which some engines render as "24:00" at midnight.
+  hourCycle: "h23",
 });
 
 // A deadline: "nov. 29., vasárnap 23:59"

@@ -36,6 +36,16 @@ export type Season = {
 export const MAX_NAME = 60;
 export const MAX_BREAKS = 10;
 
+// Days the form accepts. A date input lets anyone type year 9999, and a
+// break that long would push the calendar past what a day string can hold.
+export const MIN_DAY = "2020-01-01";
+export const MAX_DAY = "2100-12-31";
+const OUT_OF_RANGE = "Adj meg egy 2020 és 2100 közötti dátumot.";
+
+function inRange(day: string): boolean {
+  return isDay(day) && day >= MIN_DAY && day <= MAX_DAY;
+}
+
 function str(form: FormData, key: string): string {
   const value = form.get(key);
   return typeof value === "string" ? value.trim() : "";
@@ -69,11 +79,14 @@ export function parseSeason(form: FormData): SeasonResult {
   else if (name.length > MAX_NAME) errors.name = `Legfeljebb ${MAX_NAME} karakter.`;
 
   if (!isDay(registrationOpens)) errors.registrationOpens = "Add meg, mikor nyílik a nevezés.";
+  else if (!inRange(registrationOpens)) errors.registrationOpens = OUT_OF_RANGE;
   if (!isDay(registrationCloses)) errors.registrationCloses = "Add meg, mikor zárul a nevezés.";
+  else if (!inRange(registrationCloses)) errors.registrationCloses = OUT_OF_RANGE;
   else if (isDay(registrationOpens) && registrationCloses < registrationOpens)
     errors.registrationCloses = "A nevezés nem zárulhat, mielőtt kinyílik.";
 
   if (!isDay(firstPhaseStart)) errors.firstPhaseStart = "Add meg az első kör kezdőnapját.";
+  else if (!inRange(firstPhaseStart)) errors.firstPhaseStart = OUT_OF_RANGE;
   else if (!isMonday(firstPhaseStart)) errors.firstPhaseStart = "Az első kör csak hétfőn kezdődhet.";
 
   const breaks: Break[] = [];
@@ -82,6 +95,7 @@ export function parseSeason(form: FormData): SeasonResult {
     const end = ends[i] ?? "";
     if (!start && !end) continue;
     if (!isDay(start) || !isDay(end)) errors.breaks = "Minden szünetnek add meg a kezdetét és a végét.";
+    else if (!inRange(start) || !inRange(end)) errors.breaks = OUT_OF_RANGE;
     else if (end < start) errors.breaks = "A szünet nem érhet véget, mielőtt elkezdődik.";
     else breaks.push({ start, end });
   }
@@ -102,8 +116,8 @@ export function parseSeason(form: FormData): SeasonResult {
 // The live preview on the form: the phases, or null while the days don't
 // make a calendar yet.
 export function previewPhases(firstPhaseStart: string, breaks: { start: string; end: string }[]): Phase[] | null {
-  if (!isDay(firstPhaseStart) || !isMonday(firstPhaseStart)) return null;
-  const complete = breaks.filter((b) => isDay(b.start) && isDay(b.end) && b.start <= b.end);
+  if (!inRange(firstPhaseStart) || !isMonday(firstPhaseStart)) return null;
+  const complete = breaks.filter((b) => inRange(b.start) && inRange(b.end) && b.start <= b.end);
   return phaseCalendar(firstPhaseStart, complete);
 }
 
@@ -119,16 +133,18 @@ export function seasonEnd(season: Pick<Season, "phases">): Date | null {
   return last?.deadline ?? null;
 }
 
-// The season a player sees on the home page, one per league: the earliest
-// that hasn't ended yet.
-export function currentSeasons<T extends Season>(seasons: readonly T[], now: Date): T[] {
+// The seasons a player sees on the home page, per league: the earliest that
+// hasn't ended yet (the current or next one), and any later one whose
+// registration hasn't closed, so the next season's registration shows while
+// the current season's last phase runs (spec section 10). Ordered by league,
+// then start.
+export function homeSeasons<T extends Season>(seasons: readonly T[], now: Date): T[] {
   const start = (s: T) => Math.min(...s.phases.map((p) => p.startsAt.getTime()));
-  const byLeague = new Map<number, T>();
-  for (const s of seasons) {
-    const end = seasonEnd(s);
-    if (!end || end < now) continue;
-    const seen = byLeague.get(s.leagueId);
-    if (!seen || start(s) < start(seen)) byLeague.set(s.leagueId, s);
-  }
-  return [...byLeague.values()];
+  const running = seasons
+    .filter((s) => {
+      const end = seasonEnd(s);
+      return end !== null && end >= now;
+    })
+    .sort((a, b) => a.leagueId - b.leagueId || start(a) - start(b));
+  return running.filter((s, i) => running[i - 1]?.leagueId !== s.leagueId || s.registrationClosesAt >= now);
 }

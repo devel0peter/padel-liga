@@ -15,14 +15,14 @@ export async function listSeasons(leagueId?: number): Promise<Season[]> {
     .where(leagueId === undefined ? undefined : eq(seasons.leagueId, leagueId))
     .orderBy(desc(seasons.firstPhaseStart), desc(seasons.id));
   if (rows.length === 0) return [];
+  // A subquery, not a list of ids: D1 allows at most 100 bound parameters.
   const phases = await db
     .select()
     .from(seasonPhases)
     .where(
-      inArray(
-        seasonPhases.seasonId,
-        rows.map((r) => r.id),
-      ),
+      leagueId === undefined
+        ? undefined
+        : inArray(seasonPhases.seasonId, db.select({ id: seasons.id }).from(seasons).where(eq(seasons.leagueId, leagueId))),
     )
     .orderBy(asc(seasonPhases.seasonId), asc(seasonPhases.number));
   return rows.map((r) => ({

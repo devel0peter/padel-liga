@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { currentSeasons, parseSeason, previewPhases, registrationWindow, seasonActions, seasonEnd, type Season } from "./seasons";
+import { homeSeasons, parseSeason, previewPhases, registrationWindow, seasonActions, seasonEnd, type Season } from "./seasons";
 
 const form = (fields: Record<string, string | string[]>) => {
   const f = new FormData();
@@ -107,6 +107,20 @@ describe("parseSeason", () => {
     const days = Array.from({ length: 11 }, (_, i) => `2027-03-${String(i + 1).padStart(2, "0")}`);
     const r = parseSeason(form({ ...FIRST_SEASON, breakStart: days, breakEnd: days }));
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(Object.keys(r.errors)).toEqual(["breaks"]);
+  });
+
+  it("refuses days outside 2020–2100 instead of failing (a date input takes year 9999)", () => {
+    for (const fields of [
+      { firstPhaseStart: "9999-12-27" },
+      { registrationOpens: "1999-11-01" },
+      { registrationCloses: "2101-01-01" },
+      { breakStart: ["2026-11-01"], breakEnd: ["9999-12-31"] },
+    ]) {
+      const r = parseSeason(form({ ...FIRST_SEASON, ...fields }));
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(Object.values(r.errors)).toContain("Adj meg egy 2020 és 2100 közötti dátumot.");
+    }
   });
 });
 
@@ -131,6 +145,11 @@ describe("previewPhases", () => {
     expect(previewPhases("", [])).toBeNull();
     expect(previewPhases("2026-11-10", [])).toBeNull();
   });
+
+  it("doesn't throw while a date is half typed or far out of range", () => {
+    expect(previewPhases("9999-12-27", [])).toBeNull();
+    expect(previewPhases("2026-11-09", [{ start: "2026-11-01", end: "9999-12-31" }])?.[0]?.start).toBe("2026-11-09");
+  });
 });
 
 describe("seasonActions (README decision log, 2026-10-23)", () => {
@@ -145,7 +164,7 @@ describe("seasonActions (README decision log, 2026-10-23)", () => {
   });
 });
 
-const season = (id: number, leagueId: number, firstPhaseStart: string): Season => {
+const season = (id: number, leagueId: number, firstPhaseStart: string, registrationClosesAt = new Date(0)): Season => {
   const r = parseSeason(form({ ...FIRST_SEASON, registrationOpens: "2020-01-01", registrationCloses: "2020-01-02", firstPhaseStart }));
   if (!r.ok) throw new Error("bad fixture");
   return {
@@ -153,16 +172,16 @@ const season = (id: number, leagueId: number, firstPhaseStart: string): Season =
     leagueId,
     name: `S${id}`,
     registrationOpensAt: new Date(0),
-    registrationClosesAt: new Date(0),
+    registrationClosesAt,
     firstPhaseStart,
     breaks: [],
     phases: r.phases.map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline })),
   };
 };
 
-describe("seasonEnd and currentSeasons", () => {
+describe("seasonEnd and homeSeasons", () => {
   const first = season(1, 1, "2026-11-09"); // ends 14 Feb 2027
-  const next = season(2, 1, "2027-03-01");
+  const next = season(2, 1, "2027-03-01"); // registration closed long ago
   const other = season(3, 2, "2027-03-01");
 
   it("the season ends at the last phase's deadline", () => {
@@ -170,17 +189,25 @@ describe("seasonEnd and currentSeasons", () => {
     expect(seasonEnd({ phases: [] })).toBeNull();
   });
 
-  it("shows the earliest season that hasn't ended, one per league", () => {
+  it("shows the earliest season that hasn't ended, per league", () => {
     const now = new Date("2026-10-23T12:00:00Z");
-    expect(currentSeasons([next, first, other], now).map((s) => s.id)).toEqual([1, 3]);
+    expect(homeSeasons([next, first, other], now).map((s) => s.id)).toEqual([1, 3]);
+  });
+
+  it("also shows a later season while its registration is open or ahead", () => {
+    const reopening = season(4, 1, "2027-03-01", new Date("2027-02-20T22:59:00Z"));
+    const during = new Date("2027-02-01T12:00:00Z"); // first season's last phase
+    expect(homeSeasons([reopening, first], during).map((s) => s.id)).toEqual([1, 4]);
+    // A later season whose registration has closed waits its turn.
+    expect(homeSeasons([next, first], during).map((s) => s.id)).toEqual([1]);
   });
 
   it("moves on once the season's last deadline has passed", () => {
-    expect(currentSeasons([first, next], new Date("2027-02-14T22:58:00Z")).map((s) => s.id)).toEqual([1]);
-    expect(currentSeasons([first, next], new Date("2027-02-14T23:00:00Z")).map((s) => s.id)).toEqual([2]);
+    expect(homeSeasons([first, next], new Date("2027-02-14T22:58:00Z")).map((s) => s.id)).toEqual([1]);
+    expect(homeSeasons([first, next], new Date("2027-02-14T23:00:00Z")).map((s) => s.id)).toEqual([2]);
   });
 
   it("shows nothing when every season is over", () => {
-    expect(currentSeasons([first], new Date("2028-01-01T00:00:00Z"))).toEqual([]);
+    expect(homeSeasons([first], new Date("2028-01-01T00:00:00Z"))).toEqual([]);
   });
 });

@@ -8,8 +8,9 @@ import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate } from "~/lib/format";
+import { listedCities } from "~/lib/cities.server";
 import { listLeagues } from "~/lib/leagues.server";
-import { currentSeasons } from "~/lib/seasons";
+import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -26,16 +27,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const actor = (await getActor(request))!;
   const leagues = await listLeagues();
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? leagues : []));
-  // Players don't belong to a league yet: every league's current season.
-  const leagueName = new Map(leagues.map((l) => [l.id, l.name]));
-  const seasons = currentSeasons(await listSeasons(), new Date()).map((s) => ({
-    id: s.id,
-    name: s.name,
-    league: leagueName.get(s.leagueId) ?? "",
-    registrationOpensAt: s.registrationOpensAt,
-    registrationClosesAt: s.registrationClosesAt,
-    phases: s.phases,
-  }));
+  // Players don't belong to a league yet: the seasons of every league in a
+  // listed city (a city still being set up stays hidden).
+  const listed = new Set((await listedCities()).map((c) => c.slug));
+  const leagueName = new Map(leagues.filter((l) => listed.has(l.city)).map((l) => [l.id, l.name]));
+  const seasons = homeSeasons(await listSeasons(), new Date())
+    .filter((s) => leagueName.has(s.leagueId))
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      league: leagueName.get(s.leagueId)!,
+      registrationOpensAt: s.registrationOpensAt,
+      registrationClosesAt: s.registrationClosesAt,
+      phases: s.phases,
+    }));
   return {
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,

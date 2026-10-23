@@ -228,7 +228,7 @@ function DeleteSeason({ season }: { season: SeasonRow }) {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Törlöd a szezont?</AlertDialogTitle>
-          <AlertDialogDescription>{season.name} és a köreinek naptára törlődik.</AlertDialogDescription>
+          <AlertDialogDescription>„{season.name}” és a körei törlődnek.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Mégse</AlertDialogCancel>

@@ -33,6 +33,13 @@ export function isValidEmail(email: string): boolean {
   return email.length <= MAX_EMAIL && EMAIL_RE.test(email);
 }
 
+// The `?email=` of the registration invite link (#20): prefills the login
+// form. Not a credential: logging in still needs Google or the emailed code.
+export function loginEmailParam(value: string | null): string {
+  const email = normalizeEmail(value ?? "");
+  return isValidEmail(email) ? email : "";
+}
+
 // Accepts "123 456" or "123-456" as typed or pasted; null if it isn't 6 digits.
 export function normalizeCode(input: string): string | null {
   const digits = input.replace(/[\s-]/g, "");

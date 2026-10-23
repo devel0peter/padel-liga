@@ -27,6 +27,34 @@ export function signupRecipients(
   return { recipients, suppressed: skipped };
 }
 
+// The registration invite (#20, spec section 3): the person who signed up in
+// a city that has a league, once per address. Partners entered on the form
+// get nothing (only email1 is read). Skipped: withdrawn signups, unsubscribed
+// or bounced addresses, addresses that already have an account, and
+// addresses already invited through any of their signups.
+// account_invites.note of the addresses invited this way, so a deletion
+// request can remove exactly these rows (signups-admin.server.ts).
+export const INTEREST_INVITE_NOTE = "Jelentkező";
+
+export type InviteCandidate = Pick<SignupRow, "email1" | "name1" | "city" | "status"> & { invitedAt: Date | null };
+
+export function inviteRecipients(
+  rows: readonly InviteCandidate[],
+  ctx: { leagueCities: ReadonlySet<string>; suppressed: ReadonlySet<string>; accounts: ReadonlySet<string> },
+): Recipient[] {
+  const invited = new Set(rows.filter((r) => r.invitedAt).map((r) => r.email1.toLowerCase()));
+  const seen = new Set<string>();
+  const recipients: Recipient[] = [];
+  for (const r of rows) {
+    const email = r.email1.toLowerCase();
+    if (seen.has(email) || r.status === "withdrawn" || !ctx.leagueCities.has(r.city)) continue;
+    seen.add(email);
+    if (invited.has(email) || ctx.suppressed.has(email) || ctx.accounts.has(email)) continue;
+    recipients.push({ email, name: r.name1 });
+  }
+  return recipients;
+}
+
 export function audienceLabel(f: Filters, cities: readonly Pick<City, "slug" | "name">[] = []): string {
   const parts = [
     f.city === OTHER_CITY ? "Más város" : f.city ? cityName(f.city, cities) : undefined,

@@ -7,7 +7,7 @@ import { Turnstile } from "~/components/turnstile";
 import { Input } from "~/components/ui/input";
 import { googleConfigured, type GoogleError } from "~/lib/auth/google.server";
 import { sendLoginCode, verifyLoginCode } from "~/lib/auth/login-code.server";
-import { REGISTRATION_CLOSED_MESSAGE, registrationOpen, safeReturnTo } from "~/lib/auth/rules";
+import { loginEmailParam, REGISTRATION_CLOSED_MESSAGE, registrationOpen, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
 import { SITE_NAME } from "~/lib/site";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
@@ -30,6 +30,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     google: googleConfigured(),
     returnTo,
+    // Prefilled from the registration invite link (#20).
+    email: loginEmailParam(url.searchParams.get("email")),
     error: code && code in GOOGLE_ERRORS ? GOOGLE_ERRORS[code] : null,
     registrationOpen: registrationOpen(new Date()),
     turnstileSiteKey: turnstileSiteKey(),
@@ -166,7 +168,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             type="email"
             autoComplete="email"
             required
-            defaultValue={actionData?.email}
+            defaultValue={actionData?.email ?? loaderData.email}
             className={inputClass}
             {...invalid("email", emailError)}
           />

@@ -1,7 +1,8 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { interestSignups } from "~/db/schema";
+import { accountInvites, interestSignups } from "~/db/schema";
+import { INTEREST_INVITE_NOTE } from "~/lib/email/audience";
 import { deleteMessagesTo } from "~/lib/email/outbox.server";
 
 import type { SignupRow, Status } from "./signups-admin";
@@ -23,8 +24,9 @@ export async function updateSignup(
 }
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").
-// Also removes the stored emails sent to them; an unsubscribe is kept. A solo
-// paired with them goes back to the waiting list.
+// Also removes the stored emails sent to them and the account invite their
+// registration invite added; an unsubscribe is kept. A solo paired with them
+// goes back to the waiting list.
 export async function deleteSignup(id: number): Promise<void> {
   const [row] = await db
     .delete(interestSignups)
@@ -34,5 +36,9 @@ export async function deleteSignup(id: number): Promise<void> {
     .update(interestSignups)
     .set({ pairedWith: null, status: "new", updatedAt: new Date() })
     .where(eq(interestSignups.pairedWith, id));
-  if (row) await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
+  if (!row) return;
+  await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
+  await db
+    .delete(accountInvites)
+    .where(and(eq(accountInvites.email, row.email1.toLowerCase()), eq(accountInvites.note, INTEREST_INVITE_NOTE)));
 }

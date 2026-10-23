@@ -7,10 +7,24 @@ export const TRANSACTIONAL_RESERVE = 15;
 // Smaller than TRANSACTIONAL_RESERVE, so broadcasts never use it either.
 export const LOGIN_RESERVE = 10;
 
-export type MessageKind = "signup_confirmation" | "partner_notice" | "broadcast" | "login_code" | "pair_intro";
+export type MessageKind =
+  | "signup_confirmation"
+  | "partner_notice"
+  | "broadcast"
+  | "login_code"
+  | "pair_intro"
+  | "registration_invite";
+
+// Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
+// list spreads over days without delaying signup emails or login codes.
+export const BULK_KINDS = ["broadcast", "registration_invite"] as const satisfies readonly MessageKind[];
+
+function isBulk(kind: MessageKind): boolean {
+  return (BULK_KINDS as readonly MessageKind[]).includes(kind);
+}
 
 export function sendBudget(dailyLimit: number, sentLast24h: number, kind: MessageKind): number {
-  const reserve = kind === "broadcast" ? TRANSACTIONAL_RESERVE : kind === "login_code" ? 0 : LOGIN_RESERVE;
+  const reserve = isBulk(kind) ? TRANSACTIONAL_RESERVE : kind === "login_code" ? 0 : LOGIN_RESERVE;
   return Math.max(0, dailyLimit - sentLast24h - reserve);
 }
 

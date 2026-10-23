@@ -1,18 +1,28 @@
 import { env } from "cloudflare:workers";
 import { and, asc, count, eq, gt, inArray, lt, notInArray, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { broadcasts, emailMessages, emailSuppressions } from "~/db/schema";
+import { accountInvites, broadcasts, emailMessages, emailSuppressions, interestSignups, leagues, users } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
 
-import type { Recipient } from "./audience";
-import { parseDailyLimit, sendBudget, type MessageKind } from "./budget";
+import { INTEREST_INVITE_NOTE, inviteRecipients, type Recipient } from "./audience";
+import { BULK_KINDS, parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { MAX_BATCH, sendBatch } from "./resend.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { listCities } from "~/lib/cities.server";
 
-import { broadcastEmail, loginCode, pairIntro, partnerNotice, signupConfirmation, type Email, type PairIntroPerson } from "./templates";
+import {
+  broadcastEmail,
+  loginCode,
+  pairIntro,
+  partnerNotice,
+  registrationInvite,
+  signupConfirmation,
+  type Email,
+  type PairIntroPerson,
+} from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
@@ -45,22 +55,24 @@ export function emailSecret(): string {
   throw new Error("EMAIL_SECRET is not set");
 }
 
+function messageValues(m: NewMessage) {
+  return {
+    kind: m.kind,
+    broadcastId: m.broadcastId ?? null,
+    toEmail: m.toEmail,
+    subject: m.subject,
+    html: m.html,
+    text: m.text,
+    headers: m.headers ? JSON.stringify(m.headers) : null,
+  };
+}
+
 async function enqueue(messages: NewMessage[]): Promise<number[]> {
   const ids: number[] = [];
   for (let i = 0; i < messages.length; i += INSERT_CHUNK) {
     const rows = await db
       .insert(emailMessages)
-      .values(
-        messages.slice(i, i + INSERT_CHUNK).map((m) => ({
-          kind: m.kind,
-          broadcastId: m.broadcastId ?? null,
-          toEmail: m.toEmail,
-          subject: m.subject,
-          html: m.html,
-          text: m.text,
-          headers: m.headers ? JSON.stringify(m.headers) : null,
-        })),
-      )
+      .values(messages.slice(i, i + INSERT_CHUNK).map(messageValues))
       .returning({ id: emailMessages.id });
     ids.push(...rows.map((r) => r.id));
   }
@@ -170,6 +182,72 @@ export async function createBroadcast(input: {
   return id;
 }
 
+// Who would get the registration invite now (#20, audience.ts inviteRecipients).
+export async function pendingRegistrationInvites(): Promise<Recipient[]> {
+  const [rows, leagueCities, accounts, suppressed] = await Promise.all([
+    db
+      .select({
+        email1: interestSignups.email1,
+        name1: interestSignups.name1,
+        city: interestSignups.city,
+        status: interestSignups.status,
+        invitedAt: interestSignups.invitedAt,
+      })
+      .from(interestSignups)
+      .orderBy(asc(interestSignups.id)),
+    db.selectDistinct({ city: leagues.city }).from(leagues),
+    db.select({ email: users.email }).from(users),
+    suppressedSet(),
+  ]);
+  return inviteRecipients(rows, {
+    leagueCities: new Set(leagueCities.map((l) => l.city)),
+    accounts: new Set(accounts.map((u) => u.email.toLowerCase())),
+    suppressed,
+  });
+}
+
+// account_invites binds 3 parameters per row, the invited_at update 1 per
+// address plus the timestamp (D1: at most 100 per statement).
+const INVITE_CHUNK = 30;
+const MARK_CHUNK = 90;
+
+// Queues the registration invite for everyone pending. In one D1 batch (a
+// transaction): the emails, the account_invites rows (so the link works
+// before registration opens), and invited_at on every signup row of each
+// address, so the next send skips them. Returns how many were queued.
+export async function queueRegistrationInvites(now = new Date()): Promise<number> {
+  const recipients = await pendingRegistrationInvites();
+  if (recipients.length === 0) return 0;
+  const secret = emailSecret();
+  const messages = await Promise.all(
+    recipients.map(async (r): Promise<NewMessage> => {
+      const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
+      return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...registrationInvite(r, url) };
+    }),
+  );
+  const emails = recipients.map((r) => r.email);
+  const statements: BatchItem<"sqlite">[] = [];
+  for (let i = 0; i < messages.length; i += INSERT_CHUNK)
+    statements.push(db.insert(emailMessages).values(messages.slice(i, i + INSERT_CHUNK).map(messageValues)));
+  for (let i = 0; i < emails.length; i += INVITE_CHUNK)
+    statements.push(
+      db
+        .insert(accountInvites)
+        .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
+        .onConflictDoNothing(),
+    );
+  for (let i = 0; i < emails.length; i += MARK_CHUNK)
+    statements.push(
+      db
+        .update(interestSignups)
+        .set({ invitedAt: now })
+        .where(inArray(sql`lower(${interestSignups.email1})`, emails.slice(i, i + MARK_CHUNK))),
+    );
+  const [first, ...rest] = statements;
+  await db.batch([first, ...rest]);
+  return recipients.length;
+}
+
 // A one-off test of a draft, sent only to the admin. Not stored.
 export async function sendTestBroadcast(draft: { subject: string; body: string }, to: Recipient) {
   const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(to.email, emailSecret()));
@@ -179,8 +257,9 @@ export async function sendTestBroadcast(draft: { subject: string; body: string }
 
 type Claimed = typeof emailMessages.$inferSelect;
 
-// The send order: login codes, other transactional emails, broadcasts. Each
-// group has its own budget (budget.ts).
+// The send order: login codes, other transactional emails, then bulk mail
+// (broadcasts and registration invites). Each group has its own budget
+// (budget.ts).
 const GROUPS = ["login", "transactional", "broadcast"] as const;
 type Group = (typeof GROUPS)[number];
 const GROUP_BUDGET_KIND: Record<Group, MessageKind> = {
@@ -198,8 +277,10 @@ async function claim(limit: number, group: Group, ids?: number[]): Promise<Claim
       and(
         eq(emailMessages.status, "pending"),
         group === "transactional"
-          ? notInArray(emailMessages.kind, ["broadcast", "login_code"])
-          : eq(emailMessages.kind, GROUP_BUDGET_KIND[group]),
+          ? notInArray(emailMessages.kind, [...BULK_KINDS, "login_code"])
+          : group === "broadcast"
+            ? inArray(emailMessages.kind, [...BULK_KINDS])
+            : eq(emailMessages.kind, GROUP_BUDGET_KIND[group]),
         ids ? inArray(emailMessages.id, ids) : undefined,
       ),
     )

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import type { InterestSignup } from "../interest";
-import { broadcastEmail, escapeHtml, loginCode, pairIntro, partnerNotice, signupConfirmation, textToHtml } from "./templates";
+import {
+  broadcastEmail,
+  escapeHtml,
+  loginCode,
+  pairIntro,
+  partnerNotice,
+  registrationInvite,
+  registrationLink,
+  signupConfirmation,
+  textToHtml,
+} from "./templates";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
@@ -142,5 +152,35 @@ describe("pairIntro", () => {
 
   it("escapes names in the HTML", () => {
     expect(pairIntro(anna, { ...bela, name: "<b>Béla</b>" }, "Győr").html).toContain("&lt;b&gt;Béla&lt;/b&gt;");
+  });
+});
+
+describe("registrationLink", () => {
+  it("opens the login page with the email filled in", () => {
+    expect(registrationLink("anna@example.com")).toBe("https://padelparbaj.hu/login?email=anna%40example.com");
+    expect(registrationLink("a+b@example.com")).toBe("https://padelparbaj.hu/login?email=a%2Bb%40example.com");
+  });
+});
+
+describe("registrationInvite", () => {
+  const unsub = "https://padelparbaj.hu/unsubscribe?t=abc";
+  const email = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub);
+
+  it("greets the signer and links to registration with the email filled in", () => {
+    expect(email.subject).toBe("Regisztrálj a Padelpárbajra");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
+    expect(email.html).toContain('href="https://padelparbaj.hu/login?email=anna%40example.com"');
+  });
+
+  it("has an unsubscribe link: it goes to the whole list", () => {
+    expect(email.text).toContain(`Leiratkozás: ${unsub}`);
+    expect(email.html).toContain(unsub);
+  });
+
+  it("escapes names in the HTML", () => {
+    const e = registrationInvite({ name: "<b>Anna</b>", email: "anna@example.com" }, unsub);
+    expect(e.html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
+    expect(e.html).not.toContain("<b>Anna</b>");
   });
 });

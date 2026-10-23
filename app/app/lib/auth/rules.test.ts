@@ -9,6 +9,7 @@ import {
   googlePicture,
   initials,
   isValidEmail,
+  loginEmailParam,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_WINDOW,
   nextExpiry,
@@ -252,5 +253,19 @@ describe("profile picture", () => {
     expect(initials("Kovács Béla Péter", "a@x.hu")).toBe("KP");
     expect(initials("Anna", "a@x.hu")).toBe("AN");
     expect(initials("  ", "zoli@x.hu")).toBe("ZO");
+  });
+});
+
+describe("loginEmailParam", () => {
+  it("prefills the login form from the invite link's ?email=", () => {
+    expect(loginEmailParam("anna@example.com")).toBe("anna@example.com");
+    expect(loginEmailParam("  Anna@Example.com ")).toBe("anna@example.com");
+  });
+
+  it("ignores a missing or invalid address", () => {
+    expect(loginEmailParam(null)).toBe("");
+    expect(loginEmailParam("")).toBe("");
+    expect(loginEmailParam("not an email")).toBe("");
+    expect(loginEmailParam(`${"a".repeat(250)}@example.com`)).toBe("");
   });
 });

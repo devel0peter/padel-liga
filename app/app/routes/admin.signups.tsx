@@ -1,4 +1,4 @@
-import { Download, Mail, Trash2 } from "lucide-react";
+import { Download, Mail, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
@@ -52,6 +52,7 @@ import {
   STATUSES,
   type SignupRow,
 } from "~/lib/signups-admin";
+import { deliver, pendingRegistrationInvites, queueRegistrationInvites } from "~/lib/email/outbox.server";
 import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.server";
 
 const MAX_ADMIN_NOTE = 2000;
@@ -59,7 +60,12 @@ const MAX_ADMIN_NOTE = 2000;
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
-  const [all, clubs, cities] = await Promise.all([listSignups(), listClubs(), listCities()]);
+  const [all, clubs, cities, invites] = await Promise.all([
+    listSignups(),
+    listClubs(),
+    listCities(),
+    pendingRegistrationInvites(),
+  ]);
   const names = new Map(all.map((r) => [r.id, r.name1]));
   const rows = filterSignups(all, filters).map((r) => ({
     ...r,
@@ -73,12 +79,26 @@ export async function loader({ request }: Route.LoaderArgs) {
   for (const r of all) if (r.ref && !refs.has(r.ref)) refs.set(r.ref, r.ref);
   const clubOptions = clubs.map((c) => [c.slug, c.name] as [string, string]);
   const cityOptions = cities.map((c) => [c.slug, c.name] as [string, string]);
-  return { rows, counts: countSignups(rows), total: all.length, refs: [...refs], clubOptions, cityOptions };
+  return {
+    rows,
+    counts: countSignups(rows),
+    total: all.length,
+    refs: [...refs],
+    clubOptions,
+    cityOptions,
+    invitesPending: invites.length,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   await requirePermission(request, { kind: "signups.manage" });
   const form = await request.formData();
+  // The registration invite to the whole interest list (#20), not the filtered view.
+  if (form.get("intent") === "invite") {
+    const queued = await queueRegistrationInvites();
+    await deliver();
+    return { ok: true, queued };
+  }
   const id = Number(form.get("id"));
   if (!Number.isInteger(id) || id <= 0) throw new Response("Hibás azonosító.", { status: 400 });
 
@@ -249,8 +269,63 @@ function SignupTableRow({
   );
 }
 
+// Registration invite (#20): everyone pending on the interest list, once.
+function InviteButton({ pending }: { pending: number }) {
+  const fetcher = useFetcher<{ queued?: number }>();
+  const [open, setOpen] = useState(false);
+  const sending = fetcher.state !== "idle";
+  const queued = fetcher.state === "idle" ? fetcher.data?.queued : undefined;
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!sending) setOpen(next);
+      }}
+    >
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" disabled={pending === 0}>
+          <Send /> Regisztrációs meghívó ({pending} cím)
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        {queued !== undefined ? (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Meghívók elküldve</AlertDialogTitle>
+              <AlertDialogDescription>{queued} levél sorban (napi kvóta szerint)</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction>Rendben</AlertDialogAction>
+            </AlertDialogFooter>
+          </>
+        ) : (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Küldöd a regisztrációs meghívót?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pending} cím kap egy levelet a belépés linkjével, kitöltött e-mail-címmel. Mindenki csak egyszer
+                kapja meg; a párként megadott társak nem kapnak levelet.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={sending}>Mégse</AlertDialogCancel>
+              <Button
+                disabled={sending}
+                onClick={() => fetcher.submit({ intent: "invite" }, { method: "post" })}
+              >
+                {sending ? "Küldés…" : "Küldés"}
+              </Button>
+            </AlertDialogFooter>
+          </>
+        )}
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function AdminSignups({ loaderData }: Route.ComponentProps) {
-  const { rows, counts, total, refs, clubOptions, cityOptions } = loaderData;
+  const { rows, counts, total, refs, clubOptions, cityOptions, invitesPending } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
 
@@ -265,6 +340,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
       }
       actions={
         <>
+          <InviteButton pending={invitesPending} />
           <Button variant="outline" asChild>
             <Link to={`/admin/broadcasts/new?${params.toString()}`}>
               <Mail /> Levél nekik

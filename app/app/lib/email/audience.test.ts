@@ -64,8 +64,9 @@ describe("inviteRecipients", () => {
   const ctx = { leagueCities: new Set(["gyor"]), suppressed: new Set<string>(), accounts: new Set<string>() };
   const emails = (rows: InviteCandidate[], c = ctx) => inviteRecipients(rows, c).map((r) => r.email);
 
-  it("invites the signer by name, never a partner (only email1 is read)", () => {
-    expect(inviteRecipients([row()], ctx)).toEqual([{ name: "Anna", email: "anna@example.com" }]);
+  it("invites the signer by name, never the partner entered on the form", () => {
+    const pair = { ...row(), mode: "pair", name2: "Béla", email2: "bela@example.com" };
+    expect(inviteRecipients([pair], ctx)).toEqual([{ name: "Anna", email: "anna@example.com" }]);
   });
 
   it("invites each address once, case-insensitively", () => {

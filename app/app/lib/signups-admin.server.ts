@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, interestSignups } from "~/db/schema";
@@ -25,7 +25,8 @@ export async function updateSignup(
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").
 // Also removes the stored emails sent to them and the account invite their
-// registration invite added; an unsubscribe is kept. A solo paired with them
+// registration invite added (unless the address has another signup); an
+// unsubscribe is kept. A solo paired with them
 // goes back to the waiting list.
 export async function deleteSignup(id: number): Promise<void> {
   const [row] = await db
@@ -38,7 +39,14 @@ export async function deleteSignup(id: number): Promise<void> {
     .where(eq(interestSignups.pairedWith, id));
   if (!row) return;
   await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
-  await db
-    .delete(accountInvites)
-    .where(and(eq(accountInvites.email, row.email1.toLowerCase()), eq(accountInvites.note, INTEREST_INVITE_NOTE)));
+  // The invite stays while another signup of the same address remains.
+  const email = row.email1.toLowerCase();
+  const [others] = await db
+    .select({ n: count() })
+    .from(interestSignups)
+    .where(eq(sql`lower(${interestSignups.email1})`, email));
+  if (others.n === 0)
+    await db
+      .delete(accountInvites)
+      .where(and(eq(accountInvites.email, email), eq(accountInvites.note, INTEREST_INVITE_NOTE)));
 }

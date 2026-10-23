@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -211,40 +211,62 @@ export async function pendingRegistrationInvites(): Promise<Recipient[]> {
 const INVITE_CHUNK = 30;
 const MARK_CHUNK = 90;
 
-// Queues the registration invite for everyone pending. In one D1 batch (a
-// transaction): the emails, the account_invites rows (so the link works
-// before registration opens), and invited_at on every signup row of each
-// address, so the next send skips them. Returns how many were queued.
+// Sets or clears invited_at on every signup row of these addresses. Setting
+// only touches rows not invited yet, and returns the addresses it claimed.
+async function markInvited(emails: string[], invitedAt: Date | null): Promise<Set<string>> {
+  const claimed = new Set<string>();
+  for (let i = 0; i < emails.length; i += MARK_CHUNK) {
+    const chunk = inArray(sql`lower(${interestSignups.email1})`, emails.slice(i, i + MARK_CHUNK));
+    const rows = await db
+      .update(interestSignups)
+      .set({ invitedAt })
+      .where(invitedAt ? and(chunk, isNull(interestSignups.invitedAt)) : chunk)
+      .returning({ email1: interestSignups.email1 });
+    for (const r of rows) claimed.add(r.email1.toLowerCase());
+  }
+  return claimed;
+}
+
+// Queues the registration invite for everyone pending. The addresses are
+// claimed first (invited_at), so a second send running at the same time gets
+// none of them and nobody is invited twice. Then, in one D1 batch (a
+// transaction): the emails and the account_invites rows (so the link works
+// before registration opens). If that fails, the claim is released. Returns
+// how many were queued.
 export async function queueRegistrationInvites(now = new Date()): Promise<number> {
-  const recipients = await pendingRegistrationInvites();
-  if (recipients.length === 0) return 0;
-  const secret = emailSecret();
-  const messages = await Promise.all(
-    recipients.map(async (r): Promise<NewMessage> => {
-      const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
-      return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...registrationInvite(r, url) };
-    }),
+  const pending = await pendingRegistrationInvites();
+  if (pending.length === 0) return 0;
+  const claimed = await markInvited(
+    pending.map((r) => r.email),
+    now,
   );
+  const recipients = pending.filter((r) => claimed.has(r.email));
+  if (recipients.length === 0) return 0;
   const emails = recipients.map((r) => r.email);
-  const statements: BatchItem<"sqlite">[] = [];
-  for (let i = 0; i < messages.length; i += INSERT_CHUNK)
-    statements.push(db.insert(emailMessages).values(messages.slice(i, i + INSERT_CHUNK).map(messageValues)));
-  for (let i = 0; i < emails.length; i += INVITE_CHUNK)
-    statements.push(
-      db
-        .insert(accountInvites)
-        .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
-        .onConflictDoNothing(),
+  try {
+    const secret = emailSecret();
+    const messages = await Promise.all(
+      recipients.map(async (r): Promise<NewMessage> => {
+        const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
+        return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...registrationInvite(r, url) };
+      }),
     );
-  for (let i = 0; i < emails.length; i += MARK_CHUNK)
-    statements.push(
-      db
-        .update(interestSignups)
-        .set({ invitedAt: now })
-        .where(inArray(sql`lower(${interestSignups.email1})`, emails.slice(i, i + MARK_CHUNK))),
-    );
-  const [first, ...rest] = statements;
-  await db.batch([first, ...rest]);
+    const statements: BatchItem<"sqlite">[] = [];
+    for (let i = 0; i < messages.length; i += INSERT_CHUNK)
+      statements.push(db.insert(emailMessages).values(messages.slice(i, i + INSERT_CHUNK).map(messageValues)));
+    for (let i = 0; i < emails.length; i += INVITE_CHUNK)
+      statements.push(
+        db
+          .insert(accountInvites)
+          .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
+          .onConflictDoNothing(),
+      );
+    const [first, ...rest] = statements;
+    await db.batch([first, ...rest]);
+  } catch (e) {
+    await markInvited(emails, null);
+    throw e;
+  }
   return recipients.length;
 }
 

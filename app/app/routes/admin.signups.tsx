@@ -271,7 +271,9 @@ function SignupTableRow({
 
 // Registration invite (#20): everyone pending on the interest list, once.
 function InviteButton({ pending }: { pending: number }) {
-  const fetcher = useFetcher<{ queued?: number }>();
+  // A new fetcher each time the dialog opens, so an earlier result doesn't stick.
+  const [round, setRound] = useState(0);
+  const fetcher = useFetcher<{ queued?: number }>({ key: `registration-invite-${round}` });
   const [open, setOpen] = useState(false);
   const sending = fetcher.state !== "idle";
   const queued = fetcher.state === "idle" ? fetcher.data?.queued : undefined;
@@ -280,7 +282,9 @@ function InviteButton({ pending }: { pending: number }) {
     <AlertDialog
       open={open}
       onOpenChange={(next) => {
-        if (!sending) setOpen(next);
+        if (sending) return;
+        if (next) setRound((r) => r + 1);
+        setOpen(next);
       }}
     >
       <AlertDialogTrigger asChild>
@@ -292,7 +296,7 @@ function InviteButton({ pending }: { pending: number }) {
         {queued !== undefined ? (
           <>
             <AlertDialogHeader>
-              <AlertDialogTitle>Meghívók elküldve</AlertDialogTitle>
+              <AlertDialogTitle>Meghívók sorban</AlertDialogTitle>
               <AlertDialogDescription>{queued} levél sorban (napi kvóta szerint)</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

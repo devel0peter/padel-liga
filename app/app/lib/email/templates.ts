@@ -185,7 +185,7 @@ export function registrationInvite(to: { name: string; email: string }, unsubscr
       `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
       registrationLink(to.email),
       `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
-      `Regisztráció után az oldalon hívod meg a párodat, és együtt neveztek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      `Hamarosan itt hívhatod meg a párodat, és együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
       SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),

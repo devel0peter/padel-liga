@@ -42,3 +42,25 @@ const shortDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month:
 export function formatShortDate(date: Date): string {
   return shortDate.format(date);
 }
+
+const fullDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+
+// "2026. 10. 01."
+export function formatDate(date: Date): string {
+  return fullDate.format(date);
+}
+
+const dayAndTime = new Intl.DateTimeFormat("hu-HU", {
+  timeZone: TIME_ZONE,
+  month: "short",
+  day: "numeric",
+  weekday: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+// A deadline: "nov. 29., vasárnap 23:59"
+export function formatDeadline(date: Date): string {
+  return dayAndTime.format(date);
+}

@@ -1,23 +1,26 @@
-import { data, Form, Link, useFetcher } from "react-router";
+import { data, Form, Link, useFetcher, useNavigation } from "react-router";
 
 import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { ProfileFields } from "~/components/profile-fields";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
-import { hasGoogleLogin } from "~/lib/auth/accounts.server";
+import { hasGoogleLogin, updateProfile } from "~/lib/auth/accounts.server";
 import { getActor } from "~/lib/auth/admin.server";
 import { roleLabel } from "~/lib/auth/permissions";
-import { initials } from "~/lib/auth/rules";
+import { initials, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
 import { isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
 import { disabledKindsFor, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import { formatPhone } from "~/lib/phone";
 import { SITE_NAME } from "~/lib/site";
 
-// The profile, inside the app shell (app.tsx). Profile fields (phone, level)
-// come with #16.
+// The profile, inside the app shell (app.tsx): name, level and phone number
+// (the phone is never shown to anyone else on this page or any public page),
+// notification settings, logout everywhere.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Profil – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -30,6 +33,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     name: user.name,
     email: user.email,
     imageUrl: user.imageUrl,
+    level: user.level,
+    phone: formatPhone(user.phone),
     initials: initials(user.name, user.email),
     google: await hasGoogleLogin(user.id),
     role: roleLabel(actor),
@@ -42,11 +47,21 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-// Switches one notification kind on or off (Értesítések section).
+// Saves the profile form, or switches one notification kind on or off
+// (Értesítések section).
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
   const form = await request.formData();
+  if (form.get("intent") === "profile") {
+    const result = validateProfile(
+      { name: form.get("name"), level: form.get("level"), phone: form.get("phone") },
+      { requireConsent: false },
+    );
+    if (!result.ok) return data({ saved: false, errors: result.errors }, { status: 400 });
+    await updateProfile(user.id, result.value);
+    return { saved: true, errors: {} as ProfileErrors };
+  }
   const kind = form.get("kind");
   if (!isNotificationKind(kind) || !kindsFor(actor).includes(kind)) return data({ ok: false }, { status: 400 });
   await setKindEnabled(user.id, kind, form.get("enabled") === "1");
@@ -85,7 +100,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export default function Profile({ loaderData: d }: Route.ComponentProps) {
+export default function Profile({ loaderData: d, actionData }: Route.ComponentProps) {
+  const busy = useNavigation().state !== "idle";
+  const errors: ProfileErrors = (actionData && "errors" in actionData ? actionData.errors : null) ?? {};
+  const saved = !!actionData && "saved" in actionData && actionData.saved;
   return (
     <AppPage title="Profil">
       <div className="flex items-center gap-4">
@@ -99,7 +117,30 @@ export default function Profile({ loaderData: d }: Route.ComponentProps) {
         </div>
       </div>
 
-      <dl className="grid max-w-2xl gap-4">
+      <section id="adatok" className="grid max-w-2xl scroll-mt-6 gap-4">
+        <h2 className="font-display text-lg font-extrabold">Adataid</h2>
+        {!d.level && (
+          <p role="status" className="rounded-md border border-dashed p-3 text-sm">
+            Még nem adtad meg a szinted. Kell a jelentkezéshez.
+          </p>
+        )}
+        <Form method="post" className="grid gap-5">
+          <input type="hidden" name="intent" value="profile" />
+          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone }} />
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={busy}>
+              Mentés
+            </Button>
+            {saved && !busy && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Elmentettük.
+              </p>
+            )}
+          </div>
+        </Form>
+      </section>
+
+      <dl className="grid max-w-2xl gap-4 border-t pt-6">
         <Row label="E-mail-cím">{d.email}</Row>
         <Row label="Belépés">{d.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</Row>
         {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}

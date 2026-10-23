@@ -17,10 +17,12 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireUser(request);
+  const user = await requireUser(request);
   const actor = (await getActor(request))!;
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []));
   return {
+    // Accounts from before the level was asked for: nudge them to the profile.
+    needsLevel: !user.level,
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
 }
@@ -28,6 +30,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function AppHome({ loaderData: d }: Route.ComponentProps) {
   return (
     <AppPage title="Kezdőlap">
+      {d.needsLevel && (
+        <section role="status" className="grid max-w-2xl gap-2 rounded-lg border border-nav-active bg-nav-active-bg p-6">
+          <h2 className="font-display text-lg font-bold">Add meg a szinted</h2>
+          <p>
+            A jelentkezéshez kell a szinted, és innen indul az értékszámod.{" "}
+            <Link to="/profile#adatok" className="font-semibold underline">
+              Megadom a profilomban
+            </Link>
+          </p>
+        </section>
+      )}
       <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
         <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
         <p className="text-muted-foreground">

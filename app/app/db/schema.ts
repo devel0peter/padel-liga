@@ -121,6 +121,13 @@ export const users = sqliteTable("users", {
   // "superadmin" (Admin) is set only by `npm run auth:superadmin -w app`;
   // no request handler writes this column. Organizer rights: league_admins.
   platformRole: text("platform_role", { enum: ["player", "superadmin"] }).notNull().default("player"),
+  // Self-assessed level (app/lib/interest.ts LEVELS keys), the base of the
+  // starting Elo. Required on the first-login page; null only for accounts
+  // from before it was asked (the home page prompts them).
+  level: text("level", { enum: ["kezdo", "kozephalado", "halado", "versenyzo"] }),
+  // Optional Hungarian phone number in E.164 ("+36301234567"). Personal data:
+  // never on a public page; only the current phase's opponents will see it.
+  phone: text("phone"),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })

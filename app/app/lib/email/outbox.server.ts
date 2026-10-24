@@ -17,6 +17,7 @@ import {
   broadcastEmail,
   loginCode,
   pairAnswer,
+  pairDissolved,
   pairIntro,
   pairInvite,
   partnerNotice,
@@ -195,6 +196,16 @@ export async function queuePairAnswer(
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
   await deliver(await enqueue([{ kind: "pair_answer", toEmail, ...pairAnswer(input) }]));
+}
+
+// The partner learns the pair was dissolved (#85). An unsubscribed or bounced
+// address gets nothing, like the other pair emails.
+export async function queuePairDissolved(
+  toEmail: string,
+  input: { to: string; dissolverName: string; league: string },
+): Promise<void> {
+  if (await isSuppressed(toEmail)) return;
+  await deliver(await enqueue([{ kind: "pair_dissolved", toEmail, ...pairDissolved(input) }]));
 }
 
 export async function createBroadcast(input: {

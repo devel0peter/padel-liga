@@ -47,6 +47,7 @@ vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor
 vi.mock("~/lib/email/outbox.server", () => ({
   queuePairInvite: async (to: string, input: any) => h.mails.push({ kind: "invite", to, ...input }),
   queuePairAnswer: async (to: string, input: any) => h.mails.push({ kind: "answer", ...input, toEmail: to }),
+  queuePairDissolved: async (to: string, input: any) => h.mails.push({ kind: "dissolved", ...input, toEmail: to }),
 }));
 
 const P = await import("~/lib/pairs.server");
@@ -209,6 +210,34 @@ describe("pairs.server on real SQLite", () => {
     expect(await P.createInvite(user("a"), league, "c@x.hu")).toEqual({ ok: true });
     const [oa] = await P.pairOverview(user("a"), [league]);
     expect(oa.pair).toBeNull();
+  });
+
+  it("dissolve queues exactly one email, to the partner only, with the dissolver's name", async () => {
+    await P.createInvite(user("a"), league, "b@x.hu");
+    await P.answerInvite(user("b"), 1, "accept");
+    const pairId = one("select id from pairs").id;
+    h.mails = [];
+    expect(await P.dissolvePair(user("a"), pairId)).toEqual({ ok: true });
+    expect(h.mails).toEqual([{ kind: "dissolved", toEmail: "b@x.hu", to: "Béla", dissolverName: "A", league: "Padelpárbaj Győr" }]);
+    // A second submit finds nothing to dissolve and sends nothing.
+    expect(await P.dissolvePair(user("a"), pairId)).toMatchObject({ ok: false });
+    expect(h.mails).toHaveLength(1);
+  });
+
+  it("dissolve by the invitee emails the inviter", async () => {
+    await P.createInvite(user("a"), league, "b@x.hu");
+    await P.answerInvite(user("b"), 1, "accept");
+    h.mails = [];
+    await P.dissolvePair(user("b"), one("select id from pairs").id);
+    expect(h.mails).toEqual([{ kind: "dissolved", toEmail: "a@x.hu", to: "Anna", dissolverName: "B", league: "Padelpárbaj Győr" }]);
+  });
+
+  it("a refused dissolve sends no email", async () => {
+    await P.createInvite(user("a"), league, "b@x.hu");
+    await P.answerInvite(user("b"), 1, "accept");
+    h.mails = [];
+    expect(await P.dissolvePair(user("c"), one("select id from pairs").id)).toMatchObject({ ok: false });
+    expect(h.mails).toEqual([]);
   });
 
   it("caps invites per day", async () => {

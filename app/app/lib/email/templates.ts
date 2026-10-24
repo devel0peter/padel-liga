@@ -260,3 +260,20 @@ export function pairAnswer(input: { to: string; inviteeName: string; league: str
     footer(`Azért kaptad ezt a levelet, mert párnak hívtál meg valakit a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }
+
+// The partner learns the pair was dissolved (#85). Only the dissolving
+// player's name, never their email or phone; the name stays plain text.
+export function pairDissolved(input: { to: string; dissolverName: string; league: string }): Email {
+  const pairPage = `${SITE_URL}/pair`;
+  return buildPlain(
+    `${input.dissolverName} megszüntette a párotokat – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.dissolverName} megszüntette a párotokat (${input.league}). Új párt a Párom oldalon hívhatsz:`,
+      pairPage,
+      SIGNATURE,
+    ],
+    [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert pár voltatok a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}

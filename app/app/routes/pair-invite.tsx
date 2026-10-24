@@ -26,7 +26,8 @@ export function meta({}: Route.MetaArgs) {
 const DONE: Record<Exclude<InviteStatus, "pending">, string> = {
   accepted: "Ezt a meghívót már elfogadtad.",
   declined: "Ezt a meghívót nem kérted.",
-  cancelled: "Ezt a meghívót visszavonták.",
+  // Cancelled by the inviter, or because one of you paired up with someone else.
+  cancelled: "Ez a meghívó már nem érvényes.",
 };
 
 async function invitee(request: Request, token: string | undefined) {
@@ -66,7 +67,7 @@ export default function PairInvite({ loaderData: d, actionData }: Route.Componen
           <p>{d.message}</p>
           <p>
             <Link to="/pair" className="underline">
-              Tovább a párodhoz
+              Tovább a Párom oldalra
             </Link>
           </p>
         </div>

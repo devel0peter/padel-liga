@@ -208,6 +208,18 @@ describe("pairInvite", () => {
     expect(email.html).toContain('href="https://padelparbaj.hu/login?email=bela%40example.com&amp;returnTo=%2Fpair%2Finvite%2Ftok"');
   });
 
+  it("never turns the inviter's name into a link: anyone can type a URL as their name", () => {
+    const email = pairInvite({ inviterName: "Nyertél https://evil.example/x", league: "Győr", link, hasAccount: true });
+    expect(email.html).not.toContain('href="https://evil.example');
+    expect(email.html).toContain(`href="${link}"`);
+  });
+
+  it("has an unsubscribe link when given one: it goes to an address another player typed", () => {
+    const unsub = "https://padelparbaj.hu/unsubscribe?t=abc";
+    const email = pairInvite({ inviterName: "Nagy Anna", league: "Győr", link, hasAccount: true }, unsub);
+    expect(email.text).toContain(`Leiratkozás: ${unsub}`);
+  });
+
   it("escapes the inviter's name in the HTML", () => {
     const email = pairInvite({ inviterName: "<b>Anna</b>", league: "Győr", link, hasAccount: true });
     expect(email.html).not.toContain("<b>Anna</b>");

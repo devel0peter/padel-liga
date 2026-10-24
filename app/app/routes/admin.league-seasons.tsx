@@ -75,8 +75,8 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
 
   if (form.get("intent") === "delete") {
     if (!id) throw new Response("Hibás azonosító.", { status: 400 });
-    if (!allowed?.canDelete) throw data("Ezt a szezont már nem lehet törölni: van nevezés.", { status: 409 });
-    if (!(await deleteSeason(id, actor.id))) throw data("Ezt a szezont már nem lehet törölni: van nevezés.", { status: 409 });
+    if (!allowed?.canDelete) throw data("Ezt a szezont már nem lehet törölni: van nevezés, vagy kint vannak a csoportok.", { status: 409 });
+    if (!(await deleteSeason(id, actor.id))) throw data("Ezt a szezont már nem lehet törölni: van nevezés, vagy kint vannak a csoportok.", { status: 409 });
     return redirect(base);
   }
 
@@ -268,6 +268,7 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                 <TableHead>Körök</TableHead>
                 <TableHead>Vége</TableHead>
                 <TableHead>Nevezések</TableHead>
+                <TableHead>1. kör</TableHead>
                 <TableHead>
                   <span className="sr-only">Műveletek</span>
                 </TableHead>
@@ -289,6 +290,11 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                     <TableCell className="whitespace-nowrap">
                       <Link to={`${base}/${s.id}/entries`} className="underline">
                         {s.entries.pending > 0 ? `${s.entries.pending} függőben` : `${s.entries.approved} jóváhagyva`}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Link to={`${base}/${s.id}/groups`} className="underline">
+                        {s.canEdit ? "Csoportok" : "Közzétéve"}
                       </Link>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

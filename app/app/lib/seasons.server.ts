@@ -2,7 +2,7 @@ import type { Phase } from "@padel-liga/rules";
 import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { seasonEntries, seasonPhases, seasons } from "~/db/schema";
+import { groups, seasonEntries, seasonPhases, seasons } from "~/db/schema";
 
 import { audit } from "./leagues.server";
 import { registrationWindow, type Season, type SeasonInput } from "./seasons";
@@ -68,15 +68,21 @@ export async function getSeason(id: number): Promise<Season | undefined> {
   };
 }
 
-// Whether the phase 1 groups are published and how many pairs entered (any
-// entry but a withdrawn one: a dissolved pair's entry doesn't block deleting).
-// Groups don't exist yet (#24): until they do, a season can always be edited.
+// Whether the phase 1 groups are published (#24) and how many pairs entered
+// (any entry but a withdrawn one: a dissolved pair's entry doesn't block
+// deleting).
 export async function seasonState(id: number): Promise<{ groupsPublished: boolean; entries: number }> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(seasonEntries)
-    .where(and(eq(seasonEntries.seasonId, id), ne(seasonEntries.status, "withdrawn")));
-  return { groupsPublished: false, entries: row?.n ?? 0 };
+  const [[row], [published]] = await Promise.all([
+    db
+      .select({ n: count() })
+      .from(seasonEntries)
+      .where(and(eq(seasonEntries.seasonId, id), ne(seasonEntries.status, "withdrawn"))),
+    db
+      .select({ n: count() })
+      .from(groups)
+      .where(and(eq(groups.seasonId, id), sql`${groups.publishedAt} is not null`)),
+  ]);
+  return { groupsPublished: (published?.n ?? 0) > 0, entries: row?.n ?? 0 };
 }
 
 function columns(input: SeasonInput) {
@@ -120,8 +126,9 @@ export async function updateSeason(id: number, input: SeasonInput, phases: Phase
   await audit(actorId, "season.update", `season:${id}`, input.name);
 }
 
-// Only while it has no entry but withdrawn ones, checked in the delete
-// itself: an entry made in the meantime isn't deleted with it. False if not.
+// Only while it has no entry but withdrawn ones and no published groups,
+// checked in the delete itself: an entry made in the meantime isn't deleted
+// with it. False if not.
 export async function deleteSeason(id: number, actorId: string): Promise<boolean> {
   const [row] = await db
     .delete(seasons)
@@ -129,6 +136,7 @@ export async function deleteSeason(id: number, actorId: string): Promise<boolean
       and(
         eq(seasons.id, id),
         sql`not exists (select 1 from ${seasonEntries} where ${seasonEntries.seasonId} = ${id} and ${seasonEntries.status} <> 'withdrawn')`,
+        sql`not exists (select 1 from ${groups} where ${groups.seasonId} = ${id} and ${groups.publishedAt} is not null)`,
       ),
     )
     .returning({ name: seasons.name });

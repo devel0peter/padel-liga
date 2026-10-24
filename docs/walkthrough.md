@@ -8,13 +8,13 @@ The page labels below are the Hungarian ones you see on screen.
 
 1. Install and configure once, from the repo root:
    - `npm ci`
-   - Copy `app/.dev.vars.example` to `app/.dev.vars`. Set `TURNSTILE_SITE_KEY=""` (an empty key means no bot check, so asking for a login code works locally). Leave `RESEND_API_KEY=""` empty: with a key, a click on "Küldés" would try to send to the fake addresses for real.
+   - Copy `app/.dev.vars.example` to `app/.dev.vars`. Set `TURNSTILE_SITE_KEY=""` (an empty key means no bot check, so asking for a login code works locally). Leave `RESEND_API_KEY=""` empty: with a key, a click on "Küldés" would try to send to the fake addresses for real. Also set `EMAIL_DAILY_LIMIT="1000"`: a full run sends about 100 emails (login codes included), and the default daily limit of 100 would leave the last group emails unsent (nothing sends the rest locally).
 2. Migrate and seed the local database:
    - `npm run db:migrate:local -w app`
    - `npm run db:seed:local -w app`
 3. Start the app with `npm run dev` and open <http://localhost:5173>.
 
-The seed takes no options and refuses `--remote`, a production environment and CI. It only writes the local D1. Run it again at any time to start over: it deletes everything on `@example.test`, the city "Mintaváros", its league and its clubs (including everything a walkthrough created on top: accounts, pairs, entries, groups, held mail) and writes the same starting state again. Round 1 starts on the Monday about two weeks from the day you seed.
+The seed takes no options and refuses `--remote`, a production environment and CI. It only writes the local D1. Run it again at any time to start over: it deletes everything on `@example.test`, and the city "Mintaváros" with its league, clubs and signups (including everything a walkthrough created on top: accounts, pairs, entries, groups, held mail) and writes the same starting state again. Round 1 starts on the Monday about two weeks from the day you seed.
 
 ### What the seed contains
 

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, interestSignups } from "~/db/schema";
@@ -39,14 +39,16 @@ export async function deleteSignup(id: number): Promise<void> {
     .where(eq(interestSignups.pairedWith, id));
   if (!row) return;
   await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
-  // The invite stays while another signup of the same address remains.
-  const email = row.email1.toLowerCase();
-  const [others] = await db
-    .select({ n: count() })
-    .from(interestSignups)
-    .where(eq(sql`lower(${interestSignups.email1})`, email));
-  if (others.n === 0)
-    await db
-      .delete(accountInvites)
-      .where(and(eq(accountInvites.email, email), eq(accountInvites.note, INTEREST_INVITE_NOTE)));
+  // The invite stays while another signup names the same address (as the
+  // signer or, since D26, as the partner).
+  for (const email of new Set([row.email1, row.email2].filter((e): e is string => !!e).map((e) => e.toLowerCase()))) {
+    const [others] = await db
+      .select({ n: count() })
+      .from(interestSignups)
+      .where(or(eq(sql`lower(${interestSignups.email1})`, email), eq(sql`lower(${interestSignups.email2})`, email)));
+    if (others.n === 0)
+      await db
+        .delete(accountInvites)
+        .where(and(eq(accountInvites.email, email), eq(accountInvites.note, INTEREST_INVITE_NOTE)));
+  }
 }

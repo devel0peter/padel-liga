@@ -148,6 +148,13 @@
       "when": 1792843239235,
       "tag": "0020_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792874060326,
+      "tag": "0021_signup_partner_invited",
+      "breakpoints": true
     }
   ]
 }

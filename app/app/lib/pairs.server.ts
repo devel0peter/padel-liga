@@ -43,7 +43,7 @@ export async function pairLeagues(): Promise<PairLeague[]> {
 }
 
 // Either player in an active pair of the league.
-function activePairWith(leagueId: number, userIds: string[]) {
+export function activePairWith(leagueId: number, userIds: string[]) {
   return sql`exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
     and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))`;
 }

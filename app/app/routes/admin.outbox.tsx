@@ -49,12 +49,14 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
     const n = await discardHeld(kind, upTo);
     return { notice: n > 0 ? `Elvetettél ${n} levelet.` : "Ebből már nincs visszatartott levél." };
   }
-  const n = await releaseHeld(kind, upTo);
-  if (n === 0) return { notice: "Ebből már nincs visszatartott levél." };
+  const { released, skipped } = await releaseHeld(kind, upTo);
+  const dropped = skipped > 0 ? ` ${skipped} leiratkozott vagy nem kézbesíthető címre nem megy.` : "";
+  if (released === 0) return { notice: `Ebből már nincs visszatartott levél.${dropped}` };
   // A cron run right away, so it doesn't wait for the next hour; the daily
   // quota still decides how much goes out today.
   const { sent } = await deliver();
-  return { notice: `${n} levél indult. Most ${sent} ment ki, a többi a napi kvóta szerint megy.` };
+  const later = sent < released ? " Ami ma nem fér bele, a következő napokon megy." : "";
+  return { notice: `${released} levél a sorban, most ${sent} ment ki.${later}${dropped}` };
 }
 
 type Held = Route.ComponentProps["loaderData"]["held"][number];
@@ -122,7 +124,7 @@ export default function AdminOutbox({ loaderData, actionData }: Route.ComponentP
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2 text-sm">
-                <p className="text-muted-foreground">Egy közülük, a címek elrejtve:</p>
+                <p className="text-muted-foreground">Az egyik levél (a címek elrejtve):</p>
                 <div className="rounded-md border bg-muted/40 p-3">
                   <p className="font-semibold">{h.subject}</p>
                   <pre className="mt-2 max-h-64 overflow-auto font-sans text-sm whitespace-pre-wrap">{h.text}</pre>

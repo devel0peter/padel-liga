@@ -71,7 +71,7 @@ describe("/admin/outbox access", () => {
     const page = await R.loader(args(get(cookie)));
     expect(page.held.map((x) => [x.kind, x.count])).toEqual([["pair_answer", 1]]);
     expect(await R.action(args(post(cookie, { intent: "send", kind: "pair_answer", upTo: "1" })))).toEqual({
-      notice: "1 levél indult. Most 1 ment ki, a többi a napi kvóta szerint megy.",
+      notice: "1 levél a sorban, most 1 ment ki.",
     });
     expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu"]);
   });

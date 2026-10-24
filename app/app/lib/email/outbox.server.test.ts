@@ -200,7 +200,7 @@ describe("held outbox", () => {
     insert("pair_answer", 3);
     insert("pair_dissolved", 2);
     insert("pair_answer", 1, "failed");
-    expect(await O.releaseHeld("pair_answer", 2)).toBe(2);
+    expect(await O.releaseHeld("pair_answer", 2)).toEqual({ released: 2, skipped: 0 });
     expect(count("kind = 'pair_answer' and status = 'pending'")).toBe(2);
     expect(count("kind = 'pair_answer' and status = 'held'")).toBe(1);
     expect(count("kind = 'pair_answer' and status = 'failed'")).toBe(1);
@@ -221,6 +221,20 @@ describe("held outbox", () => {
     expect(h.sent.every((m) => m.subject.startsWith("pair_answer"))).toBe(true);
     expect(count("status = 'pending'")).toBe(30);
     expect(count("status = 'held'")).toBe(0);
+  });
+
+  it("Küldés drops mail to an address that unsubscribed or bounced while it was held", async () => {
+    insert("broadcast", 1, "held", "anna@x.hu");
+    insert("broadcast", 1, "held", "Bela@x.hu");
+    insert("broadcast", 1, "held", "cili@x.hu");
+    insert("pair_answer", 1, "held", "bela@x.hu");
+    await O.suppress("anna@x.hu", "unsubscribed");
+    await O.suppress("bela@x.hu", "bounced");
+    expect(await O.releaseHeld("broadcast", 1000)).toEqual({ released: 1, skipped: 2 });
+    await O.deliver();
+    expect(h.sent.map((m) => m.to)).toEqual(["cili@x.hu"]);
+    expect(count("kind = 'broadcast'")).toBe(1);
+    expect(count("kind = 'pair_answer' and status = 'held'")).toBe(1);
   });
 
   it("Elvetés deletes only that kind's held mail, up to what the Admin saw", async () => {

@@ -168,7 +168,8 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
 // players can't use invites to flood an inbox.
 const PAIR_INVITES_PER_ADDRESS_PER_DAY = 3;
 
-// A partner invite (#21), sent at once. It goes to an address another player
+// A partner invite (#21), held for the Admin like every email but login codes
+// and signup confirmations (#88). It goes to an address another player
 // typed, so it has an unsubscribe link. An unsubscribed or bounced address,
 // or one over the daily cap, gets nothing; the invite still shows in the app
 // once they log in.
@@ -532,14 +533,19 @@ const heldOfKind = (kind: MessageKind, upTo: number) =>
   and(eq(emailMessages.status, "held"), eq(emailMessages.kind, kind), lte(emailMessages.id, upTo));
 
 // "Küldés": the kind's held mail joins the normal queue, where deliver()
-// keeps the daily quota and the send order. Returns how many were released.
-export async function releaseHeld(kind: MessageKind, upTo: number): Promise<number> {
-  const rows = await db
-    .update(emailMessages)
-    .set({ status: "pending" })
-    .where(heldOfKind(kind, upTo))
-    .returning({ id: emailMessages.id });
-  return rows.length;
+// keeps the daily quota and the send order. Mail to an address that
+// unsubscribed, bounced or complained while it was held is deleted instead,
+// as if it had never been queued. One D1 batch (a transaction).
+export async function releaseHeld(kind: MessageKind, upTo: number): Promise<{ released: number; skipped: number }> {
+  const suppressed = db.select({ email: emailSuppressions.email }).from(emailSuppressions);
+  const [skipped, released] = await db.batch([
+    db
+      .delete(emailMessages)
+      .where(and(heldOfKind(kind, upTo), inArray(sql`lower(${emailMessages.toEmail})`, suppressed)))
+      .returning({ id: emailMessages.id }),
+    db.update(emailMessages).set({ status: "pending" }).where(heldOfKind(kind, upTo)).returning({ id: emailMessages.id }),
+  ]);
+  return { released: released.length, skipped: skipped.length };
 }
 
 // "Elvetés": the kind's held mail is deleted unsent. Returns how many.

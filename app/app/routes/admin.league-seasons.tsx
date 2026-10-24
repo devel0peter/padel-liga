@@ -25,6 +25,7 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { formatDate, formatShortDate } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { MAX_BREAKS, MAX_NAME, parseSeason, previewPhases, seasonActions, seasonEnd, type SeasonField } from "~/lib/seasons";
+import { entryCounts } from "~/lib/season-entries.server";
 import { createSeason, deleteSeason, listSeasons, seasonInLeague, seasonState, updateSeason } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -45,12 +46,14 @@ async function leagueScope(request: Request, slug: string) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league } = await leagueScope(request, params.league);
   const seasons = await listSeasons(league.id);
+  const counts = await entryCounts(seasons.map((s) => s.id));
   return {
     league: { name: league.name },
     seasons: await Promise.all(
       seasons.map(async (s) => ({
         ...s,
         ...seasonActions(await seasonState(s.id)),
+        entries: counts.get(s.id)!,
         // The form's days, as the organizer typed them.
         registrationOpens: budapestDay(s.registrationOpensAt),
         registrationCloses: budapestDay(s.registrationClosesAt),
@@ -264,6 +267,7 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                 <TableHead>Nevezés</TableHead>
                 <TableHead>Körök</TableHead>
                 <TableHead>Vége</TableHead>
+                <TableHead>Nevezések</TableHead>
                 <TableHead>
                   <span className="sr-only">Műveletek</span>
                 </TableHead>
@@ -282,6 +286,11 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                       <PhaseList phases={s.phases} compact />
                     </TableCell>
                     <TableCell>{end && formatDate(end)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Link to={`${base}/${s.id}/entries`} className="underline">
+                        {s.entries.pending > 0 ? `${s.entries.pending} függőben` : `${s.entries.approved} jóváhagyva`}
+                      </Link>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {s.canEdit && (
                         <Button variant="ghost" size="icon" aria-label="Szerkesztés" asChild>

@@ -2,6 +2,7 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
+import { formatShortDate } from "../format";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { SHARE_REFS, shareUrl } from "../share";
@@ -275,5 +276,46 @@ export function pairDissolved(input: { to: string; dissolverName: string; league
     ],
     [pairPage],
     footer(`Azért kaptad ezt a levelet, mert pár voltatok a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+// Both players learn the Szervező's decision on their season entry (#23),
+// with the note if there is one. The note and the names stay plain text.
+export function seasonEntryDecision(input: {
+  to: string;
+  partnerName: string;
+  league: string;
+  season: string;
+  approved: boolean;
+  // Where an approved pair starts; null: the next season.
+  joins: { phase: number; startsAt: Date } | null;
+  note: string | null;
+}): Email {
+  const pairPage = `${SITE_URL}/pair`;
+  const where = `${input.season}, ${input.league}`;
+  const start = !input.approved
+    ? null
+    : input.joins === null
+      ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok, újra nevezni nem kell."
+      : input.joins.phase === 1
+        ? `Az 1. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`
+        : `A szezon már elindult, ezért a ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
+  return buildPlain(
+    input.approved
+      ? `Jóváhagyták a nevezéseteket – ${SITE_NAME}`
+      : `Nem fogadták el a nevezéseteket – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      input.approved
+        ? `A szervező jóváhagyta a nevezéseteket ${input.partnerName} pároddal (${where}).`
+        : `A szervező most nem fogadta el a nevezéseteket ${input.partnerName} pároddal (${where}).`,
+      start,
+      input.note ? `A szervező üzenete:\n${input.note}` : null,
+      `A nevezéseteket a Párom oldalon is látod:`,
+      pairPage,
+      SIGNATURE,
+    ].filter((p): p is string => p !== null),
+    [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

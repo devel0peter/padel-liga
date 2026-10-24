@@ -134,6 +134,13 @@
       "when": 1792832714942,
       "tag": "0018_pairs",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792839145430,
+      "tag": "0019_season_entries",
+      "breakpoints": true
     }
   ]
 }

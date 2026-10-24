@@ -5,6 +5,7 @@ import { db } from "~/db/client.server";
 import { accountInvites, leagues, pairInvites, pairs, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
 import { queuePairAnswer, queuePairDissolved, queuePairInvite } from "~/lib/email/outbox.server";
+import { withdrawEntries } from "~/lib/season-entries.server";
 import { SITE_URL } from "~/lib/site";
 
 import { normalizeEmail } from "./auth/rules";
@@ -310,7 +311,7 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
 
 // "Pár megszüntetése" (D16): either player, not while the pair plays in a
 // group of a running phase. The partner is emailed (#85); the player who
-// dissolved it is not.
+// dissolved it is not. Its season entries not played yet are withdrawn (D19).
 export async function dissolvePair(user: User, pairId: number): Promise<Result> {
   const [pair] = await db
     .select({ status: pairs.status, playerA: pairs.playerA, playerB: pairs.playerB, league: leagues.name })
@@ -320,11 +321,16 @@ export async function dissolvePair(user: User, pairId: number): Promise<Result> 
   if (!pair || (pair.playerA !== user.id && pair.playerB !== user.id) || pair.status !== "active")
     return { ok: false, error: "Ez a pár már nem létezik." };
   if (!canDissolve(pair, user.id, await pairInRunningGroup(pairId))) return { ok: false, error: DISSOLVE_REFUSED };
-  const dissolved = await db
-    .update(pairs)
-    .set({ status: "dissolved", dissolvedAt: new Date(), dissolvedBy: user.id })
-    .where(and(eq(pairs.id, pairId), eq(pairs.status, "active")))
-    .returning({ id: pairs.id });
+  const now = new Date();
+  // With its entries for seasons it hasn't played in yet (D19), in one batch.
+  const [dissolved] = await db.batch([
+    db
+      .update(pairs)
+      .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: user.id })
+      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active")))
+      .returning({ id: pairs.id }),
+    withdrawEntries(pairId, now),
+  ]);
   // Two submits at once: only the one that dissolved it sends the email.
   if (dissolved.length === 0) return { ok: true };
   const [partner] = await db

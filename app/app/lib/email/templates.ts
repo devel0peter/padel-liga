@@ -2,7 +2,8 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatShortDate } from "../format";
+import { formatDeadline, formatShortDate } from "../format";
+import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { SHARE_REFS, shareUrl } from "../share";
@@ -316,6 +317,41 @@ export function seasonEntryDecision(input: {
       SIGNATURE,
     ].filter((p): p is string => p !== null),
     [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+// The groups are published (#24, D22): each player gets their group, the
+// pair they play each week (names only, never an email or phone) and the
+// deadline. Names stay plain text.
+export function groupsPublished(input: {
+  to: string;
+  partnerName: string;
+  league: string;
+  season: string;
+  phase: number;
+  group: number;
+  // One per week: the date range and the opponents' two names, or null for
+  // the rest week of a group of 3.
+  weeks: { week: number; range: string; opponents: [string, string] | null }[];
+  deadline: Date;
+}): Email {
+  const home = `${SITE_URL}/home`;
+  const schedule = input.weeks
+    .map((w) => `${w.week}. hét (${w.range}): ${w.opponents ? `${w.opponents.join(" és ")} ellen` : "pihenőhét"}`)
+    .join("\n");
+  return buildPlain(
+    `Itt a csoportod: ${input.group}. csoport – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Kész ${withArticle(input.phase)} kör csoportbeosztása (${input.season}, ${input.league}). ${input.partnerName} pároddal ${withArticle(input.group)} csoportban játszotok.`,
+      `A meccseitek:\n${schedule}`,
+      `Határidő: ${formatDeadline(input.deadline)}. Addig bármikor lejátszhatjátok a meccseket, de érdemes a kiírt héten.`,
+      `Belépés:`,
+      home,
+      SIGNATURE,
+    ],
+    [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

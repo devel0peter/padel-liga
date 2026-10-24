@@ -15,6 +15,7 @@ import { listCities } from "~/lib/cities.server";
 
 import {
   broadcastEmail,
+  groupsPublished,
   loginCode,
   pairAnswer,
   pairDissolved,
@@ -218,6 +219,20 @@ export async function queueSeasonEntryDecision(
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
   await deliver(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
+}
+
+// The groups are published (#24, D22): one email per player, queued at once
+// and sent as transactional mail (ahead of broadcasts); what doesn't fit the
+// day's quota goes with the next cron runs. Unsubscribed or bounced addresses
+// get nothing; the groups still show in the app.
+export async function queueGroupsPublished(
+  messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0] }[],
+): Promise<void> {
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, ...groupsPublished(m.input) }));
+  if (queued.length > 0) await deliver(await enqueue(queued));
 }
 
 export async function createBroadcast(input: {

@@ -40,3 +40,33 @@ describe("queuePairDissolved", () => {
     expect(h.sent).toEqual([]);
   });
 });
+
+describe("queueSeasonEntryDecision", () => {
+  const input = {
+    to: "Béla",
+    partnerName: "Anna",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    approved: true,
+    joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") },
+    note: null,
+  };
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+  });
+
+  it("queues and sends one email", async () => {
+    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    expect(messages()).toEqual([
+      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Jóváhagyták a nevezéseteket – Padelpárbaj", status: "sent" },
+    ]);
+  });
+
+  it("sends nothing to a suppressed address", async () => {
+    h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "unsubscribed");
+    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    expect(messages()).toEqual([]);
+  });
+});

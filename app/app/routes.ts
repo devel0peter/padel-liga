@@ -35,6 +35,7 @@ export default [
       route("admin/users", "routes/admin.users.tsx"),
       route("admin/leagues/:league", "routes/admin.league.tsx"),
       route("admin/leagues/:league/seasons", "routes/admin.league-seasons.tsx"),
+      route("admin/leagues/:league/seasons/:season/entries", "routes/admin.season-entries.tsx"),
       route("admin/leagues/:league/solos", "routes/admin.league-solos.tsx"),
       route("admin/leagues/:league/clubs", "routes/admin.league-clubs.tsx"),
     ]),

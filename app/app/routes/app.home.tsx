@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
 import { PhaseList } from "~/components/season-calendar";
+import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
@@ -11,6 +12,7 @@ import { formatDeadline, formatShortDate } from "~/lib/format";
 import { listedCities } from "~/lib/cities.server";
 import { listLeagues } from "~/lib/leagues.server";
 import { homeSeasons } from "~/lib/seasons";
+import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -31,16 +33,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   // listed city (a city still being set up stays hidden).
   const listed = new Set((await listedCities()).map((c) => c.slug));
   const leagueName = new Map(leagues.filter((l) => listed.has(l.city)).map((l) => [l.id, l.name]));
-  const seasons = homeSeasons(await listSeasons(), new Date())
-    .filter((s) => leagueName.has(s.leagueId))
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      league: leagueName.get(s.leagueId)!,
-      registrationOpensAt: s.registrationOpensAt,
-      registrationClosesAt: s.registrationClosesAt,
-      phases: s.phases,
-    }));
+  const now = new Date();
+  const shown = homeSeasons(await listSeasons(), now).filter((s) => leagueName.has(s.leagueId));
+  // The pair's entry, the "Nevezünk" button or why not (#23).
+  const views = await entryViews(user, shown, now);
+  const seasons = shown.map((s) => ({
+    id: s.id,
+    name: s.name,
+    league: leagueName.get(s.leagueId)!,
+    registrationOpensAt: s.registrationOpensAt,
+    registrationClosesAt: s.registrationClosesAt,
+    phases: s.phases,
+    entry: views.get(s.id) ?? null,
+  }));
   return {
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
@@ -49,7 +54,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export default function AppHome({ loaderData: d }: Route.ComponentProps) {
+// "Nevezünk" on a season card.
+export async function action({ request }: Route.ActionArgs) {
+  const user = await requireUser(request);
+  const form = await request.formData();
+  const season = Number(form.get("season") || 0);
+  if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
+    throw new Response("Hibás kérés.", { status: 400 });
+  const result = await applyToSeason(user, season);
+  return result.ok ? { season, notice: ENTERED_NOTICE } : { season, error: result.error };
+}
+
+export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
     <AppPage title="Kezdőlap">
       {d.needsLevel && (
@@ -75,6 +91,17 @@ export default function AppHome({ loaderData: d }: Route.ComponentProps) {
               {formatDeadline(s.registrationClosesAt)}
             </p>
             <PhaseList phases={s.phases} />
+            {actionData?.season === s.id && (
+              <p
+                role={actionData.error ? "alert" : "status"}
+                className={actionData.error ? "font-semibold text-destructive" : "font-medium"}
+              >
+                {actionData.error ?? actionData.notice}
+              </p>
+            )}
+            {s.entry && !(actionData?.season === s.id && actionData.notice) && (
+              <SeasonEntry seasonId={s.id} view={s.entry} />
+            )}
           </CardContent>
         </Card>
       ))}

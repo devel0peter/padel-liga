@@ -22,6 +22,7 @@ import {
   pairInvite,
   partnerNotice,
   registrationInvite,
+  seasonEntryDecision,
   signupConfirmation,
   type Email,
   type PairIntroPerson,
@@ -206,6 +207,17 @@ export async function queuePairDissolved(
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
   await deliver(await enqueue([{ kind: "pair_dissolved", toEmail, ...pairDissolved(input) }]));
+}
+
+// A Szervező approved or rejected a season entry (#23): each player of the
+// pair gets one. An unsubscribed or bounced address gets nothing; the status
+// still shows in the app.
+export async function queueSeasonEntryDecision(
+  toEmail: string,
+  input: Parameters<typeof seasonEntryDecision>[0],
+): Promise<void> {
+  if (await isSuppressed(toEmail)) return;
+  await deliver(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
 }
 
 export async function createBroadcast(input: {

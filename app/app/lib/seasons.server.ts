@@ -1,8 +1,8 @@
 import type { Phase } from "@padel-liga/rules";
-import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { seasonPhases, seasons } from "~/db/schema";
+import { seasonEntries, seasonPhases, seasons } from "~/db/schema";
 
 import { audit } from "./leagues.server";
 import { registrationWindow, type Season, type SeasonInput } from "./seasons";
@@ -47,11 +47,36 @@ export async function seasonInLeague(id: number, leagueId: number): Promise<bool
   return !!row;
 }
 
-// Whether the phase 1 groups are published and how many pairs entered.
-// Neither exists yet (#23 season entry, #24 groups): until they do, a season
-// can always be edited and deleted.
-export async function seasonState(_id: number): Promise<{ groupsPublished: boolean; entries: number }> {
-  return { groupsPublished: false, entries: 0 };
+// One season with its phases.
+export async function getSeason(id: number): Promise<Season | undefined> {
+  const [row] = await db.select().from(seasons).where(eq(seasons.id, id));
+  if (!row) return undefined;
+  const phases = await db
+    .select({ number: seasonPhases.number, startsAt: seasonPhases.startsAt, deadline: seasonPhases.deadline })
+    .from(seasonPhases)
+    .where(eq(seasonPhases.seasonId, id))
+    .orderBy(asc(seasonPhases.number));
+  return {
+    id: row.id,
+    leagueId: row.leagueId,
+    name: row.name,
+    registrationOpensAt: row.registrationOpensAt,
+    registrationClosesAt: row.registrationClosesAt,
+    firstPhaseStart: row.firstPhaseStart,
+    breaks: row.breaks,
+    phases,
+  };
+}
+
+// Whether the phase 1 groups are published and how many pairs entered (any
+// entry but a withdrawn one: a dissolved pair's entry doesn't block deleting).
+// Groups don't exist yet (#24): until they do, a season can always be edited.
+export async function seasonState(id: number): Promise<{ groupsPublished: boolean; entries: number }> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(seasonEntries)
+    .where(and(eq(seasonEntries.seasonId, id), ne(seasonEntries.status, "withdrawn")));
+  return { groupsPublished: false, entries: row?.n ?? 0 };
 }
 
 function columns(input: SeasonInput) {

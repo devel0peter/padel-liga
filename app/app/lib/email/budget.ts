@@ -16,7 +16,8 @@ export type MessageKind =
   | "registration_invite"
   | "pair_invite"
   | "pair_answer"
-  | "pair_dissolved";
+  | "pair_dissolved"
+  | "season_entry_decision";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

@@ -90,7 +90,11 @@ export default function Privacy() {
               <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
               <li>
                 a párod a ligában, és a pármeghívók, amiket küldtél vagy kaptál
-                (kinek az e-mail-címére, mikor, és elfogadták-e).
+                (kinek az e-mail-címére, mikor, és elfogadták-e),
+              </li>
+              <li>
+                a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
+                döntése az üzenetével együtt.
               </li>
             </ul>
             <p>
@@ -139,6 +143,11 @@ export default function Privacy() {
                 egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol
                 játszanak a legtöbbet, hogy párt találjon nekik; az
                 e-mail-címüket nem.
+              </li>
+              <li>
+                A nevezéseket a liga szervezője látja: a pár két tagjának nevét,
+                szintjét és azt, hogy mikor neveztetek; az e-mail-címeteket és a
+                telefonszámotokat nem.
               </li>
             </ul>
           </Section>

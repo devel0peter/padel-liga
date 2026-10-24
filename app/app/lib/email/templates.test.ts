@@ -12,6 +12,7 @@ import {
   partnerNotice,
   registrationInvite,
   registrationLink,
+  seasonEntryDecision,
   signupConfirmation,
   textToHtml,
 } from "./templates";
@@ -267,5 +268,51 @@ describe("pairDissolved", () => {
     const evil = pairDissolved({ to: "Béla", dissolverName: "<b>https://evil.example/x</b>", league: "Győr" });
     expect(evil.html).not.toContain('href="https://evil.example');
     expect(evil.html).toContain("&lt;b&gt;");
+  });
+});
+
+describe("seasonEntryDecision", () => {
+  const base = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    approved: true,
+    joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") },
+    note: null,
+  };
+
+  it("tells an approved pair it starts in phase 1", () => {
+    const email = seasonEntryDecision(base);
+    expect(email.subject).toBe("Jóváhagyták a nevezéseteket – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain("jóváhagyta a nevezéseteket Kovács Béla pároddal (2026/27 tél, Padelpárbaj Győr).");
+    expect(email.text).toContain("Az 1. körtől játszotok (kezdés: nov. 9.).");
+    expect(email.html).toContain('href="https://padelparbaj.hu/pair"');
+    expect(email.text).not.toContain("üzenete");
+  });
+
+  it("tells a late pair the phase it joins", () => {
+    const email = seasonEntryDecision({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } });
+    expect(email.text).toContain("a 2. körtől játszotok (kezdés: nov. 30.)");
+  });
+
+  it("tells a pair approved in the last phase that it moves into the next season", () => {
+    expect(seasonEntryDecision({ ...base, joins: null }).text).toContain("a következő szezontól játszotok");
+  });
+
+  it("tells a rejected pair, with the organizer's note", () => {
+    const email = seasonEntryDecision({ ...base, approved: false, joins: null, note: "Most tele vagyunk." });
+    expect(email.subject).toBe("Nem fogadták el a nevezéseteket – Padelpárbaj");
+    expect(email.text).toContain("most nem fogadta el a nevezéseteket");
+    expect(email.text).toContain("A szervező üzenete:\nMost tele vagyunk.");
+    expect(email.text).not.toContain("körtől");
+  });
+
+  it("keeps the note and the names plain text", () => {
+    const email = seasonEntryDecision({ ...base, partnerName: "<i>Béla</i>", note: "Nézd meg: https://evil.example/x" });
+    expect(email.html).not.toContain('href="https://evil.example');
+    expect(email.html).toContain("&lt;i&gt;Béla&lt;/i&gt;");
+    expect(email.text).toContain("https://evil.example/x");
   });
 });

@@ -2,6 +2,7 @@ import { Form, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
+import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,11 +23,14 @@ import { requireUser } from "~/lib/auth/session.server";
 import { formatShortDate } from "~/lib/format";
 import { DISSOLVE_REFUSED } from "~/lib/pairs";
 import { answerInvite, cancelInvite, createInvite, dissolvePair, pairLeagues, pairOverview } from "~/lib/pairs.server";
+import { applyToSeason, entryViews } from "~/lib/season-entries.server";
+import { homeSeasons } from "~/lib/seasons";
+import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
 // "Párom" (#21): invite a partner by email, answer invites, see and dissolve
-// the pair. One block per league; the league is only named when there are
-// several.
+// the pair, and enter the league's open seasons together (#23). One block per
+// league; the league is only named when there are several.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párom – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -36,9 +40,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const leagues = await pairLeagues();
   const overview = await pairOverview(user, leagues);
+  // The seasons the home page shows (the current or next one per league),
+  // with this pair's entry or the "Nevezünk" button.
+  const now = new Date();
+  const ids = new Set(leagues.map((l) => l.id));
+  const seasons = homeSeasons((await listSeasons()).filter((s) => ids.has(s.leagueId)), now);
+  const views = await entryViews(user, seasons, now);
   return {
     multi: leagues.length > 1,
     overview,
+    entries: seasons.flatMap((s) => {
+      const view = views.get(s.id);
+      return view ? [{ id: s.id, name: s.name, leagueId: s.leagueId, view }] : [];
+    }),
     // Leagues where this player can send an invite now.
     inviteLeagues: overview.filter((o) => !o.pair && !o.sent).map((o) => o.league),
   };
@@ -52,13 +66,14 @@ const NOTICES: Record<string, string> = {
   accept: "Elfogadtad: mostantól pár vagytok.",
   decline: "Jeleztük neki, hogy nem kéred.",
   dissolve: "Megszüntetted a párt.",
+  enter: ENTERED_NOTICE,
 };
 
 export async function action({ request }: Route.ActionArgs): Promise<ActionData> {
   const user = await requireUser(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  const id = Number(form.get("id") || 0);
+  const id = Number(form.get(intent === "enter" ? "season" : "id") || 0);
   const needsId = intent !== "invite";
   if (!Object.hasOwn(NOTICES, intent) || (needsId && (!Number.isInteger(id) || id <= 0)))
     throw new Response("Hibás kérés.", { status: 400 });
@@ -72,11 +87,32 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
     result = await createInvite(user, league, String(form.get("email") ?? ""));
   } else if (intent === "cancel") result = await cancelInvite(user, id);
   else if (intent === "accept" || intent === "decline") result = await answerInvite(user, id, intent);
+  else if (intent === "enter") result = await applyToSeason(user, id);
   else result = await dissolvePair(user, id);
   return result.ok ? { intent, notice: NOTICES[intent] } : { intent, error: result.error };
 }
 
 type Overview = Route.ComponentProps["loaderData"]["overview"][number];
+type Entry = Route.ComponentProps["loaderData"]["entries"][number];
+
+function Entries({ entries }: { entries: Entry[] }) {
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">Nevezés</CardTitle>
+        <CardDescription>Elég, ha egyikőtök nevez. A szervező jóváhagyásáról mindketten e-mailt kaptok.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 text-sm">
+        {entries.map((e) => (
+          <section key={e.id} className="grid gap-2">
+            <h3 className="font-semibold">{e.name}</h3>
+            <SeasonEntry seasonId={e.id} view={e.view} />
+          </section>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function Received({ invite }: { invite: Overview["received"][number] }) {
   const busy = useNavigation().state !== "idle";
@@ -260,6 +296,9 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
             <Received key={r.id} invite={r} />
           ))}
           {o.pair && <ActivePair pair={o.pair} />}
+          {o.pair && d.entries.some((e) => e.leagueId === o.league.id) && (
+            <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
+          )}
           {o.sent && <Sent sent={o.sent} />}
         </section>
       ))}

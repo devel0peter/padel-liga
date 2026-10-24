@@ -56,6 +56,7 @@ export const emailMessages = sqliteTable(
         "pair_invite",
         "pair_answer",
         "pair_dissolved",
+        "season_entry_decision",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -452,5 +453,43 @@ export const pairInvites = sqliteTable(
     uniqueIndex("pair_invites_pending_idx").on(t.leagueId, t.inviterId).where(sql`status = 'pending'`),
     index("pair_invites_invitee_idx").on(t.inviteeEmail, t.status),
     index("pair_invites_inviter_idx").on(t.inviterId, t.createdAt),
+  ],
+);
+
+// A pair's entry to a season ("Nevezünk", #23, spec section 4). Either player
+// applies while the season is open (registration opens → the last phase
+// starts); a Szervező approves or rejects, and can change the decision later.
+// One row per season and pair: a rejected pair can't apply again. Dissolving
+// the pair withdraws its entries for seasons not started yet (D19).
+export const seasonEntries = sqliteTable(
+  "season_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "approved", "rejected", "withdrawn"] })
+      .notNull()
+      .default("pending"),
+    // The Szervező's optional note, sent to both players with the decision.
+    note: text("note"),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    // The phase the pair starts in, set on approval: 1 before the season
+    // starts, else the next phase; null when approved during the last phase
+    // (it moves into the next season).
+    joinsPhase: integer("joins_phase"),
+    updatedAt: integer("updated_at", { mode: "timestamp" }),
+    // When the pair applied.
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    uniqueIndex("season_entries_season_pair_idx").on(t.seasonId, t.pairId),
+    index("season_entries_pair_idx").on(t.pairId),
   ],
 );

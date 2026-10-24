@@ -45,8 +45,17 @@ async function acceptOrganizerInvites(userId: string, email: string): Promise<vo
   if (invites.length) await db.delete(leagueAdminInvites).where(eq(leagueAdminInvites.email, email));
 }
 
+// First login: the profile and the privacy consent.
 export async function saveProfile(userId: string, profile: ProfileInput): Promise<void> {
-  await db.update(users).set({ name: profile.name, consentAt: new Date() }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ name: profile.name, level: profile.level, phone: profile.phone, consentAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+// The profile page: the same fields, the consent stays as it was given.
+export async function updateProfile(userId: string, profile: Omit<ProfileInput, "consent">): Promise<void> {
+  await db.update(users).set({ name: profile.name, level: profile.level, phone: profile.phone }).where(eq(users.id, userId));
 }
 
 export async function hasGoogleLogin(userId: string): Promise<boolean> {

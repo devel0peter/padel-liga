@@ -311,7 +311,7 @@ function InviteButton({ pending }: { pending: number }) {
               <AlertDialogTitle>Küldöd a regisztrációs meghívót?</AlertDialogTitle>
               <AlertDialogDescription>
                 {pending} cím kap egy levelet a belépés linkjével, kitöltött e-mail-címmel. Mindenki csak egyszer
-                kapja meg; a párként megadott társak nem kapnak levelet.
+                kapja meg: a párok mindkét tagja, az egyedül jelentkezők csak akkor, ha már párt kaptak.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

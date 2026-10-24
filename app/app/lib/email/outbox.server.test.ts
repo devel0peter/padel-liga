@@ -175,7 +175,7 @@ describe("held outbox", () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
     h.raw
       .prepare(
-        "insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', 'Zsófi', 'zsofi@x.hu', 'kezdo', 1, 'gyor')",
+        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', 'Zsófi', 'zsofi@x.hu', 'Ödön', 'odon@x.hu', 'kezdo', 1, 'gyor')",
       )
       .run();
     const league = "Padelpárbaj Győr";
@@ -204,7 +204,7 @@ describe("held outbox", () => {
       recipients: [{ email: "anna@x.hu", name: "Anna" }],
       createdBy: "admin@x.hu",
     });
-    expect(await O.queueRegistrationInvites()).toBe(1);
+    expect(await O.queueRegistrationInvites()).toBe(2);
     await O.queueGroupsPublished([
       {
         toEmail: "bela@x.hu",
@@ -321,38 +321,71 @@ describe("held outbox", () => {
     expect(h.sent).toEqual([]);
   });
 
-  it("Elvetés on registration invites lets the invite button offer those addresses again", async () => {
+  const pairSignup = (name1: string, email1: string, name2: string, email2: string) =>
+    h.raw
+      .prepare(
+        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', ?, ?, ?, ?, 'kezdo', 1, 'gyor')",
+      )
+      .run(name1, email1, name2, email2);
+  const marks = () =>
+    h.raw.prepare("select invited_at is not null as one, invited2_at is not null as two from interest_signups order by id").all();
+
+  it("Elvetés on registration invites lets the invite button offer those addresses again, partners included", async () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    const add = h.raw.prepare(
-      "insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', ?, ?, 'kezdo', 1, 'gyor')",
-    );
-    add.run("Zsófi", "zsofi@x.hu");
-    add.run("Ödön", "Odon@x.hu");
-    expect(await O.queueRegistrationInvites()).toBe(2);
+    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "Odon@x.hu");
+    pairSignup("Cili", "cili@x.hu", "Dani", "dani@x.hu");
+    expect(await O.queueRegistrationInvites()).toBe(4);
+    expect(marks()).toEqual([
+      { one: 1, two: 1 },
+      { one: 1, two: 1 },
+    ]);
     expect((await O.pendingRegistrationInvites()).length).toBe(0);
     const [held] = await O.listHeld();
 
-    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(2);
+    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(4);
     expect(count("kind = 'registration_invite'")).toBe(0);
-    expect(h.raw.prepare("select invited_at from interest_signups").all()).toEqual([{ invited_at: null }, { invited_at: null }]);
+    // Both the signer's mark (invited_at) and the partner's (invited2_at) are cleared.
+    expect(marks()).toEqual([
+      { one: 0, two: 0 },
+      { one: 0, two: 0 },
+    ]);
     // The account invites stay, so the login link still works for them.
     expect(h.raw.prepare("select email from account_invites order by email").all()).toEqual([
+      { email: "cili@x.hu" },
+      { email: "dani@x.hu" },
       { email: "odon@x.hu" },
       { email: "zsofi@x.hu" },
     ]);
-    expect((await O.pendingRegistrationInvites()).map((r) => r.email).sort()).toEqual(["odon@x.hu", "zsofi@x.hu"]);
-    expect(await O.queueRegistrationInvites()).toBe(2);
+    expect((await O.pendingRegistrationInvites()).map((r) => r.email).sort()).toEqual([
+      "cili@x.hu",
+      "dani@x.hu",
+      "odon@x.hu",
+      "zsofi@x.hu",
+    ]);
+    expect(await O.queueRegistrationInvites()).toBe(4);
+  });
+
+  it("Elvetés stops at what the Admin saw: an invite held later keeps its mark", async () => {
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
+    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "odon@x.hu");
+    await O.queueRegistrationInvites();
+    const [held] = await O.listHeld();
+    pairSignup("Cili", "cili@x.hu", "Dani", "dani@x.hu");
+    await O.queueRegistrationInvites();
+    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(2);
+    expect(marks()).toEqual([
+      { one: 0, two: 0 },
+      { one: 1, two: 1 },
+    ]);
   });
 
   it("Elvetés on another kind leaves the invite marks alone", async () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    h.raw
-      .prepare("insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', 'Zsófi', 'zsofi@x.hu', 'kezdo', 1, 'gyor')")
-      .run();
+    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "odon@x.hu");
     await O.queueRegistrationInvites();
     insert("broadcast", 1, "held", "zsofi@x.hu");
     await O.discardHeld("broadcast", 1000);
-    expect(h.raw.prepare("select invited_at is not null as invited from interest_signups").get().invited).toBe(1);
-    expect(count("kind = 'registration_invite' and status = 'held'")).toBe(1);
+    expect(marks()).toEqual([{ one: 1, two: 1 }]);
+    expect(count("kind = 'registration_invite' and status = 'held'")).toBe(2);
   });
 });

@@ -141,7 +141,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
   4. **No free spot at or below the target:** the new pair goes into the target group, and from there down each group passes its lowest-Elo pair one group down; the bottom groups are re-cut to the sizes in section 4. Groups above the target don't change.
   5. Several new pairs are placed one by one, highest placement rating first, after promotion and relegation of the continuing pairs.
   6. The result is part of the round switch draft; the organizer can move pairs before publishing.
-- First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
+- First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes. Publishing creates the phase's matches, emails every player and locks the groups (README decision log, 2026-10-24, #24).
 - **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - **Season end and switch** (README decision log, 2026-10-05):
   1. **Final standings:** each pair's group and place in the last phase.

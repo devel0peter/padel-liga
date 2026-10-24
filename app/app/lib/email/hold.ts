@@ -31,6 +31,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   pair_answer: "Válasz a pármeghívóra",
   pair_dissolved: "Megszűnt a pár",
   season_entry_decision: "Döntés a nevezésről",
+  groups_published: "Kihirdetett csoportok",
 };
 
 export function kindLabel(kind: string): string {

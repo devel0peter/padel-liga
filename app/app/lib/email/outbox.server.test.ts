@@ -75,6 +75,62 @@ describe("queueSeasonEntryDecision", () => {
   });
 });
 
+describe("queueGroupsPublished", () => {
+  const input = (to: string) => ({
+    to,
+    partnerName: "Anna",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["Cecil", "Dóra"] as [string, string] }],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  });
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+  });
+
+  it("queues one email per player, held for the Admin (#88)", async () => {
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: input("Anna") },
+      { toEmail: "bela@x.hu", input: input("Béla") },
+    ]);
+    expect(messages()).toEqual([
+      { kind: "groups_published", to_email: "anna@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "held" },
+      { kind: "groups_published", to_email: "bela@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "held" },
+    ]);
+    expect(h.sent).toEqual([]);
+  });
+
+  it("skips a suppressed address", async () => {
+    h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "bounced");
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: input("Anna") },
+      { toEmail: "Bela@x.hu", input: input("Béla") },
+    ]);
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+  });
+
+  it("queues a whole league at once, within D1's parameter limit; once sent, what is over the day's quota waits", async () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
+    await O.queueGroupsPublished(many);
+    expect(messages()).toHaveLength(120);
+    expect(h.sent).toEqual([]);
+    expect(await O.releaseHeld("groups_published", 1000)).toEqual({ released: 120, skipped: 0 });
+    await O.deliver();
+    // Daily limit 100, minus the 10 kept for login codes.
+    expect(h.sent).toHaveLength(90);
+    expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(30);
+  });
+
+  it("does nothing for an empty list", async () => {
+    await O.queueGroupsPublished([]);
+    expect(messages()).toEqual([]);
+  });
+});
+
 // The held outbox (#88, D23-D25): only login codes and signup confirmations
 // go out by themselves; the rest waits for the Admin.
 describe("held outbox", () => {
@@ -149,6 +205,21 @@ describe("held outbox", () => {
       createdBy: "admin@x.hu",
     });
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await O.queueGroupsPublished([
+      {
+        toEmail: "bela@x.hu",
+        input: {
+          to: "Béla",
+          partnerName: "Anna",
+          league,
+          season: "2026/27 tél",
+          phase: 1,
+          group: 1,
+          weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["Cecil", "Dóra"] }],
+          deadline: new Date("2026-11-29T22:59:00Z"),
+        },
+      },
+    ]);
     await O.queueLoginCode("anna@x.hu", "123456");
     await O.deliver();
 
@@ -163,6 +234,7 @@ describe("held outbox", () => {
       season_entry_decision: "held",
       broadcast: "held",
       registration_invite: "held",
+      groups_published: "held",
     });
     expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu", "anna@x.hu"]);
     expect(h.sent[1].subject).toMatch(/^123 456 a belépőkódod/);

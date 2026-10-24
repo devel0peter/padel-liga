@@ -123,9 +123,9 @@ export function previewPhases(firstPhaseStart: string, breaks: { start: string; 
 
 // What an organizer may still do with a season (README decision log,
 // 2026-10-23): edit it until the phase 1 groups are published, delete it
-// while nobody has entered.
+// while nobody has entered and nothing is published.
 export function seasonActions(state: { groupsPublished: boolean; entries: number }): { canEdit: boolean; canDelete: boolean } {
-  return { canEdit: !state.groupsPublished, canDelete: state.entries === 0 };
+  return { canEdit: !state.groupsPublished, canDelete: state.entries === 0 && !state.groupsPublished };
 }
 
 export function seasonEnd(season: Pick<Season, "phases">): Date | null {

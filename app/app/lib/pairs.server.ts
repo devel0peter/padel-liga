@@ -5,6 +5,7 @@ import { db } from "~/db/client.server";
 import { accountInvites, leagues, pairInvites, pairs, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
 import { queuePairAnswer, queuePairDissolved, queuePairInvite } from "~/lib/email/outbox.server";
+import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { withdrawEntries } from "~/lib/season-entries.server";
 import { SITE_URL } from "~/lib/site";
 
@@ -56,11 +57,6 @@ async function isPaired(leagueId: number, userId: string): Promise<boolean> {
   return !!row;
 }
 
-// Whether the pair plays in a group of a running phase. Groups don't exist
-// yet (#24): until they do, a pair can always be dissolved (D16).
-export async function pairInRunningGroup(_pairId: number): Promise<boolean> {
-  return false;
-}
 
 export type PairOverview = {
   league: PairLeague;
@@ -320,19 +316,22 @@ export async function dissolvePair(user: User, pairId: number): Promise<Result> 
     .where(eq(pairs.id, pairId));
   if (!pair || (pair.playerA !== user.id && pair.playerB !== user.id) || pair.status !== "active")
     return { ok: false, error: "Ez a pár már nem létezik." };
-  if (!canDissolve(pair, user.id, await pairInRunningGroup(pairId))) return { ok: false, error: DISSOLVE_REFUSED };
   const now = new Date();
+  if (!canDissolve(pair, user.id, await pairInRunningGroup(pairId, now))) return { ok: false, error: DISSOLVE_REFUSED };
   // With its entries for seasons it hasn't played in yet (D19), in one batch.
+  // The running-group check is repeated in the update, so groups published
+  // in the meantime win; the withdrawal only runs once the pair is dissolved.
   const [dissolved] = await db.batch([
     db
       .update(pairs)
       .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: user.id })
-      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active")))
+      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active"), notInRunningGroup(pairId, now)))
       .returning({ id: pairs.id }),
     withdrawEntries(pairId, now),
   ]);
   // Two submits at once: only the one that dissolved it sends the email.
-  if (dissolved.length === 0) return { ok: true };
+  if (dissolved.length === 0)
+    return (await pairInRunningGroup(pairId, now)) ? { ok: false, error: DISSOLVE_REFUSED } : { ok: true };
   const [partner] = await db
     .select({ email: users.email, name: users.name })
     .from(users)

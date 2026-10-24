@@ -1,21 +1,21 @@
-// The deploy step of the held outbox (#88, D24): migration 0020 holds mail
+// The deploy step of the held outbox (#88, D24): migration 0021 holds mail
 // that was queued but not sent yet, except login codes and signup
 // confirmations. Runs every migration before it on a real SQLite, adds rows,
-// then applies 0020.
+// then applies 0021.
 import { describe, expect, it } from "vitest";
 
 const { readdirSync, readFileSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
 const { DatabaseSync } = await import(/* @vite-ignore */ `node:${"sqlite"}`);
 
 const MIGRATIONS = new URL("../../../drizzle/", import.meta.url);
-const HELD = "0020_held_emails.sql";
+const HELD = "0021_held_emails.sql";
 
 function apply(raw: any, file: string) {
   for (const stmt of readFileSync(new URL(file, MIGRATIONS), "utf8").split("--> statement-breakpoint"))
     if (stmt.trim()) raw.exec(stmt);
 }
 
-describe("migration 0020_held_emails", () => {
+describe("migration 0021_held_emails", () => {
   it("holds unsent mail that isn't a login code or a signup confirmation, and nothing else", () => {
     const raw = new DatabaseSync(":memory:");
     const files = (readdirSync(MIGRATIONS) as string[]).filter((f) => f.endsWith(".sql")).sort();

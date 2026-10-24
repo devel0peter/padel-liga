@@ -1,8 +1,8 @@
 {
-  "id": "9bad964c-24ef-4976-a769-a12fdd52bd50",
-  "prevId": "77963e06-b457-433b-89cd-452fb620b1be",
   "version": "6",
   "dialect": "sqlite",
+  "id": "2b551f50-f967-41d9-b355-e67762ea01fb",
+  "prevId": "77963e06-b457-433b-89cd-452fb620b1be",
   "tables": {
     "account_invites": {
       "name": "account_invites",
@@ -88,15 +88,15 @@
         "audit_log_actor_id_users_id_fk": {
           "name": "audit_log_actor_id_users_id_fk",
           "tableFrom": "audit_log",
+          "tableTo": "users",
           "columnsFrom": [
             "actor_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -419,15 +419,15 @@
         "email_messages_broadcast_id_broadcasts_id_fk": {
           "name": "email_messages_broadcast_id_broadcasts_id_fk",
           "tableFrom": "email_messages",
+          "tableTo": "broadcasts",
           "columnsFrom": [
             "broadcast_id"
           ],
-          "tableTo": "broadcasts",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -462,6 +462,165 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "group_pairs": {
+      "name": "group_pairs",
+      "columns": {
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_id": {
+          "name": "pair_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seed": {
+          "name": "seed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "group_pairs_pair_idx": {
+          "name": "group_pairs_pair_idx",
+          "columns": [
+            "pair_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "group_pairs_group_id_groups_id_fk": {
+          "name": "group_pairs_group_id_groups_id_fk",
+          "tableFrom": "group_pairs",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "group_pairs_pair_id_pairs_id_fk": {
+          "name": "group_pairs_pair_id_pairs_id_fk",
+          "tableFrom": "group_pairs",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "group_pairs_group_id_pair_id_pk": {
+          "columns": [
+            "group_id",
+            "pair_id"
+          ],
+          "name": "group_pairs_group_id_pair_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "groups": {
+      "name": "groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "season_id": {
+          "name": "season_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "groups_season_phase_number_idx": {
+          "name": "groups_season_phase_number_idx",
+          "columns": [
+            "season_id",
+            "phase",
+            "number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "groups_season_id_seasons_id_fk": {
+          "name": "groups_season_id_seasons_id_fk",
+          "tableFrom": "groups",
+          "tableTo": "seasons",
+          "columnsFrom": [
+            "season_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -691,28 +850,28 @@
         "league_admin_invites_league_id_leagues_id_fk": {
           "name": "league_admin_invites_league_id_leagues_id_fk",
           "tableFrom": "league_admin_invites",
+          "tableTo": "leagues",
           "columnsFrom": [
             "league_id"
           ],
-          "tableTo": "leagues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "league_admin_invites_invited_by_users_id_fk": {
           "name": "league_admin_invites_invited_by_users_id_fk",
           "tableFrom": "league_admin_invites",
+          "tableTo": "users",
           "columnsFrom": [
             "invited_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -773,41 +932,41 @@
         "league_admins_league_id_leagues_id_fk": {
           "name": "league_admins_league_id_leagues_id_fk",
           "tableFrom": "league_admins",
+          "tableTo": "leagues",
           "columnsFrom": [
             "league_id"
           ],
-          "tableTo": "leagues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "league_admins_user_id_users_id_fk": {
           "name": "league_admins_user_id_users_id_fk",
           "tableFrom": "league_admins",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "league_admins_granted_by_users_id_fk": {
           "name": "league_admins_granted_by_users_id_fk",
           "tableFrom": "league_admins",
+          "tableTo": "users",
           "columnsFrom": [
             "granted_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -930,6 +1089,145 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "matches": {
+      "name": "matches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_a": {
+          "name": "pair_a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_b": {
+          "name": "pair_b",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "week": {
+          "name": "week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deadline": {
+          "name": "deadline",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'open'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "matches_group_pairs_idx": {
+          "name": "matches_group_pairs_idx",
+          "columns": [
+            "group_id",
+            "pair_a",
+            "pair_b"
+          ],
+          "isUnique": true
+        },
+        "matches_group_idx": {
+          "name": "matches_group_idx",
+          "columns": [
+            "group_id"
+          ],
+          "isUnique": false
+        },
+        "matches_pair_a_idx": {
+          "name": "matches_pair_a_idx",
+          "columns": [
+            "pair_a"
+          ],
+          "isUnique": false
+        },
+        "matches_pair_b_idx": {
+          "name": "matches_pair_b_idx",
+          "columns": [
+            "pair_b"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "matches_group_id_groups_id_fk": {
+          "name": "matches_group_id_groups_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "matches_pair_a_pairs_id_fk": {
+          "name": "matches_pair_a_pairs_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_a"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "matches_pair_b_pairs_id_fk": {
+          "name": "matches_pair_b_pairs_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_b"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "notification_opt_outs": {
       "name": "notification_opt_outs",
       "columns": {
@@ -961,15 +1259,15 @@
         "notification_opt_outs_user_id_users_id_fk": {
           "name": "notification_opt_outs_user_id_users_id_fk",
           "tableFrom": "notification_opt_outs",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1059,15 +1357,15 @@
         "notifications_user_id_users_id_fk": {
           "name": "notifications_user_id_users_id_fk",
           "tableFrom": "notifications",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1120,15 +1418,15 @@
         "oauth_accounts_user_id_users_id_fk": {
           "name": "oauth_accounts_user_id_users_id_fk",
           "tableFrom": "oauth_accounts",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1219,8 +1517,8 @@
             "league_id",
             "inviter_id"
           ],
-          "where": "status = 'pending'",
-          "isUnique": true
+          "isUnique": true,
+          "where": "status = 'pending'"
         },
         "pair_invites_invitee_idx": {
           "name": "pair_invites_invitee_idx",
@@ -1243,28 +1541,28 @@
         "pair_invites_league_id_leagues_id_fk": {
           "name": "pair_invites_league_id_leagues_id_fk",
           "tableFrom": "pair_invites",
+          "tableTo": "leagues",
           "columnsFrom": [
             "league_id"
           ],
-          "tableTo": "leagues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "pair_invites_inviter_id_users_id_fk": {
           "name": "pair_invites_inviter_id_users_id_fk",
           "tableFrom": "pair_invites",
+          "tableTo": "users",
           "columnsFrom": [
             "inviter_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1354,8 +1652,8 @@
             "league_id",
             "player_a"
           ],
-          "where": "status = 'active'",
-          "isUnique": true
+          "isUnique": true,
+          "where": "status = 'active'"
         },
         "pairs_active_b_idx": {
           "name": "pairs_active_b_idx",
@@ -1363,75 +1661,75 @@
             "league_id",
             "player_b"
           ],
-          "where": "status = 'active'",
-          "isUnique": true
+          "isUnique": true,
+          "where": "status = 'active'"
         }
       },
       "foreignKeys": {
         "pairs_league_id_leagues_id_fk": {
           "name": "pairs_league_id_leagues_id_fk",
           "tableFrom": "pairs",
+          "tableTo": "leagues",
           "columnsFrom": [
             "league_id"
           ],
-          "tableTo": "leagues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "pairs_player_a_users_id_fk": {
           "name": "pairs_player_a_users_id_fk",
           "tableFrom": "pairs",
+          "tableTo": "users",
           "columnsFrom": [
             "player_a"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "pairs_player_b_users_id_fk": {
           "name": "pairs_player_b_users_id_fk",
           "tableFrom": "pairs",
+          "tableTo": "users",
           "columnsFrom": [
             "player_b"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "pairs_invite_id_pair_invites_id_fk": {
           "name": "pairs_invite_id_pair_invites_id_fk",
           "tableFrom": "pairs",
+          "tableTo": "pair_invites",
           "columnsFrom": [
             "invite_id"
           ],
-          "tableTo": "pair_invites",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "pairs_dissolved_by_users_id_fk": {
           "name": "pairs_dissolved_by_users_id_fk",
           "tableFrom": "pairs",
+          "tableTo": "users",
           "columnsFrom": [
             "dissolved_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1491,15 +1789,15 @@
         "push_subscriptions_user_id_users_id_fk": {
           "name": "push_subscriptions_user_id_users_id_fk",
           "tableFrom": "push_subscriptions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1603,41 +1901,41 @@
         "season_entries_season_id_seasons_id_fk": {
           "name": "season_entries_season_id_seasons_id_fk",
           "tableFrom": "season_entries",
+          "tableTo": "seasons",
           "columnsFrom": [
             "season_id"
           ],
-          "tableTo": "seasons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "season_entries_pair_id_pairs_id_fk": {
           "name": "season_entries_pair_id_pairs_id_fk",
           "tableFrom": "season_entries",
+          "tableTo": "pairs",
           "columnsFrom": [
             "pair_id"
           ],
-          "tableTo": "pairs",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "season_entries_decided_by_users_id_fk": {
           "name": "season_entries_decided_by_users_id_fk",
           "tableFrom": "season_entries",
+          "tableTo": "users",
           "columnsFrom": [
             "decided_by"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1681,15 +1979,15 @@
         "season_phases_season_id_seasons_id_fk": {
           "name": "season_phases_season_id_seasons_id_fk",
           "tableFrom": "season_phases",
+          "tableTo": "seasons",
           "columnsFrom": [
             "season_id"
           ],
-          "tableTo": "seasons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1786,15 +2084,15 @@
         "seasons_league_id_leagues_id_fk": {
           "name": "seasons_league_id_leagues_id_fk",
           "tableFrom": "seasons",
+          "tableTo": "leagues",
           "columnsFrom": [
             "league_id"
           ],
-          "tableTo": "leagues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1847,15 +2145,15 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1950,9 +2248,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

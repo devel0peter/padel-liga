@@ -23,8 +23,9 @@ describe("queuedStatus", () => {
     for (const kind of others) expect(queuedStatus(kind), kind).toBe("held");
   });
 
-  it("holds a kind it has never heard of (allowlist)", () => {
-    expect(isAutomatic("groups_published")).toBe(false);
+  it("holds the group publish emails (#24) and a kind it has never heard of (allowlist)", () => {
+    expect(ALL_KINDS).toContain("groups_published");
+    expect(queuedStatus("groups_published")).toBe("held");
     expect(isAutomatic("anything_new")).toBe(false);
   });
 });
@@ -32,7 +33,7 @@ describe("queuedStatus", () => {
 describe("kindLabel", () => {
   it("names every kind in Hungarian, and falls back to the code name for a new one", () => {
     for (const kind of ALL_KINDS) expect(kindLabel(kind), kind).not.toBe(kind);
-    expect(kindLabel("groups_published")).toBe("groups_published");
+    expect(kindLabel("anything_new")).toBe("anything_new");
   });
 });
 

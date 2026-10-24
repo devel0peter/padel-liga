@@ -149,6 +149,12 @@ export default function Privacy() {
                 szintjét és azt, hogy mikor neveztetek; az e-mail-címeteket és a
                 telefonszámotokat nem.
               </li>
+              <li>
+                A csoportok összeállításakor a szervező a pár két tagjának nevét
+                és az értékszámotokat látja. A csoportbeosztásról mindenki
+                e-mailt kap, benne az ellenfelei nevével; az e-mail-címeteket és
+                a telefonszámotokat nem.
+              </li>
             </ul>
           </Section>
 

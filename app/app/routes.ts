@@ -28,6 +28,7 @@ export default [
       route("admin/signups", "routes/admin.signups.tsx"),
       route("admin/broadcasts", "routes/admin.broadcasts.tsx"),
       route("admin/broadcasts/new", "routes/admin.broadcast-new.tsx"),
+      route("admin/outbox", "routes/admin.outbox.tsx"),
       route("admin/clubs", "routes/admin.clubs.tsx"),
       route("admin/traffic", "routes/admin.traffic.tsx"),
       route("admin/leagues", "routes/admin.leagues.tsx"),

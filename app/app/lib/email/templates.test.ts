@@ -6,6 +6,7 @@ import {
   escapeHtml,
   loginCode,
   pairAnswer,
+  pairDissolved,
   pairIntro,
   pairInvite,
   partnerNotice,
@@ -240,5 +241,31 @@ describe("pairAnswer", () => {
     const email = pairAnswer({ to: "Nagy Anna", inviteeName: "Kovács Béla", league: "Padelpárbaj Győr", accepted: false });
     expect(email.subject).toBe("Kovács Béla nem fogadta el a meghívásod – Padelpárbaj");
     expect(email.text).toContain("most nem fogadta el a meghívásod (Padelpárbaj Győr). Meghívhatsz mást.");
+  });
+});
+
+describe("pairDissolved", () => {
+  const email = pairDissolved({ to: "Kovács Béla", dissolverName: "Nagy Anna", league: "Padelpárbaj Győr" });
+
+  it("tells the partner who dissolved the pair and links to /pair", () => {
+    expect(email.subject).toBe("Nagy Anna megszüntette a párotokat – Padelpárbaj");
+    expect(email.text).toContain("Szia Kovács Béla!");
+    expect(email.text).toContain("Nagy Anna megszüntette a párotokat (Padelpárbaj Győr). Új párt a Párom oldalon hívhatsz:");
+    expect(email.text).toContain("https://padelparbaj.hu/pair");
+    expect(email.html).toContain('href="https://padelparbaj.hu/pair"');
+  });
+
+  it("has no email address or phone number in it, only the contact address in the footer", () => {
+    for (const part of [email.subject, email.text, email.html]) {
+      const addresses = part.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) ?? [];
+      expect(addresses.every((a) => a === "hello@padelparbaj.hu")).toBe(true);
+      expect(part).not.toMatch(/\+36|06[ -]?\d{2}/);
+    }
+  });
+
+  it("never turns the dissolver's name into a link, and escapes it", () => {
+    const evil = pairDissolved({ to: "Béla", dissolverName: "<b>https://evil.example/x</b>", league: "Győr" });
+    expect(evil.html).not.toContain('href="https://evil.example');
+    expect(evil.html).toContain("&lt;b&gt;");
   });
 });

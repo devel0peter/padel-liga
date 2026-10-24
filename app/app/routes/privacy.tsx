@@ -163,7 +163,8 @@ export default function Privacy() {
             </p>
             <p>
               A pár oldalán a párod csak a neved látja, az e-mail-címedet és a
-              telefonszámodat nem.
+              telefonszámodat nem. Ha megszünteted a párt, e-mailt kap róla a
+              neveddel.
             </p>
           </Section>
 

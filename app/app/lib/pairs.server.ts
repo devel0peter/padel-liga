@@ -4,7 +4,7 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import { accountInvites, leagues, pairInvites, pairs, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
-import { queuePairAnswer, queuePairInvite } from "~/lib/email/outbox.server";
+import { queuePairAnswer, queuePairDissolved, queuePairInvite } from "~/lib/email/outbox.server";
 import { SITE_URL } from "~/lib/site";
 
 import { normalizeEmail } from "./auth/rules";
@@ -309,18 +309,28 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
 }
 
 // "Pár megszüntetése" (D16): either player, not while the pair plays in a
-// group of a running phase.
+// group of a running phase. The partner is emailed (#85); the player who
+// dissolved it is not.
 export async function dissolvePair(user: User, pairId: number): Promise<Result> {
   const [pair] = await db
-    .select({ status: pairs.status, playerA: pairs.playerA, playerB: pairs.playerB })
+    .select({ status: pairs.status, playerA: pairs.playerA, playerB: pairs.playerB, league: leagues.name })
     .from(pairs)
+    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
     .where(eq(pairs.id, pairId));
   if (!pair || (pair.playerA !== user.id && pair.playerB !== user.id) || pair.status !== "active")
     return { ok: false, error: "Ez a pár már nem létezik." };
   if (!canDissolve(pair, user.id, await pairInRunningGroup(pairId))) return { ok: false, error: DISSOLVE_REFUSED };
-  await db
+  const dissolved = await db
     .update(pairs)
     .set({ status: "dissolved", dissolvedAt: new Date(), dissolvedBy: user.id })
-    .where(and(eq(pairs.id, pairId), eq(pairs.status, "active")));
+    .where(and(eq(pairs.id, pairId), eq(pairs.status, "active")))
+    .returning({ id: pairs.id });
+  // Two submits at once: only the one that dissolved it sends the email.
+  if (dissolved.length === 0) return { ok: true };
+  const [partner] = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, pair.playerA === user.id ? pair.playerB : pair.playerA));
+  if (partner) await queuePairDissolved(partner.email, { to: partner.name, dissolverName: user.name, league: pair.league });
   return { ok: true };
 }

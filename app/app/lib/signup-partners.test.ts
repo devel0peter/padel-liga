@@ -74,6 +74,18 @@ describe("signupPartners", () => {
     ]);
   });
 
+  it("puts their own signups before ones where someone else named them", () => {
+    // Béla signed up with Cili; Anna later entered Béla as her partner.
+    const own = row({ name1: "Béla", email1: "bela@x.hu", name2: "Cili", email2: "cili@x.hu", createdAt: new Date("2026-09-01T10:00:00Z") });
+    const named = row({ createdAt: new Date("2026-10-10T10:00:00Z") });
+    expect(signupPartners([own, named], "bela@x.hu")).toEqual([{ city: "gyor", name: "Cili", email: "cili@x.hu" }]);
+    // An own solo signup, still waiting, says "nobody" too.
+    const soloOwn = row({ mode: "solo", name1: "Béla", email1: "bela@x.hu", name2: null, email2: null });
+    expect(signupPartners([soloOwn, named], "bela@x.hu")).toEqual([]);
+    // Without an own signup, being named decides.
+    expect(signupPartners([named], "bela@x.hu")).toEqual([{ city: "gyor", name: "Anna", email: "anna@x.hu" }]);
+  });
+
   it("names nobody when the newest signup names nobody, even if an older one did", () => {
     const old = row({ createdAt: new Date("2026-09-01T10:00:00Z") });
     const soloNow = row({ mode: "solo", name2: null, email2: null, createdAt: new Date("2026-10-10T10:00:00Z") });

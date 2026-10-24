@@ -28,18 +28,21 @@ function soloPartner<T extends SignupLink>(row: T, byId: ReadonlyMap<number, T>)
 // The partner the signups name for this (any case) email, one per city: the
 // address's newest signup there decides (as for the level prefill), so a
 // newer solo signup or a pair signup without the partner's email names
-// nobody, even if an older one did. A partner entered without an email can't
-// be matched to an account.
+// nobody, even if an older one did. Their own signups (as the signer) come
+// before those where someone else entered them as the partner: nobody can
+// override what a player said themselves. A partner entered without an email
+// can't be matched to an account.
 export function signupPartners(rows: readonly SignupLink[], email: string): SignupPartner[] {
   const me = lower(email);
   if (!me) return [];
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const newestFirst = [...rows].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id,
+  const own = (r: SignupLink) => (lower(r.email1) === me ? 0 : 1);
+  const ordered = [...rows].sort(
+    (a, b) => own(a) - own(b) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id,
   );
   const decided = new Set<string>();
   const out: SignupPartner[] = [];
-  for (const r of newestFirst) {
+  for (const r of ordered) {
     if (r.status === "withdrawn" || decided.has(r.city)) continue;
     let partner: { name: string | null; email: string | null };
     if (r.mode === "pair" && lower(r.email1) === me) partner = { name: r.name2, email: r.email2 };

@@ -169,7 +169,8 @@ export default function Privacy() {
             <p>
               Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
               csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
-              jelentkezésből, az e-mail-címét nem.
+              jelentkezésből, az e-mail-címét nem. Ha megszüntetitek a párt, nem
+              jön létre újra magától.
             </p>
           </Section>
 

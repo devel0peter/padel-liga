@@ -110,6 +110,75 @@ describe("signup pairs on real SQLite", () => {
     expect(activePairs()).toEqual([{ league_id: 1, player_a: "b", player_b: "c" }]);
   });
 
+  it("doesn't pair with a partner who has an account but hasn't finished the first-login page", async () => {
+    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu" });
+    register("b", "Béla", false);
+    register("a", "Anna");
+    await SP.formSignupPairs("a");
+    expect(activePairs()).toEqual([]);
+  });
+
+  it("forms it only once: after a dissolve, logging in again doesn't bring it back", async () => {
+    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu" });
+    register("a", "Anna");
+    register("b", "Béla");
+    register("c", "Cecil");
+    await SP.formSignupPairs("b");
+    const [pair] = all("select id from pairs");
+    expect(await P.dissolvePair(user("b"), pair.id)).toEqual({ ok: true });
+    expect(await P.createInvite(user("b"), league, "c@x.hu")).toEqual({ ok: true });
+    await SP.formSignupPairs("a");
+    await SP.formSignupPairs("b");
+    expect(activePairs()).toEqual([]);
+    expect(all("select status from pair_invites")).toEqual([{ status: "pending" }]);
+  });
+
+  it("needs both sides: someone else's signup alone puts nobody in a pair", async () => {
+    // Béla signed up himself with Cili; Xavér later entered Béla as his partner.
+    signup({ name1: "Béla", email1: "b@x.hu", name2: "Cili", email2: "c@x.hu" });
+    signup({ name1: "Xavér", email1: "x@x.hu", name2: "Béla", email2: "b@x.hu" });
+    register("b", "Béla");
+    register("x", "Xavér");
+    await SP.formSignupPairs("x");
+    expect(activePairs()).toEqual([]);
+    expect([...(await SP.waitingPartners("x@x.hu"))]).toEqual([]);
+    // Béla's own newer solo signup says "nobody" for Anna's old pair signup too.
+    signup({ name1: "Anna", email1: "a@x.hu", name2: "Dani", email2: "d@x.hu" });
+    signup({ mode: "solo", name1: "Dani", email1: "d@x.hu" });
+    register("a", "Anna");
+    register("d", "Dani");
+    await SP.formSignupPairs("a");
+    await SP.formSignupPairs("d");
+    expect(activePairs()).toEqual([]);
+  });
+
+  it("leaves pending invites alone when it forms nothing", async () => {
+    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu" });
+    register("a", "Anna");
+    register("b", "Béla");
+    register("c", "Cecil");
+    register("d", "Dóra");
+    // Already a pair by invite: a later login changes nothing.
+    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'a', 'b')`);
+    h.raw.exec(`insert into pair_invites (league_id, inviter_id, invitee_email, token_hash) values (1, 'c', 'a@x.hu', 'h1')`);
+    await SP.formSignupPairs("b");
+    // Blocked because Béla is paired with Dóra: nothing changes either.
+    h.raw.exec(`update pairs set status = 'dissolved'`);
+    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'b', 'd')`);
+    await SP.formSignupPairs("a");
+    expect(all("select status from pair_invites")).toEqual([{ status: "pending" }]);
+  });
+
+  it("forms nothing in a city that isn't listed yet", async () => {
+    h.raw.exec(`insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 0)`);
+    h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')`);
+    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "deb" });
+    register("a", "Anna");
+    register("b", "Béla");
+    await SP.formSignupPairs("b");
+    expect(activePairs()).toEqual([]);
+  });
+
   it("forms nothing in a city without a league, or from a withdrawn signup", async () => {
     signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "pecs" });
     const id = signup({ name1: "Cili", email1: "c@x.hu", name2: "Dani", email2: "d@x.hu" });
@@ -153,5 +222,9 @@ describe("signup pairs on real SQLite", () => {
     expect(await I.interestLevelFor("b@x.hu")).toBe("halado");
     expect(await I.interestLevelFor("c@x.hu")).toBe("versenyzo");
     expect(await I.interestLevelFor("x@x.hu")).toBeNull();
+    // A withdrawn signup doesn't prefill the partner's level.
+    const id = signup({ name1: "Ede", email1: "e@x.hu", name2: "Feri", email2: "f@x.hu", level: "halado" });
+    h.raw.prepare("update interest_signups set status = 'withdrawn' where id = ?").run(id);
+    expect(await I.interestLevelFor("f@x.hu")).toBeNull();
   });
 });

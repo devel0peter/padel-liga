@@ -1,4 +1,4 @@
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { interestSignups } from "~/db/schema";
@@ -17,7 +17,13 @@ export async function interestLevelFor(email: string): Promise<Level | null> {
   const [row] = await db
     .select({ level: interestSignups.level })
     .from(interestSignups)
-    .where(or(eq(interestSignups.email1, email), eq(interestSignups.email2, email)))
+    .where(
+      or(
+        eq(interestSignups.email1, email),
+        // Someone else's signup counts only while it stands.
+        and(eq(interestSignups.email2, email), ne(interestSignups.status, "withdrawn")),
+      ),
+    )
     .orderBy(desc(interestSignups.createdAt), desc(interestSignups.id))
     .limit(1);
   return row && isLevel(row.level) ? row.level : null;

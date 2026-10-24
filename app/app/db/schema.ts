@@ -32,6 +32,9 @@ export const interestSignups = sqliteTable("interest_signups", {
   // When this address got the registration invite (#20). Set on every signup
   // row of the address, so it is invited once (app/lib/email/audience.ts).
   invitedAt: integer("invited_at", { mode: "timestamp" }),
+  // The same for email2, the partner of a pair signup (D26): invited_at
+  // stays about email1, so each address is still invited once.
+  invited2At: integer("invited2_at", { mode: "timestamp" }),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -401,7 +404,9 @@ export const pairs = sqliteTable(
     leagueId: integer("league_id")
       .notNull()
       .references(() => leagues.id, { onDelete: "cascade" }),
-    // The player who sent the invite, and the one who accepted it.
+    // The player who sent the invite, and the one who accepted it. For a pair
+    // from the interest signup (no invite, #89): the one who registered first,
+    // and the one whose registration formed it.
     playerA: text("player_a")
       .notNull()
       .references(() => users.id),

@@ -260,11 +260,18 @@ export async function pendingRegistrationInvites(): Promise<Recipient[]> {
   const [rows, leagueCities, accounts, suppressed] = await Promise.all([
     db
       .select({
+        id: interestSignups.id,
+        mode: interestSignups.mode,
         email1: interestSignups.email1,
         name1: interestSignups.name1,
+        email2: interestSignups.email2,
+        name2: interestSignups.name2,
+        pairedWith: interestSignups.pairedWith,
         city: interestSignups.city,
         status: interestSignups.status,
+        createdAt: interestSignups.createdAt,
         invitedAt: interestSignups.invitedAt,
+        invited2At: interestSignups.invited2At,
       })
       .from(interestSignups)
       .orderBy(asc(interestSignups.id)),
@@ -284,18 +291,28 @@ export async function pendingRegistrationInvites(): Promise<Recipient[]> {
 const INVITE_CHUNK = 30;
 const MARK_CHUNK = 90;
 
-// Sets or clears invited_at on every signup row of these addresses. Setting
-// only touches rows not invited yet, and returns the addresses it claimed.
+// Sets or clears invited_at on every signup row of these addresses (and
+// invited2_at where the address is the partner, email2). Setting only touches
+// rows not invited yet, and returns the addresses it claimed.
 async function markInvited(emails: string[], invitedAt: Date | null): Promise<Set<string>> {
   const claimed = new Set<string>();
   for (let i = 0; i < emails.length; i += MARK_CHUNK) {
-    const chunk = inArray(sql`lower(${interestSignups.email1})`, emails.slice(i, i + MARK_CHUNK));
-    const rows = await db
-      .update(interestSignups)
-      .set({ invitedAt })
-      .where(invitedAt ? and(chunk, isNull(interestSignups.invitedAt)) : chunk)
-      .returning({ email1: interestSignups.email1 });
-    for (const r of rows) claimed.add(r.email1.toLowerCase());
+    const slice = emails.slice(i, i + MARK_CHUNK);
+    const chunk1 = inArray(sql`lower(${interestSignups.email1})`, slice);
+    const chunk2 = inArray(sql`lower(${interestSignups.email2})`, slice);
+    const [rows1, rows2] = await db.batch([
+      db
+        .update(interestSignups)
+        .set({ invitedAt })
+        .where(invitedAt ? and(chunk1, isNull(interestSignups.invitedAt)) : chunk1)
+        .returning({ email: interestSignups.email1 }),
+      db
+        .update(interestSignups)
+        .set({ invited2At: invitedAt })
+        .where(invitedAt ? and(chunk2, isNull(interestSignups.invited2At)) : chunk2)
+        .returning({ email: interestSignups.email2 }),
+    ]);
+    for (const r of [...rows1, ...rows2]) if (r.email) claimed.add(r.email.toLowerCase());
   }
   return claimed;
 }

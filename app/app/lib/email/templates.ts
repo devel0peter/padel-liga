@@ -270,7 +270,7 @@ export function pairDissolved(input: { to: string; dissolverName: string; league
     `${input.dissolverName} megszüntette a párotokat – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.dissolverName} megszüntette a párotokat (${input.league}). Új párt a Párom oldalon hívhatsz:`,
+      `${input.dissolverName} megszüntette a párotokat (${input.league}). Új párt a Párom oldalon hívhatsz meg:`,
       pairPage,
       SIGNATURE,
     ],

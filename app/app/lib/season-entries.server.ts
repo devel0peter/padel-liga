@@ -302,6 +302,10 @@ export async function decideEntry(
         decision === "approve"
           ? sql`exists (select 1 from ${pairs} where ${pairs.id} = ${entry.pairId} and ${pairs.status} = 'active')`
           : notInRunningGroup(entry.pairId, now),
+        // Phase 1's groups published in the meantime: decide again, for phase 2.
+        phase === FIRST_PHASE
+          ? sql`not exists (select 1 from groups g where g.season_id = ${seasonId} and g.phase = ${FIRST_PHASE} and g.published_at is not null)`
+          : undefined,
       ),
     )
     .returning({ id: seasonEntries.id });

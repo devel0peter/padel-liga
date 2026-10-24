@@ -277,6 +277,11 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
   // regenerated) and their revisions (bumped by every move).
   const draftOf = sql`${groups.seasonId} = ${seasonId} and ${groups.phase} = ${FIRST_PHASE} and ${groups.publishedAt} is null`;
   const unchanged = sql`(select count(*) || ':' || min(${groups.id}) || ':' || sum(${groups.revision}) from ${groups} where ${draftOf}) = ${`${ids.length}:${Math.min(...ids)}:${draft.reduce((n, g) => n + g.revision, 0)}`}`;
+  // Every pair in the draft is still active and approved for phase 1: a
+  // dissolve or rejection since the check above stops the publish.
+  const pairsStillIn = sql`not exists (select 1 from group_pairs gp join groups dg on dg.id = gp.group_id join pairs p on p.id = gp.pair_id
+    where dg.season_id = ${seasonId} and dg.phase = ${FIRST_PHASE} and dg.published_at is null and (p.status <> 'active' or not exists (
+      select 1 from season_entries se where se.season_id = dg.season_id and se.pair_id = gp.pair_id and se.status = 'approved' and se.joins_phase = ${FIRST_PHASE})))`;
   // The matches go in only if this publish claimed every group.
   const claimed = sql`(select count(*) from ${groups} where ${groups.seasonId} = ${seasonId} and ${groups.phase} = ${FIRST_PHASE} and ${groups.publishedAt} = ${publishedAt}) = ${ids.length}`;
   const matchRows = fixtures.map((m) => sql`(${draft[m.group]!.id}, ${m.a.pairId}, ${m.b.pairId}, ${m.week}, ${Math.floor(phase.deadline.getTime() / 1000)})`);
@@ -285,7 +290,7 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
   // second hits the matches' unique index and rolls back.
   try {
     await db.batch([
-      db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged)),
+      db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged, pairsStillIn)),
       ...chunks(matchRows, MATCH_CHUNK).map((rows) =>
         db.run(
           sql`insert into ${matches} (group_id, pair_a, pair_b, week, deadline) select * from (values ${sql.join(rows, sql`, `)}) where ${claimed}`,

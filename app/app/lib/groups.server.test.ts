@@ -301,6 +301,33 @@ describe("first-phase groups on real SQLite", () => {
     expect(h.mails).toEqual([]);
   });
 
+  it("a pair dissolved while publishing is checked stops the publish", async () => {
+    await G.generateDraft(1, "o");
+    const raw = h.raw;
+    let dissolved = false;
+    h.raw = new Proxy(raw, {
+      get(target, prop) {
+        if (prop !== "prepare") {
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (q: string) => {
+          if (!dissolved && /^update "groups" set "published_at"/.test(q)) {
+            dissolved = true;
+            target.exec(`update pairs set status = 'dissolved' where id = 7`);
+          }
+          return target.prepare(q);
+        };
+      },
+    });
+    const result = await G.publishGroups(1, "o", NOW);
+    h.raw = raw;
+    expect(dissolved).toBe(true);
+    expect(result).toEqual({ ok: false, error: "A javaslat közben változott. Frissítsd az oldalt." });
+    expect(all("select count(*) n from matches")[0].n).toBe(0);
+    expect(h.mails).toEqual([]);
+  });
+
   it("a move bumps the revision of both groups it touches", async () => {
     await G.generateDraft(1, "o");
     await G.moveDraftPair(1, 3, 2, "o");
@@ -312,8 +339,8 @@ describe("first-phase groups on real SQLite", () => {
   });
 
   it("an Elo tie in the target group goes by approval order after a move (D20)", async () => {
-    // Pair 4 (1400, approved first) is in group 1 with pair 3 (1400). Move 3
-    // to group 2, then back: it is seeded below 4 again, not by move order.
+    // Pair 4 (1400, approved first) is in group 1 with pair 3 (1400). Move 4
+    // to group 2, then back: it is seeded above 3 again, not by move order.
     await G.generateDraft(1, "o");
     await G.moveDraftPair(1, 4, 2, "o");
     await G.moveDraftPair(1, 4, 1, "o");

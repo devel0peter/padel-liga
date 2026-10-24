@@ -9,7 +9,7 @@ import { can } from "~/lib/auth/permissions";
 import { cityName } from "~/lib/cities";
 import { listCities } from "~/lib/cities.server";
 import { countBy, OTHER_CLUB, parseClub } from "~/lib/clubs";
-import { createClub, deleteClub, listClubs, slugTaken, updateClub } from "~/lib/clubs.server";
+import { createClub, deleteClub, listClubs, setClubActive, slugTaken, updateClub } from "~/lib/clubs.server";
 import { getLeague } from "~/lib/leagues.server";
 import { listSignups } from "~/lib/signups-admin.server";
 
@@ -75,6 +75,13 @@ export async function clubsAction(request: Request, scope: ClubsScope): Promise<
 
   if (form.get("intent") === "delete") {
     await deleteClub(id);
+    return redirect(scope.base);
+  }
+
+  const intent = form.get("intent");
+  if (intent === "deactivate" || intent === "activate") {
+    if (!id) throw new Response("Hibás azonosító.", { status: 400 });
+    await setClubActive(id, intent === "activate");
     return redirect(scope.base);
   }
 

@@ -27,6 +27,10 @@ export async function updateClub(id: number, input: ClubInput): Promise<void> {
   await db.update(clubs).set({ ...input, updatedAt: new Date() }).where(eq(clubs.id, id));
 }
 
+export async function setClubActive(id: number, active: boolean): Promise<void> {
+  await db.update(clubs).set({ active, updatedAt: new Date() }).where(eq(clubs.id, id));
+}
+
 // Signups keep their ref; they then show the raw slug as the source.
 export async function deleteClub(id: number): Promise<void> {
   await db.delete(clubs).where(eq(clubs.id, id));

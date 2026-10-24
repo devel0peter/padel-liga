@@ -2,6 +2,7 @@ import { Pencil, Printer, Trash2 } from "lucide-react";
 import { Form, Link, useNavigation, useSearchParams } from "react-router";
 
 import { AppPage } from "~/components/app-page";
+import { Badge } from "~/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -169,6 +170,20 @@ function ClubForm({
   );
 }
 
+// Reversible, so no confirmation. Inactive clubs stay on old records.
+function ToggleActive({ club }: { club: Club }) {
+  const busy = useNavigation().state === "submitting";
+  return (
+    <Form method="post" className="inline">
+      <input type="hidden" name="intent" value={club.active ? "deactivate" : "activate"} />
+      <input type="hidden" name="id" value={club.id} />
+      <Button type="submit" variant="ghost" size="sm" disabled={busy}>
+        {club.active ? "Inaktiválás" : "Aktiválás"}
+      </Button>
+    </Form>
+  );
+}
+
 function DeleteClub({ club }: { club: Club }) {
   return (
     <AlertDialog>
@@ -182,7 +197,8 @@ function DeleteClub({ club }: { club: Club }) {
           <AlertDialogTitle>Törlöd a klubot?</AlertDialogTitle>
           <AlertDialogDescription>
             {club.name} lekerül a listáról és a jelentkezési űrlapról. A jelentkezések
-            megmaradnak, ahol ez a klub szerepel, ott „{club.slug}” lesz.
+            megmaradnak, ahol ez a klub szerepel, ott „{club.slug}” lesz. Ha csak nem akarod
+            többé felkínálni, inkább inaktiváld.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -213,7 +229,8 @@ export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: 
         <>
           Csak a szervezők látják. A jelentkezési űrlapon a város klubjai közül választhatnak, hol
           játszanak a legtöbbet; a plakát QR-kódja pedig a klub azonosítójával viszi a főoldalra, így
-          látszik, hány jelentkezést hozott.
+          látszik, hány jelentkezést hozott. Az inaktív klubot nem kínáljuk fel újonnan, a régi
+          adatokon megmarad.
         </>
       }
       actions={
@@ -246,9 +263,12 @@ export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: 
             </TableHeader>
             <TableBody>
               {clubs.map((club) => (
-                <TableRow key={club.id}>
+                <TableRow key={club.id} className={club.active ? undefined : "text-muted-foreground"}>
                   <TableCell>
-                    <div className="font-medium">{club.name}</div>
+                    <div className="flex items-center gap-2 font-medium">
+                      {club.name}
+                      {!club.active && <Badge variant="secondary">inaktív</Badge>}
+                    </div>
                     <div className="text-xs text-muted-foreground">{posterUrl(club.slug)}</div>
                   </TableCell>
                   {!scope.city && <TableCell>{cityName(club.city, cities)}</TableCell>}
@@ -270,6 +290,7 @@ export function ClubsPage({ data, actionData }: { data: ClubsData; actionData?: 
                         <Pencil />
                       </Link>
                     </Button>
+                    <ToggleActive club={club} />
                     <DeleteClub club={club} />
                   </TableCell>
                 </TableRow>

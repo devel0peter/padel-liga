@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countBy, homeClubLabel, normalizeRef, parseClub, posterUrl, refLabel, slugify, toClubOption } from "./clubs";
+import { activeVenues, countBy, homeClubLabel, normalizeRef, parseClub, posterUrl, refLabel, slugify, toClubOption } from "./clubs";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
@@ -89,11 +89,29 @@ describe("refLabel", () => {
 
 describe("club data", () => {
   it("gives the signup form no admin fields", () => {
-    const option = toClubOption({ id: 1, slug: "gyp", city: "gyor", name: "GYP", adminNote: "secret" });
+    const option = toClubOption({ id: 1, slug: "gyp", city: "gyor", name: "GYP", adminNote: "secret", active: true });
     expect(option).toEqual({ slug: "gyp", city: "gyor", name: "GYP" });
   });
 
   it("builds the poster link from the slug", () => {
     expect(posterUrl("gyp")).toBe("https://padelparbaj.hu/?ref=gyp");
+  });
+});
+
+describe("activeVenues", () => {
+  const venue = (slug: string, city: string, active: boolean) => ({ slug, city, name: slug, active });
+
+  it("drops inactive clubs from new choices", () => {
+    const all = [venue("a", "gyor", true), venue("b", "gyor", false), venue("c", "gyor", true)];
+    expect(activeVenues(all).map((c) => c.slug)).toEqual(["a", "c"]);
+  });
+
+  it("narrows to one city and keeps the order", () => {
+    const all = [venue("a", "gyor", true), venue("b", "pest", true), venue("c", "gyor", true)];
+    expect(activeVenues(all, "gyor").map((c) => c.slug)).toEqual(["a", "c"]);
+  });
+
+  it("is empty when every club is inactive", () => {
+    expect(activeVenues([venue("a", "gyor", false)])).toEqual([]);
   });
 });

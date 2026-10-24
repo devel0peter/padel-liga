@@ -107,6 +107,9 @@ export const clubs = sqliteTable("clubs", {
   city: text("city").notNull(),
   name: text("name").notNull(),
   adminNote: text("admin_note"),
+  // False: hidden from new choices (signup home club, a match's venue), kept on
+  // existing records. Deactivate instead of delete once a club is in use.
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()

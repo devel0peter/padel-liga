@@ -15,6 +15,9 @@ export type Club = {
   city: string;
   name: string;
   adminNote: string | null;
+  // Inactive clubs stay on existing records but are not offered for new
+  // choices (signup home club, a match's venue). See activeVenues.
+  active: boolean;
 };
 
 // What the signup form gets: no admin fields.
@@ -22,6 +25,13 @@ export type ClubOption = Pick<Club, "slug" | "city" | "name">;
 
 export function toClubOption({ slug, city, name }: Club): ClubOption {
   return { slug, city, name };
+}
+
+// The clubs that can be picked for something new (the signup form's home
+// club, a match's venue). Optionally one city's. Inactive ones stay on the
+// records that already name them.
+export function activeVenues<T extends Pick<Club, "city" | "active">>(clubs: readonly T[], city?: string): T[] {
+  return clubs.filter((c) => c.active && (city === undefined || c.city === city));
 }
 
 // "Máshol / vegyesen" answer to "where do you play most".
@@ -34,7 +44,7 @@ export function posterUrl(slug: string): string {
   return `${SITE_URL}/?ref=${slug}`;
 }
 
-export type ClubInput = Omit<Club, "id">;
+export type ClubInput = Omit<Club, "id" | "active">;
 export type ClubField = "name" | "slug" | "city" | "adminNote";
 export type ClubResult =
   | { ok: true; data: ClubInput }

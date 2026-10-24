@@ -12,6 +12,7 @@ import type { User } from "./auth/session.server";
 import { randomToken, sha256Hex } from "./auth/tokens";
 import {
   ANSWER_REFUSALS,
+  CANCEL_REFUSED,
   canCancel,
   canDissolve,
   checkAnswer,
@@ -168,12 +169,14 @@ export async function cancelInvite(user: User, inviteId: number): Promise<Result
     .select({ status: pairInvites.status, inviterId: pairInvites.inviterId })
     .from(pairInvites)
     .where(eq(pairInvites.id, inviteId));
-  if (!invite || !canCancel(invite, user.id)) return { ok: false, error: ANSWER_REFUSALS.answered };
-  await db
+  if (!invite || !canCancel(invite, user.id)) return { ok: false, error: CANCEL_REFUSED };
+  // Only while still pending: the invitee may have answered in the meantime.
+  const updated = await db
     .update(pairInvites)
     .set({ status: "cancelled", respondedAt: new Date() })
-    .where(and(eq(pairInvites.id, inviteId), eq(pairInvites.status, "pending")));
-  return { ok: true };
+    .where(and(eq(pairInvites.id, inviteId), eq(pairInvites.inviterId, user.id), eq(pairInvites.status, "pending")))
+    .returning({ id: pairInvites.id });
+  return updated.length ? { ok: true } : { ok: false, error: CANCEL_REFUSED };
 }
 
 export type InviteDetails = {
@@ -234,6 +237,16 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
       },
       answer,
     );
+  // Accepting again (a second tab, a double submit) finds the pair this
+  // invite formed: done, and the inviter was told the first time.
+  const formedHere = async () => {
+    const [formed] = await db
+      .select({ id: pairs.id })
+      .from(pairs)
+      .where(and(eq(pairs.inviteId, inviteId), eq(pairs.status, "active"), eq(pairs.playerB, user.id)));
+    return !!formed;
+  };
+  if (answer === "accept" && invite.status === "accepted" && (await formedHere())) return { ok: true };
   const refused = await refusal();
   if (refused) return { ok: false, error: ANSWER_REFUSALS[refused] };
   const now = new Date();
@@ -252,7 +265,7 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
   const players = [invite.inviterId, user.id];
   const emails = [normalizeEmail(invite.inviterEmail), normalizeEmail(user.email)];
   const pairOfInvite = sql`exists (select 1 from ${pairs} where ${pairs.inviteId} = ${inviteId} and ${pairs.status} = 'active')`;
-  await db.batch([
+  const [accepted] = await db.batch([
     db
       .update(pairInvites)
       .set({ status: "accepted", respondedAt: now })
@@ -263,7 +276,8 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
           eq(pairInvites.inviteeEmail, emails[1]),
           sql`not ${activePairWith(invite.leagueId, players)}`,
         ),
-      ),
+      )
+      .returning({ id: pairInvites.id }),
     db.run(sql`insert into ${pairs} (league_id, player_a, player_b, invite_id)
       select ${invite.leagueId}, ${invite.inviterId}, ${user.id}, ${inviteId}
       where exists (select 1 from ${pairInvites} where ${pairInvites.id} = ${inviteId} and ${pairInvites.status} = 'accepted')
@@ -281,11 +295,10 @@ export async function answerInvite(user: User, inviteId: number, answer: "accept
         ),
       ),
   ]);
-  const [formed] = await db
-    .select({ id: pairs.id })
-    .from(pairs)
-    .where(and(eq(pairs.inviteId, inviteId), eq(pairs.status, "active"), eq(pairs.playerB, user.id)));
-  if (!formed) {
+  // Statement 1 changed the invite only if this batch formed the pair.
+  if (accepted.length === 0) {
+    // Two submits at once: the other one formed it and told the inviter.
+    if (await formedHere()) return { ok: true };
     // Someone was quicker: say why, from the state now.
     const again = await inviteById(inviteId);
     if (again) invite.status = again.status;

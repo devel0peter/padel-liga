@@ -389,8 +389,9 @@ export const notificationOptOuts = sqliteTable(
 
 // Two players who play a league together (spec section 4, #21). Formed when
 // the invitee accepts a pair_invites row; a player is in at most one active
-// pair per league (checked in the accept batch, backed by the two unique
-// indexes). Dissolved pairs stay as history, so later matches keep their pair.
+// pair per league. The accept batch (pairs.server.ts) enforces it; the two
+// unique indexes only catch the same player twice in the same column.
+// Dissolved pairs stay as history, so later matches keep their pair.
 export const pairs = sqliteTable(
   "pairs",
   {

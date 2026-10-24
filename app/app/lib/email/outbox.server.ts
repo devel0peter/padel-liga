@@ -157,15 +157,35 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
   await deliver(ids);
 }
 
-// A partner invite (#21), sent at once. An unsubscribed or bounced address
-// gets nothing (as with the partner notice); the invite still shows in the
-// app once they log in.
+// Partner invite emails one address gets in 24 hours, from anyone: several
+// players can't use invites to flood an inbox.
+const PAIR_INVITES_PER_ADDRESS_PER_DAY = 3;
+
+// A partner invite (#21), sent at once. It goes to an address another player
+// typed, so it has an unsubscribe link. An unsubscribed or bounced address,
+// or one over the daily cap, gets nothing; the invite still shows in the app
+// once they log in.
 export async function queuePairInvite(
   toEmail: string,
   input: { inviterName: string; league: string; link: string; hasAccount: boolean },
+  now = new Date(),
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  await deliver(await enqueue([{ kind: "pair_invite", toEmail, ...pairInvite(input) }]));
+  const [recent] = await db
+    .select({ n: count() })
+    .from(emailMessages)
+    .where(
+      and(
+        eq(emailMessages.kind, "pair_invite"),
+        eq(emailMessages.toEmail, toEmail),
+        gt(emailMessages.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000)),
+      ),
+    );
+  if (recent.n >= PAIR_INVITES_PER_ADDRESS_PER_DAY) return;
+  const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(toEmail, emailSecret()));
+  await deliver(
+    await enqueue([{ kind: "pair_invite", toEmail, headers: unsubscribeHeaders(url), ...pairInvite(input, url) }]),
+  );
 }
 
 // The inviter learns whether the invite was accepted or declined (#21).

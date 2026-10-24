@@ -26,7 +26,7 @@ export type InviteRefusal = "email" | "self" | "inviter_paired" | "invitee_paire
 export const INVITE_REFUSALS: Record<InviteRefusal, string> = {
   email: "Adj meg egy érvényes e-mail-címet.",
   self: "Magadat nem hívhatod meg.",
-  inviter_paired: "Ebben a ligában már van párod. Új párt csak a mostani megszüntetése után hívhatsz.",
+  inviter_paired: "Ebben a ligában már van párod. Új párt csak a mostani megszüntetése után hívhatsz meg.",
   invitee_paired: "Neki már van párja ebben a ligában.",
   already_inviting: "Már elküldtél egy meghívót ebben a ligában. Vond vissza, ha mást hívnál.",
   too_many: `Egy nap legfeljebb ${MAX_INVITES_PER_DAY} meghívót küldhetsz. Próbáld holnap.`,
@@ -84,6 +84,8 @@ export function checkAnswer(c: AnswerCheck, answer: "accept" | "decline"): Answe
   if (c.inviterPaired) return "inviter_paired";
   return null;
 }
+
+export const CANCEL_REFUSED = "Ezt a meghívót már nem lehet visszavonni.";
 
 // Only the inviter cancels, and only while nobody has answered.
 export function canCancel(invite: { status: InviteStatus; inviterId: string }, userId: string): boolean {

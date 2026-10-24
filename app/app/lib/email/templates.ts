@@ -80,6 +80,16 @@ function build(subject: string, bodyText: string, foot: { html: string; text: st
   };
 }
 
+// Like build(), for a body with text another player typed (a name): only the
+// paragraphs in `links` become links, so a name like "https://…" stays text
+// in an email we send to any address.
+function buildPlain(subject: string, paragraphs: string[], links: string[], foot: { html: string; text: string }): Email {
+  const html = paragraphs
+    .map((p) => (links.includes(p) ? textToHtml(p) : `<p style="margin:0 0 16px">${escapeHtml(p.trim()).replace(/\n/g, "<br>")}</p>`))
+    .join("\n");
+  return { subject, html: layout(html, foot.html), text: `${paragraphs.join("\n\n").trim()}\n\n--\n${foot.text}\n` };
+}
+
 const SIGNATURE = `Péter\n${SITE_NAME}`;
 
 type Cities = readonly Pick<City, "slug" | "name">[];
@@ -210,8 +220,11 @@ export function loginCode(code: string, validMinutes: number): Email {
 
 // A player invites another to form a pair (#21). The invitee may have no
 // account: then the link goes through the login page (lib/pairs.ts inviteLink).
-export function pairInvite(input: { inviterName: string; league: string; link: string; hasAccount: boolean }): Email {
-  return build(
+export function pairInvite(
+  input: { inviterName: string; league: string; link: string; hasAccount: boolean },
+  unsubscribeUrl?: string,
+): Email {
+  return buildPlain(
     `${input.inviterName} meghívott párnak – ${SITE_NAME}`,
     [
       `Szia!`,
@@ -222,28 +235,28 @@ export function pairInvite(input: { inviterName: string; league: string; link: s
         : `Ehhez be kell lépned. Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be, a címedet kitöltöttük.`,
       `Ha nem ismered, nem kell tenned semmit: más nem fogadhatja el helyetted.`,
       SIGNATURE,
-    ]
-      .filter((p): p is string => p !== null)
-      .join("\n\n"),
-    footer(`Azért kaptad ezt a levelet, mert ${input.inviterName} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`),
+    ].filter((p): p is string => p !== null),
+    [input.link],
+    footer(`Azért kaptad ezt a levelet, mert ${input.inviterName} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`, unsubscribeUrl),
   );
 }
 
 // The inviter learns the answer (#21, D15): accepted or declined.
 export function pairAnswer(input: { to: string; inviteeName: string; league: string; accepted: boolean }): Email {
   const pairPage = `${SITE_URL}/pair`;
-  return build(
+  return buildPlain(
     input.accepted
       ? `${input.inviteeName} elfogadta a meghívásod – ${SITE_NAME}`
       : `${input.inviteeName} nem fogadta el a meghívásod – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
       input.accepted
-        ? `${input.inviteeName} elfogadta a meghívásod: mostantól pár vagytok (${input.league}). Ha nyílik a nevezés, együtt nevezhettek a szezonra.`
+        ? `${input.inviteeName} elfogadta a meghívásod: mostantól pár vagytok (${input.league}). Ha megnyílik a nevezés, együtt nevezhettek a szezonra.`
         : `${input.inviteeName} most nem fogadta el a meghívásod (${input.league}). Meghívhatsz mást.`,
       pairPage,
       SIGNATURE,
-    ].join("\n\n"),
+    ],
+    [pairPage],
     footer(`Azért kaptad ezt a levelet, mert párnak hívtál meg valakit a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

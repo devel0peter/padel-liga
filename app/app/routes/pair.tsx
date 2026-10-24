@@ -60,7 +60,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
   const intent = String(form.get("intent") ?? "");
   const id = Number(form.get("id") || 0);
   const needsId = intent !== "invite";
-  if (!(intent in NOTICES) || (needsId && (!Number.isInteger(id) || id <= 0)))
+  if (!Object.hasOwn(NOTICES, intent) || (needsId && (!Number.isInteger(id) || id <= 0)))
     throw new Response("Hibás kérés.", { status: 400 });
 
   let result: { ok: true } | { ok: false; error: string };
@@ -229,7 +229,8 @@ const ANSWERED: Record<string, string> = {
 export default function Pair({ loaderData: d, actionData }: Route.ComponentProps) {
   const [params] = useSearchParams();
   // After answering on the emailed link's page (pair-invite.tsx).
-  const notice = actionData?.notice ?? ANSWERED[params.get("answered") ?? ""];
+  const answered = params.get("answered") ?? "";
+  const notice = actionData?.notice ?? (Object.hasOwn(ANSWERED, answered) ? ANSWERED[answered] : undefined);
   const inviteError = actionData?.intent === "invite" ? actionData.error : undefined;
   const otherError = actionData?.intent !== "invite" ? actionData?.error : undefined;
   const shown = d.overview.filter((o) => o.pair || o.sent || o.received.length > 0);

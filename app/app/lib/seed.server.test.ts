@@ -171,6 +171,8 @@ describe("running it twice", () => {
         ('u1', 'jatekos1@example.test', 'Egy', 'kezdo', 1), ('u2', 'jatekos2@example.test', 'Kettő', 'kezdo', 1);
       insert into pairs (league_id, player_a, player_b) values (900, 'u1', 'u2');
       insert into interest_signups (mode, name1, email1, level, consent_at) values ('solo', 'Kézi', 'kezi@example.test', 'kezdo', 1);
+      insert into interest_signups (mode, name1, email1, level, city, consent_at) values ('solo', 'Kézi', 'kezi@valodi.example.org', 'kezdo', 'minta', 1);
+      insert into clubs (slug, city, name) values ('uj-klub', 'minta', 'Új klub');
     `);
     // A second pair that matches the first one's group, so matches exist too.
     h.raw.exec(`
@@ -193,6 +195,9 @@ describe("running it twice", () => {
     expect(rows("select email1 from interest_signups where email1 = 'real@example.com'")).toHaveLength(1);
     expect(rows("select to_email from email_messages")).toEqual([{ to_email: "real@example.com" }]);
     expect(rows("select email from account_invites")).toEqual([{ email: "real@example.com" }]);
+    // What was added inside the fake city goes too: a club, a signup from the public form.
+    expect(rows("select slug from clubs where slug = 'uj-klub'")).toHaveLength(0);
+    expect(rows("select email1 from interest_signups where email1 like 'kezi%'")).toHaveLength(0);
     expect(count("cities")).toBe(baseline.cities + 1);
     expect(count("leagues")).toBe(baseline.leagues + 1);
   });

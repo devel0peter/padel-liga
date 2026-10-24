@@ -24,12 +24,12 @@ const dir = mkdtempSync(join(tmpdir(), "padel-seed-"));
 const file = join(dir, "seed.sql");
 try {
   writeFileSync(file, seedSql(now));
-  execFileSync("npx", wranglerArgs(file), { stdio: "inherit" });
+  execFileSync("npx", ["--no-install", ...wranglerArgs(file)], { stdio: "inherit" });
   console.log(`\n${summary(now)}`);
 } catch (e) {
   console.error(`\nSeeding failed: ${(e as Error).message}`);
   console.error("Is the local database migrated? Run the local migration script of the app workspace first.");
-  process.exit(1);
+  process.exitCode = 1;
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

@@ -120,6 +120,13 @@
       "when": 1792829238820,
       "tag": "0016_signup_invited_at",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792830963495,
+      "tag": "0017_club_active",
+      "breakpoints": true
     }
   ]
 }

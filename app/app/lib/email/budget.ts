@@ -13,7 +13,9 @@ export type MessageKind =
   | "broadcast"
   | "login_code"
   | "pair_intro"
-  | "registration_invite";
+  | "registration_invite"
+  | "pair_invite"
+  | "pair_answer";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

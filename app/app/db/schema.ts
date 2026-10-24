@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
@@ -46,7 +46,16 @@ export const emailMessages = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     kind: text("kind", {
-      enum: ["signup_confirmation", "partner_notice", "broadcast", "login_code", "pair_intro", "registration_invite"],
+      enum: [
+        "signup_confirmation",
+        "partner_notice",
+        "broadcast",
+        "login_code",
+        "pair_intro",
+        "registration_invite",
+        "pair_invite",
+        "pair_answer",
+      ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
     toEmail: text("to_email").notNull(),
@@ -376,4 +385,70 @@ export const notificationOptOuts = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
+);
+
+// Two players who play a league together (spec section 4, #21). Formed when
+// the invitee accepts a pair_invites row; a player is in at most one active
+// pair per league (checked in the accept batch, backed by the two unique
+// indexes). Dissolved pairs stay as history, so later matches keep their pair.
+export const pairs = sqliteTable(
+  "pairs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    // The player who sent the invite, and the one who accepted it.
+    playerA: text("player_a")
+      .notNull()
+      .references(() => users.id),
+    playerB: text("player_b")
+      .notNull()
+      .references(() => users.id),
+    inviteId: integer("invite_id")
+      .unique()
+      .references((): AnySQLiteColumn => pairInvites.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["active", "dissolved"] }).notNull().default("active"),
+    dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
+    dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    uniqueIndex("pairs_active_a_idx").on(t.leagueId, t.playerA).where(sql`status = 'active'`),
+    uniqueIndex("pairs_active_b_idx").on(t.leagueId, t.playerB).where(sql`status = 'active'`),
+  ],
+);
+
+// A player's invite to another to form a pair in a league, by email (#21).
+// The emailed link carries a random token; only its SHA-256 is stored. No
+// expiry: the inviter can cancel. One pending invite per inviter and league.
+// Personal data: the invitee's email, typed by the inviter (privacy page).
+export const pairInvites = sqliteTable(
+  "pair_invites",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    inviterId: text("inviter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Lowercased; the invitee may not have an account yet.
+    inviteeEmail: text("invitee_email").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    status: text("status", { enum: ["pending", "accepted", "declined", "cancelled"] })
+      .notNull()
+      .default("pending"),
+    respondedAt: integer("responded_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    uniqueIndex("pair_invites_pending_idx").on(t.leagueId, t.inviterId).where(sql`status = 'pending'`),
+    index("pair_invites_invitee_idx").on(t.inviteeEmail, t.status),
+    index("pair_invites_inviter_idx").on(t.inviterId, t.createdAt),
+  ],
 );

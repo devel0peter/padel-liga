@@ -16,7 +16,9 @@ import { listCities } from "~/lib/cities.server";
 import {
   broadcastEmail,
   loginCode,
+  pairAnswer,
   pairIntro,
+  pairInvite,
   partnerNotice,
   registrationInvite,
   signupConfirmation,
@@ -84,6 +86,14 @@ export async function suppressedSet(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.email));
 }
 
+async function isSuppressed(email: string): Promise<boolean> {
+  const [row] = await db
+    .select({ email: emailSuppressions.email })
+    .from(emailSuppressions)
+    .where(eq(emailSuppressions.email, email.toLowerCase()));
+  return !!row;
+}
+
 export async function suppress(email: string, reason: "unsubscribed" | "bounced" | "complained") {
   await db.insert(emailSuppressions).values({ email: email.toLowerCase(), reason }).onConflictDoNothing();
 }
@@ -145,6 +155,26 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
     { kind: "login_code", toEmail: email, ...loginCode(code, CODE_TTL_MS / 60_000) },
   ]);
   await deliver(ids);
+}
+
+// A partner invite (#21), sent at once. An unsubscribed or bounced address
+// gets nothing (as with the partner notice); the invite still shows in the
+// app once they log in.
+export async function queuePairInvite(
+  toEmail: string,
+  input: { inviterName: string; league: string; link: string; hasAccount: boolean },
+): Promise<void> {
+  if (await isSuppressed(toEmail)) return;
+  await deliver(await enqueue([{ kind: "pair_invite", toEmail, ...pairInvite(input) }]));
+}
+
+// The inviter learns whether the invite was accepted or declined (#21).
+export async function queuePairAnswer(
+  toEmail: string,
+  input: { to: string; inviteeName: string; league: string; accepted: boolean },
+): Promise<void> {
+  if (await isSuppressed(toEmail)) return;
+  await deliver(await enqueue([{ kind: "pair_answer", toEmail, ...pairAnswer(input) }]));
 }
 
 export async function createBroadcast(input: {

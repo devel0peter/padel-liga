@@ -25,6 +25,12 @@ describe("sendBudget", () => {
     expect(BULK_KINDS).toEqual(["broadcast", "registration_invite"]);
   });
 
+  it("treats pair invites and answers as transactional: behind login codes, ahead of bulk mail", () => {
+    expect(sendBudget(100, 40, "pair_invite")).toBe(60 - LOGIN_RESERVE);
+    expect(sendBudget(100, 40, "pair_answer")).toBe(60 - LOGIN_RESERVE);
+    expect(sendBudget(100, 100 - TRANSACTIONAL_RESERVE, "pair_invite")).toBe(TRANSACTIONAL_RESERVE - LOGIN_RESERVE);
+  });
+
   it("never goes negative", () => {
     expect(sendBudget(100, 150, "signup_confirmation")).toBe(0);
     expect(sendBudget(100, 150, "login_code")).toBe(0);

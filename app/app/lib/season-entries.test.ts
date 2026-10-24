@@ -46,9 +46,10 @@ describe("entryOpen (D18)", () => {
     expect(entryOpen({ ...season, phases: [] }, at("2026-11-03T12:00:00Z"))).toBe(false);
   });
 
-  it("knows a late entry", () => {
-    expect(lateEntry(season, at("2026-11-05T22:59:00Z"))).toBe(false);
-    expect(lateEntry(season, at("2026-11-05T23:00:00Z"))).toBe(true);
+  it("knows a late entry: once phase 1 has started, not between registration and phase 1", () => {
+    expect(lateEntry(season, at("2026-11-06T12:00:00Z"))).toBe(false);
+    expect(lateEntry(season, at("2026-11-08T22:59:59Z"))).toBe(false);
+    expect(lateEntry(season, at("2026-11-08T23:00:00Z"))).toBe(true);
   });
 });
 
@@ -186,6 +187,7 @@ describe("entryView", () => {
 
   it("offers Nevezünk while open", () => {
     expect(entryView(base)).toEqual({ kind: "apply", late: false });
+    expect(entryView({ ...base, now: at("2026-11-07T12:00:00Z") })).toEqual({ kind: "apply", late: false });
     expect(entryView({ ...base, now: at("2026-11-20T12:00:00Z") })).toEqual({ kind: "apply", late: true });
   });
 

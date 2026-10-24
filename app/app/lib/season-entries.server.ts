@@ -31,7 +31,13 @@ type Result = { ok: true } | { ok: false; error: string };
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
 
-type ActivePair = { id: number; leagueId: number; myLevel: string | null; partnerLevel: string | null };
+type ActivePair = {
+  id: number;
+  leagueId: number;
+  players: [string, string];
+  myLevel: string | null;
+  partnerLevel: string | null;
+};
 
 // The player's active pair in each of these leagues, with both levels.
 async function activePairs(userId: string, leagueIds: number[]): Promise<Map<number, ActivePair>> {
@@ -41,6 +47,7 @@ async function activePairs(userId: string, leagueIds: number[]): Promise<Map<num
       id: pairs.id,
       leagueId: pairs.leagueId,
       playerA: pairs.playerA,
+      playerB: pairs.playerB,
       levelA: playerA.level,
       levelB: playerB.level,
     })
@@ -57,8 +64,48 @@ async function activePairs(userId: string, leagueIds: number[]): Promise<Map<num
   return new Map(
     rows.map((r) => {
       const mine = r.playerA === userId;
-      return [r.leagueId, { id: r.id, leagueId: r.leagueId, myLevel: mine ? r.levelA : r.levelB, partnerLevel: mine ? r.levelB : r.levelA }];
+      return [
+        r.leagueId,
+        {
+          id: r.id,
+          leagueId: r.leagueId,
+          players: [r.playerA, r.playerB],
+          myLevel: mine ? r.levelA : r.levelB,
+          partnerLevel: mine ? r.levelB : r.levelA,
+        },
+      ];
     }),
+  );
+}
+
+type StoredEntry = { seasonId: number; pairId: number; status: EntryStatus; joinsPhase: number | null; note: string | null; playerA: string; playerB: string };
+
+// The season entries of pairs this player was in, for these seasons.
+async function entriesOf(userId: string, seasonIds: number[]): Promise<StoredEntry[]> {
+  if (seasonIds.length === 0) return [];
+  return db
+    .select({
+      seasonId: seasonEntries.seasonId,
+      pairId: seasonEntries.pairId,
+      status: seasonEntries.status,
+      joinsPhase: seasonEntries.joinsPhase,
+      note: seasonEntries.note,
+      playerA: pairs.playerA,
+      playerB: pairs.playerB,
+    })
+    .from(seasonEntries)
+    .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
+    .where(and(inArray(seasonEntries.seasonId, seasonIds), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))));
+}
+
+// The entry that counts for this pair in this season: its own, or one of an
+// earlier pair of the same two players that wasn't withdrawn, so dissolving
+// and re-forming the pair doesn't get round a rejection (D17).
+function entryFor(entries: readonly StoredEntry[], seasonId: number, pair: ActivePair): StoredEntry | undefined {
+  const same = (e: StoredEntry) => [e.playerA, e.playerB].sort().join() === [...pair.players].sort().join();
+  return (
+    entries.find((e) => e.seasonId === seasonId && e.pairId === pair.id) ??
+    entries.find((e) => e.seasonId === seasonId && e.status !== "withdrawn" && same(e))
   );
 }
 
@@ -68,30 +115,10 @@ export async function entryViews(user: User, list: readonly Season[], now = new 
   const views = new Map<number, EntryView>();
   if (list.length === 0) return views;
   const mine = await activePairs(user.id, [...new Set(list.map((s) => s.leagueId))]);
-  const pairIds = [...mine.values()].map((p) => p.id);
-  const entries = pairIds.length
-    ? await db
-        .select({
-          seasonId: seasonEntries.seasonId,
-          pairId: seasonEntries.pairId,
-          status: seasonEntries.status,
-          joinsPhase: seasonEntries.joinsPhase,
-          note: seasonEntries.note,
-        })
-        .from(seasonEntries)
-        .where(
-          and(
-            inArray(seasonEntries.pairId, pairIds),
-            inArray(
-              seasonEntries.seasonId,
-              list.map((s) => s.id),
-            ),
-          ),
-        )
-    : [];
+  const entries = mine.size ? await entriesOf(user.id, list.map((s) => s.id)) : [];
   for (const season of list) {
     const pair = mine.get(season.leagueId);
-    const entry = pair ? entries.find((e) => e.seasonId === season.id && e.pairId === pair.id) : undefined;
+    const entry = pair ? entryFor(entries, season.id, pair) : undefined;
     const view = entryView({
       season,
       now,
@@ -105,42 +132,44 @@ export async function entryViews(user: User, list: readonly Season[], now = new 
   return views;
 }
 
+async function entryRefusal(user: User, season: Season, now: Date) {
+  const pair = (await activePairs(user.id, [season.leagueId])).get(season.leagueId);
+  const entered = pair ? !!entryFor(await entriesOf(user.id, [season.id]), season.id, pair) : false;
+  const refusal = checkEntry({
+    hasPair: !!pair,
+    open: entryOpen(season, now),
+    entered,
+    myLevel: pair?.myLevel ?? null,
+    partnerLevel: pair?.partnerLevel ?? null,
+  });
+  return { pair, refusal };
+}
+
 // "Nevezünk" (D18): either player of an active pair in the season's league.
 export async function applyToSeason(user: User, seasonId: number, now = new Date()): Promise<Result> {
   const season = await getSeason(seasonId);
   if (!season) return { ok: false, error: "Nincs ilyen szezon." };
-  const pair = (await activePairs(user.id, [season.leagueId])).get(season.leagueId);
-  const existing = pair
-    ? await db
-        .select({ id: seasonEntries.id })
-        .from(seasonEntries)
-        .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.pairId, pair.id)))
-    : [];
-  const refusal = checkEntry({
-    hasPair: !!pair,
-    open: entryOpen(season, now),
-    entered: existing.length > 0,
-    myLevel: pair?.myLevel ?? null,
-    partnerLevel: pair?.partnerLevel ?? null,
-  });
+  const { pair, refusal } = await entryRefusal(user, season, now);
   if (refusal) return { ok: false, error: ENTRY_REFUSALS[refusal] };
-  // One statement re-checks that the pair is still active and both players
-  // have a level; the unique index settles a double submit.
+  const [a, b] = pair!.players;
+  // One statement re-checks that the pair is still active, both players have
+  // a level and the same two players have no other entry here; the unique
+  // index settles a double submit.
   const inserted = await db.all(sql`insert into ${seasonEntries} (season_id, pair_id)
     select ${seasonId}, ${pair!.id}
     where exists (select 1 from ${pairs} where ${pairs.id} = ${pair!.id} and ${pairs.status} = 'active')
-      and (select count(*) from ${users} where ${users.id} in (
-        select player_a from ${pairs} where ${pairs.id} = ${pair!.id}
-        union select player_b from ${pairs} where ${pairs.id} = ${pair!.id}
-      ) and ${users.level} is not null) = 2
+      and (select count(*) from ${users} where ${users.id} in (${a}, ${b}) and ${users.level} is not null) = 2
+      and not exists (
+        select 1 from season_entries se join pairs p on p.id = se.pair_id
+        where se.season_id = ${seasonId} and se.status <> 'withdrawn'
+          and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
+      )
     on conflict do nothing
     returning id`);
   if (inserted.length > 0) return { ok: true };
-  const [again] = await db
-    .select({ id: seasonEntries.id })
-    .from(seasonEntries)
-    .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.pairId, pair!.id)));
-  return { ok: false, error: again ? ENTRY_REFUSALS.entered : "Ez a pár már nem létezik." };
+  // Something changed in the meantime: say what, from the state now.
+  const again = await entryRefusal(user, season, now);
+  return { ok: false, error: again.refusal ? ENTRY_REFUSALS[again.refusal] : "Ez a pár már nem létezik." };
 }
 
 export type EntryRow = {

@@ -120,7 +120,19 @@ export async function updateSeason(id: number, input: SeasonInput, phases: Phase
   await audit(actorId, "season.update", `season:${id}`, input.name);
 }
 
-export async function deleteSeason(id: number, actorId: string): Promise<void> {
-  const [row] = await db.delete(seasons).where(eq(seasons.id, id)).returning({ name: seasons.name });
-  await audit(actorId, "season.delete", `season:${id}`, row?.name);
+// Only while it has no entry but withdrawn ones, checked in the delete
+// itself: an entry made in the meantime isn't deleted with it. False if not.
+export async function deleteSeason(id: number, actorId: string): Promise<boolean> {
+  const [row] = await db
+    .delete(seasons)
+    .where(
+      and(
+        eq(seasons.id, id),
+        sql`not exists (select 1 from ${seasonEntries} where ${seasonEntries.seasonId} = ${id} and ${seasonEntries.status} <> 'withdrawn')`,
+      ),
+    )
+    .returning({ name: seasons.name });
+  if (!row) return false;
+  await audit(actorId, "season.delete", `season:${id}`, row.name);
+  return true;
 }

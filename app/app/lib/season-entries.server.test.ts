@@ -163,6 +163,9 @@ describe("season entries on real SQLite", () => {
   });
 
   it("D19: dissolving withdraws entries for seasons not started, and no one can approve them", async () => {
+    // dissolvePair reads the clock: keep it before phase 1.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(DURING_REGISTRATION);
     addSeason(2, 1, "Tavasz");
     await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
     await E.applyToSeason(user("a"), 2, DURING_REGISTRATION);
@@ -173,6 +176,37 @@ describe("season entries on real SQLite", () => {
     expect(await E.decideEntry(org, 1, s1, "approve", null, DURING_REGISTRATION)).toMatchObject({ ok: false });
     expect(await E.decideEntry(org, 2, s2, "reject", null, DURING_REGISTRATION)).toMatchObject({ ok: false });
     expect(await S.seasonState(1)).toMatchObject({ entries: 0 });
+    vi.useRealTimers();
+  });
+
+  it("dissolving and re-forming the pair doesn't get round a rejection", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(DURING_REGISTRATION);
+    try {
+      await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+      await E.decideEntry(org, 1, entry().id, "reject", "Nem.", DURING_REGISTRATION);
+      await P.dissolvePair(user("a"), 1);
+      h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (3, 1, 'b', 'a')`);
+      expect(await E.applyToSeason(user("b"), 1, DURING_REGISTRATION)).toMatchObject({ ok: false, error: expect.stringContaining("már neveztetek") });
+      const season = (await S.getSeason(1))!;
+      expect((await E.entryViews(user("a"), [season], DURING_REGISTRATION)).get(1)).toMatchObject({ kind: "status", status: "rejected", note: "Nem." });
+      expect(all("select * from season_entries")).toHaveLength(1);
+      // With someone else it's a new pair: it may apply.
+      h.raw.exec(`update pairs set status = 'dissolved' where id = 3`);
+      h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (4, 1, 'a', 'o')`);
+      expect(await E.applyToSeason(user("a"), 1, DURING_REGISTRATION)).toEqual({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a season with an entry can't be deleted; with only withdrawn ones it can", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    expect(await S.deleteSeason(1, "o")).toBe(false);
+    expect(one("select count(*) as n from seasons").n).toBe(1);
+    h.raw.exec(`update season_entries set status = 'withdrawn'`);
+    expect(await S.deleteSeason(1, "o")).toBe(true);
+    expect(one("select count(*) as n from season_entries").n).toBe(0);
   });
 
   it("D19: an entry the pair already plays in stays; a rejected one stays rejected", async () => {

@@ -100,7 +100,7 @@ function Entries({ entries }: { entries: Entry[] }) {
     <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle className="font-display text-lg">Nevezés</CardTitle>
-        <CardDescription>Elég, ha egyikőtök nevez. A szervező jóváhagyásáról mindketten e-mailt kaptok.</CardDescription>
+        <CardDescription>Elég, ha egyikőtök nevez. A szervező döntéséről mindketten e-mailt kaptok.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
         {entries.map((e) => (
@@ -137,7 +137,7 @@ function Received({ invite }: { invite: Overview["received"][number] }) {
   );
 }
 
-function ActivePair({ pair }: { pair: NonNullable<Overview["pair"]> }) {
+function ActivePair({ pair, entered }: { pair: NonNullable<Overview["pair"]>; entered: boolean }) {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
@@ -154,7 +154,9 @@ function ActivePair({ pair }: { pair: NonNullable<Overview["pair"]> }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Megszünteted a párt?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {pair.partnerName} és te nem lesztek többé pár, erről e-mailt kap. Utána új párt hívhatsz meg.
+                  {pair.partnerName} és te nem lesztek többé pár, erről e-mailt kap.
+                  {entered && " A szezonnevezésetek is visszavonódik, ha még nem kezdtetek el játszani."} Utána új
+                  párt hívhatsz meg.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -295,7 +297,14 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
           {o.received.map((r) => (
             <Received key={r.id} invite={r} />
           ))}
-          {o.pair && <ActivePair pair={o.pair} />}
+          {o.pair && (
+            <ActivePair
+              pair={o.pair}
+              entered={d.entries.some(
+                (e) => e.leagueId === o.league.id && e.view.kind === "status" && (e.view.status === "pending" || e.view.status === "approved"),
+              )}
+            />
+          )}
           {o.pair && d.entries.some((e) => e.leagueId === o.league.id) && (
             <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
           )}

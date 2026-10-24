@@ -25,7 +25,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Until registration opens (2 Nov 2026), only invited emails can create an account.
 - First login asks for a name and privacy consent.
 - Facebook login: after the MVP (Meta business verification and app review take weeks).
-- Onboarding from the interest list: when registration opens, everyone on the interest list (the person who signed up, not the partner they entered) gets one invite email with a registration link, their email pre-filled. Pairs are then formed in the app (section 4), not taken from the signup.
+- Onboarding from the interest list: when registration opens, the players who start with a partner from the signup get one invite email each with a registration link, their email pre-filled: both addresses of a pair signup, and both solos once a Szervező paired them. A solo still waiting for a partner gets none. For the first season everyone starts with that partner: the pair forms by itself once both have registered (section 4; README decision log, 2026-10-24, #89).
 - Same email = same account, whichever way they log in. A Google login links to an existing account only if Google reports the email as verified.
 - Profile:
   - Required: name, email.
@@ -47,7 +47,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
   - Sizes from the number of groups `n` in the phase: each division gets `floor(n / 3)` groups; a remainder of 1 goes to Réz, a remainder of 2 to Réz and Rookie (15 = 5+5+5, 16 = 5+6+5, 17 = 5+6+6). With fewer than 3 groups, top-down: 1 group = Bronz; 2 groups = Bronz, Réz.
   - Recalculated every phase, so the borders move as groups are added or removed. A pair's division is the division of its current group.
   - The signup level "versenyző" has no division of its own.
-- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. A pair is formed by one player inviting the other by email; the pair exists once the invitee accepts. Invites, refusals and dissolving a pair: README decision log, 2026-10-24.
+- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. A pair is formed by one player inviting the other by email; the pair exists once the invitee accepts. Invites, refusals and dissolving a pair: README decision log, 2026-10-24. A pair named on the interest signup (section 3) forms without an invite, when the second of the two finishes registering, unless either is already in an active pair in that league.
 - **Withdrawal:** if a pair drops out mid-phase (injury, moving away), the organizer withdraws it: all its matches in that phase, played or not, are removed from the group's standings, and the group continues without it. No replacement mid-phase.
 - **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
   - The pair requests it, naming the substitute; the organizer sees the substitute's and the absent player's Elo side by side and approves or rejects. The opponents are notified and see the substitute on the match page.
@@ -232,7 +232,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Accounts: kept until deletion, then anonymized (section 3).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address.
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
-- **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion. Nothing else is sent to them until they register themselves.
+- **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion, and they get the registration invite (section 3). Nothing else is sent to them until they register themselves. Until then, the player who registered sees only the partner's name from the signup on "Párom", never the email.
 
 ## 18. MVP plan and calendar (decided 2026-10-03)
 Dates are Europe/Budapest.

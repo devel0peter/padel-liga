@@ -155,9 +155,15 @@ export default function Privacy() {
           <Section title="Ha a párodat is jelentkezteted">
             <p>
               Ha megadod a párod e-mail-címét, egyszer írunk neki, hogy tudjon a
-              jelentkezésről, és kérhesse az adatai törlését. Ezen kívül semmit
-              nem küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
+              jelentkezésről, és kérhesse az adatai törlését. Amikor indul a
+              regisztráció, neki is küldünk egy meghívót. Ezen kívül semmit nem
+              küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
               meg a párod adatait, ha ő is benne van.
+            </p>
+            <p>
+              Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
+              csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
+              jelentkezésből, az e-mail-címét nem.
             </p>
           </Section>
 
@@ -184,6 +190,12 @@ export default function Privacy() {
               szintjét és e-mail-címét, hogy megbeszélhessétek. Mást nem adunk át,
               és a szervező sem látja az e-mail-címedet. Ha ezt nem szeretnéd,
               írd meg a megjegyzésben, vagy írj nekünk.
+            </p>
+            <p>
+              Ha párt kaptál, a regisztráció indulásakor mindketten meghívót
+              kaptok, és ha mindketten regisztráltatok, a ligában magától pár
+              lesztek. Amíg csak egyikőtök regisztrált, ő a Párom oldalon látja a
+              másik nevét.
             </p>
           </Section>
 

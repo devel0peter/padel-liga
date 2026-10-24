@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { InterestSignup } from "../interest";
 import {
   broadcastEmail,
+  groupsPublished,
   escapeHtml,
   loginCode,
   pairAnswer,
@@ -294,7 +295,7 @@ describe("seasonEntryDecision", () => {
 
   it("tells a late pair the phase it joins", () => {
     const email = seasonEntryDecision({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } });
-    expect(email.text).toContain("a 2. körtől játszotok (kezdés: nov. 30.)");
+    expect(email.text).toContain("A 2. körtől játszotok (kezdés: nov. 30.).");
   });
 
   it("tells a pair approved in the last phase that it moves into the next season", () => {
@@ -314,5 +315,50 @@ describe("seasonEntryDecision", () => {
     expect(email.html).not.toContain('href="https://evil.example');
     expect(email.html).toContain("&lt;i&gt;Béla&lt;/i&gt;");
     expect(email.text).toContain("https://evil.example/x");
+  });
+});
+
+describe("groupsPublished (#24, D22)", () => {
+  const base = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [
+      { week: 1, range: "nov. 9. – nov. 15.", opponents: ["Kiss Cecil", "Tóth Dóra"] as [string, string] },
+      { week: 2, range: "nov. 16. – nov. 22.", opponents: ["Szabó Emil", "Varga Flóra"] as [string, string] },
+      { week: 3, range: "nov. 23. – nov. 29.", opponents: null },
+    ],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  };
+
+  it("tells the player their group, the opponents each week and the deadline", () => {
+    const email = groupsPublished(base);
+    expect(email.subject).toBe("Itt a csoportod: 1. csoport – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain(
+      "Kész az 1. kör csoportbeosztása (2026/27 tél, Padelpárbaj Győr). Kovács Béla pároddal az 1. csoportban játszotok.",
+    );
+    expect(email.text).toContain(
+      "A meccseitek:\n1. hét (nov. 9. – nov. 15.): Kiss Cecil és Tóth Dóra ellen\n2. hét (nov. 16. – nov. 22.): Szabó Emil és Varga Flóra ellen\n3. hét (nov. 23. – nov. 29.): pihenőhét",
+    );
+    expect(email.text).toContain("Határidő: nov. 29., vasárnap 23:59.");
+    expect(email.html).toContain('href="https://padelparbaj.hu/home"');
+  });
+
+  it("uses the right article for the group", () => {
+    expect(groupsPublished({ ...base, group: 2 }).text).toContain("pároddal a 2. csoportban játszotok.");
+  });
+
+  it("keeps the names plain text and has no contact details", () => {
+    const email = groupsPublished({
+      ...base,
+      weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["<b>X</b>", "https://evil.example/y"] }],
+    });
+    expect(email.html).toContain("&lt;b&gt;X&lt;/b&gt;");
+    expect(email.html).not.toContain('href="https://evil.example');
+    expect(email.text).not.toMatch(/@|\+36/);
   });
 });

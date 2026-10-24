@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bc2e4229-928e-45a0-93b3-1eba7e5dfc27",
+  "id": "2b551f50-f967-41d9-b355-e67762ea01fb",
   "prevId": "77963e06-b457-433b-89cd-452fb620b1be",
   "tables": {
     "account_invites": {
@@ -466,6 +466,165 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "group_pairs": {
+      "name": "group_pairs",
+      "columns": {
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_id": {
+          "name": "pair_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seed": {
+          "name": "seed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "group_pairs_pair_idx": {
+          "name": "group_pairs_pair_idx",
+          "columns": [
+            "pair_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "group_pairs_group_id_groups_id_fk": {
+          "name": "group_pairs_group_id_groups_id_fk",
+          "tableFrom": "group_pairs",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "group_pairs_pair_id_pairs_id_fk": {
+          "name": "group_pairs_pair_id_pairs_id_fk",
+          "tableFrom": "group_pairs",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "group_pairs_group_id_pair_id_pk": {
+          "columns": [
+            "group_id",
+            "pair_id"
+          ],
+          "name": "group_pairs_group_id_pair_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "groups": {
+      "name": "groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "season_id": {
+          "name": "season_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "groups_season_phase_number_idx": {
+          "name": "groups_season_phase_number_idx",
+          "columns": [
+            "season_id",
+            "phase",
+            "number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "groups_season_id_seasons_id_fk": {
+          "name": "groups_season_id_seasons_id_fk",
+          "tableFrom": "groups",
+          "tableTo": "seasons",
+          "columnsFrom": [
+            "season_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "interest_signups": {
       "name": "interest_signups",
       "columns": {
@@ -585,13 +744,6 @@
         },
         "invited_at": {
           "name": "invited_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "invited2_at": {
-          "name": "invited2_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -933,6 +1085,145 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "matches": {
+      "name": "matches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_a": {
+          "name": "pair_a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_b": {
+          "name": "pair_b",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "week": {
+          "name": "week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deadline": {
+          "name": "deadline",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'open'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "matches_group_pairs_idx": {
+          "name": "matches_group_pairs_idx",
+          "columns": [
+            "group_id",
+            "pair_a",
+            "pair_b"
+          ],
+          "isUnique": true
+        },
+        "matches_group_idx": {
+          "name": "matches_group_idx",
+          "columns": [
+            "group_id"
+          ],
+          "isUnique": false
+        },
+        "matches_pair_a_idx": {
+          "name": "matches_pair_a_idx",
+          "columns": [
+            "pair_a"
+          ],
+          "isUnique": false
+        },
+        "matches_pair_b_idx": {
+          "name": "matches_pair_b_idx",
+          "columns": [
+            "pair_b"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "matches_group_id_groups_id_fk": {
+          "name": "matches_group_id_groups_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "matches_pair_a_pairs_id_fk": {
+          "name": "matches_pair_a_pairs_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_a"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "matches_pair_b_pairs_id_fk": {
+          "name": "matches_pair_b_pairs_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_b"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

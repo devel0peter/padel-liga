@@ -23,6 +23,7 @@ import {
 } from "./season-entries";
 import type { Season } from "./seasons";
 import { getSeason } from "./seasons.server";
+import { FIRST_PHASE, groupsPublished, notInRunningGroup, pairInRunningGroup } from "./groups.server";
 
 // Season entries in D1 (#23). The rules are in season-entries.ts.
 
@@ -243,6 +244,7 @@ export async function entryCounts(seasonIds: number[]): Promise<Map<number, Entr
 
 const DECIDED_MEANWHILE = "Erről a nevezésről közben már döntöttek. Frissítsd az oldalt.";
 const PAIR_GONE = "Ez a pár közben megszűnt, ezért nem hagyhatod jóvá.";
+const IN_GROUP = "Ez a pár már a kiírt csoportjában játszik, ezért most nem utasíthatod el.";
 
 // Approve or reject (D17), also flipping an earlier decision. Both players
 // are emailed, with the note. `seasonId` scopes the entry to the season the
@@ -276,7 +278,10 @@ export async function decideEntry(
   if (!canDecide(entry.status, decision, pairActive))
     return { ok: false, error: decision === "approve" && !pairActive ? PAIR_GONE : DECIDED_MEANWHILE };
 
-  const phase = decision === "approve" ? joinsPhase(season.phases, now) : null;
+  if (decision === "reject" && (await pairInRunningGroup(entry.pairId, now))) return { ok: false, error: IN_GROUP };
+  // A pair approved once phase 1's groups are out starts at phase 2 (#24).
+  const published = (await groupsPublished(seasonId)) ? [FIRST_PHASE] : [];
+  const phase = decision === "approve" ? joinsPhase(season.phases, now, published) : null;
   // Only from the status just read, and an approval only while the pair is
   // still active: a decision or a dissolve in the meantime wins.
   const updated = await db
@@ -296,6 +301,10 @@ export async function decideEntry(
         inArray(seasonEntries.status, [...DECIDABLE_FROM[decision]]),
         decision === "approve"
           ? sql`exists (select 1 from ${pairs} where ${pairs.id} = ${entry.pairId} and ${pairs.status} = 'active')`
+          : notInRunningGroup(entry.pairId, now),
+        // Phase 1's groups published in the meantime: decide again, for phase 2.
+        phase === FIRST_PHASE
+          ? sql`not exists (select 1 from groups g where g.season_id = ${seasonId} and g.phase = ${FIRST_PHASE} and g.published_at is not null)`
           : undefined,
       ),
     )
@@ -322,7 +331,8 @@ export async function decideEntry(
 
 // D19: dissolving a pair withdraws the entries it hasn't played in: pending
 // ones, and approved ones whose first phase hasn't started (or that wait for
-// the next season). For the dissolve batch in pairs.server.ts.
+// the next season). For the dissolve batch in pairs.server.ts, after the
+// pair's update: it does nothing unless the pair is dissolved by then.
 export function withdrawEntries(pairId: number, now: Date) {
   const seconds = Math.floor(now.getTime() / 1000);
   return db
@@ -331,6 +341,7 @@ export function withdrawEntries(pairId: number, now: Date) {
     .where(
       and(
         eq(seasonEntries.pairId, pairId),
+        sql`exists (select 1 from pairs where pairs.id = ${pairId} and pairs.status = 'dissolved')`,
         sql`(season_entries.status = 'pending' or (season_entries.status = 'approved' and (
           season_entries.joins_phase is null or exists (
             select 1 from season_phases sp

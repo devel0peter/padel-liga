@@ -60,6 +60,7 @@ export const emailMessages = sqliteTable(
         "pair_answer",
         "pair_dissolved",
         "season_entry_decision",
+        "groups_published",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -496,5 +497,79 @@ export const seasonEntries = sqliteTable(
   (t) => [
     uniqueIndex("season_entries_season_pair_idx").on(t.seasonId, t.pairId),
     index("season_entries_pair_idx").on(t.pairId),
+  ],
+);
+
+// A phase's groups (#24, D21), 1. csoport the strongest. Until published_at
+// is set they are the Szervező's draft: regenerated or adjusted at will, and
+// stored so moves persist. Publishing creates the matches and the emails;
+// after that the groups are locked.
+export const groups = sqliteTable(
+  "groups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    phase: integer("phase").notNull(), // 1–4
+    number: integer("number").notNull(), // 1 = strongest
+    // Bumped by every move into or out of the group, so publishing can tell
+    // that the draft it checked is still the one it locks.
+    revision: integer("revision").notNull().default(0),
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [uniqueIndex("groups_season_phase_number_idx").on(t.seasonId, t.phase, t.number)],
+);
+
+// The pairs of a group, with their seed (1 = strongest in the group), which
+// sets the fixture order (spec section 5).
+export const groupPairs = sqliteTable(
+  "group_pairs",
+  {
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    seed: integer("seed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.pairId] }), index("group_pairs_pair_idx").on(t.pairId)],
+);
+
+// A match between two pairs of a group (spec section 4), created when the
+// groups are published. Minimal for now (D21): scheduling, results and the
+// other statuses come with milestone 2.
+export const matches = sqliteTable(
+  "matches",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    pairA: integer("pair_a")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    pairB: integer("pair_b")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    week: integer("week").notNull(), // the scheduled week, 1–3
+    // The end of the phase: its last Sunday 23:59 Budapest (spec section 5).
+    deadline: integer("deadline", { mode: "timestamp" }).notNull(),
+    status: text("status", { enum: ["open"] }).notNull().default("open"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    // Two pairs meet once per group (spec section 5): a second publish of
+    // the same groups fails here instead of doubling the matches.
+    uniqueIndex("matches_group_pairs_idx").on(t.groupId, t.pairA, t.pairB),
+    index("matches_group_idx").on(t.groupId),
+    index("matches_pair_a_idx").on(t.pairA),
+    index("matches_pair_b_idx").on(t.pairB),
   ],
 );

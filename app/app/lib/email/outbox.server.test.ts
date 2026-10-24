@@ -70,3 +70,56 @@ describe("queueSeasonEntryDecision", () => {
     expect(messages()).toEqual([]);
   });
 });
+
+describe("queueGroupsPublished", () => {
+  const input = (to: string) => ({
+    to,
+    partnerName: "Anna",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["Cecil", "Dóra"] as [string, string] }],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  });
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+  });
+
+  it("queues and sends one email per player", async () => {
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: input("Anna") },
+      { toEmail: "bela@x.hu", input: input("Béla") },
+    ]);
+    expect(messages()).toEqual([
+      { kind: "groups_published", to_email: "anna@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
+      { kind: "groups_published", to_email: "bela@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
+    ]);
+    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu", "bela@x.hu"]);
+  });
+
+  it("skips a suppressed address and still sends the others", async () => {
+    h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "bounced");
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: input("Anna") },
+      { toEmail: "Bela@x.hu", input: input("Béla") },
+    ]);
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+  });
+
+  it("queues a whole league at once, within D1's parameter limit; what is over the day's quota waits", async () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
+    await O.queueGroupsPublished(many);
+    expect(messages()).toHaveLength(120);
+    // Daily limit 100, minus the 10 kept for login codes.
+    expect(h.sent).toHaveLength(90);
+    expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(30);
+  });
+
+  it("does nothing for an empty list", async () => {
+    await O.queueGroupsPublished([]);
+    expect(messages()).toEqual([]);
+  });
+});

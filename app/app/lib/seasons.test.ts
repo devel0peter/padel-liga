@@ -162,6 +162,10 @@ describe("seasonActions (README decision log, 2026-10-23)", () => {
     expect(seasonActions({ groupsPublished: false, entries: 0 }).canDelete).toBe(true);
     expect(seasonActions({ groupsPublished: false, entries: 1 }).canDelete).toBe(false);
   });
+
+  it("is not deletable once the groups are published, even if every entry was withdrawn (#24)", () => {
+    expect(seasonActions({ groupsPublished: true, entries: 0 }).canDelete).toBe(false);
+  });
 });
 
 const season = (id: number, leagueId: number, firstPhaseStart: string, registrationClosesAt = new Date(0)): Season => {

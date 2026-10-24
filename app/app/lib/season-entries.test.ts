@@ -74,6 +74,11 @@ describe("joinsPhase (D18, spec section 4)", () => {
   it("doesn't depend on the order the phases come in", () => {
     expect(joinsPhase([...season.phases].reverse(), at("2026-11-10T12:00:00Z"))).toBe(2);
   });
+
+  it("skips a phase whose groups are already published (#24)", () => {
+    expect(joinsPhase(season.phases, at("2026-11-03T12:00:00Z"), [1])).toBe(2);
+    expect(joinsPhase(season.phases, at("2026-11-03T12:00:00Z"), [])).toBe(1);
+  });
 });
 
 describe("canDecide (D17)", () => {

@@ -39,10 +39,13 @@ export function lateEntry(season: Pick<Season, "phases">, now: Date): boolean {
 }
 
 // The phase a pair approved at `at` starts in: the first phase that hasn't
-// started yet (1 before the season starts), or null once the last phase has
-// started (it moves into the next season).
-export function joinsPhase(phases: readonly StoredPhase[], at: Date): number | null {
-  const next = [...phases].sort((a, b) => a.number - b.number).find((p) => p.startsAt > at);
+// started yet (1 before the season starts) and whose groups aren't published
+// yet (#24: a published phase is locked), or null once there is none (it
+// moves into the next season).
+export function joinsPhase(phases: readonly StoredPhase[], at: Date, published: readonly number[] = []): number | null {
+  const next = [...phases]
+    .sort((a, b) => a.number - b.number)
+    .find((p) => p.startsAt > at && !published.includes(p.number));
   return next?.number ?? null;
 }
 

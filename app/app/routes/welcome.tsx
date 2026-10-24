@@ -11,6 +11,7 @@ import { interestLevelFor } from "~/lib/interest.server";
 import { formatPhone } from "~/lib/phone";
 import { safeReturnTo, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
 import { requireAccount } from "~/lib/auth/session.server";
+import { formSignupPairs } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
 
 // First login: name, level, an optional phone number and the privacy consent
@@ -38,6 +39,8 @@ export async function action({ request }: Route.ActionArgs) {
   );
   if (!result.ok) return { errors: result.errors };
   await saveProfile(user.id, result.value);
+  // Registered now: the pair from the interest signup, if the partner is too (D27).
+  await formSignupPairs(user.id);
   return redirect(safeReturnTo(String(form.get("returnTo") ?? "")));
 }
 

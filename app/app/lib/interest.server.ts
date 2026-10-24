@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { interestSignups } from "~/db/schema";
@@ -9,15 +9,15 @@ export async function saveInterest(signup: InterestSignup): Promise<void> {
   await db.insert(interestSignups).values({ ...signup, consentAt: new Date() });
 }
 
-// The level someone gave on the interest form with this (lowercase) email, to
-// prefill the first-login page (the form stores emails lowercase); the newest signup wins. Only the signer's own
-// email counts: the partner's email on a pair signup says nothing about the
-// partner's level.
+// The level of the newest interest signup naming this (lowercase) email, to
+// prefill the first-login page (the form stores emails lowercase): as the
+// signer, a paired solo included, or as the partner of a pair signup (#89),
+// who gets the level the signer gave for the pair.
 export async function interestLevelFor(email: string): Promise<Level | null> {
   const [row] = await db
     .select({ level: interestSignups.level })
     .from(interestSignups)
-    .where(eq(interestSignups.email1, email))
+    .where(or(eq(interestSignups.email1, email), eq(interestSignups.email2, email)))
     .orderBy(desc(interestSignups.createdAt), desc(interestSignups.id))
     .limit(1);
   return row && isLevel(row.level) ? row.level : null;

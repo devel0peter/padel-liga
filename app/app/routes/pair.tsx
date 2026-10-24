@@ -24,6 +24,8 @@ import { formatShortDate } from "~/lib/format";
 import { DISSOLVE_REFUSED } from "~/lib/pairs";
 import { answerInvite, cancelInvite, createInvite, dissolvePair, pairLeagues, pairOverview } from "~/lib/pairs.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
+import { waitingMessage } from "~/lib/signup-partners";
+import { waitingPartners } from "~/lib/signup-partners.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
@@ -39,7 +41,10 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const leagues = await pairLeagues();
-  const overview = await pairOverview(user, leagues);
+  // The partner the interest signup names, while they haven't registered
+  // (#89): the pair forms by itself once they do.
+  const [pairs, waiting] = await Promise.all([pairOverview(user, leagues), waitingPartners(user.email)]);
+  const overview = pairs.map((o) => ({ ...o, waiting: o.pair ? null : (waiting.get(o.league.id) ?? null) }));
   // The seasons the home page shows (the current or next one per league),
   // with this pair's entry or the "Nevezünk" button.
   const now = new Date();
@@ -179,6 +184,16 @@ function ActivePair({ pair, entered }: { pair: NonNullable<Overview["pair"]>; en
   );
 }
 
+function Waiting({ name }: { name: string }) {
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">{waitingMessage(name)}</CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
+
 function Sent({ sent }: { sent: NonNullable<Overview["sent"]> }) {
   const busy = useNavigation().state !== "idle";
   return (
@@ -271,7 +286,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
   const notice = actionData?.notice ?? (Object.hasOwn(ANSWERED, answered) ? ANSWERED[answered] : undefined);
   const inviteError = actionData?.intent === "invite" ? actionData.error : undefined;
   const otherError = actionData?.intent !== "invite" ? actionData?.error : undefined;
-  const shown = d.overview.filter((o) => o.pair || o.sent || o.received.length > 0);
+  const shown = d.overview.filter((o) => o.pair || o.waiting || o.sent || o.received.length > 0);
 
   return (
     <AppPage
@@ -308,6 +323,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
           {o.pair && d.entries.some((e) => e.leagueId === o.league.id) && (
             <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
           )}
+          {o.waiting && <Waiting name={o.waiting} />}
           {o.sent && <Sent sent={o.sent} />}
         </section>
       ))}

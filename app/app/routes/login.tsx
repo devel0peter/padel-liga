@@ -9,6 +9,7 @@ import { googleConfigured, type GoogleError } from "~/lib/auth/google.server";
 import { sendLoginCode, verifyLoginCode } from "~/lib/auth/login-code.server";
 import { loginEmailParam, REGISTRATION_CLOSED_MESSAGE, registrationOpen, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
+import { formSignupPairs } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
@@ -48,6 +49,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   if (form.get("intent") === "verify") {
     const result = await verifyLoginCode(email, String(form.get("code") ?? ""));
     if (!result.ok) return { step: "code", email, error: result.error };
+    await formSignupPairs(result.userId);
     return redirect(returnTo, { headers: { "Set-Cookie": await createSession(result.userId) } });
   }
 

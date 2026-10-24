@@ -154,7 +154,8 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. Elküldés után nem lehet visszavonni.
+                    „{subject}” · {label}. A levelek a Kimenő levelek közé kerülnek: ott még elvetheted, a
+                    „Küldés” után már nem lehet visszavonni.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

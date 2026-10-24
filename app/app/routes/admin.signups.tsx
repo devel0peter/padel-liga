@@ -297,7 +297,9 @@ function InviteButton({ pending }: { pending: number }) {
           <>
             <AlertDialogHeader>
               <AlertDialogTitle>Meghívók sorban</AlertDialogTitle>
-              <AlertDialogDescription>{queued} levél sorban (napi kvóta szerint)</AlertDialogDescription>
+              <AlertDialogDescription>
+                {queued} levél vár a Kimenő levelek között; onnan küldöd ki (napi kvóta szerint).
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogAction>Rendben</AlertDialogAction>

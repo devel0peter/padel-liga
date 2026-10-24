@@ -243,6 +243,13 @@ export default function Privacy() {
                 lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
                 töröljük.
               </li>
+              <li>
+                <strong>Levelek:</strong> a belépőkódon és a jelentkezés
+                visszaigazolásán kívül minden levél nálunk vár, amíg a szervező
+                el nem küldi vagy el nem veti. A szövegét a kiküldésig vagy az
+                elvetésig őrizzük; utána csak azt, hogy kinek, mikor és milyen
+                tárggyal ment.
+              </li>
             </ul>
           </Section>
 

@@ -61,7 +61,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 type ActionData = { intent: string; error?: string; notice?: string };
 
 const NOTICES: Record<string, string> = {
-  invite: "Elküldtük a meghívót.",
+  invite: "Meghívtad. Ha belép, itt látja a meghívót.",
   cancel: "Visszavontad a meghívót.",
   accept: "Elfogadtad: mostantól pár vagytok.",
   decline: "Jeleztük neki, hogy nem kéred.",
@@ -100,7 +100,7 @@ function Entries({ entries }: { entries: Entry[] }) {
     <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle className="font-display text-lg">Nevezés</CardTitle>
-        <CardDescription>Elég, ha egyikőtök nevez. A szervező döntéséről mindketten e-mailt kaptok.</CardDescription>
+        <CardDescription>Elég, ha egyikőtök nevez. A szervező döntését itt látjátok.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
         {entries.map((e) => (
@@ -154,7 +154,7 @@ function ActivePair({ pair, entered }: { pair: NonNullable<Overview["pair"]>; en
               <AlertDialogHeader>
                 <AlertDialogTitle>Megszünteted a párt?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {pair.partnerName} és te nem lesztek többé pár, erről e-mailt kap.
+                  {pair.partnerName} és te nem lesztek többé pár; ő is itt látja.
                   {entered && " A szezonnevezésetek is visszavonódik, ha még nem kezdtetek el játszani."} Utána új
                   párt hívhatsz meg.
                 </AlertDialogDescription>
@@ -186,7 +186,7 @@ function Sent({ sent }: { sent: NonNullable<Overview["sent"]> }) {
       <CardHeader>
         <CardTitle className="font-display text-lg">Meghívtad: {sent.email}</CardTitle>
         <CardDescription>
-          {formatShortDate(new Date(sent.createdAt))} óta vár a válaszára. Ha elfogadja, e-mailt kapsz.
+          {formatShortDate(new Date(sent.createdAt))} óta vár a válaszára. Ha elfogadja, itt látod.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -207,7 +207,7 @@ function InviteForm({ leagues, error }: { leagues: Overview["league"][]; error?:
     <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle className="font-display text-lg">Hívd meg a párodat</CardTitle>
-        <CardDescription>Írd be az e-mail-címét. Ha még nincs fiókja, a levélből be tud lépni.</CardDescription>
+        <CardDescription>Írd be az e-mail-címét. Ha még nincs fiókja, ezzel a címmel regisztrálhat.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form method="post" className="grid gap-4">

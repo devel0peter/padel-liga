@@ -172,6 +172,8 @@ Group size, phase length in weeks, phases per season (4), catch-up week on or of
 ## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
 Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
 
+Every email except login codes and signup confirmations is held until an Admin sends or discards it on "Kimenő levelek" (`/admin/outbox`), per kind (README decision log, 2026-10-24, #88). The "instant" emails below leave only then.
+
 **Instant** (email and push), only when someone has to act soon or the groups change:
 - New phase (Monday morning after the deadline): your group, opponents and the deadline.
 - A proposal arrived, or an agreed time is waiting for confirmation.

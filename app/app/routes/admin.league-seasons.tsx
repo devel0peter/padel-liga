@@ -268,6 +268,7 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                 <TableHead>Körök</TableHead>
                 <TableHead>Vége</TableHead>
                 <TableHead>Nevezések</TableHead>
+                <TableHead>1. kör</TableHead>
                 <TableHead>
                   <span className="sr-only">Műveletek</span>
                 </TableHead>
@@ -289,6 +290,11 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                     <TableCell className="whitespace-nowrap">
                       <Link to={`${base}/${s.id}/entries`} className="underline">
                         {s.entries.pending > 0 ? `${s.entries.pending} függőben` : `${s.entries.approved} jóváhagyva`}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Link to={`${base}/${s.id}/groups`} className="underline">
+                        {s.canEdit ? "Csoportok" : "Közzétéve"}
                       </Link>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

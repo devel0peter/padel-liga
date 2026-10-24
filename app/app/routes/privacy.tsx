@@ -262,6 +262,13 @@ export default function Privacy() {
                 lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
                 töröljük.
               </li>
+              <li>
+                <strong>Levelek:</strong> a belépőkódon és a jelentkezés
+                visszaigazolásán kívül minden levél nálunk vár, amíg el nem
+                küldjük vagy el nem vetjük. A szövegét a kiküldésig őrizzük,
+                utána csak azt, hogy kinek, mikor és milyen tárggyal ment; az
+                elvetett levelet teljesen töröljük.
+              </li>
             </ul>
           </Section>
 

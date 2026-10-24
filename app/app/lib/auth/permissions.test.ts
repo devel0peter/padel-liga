@@ -21,6 +21,7 @@ const superadmin = actor({ platformRole: "superadmin" });
 const platformOnly: Permission[] = [
   { kind: "signups.manage" },
   { kind: "broadcasts.send" },
+  { kind: "outbox.manage" },
   { kind: "traffic.view" },
   { kind: "leagues.manage" },
   { kind: "cities.manage" },
@@ -102,6 +103,7 @@ describe("sidebar", () => {
       "/admin/users",
       "/admin/signups",
       "/admin/broadcasts",
+      "/admin/outbox",
       "/admin/traffic",
     ]);
     expect(adminHome(superadmin)).toBe("/admin/signups");

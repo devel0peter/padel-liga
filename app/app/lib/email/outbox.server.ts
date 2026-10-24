@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -8,6 +8,7 @@ import type { InterestSignup } from "~/lib/interest";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, type Recipient } from "./audience";
 import { BULK_KINDS, parseDailyLimit, sendBudget, type MessageKind } from "./budget";
+import { hideAddresses, queuedStatus } from "./hold";
 import { MAX_BATCH, sendBatch } from "./resend.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
@@ -33,7 +34,10 @@ import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscr
 // The outbox: every email is first stored in email_messages, then delivered
 // by deliver(), right away and again by the hourly cron (workers/app.ts).
 // deliver() stays under the provider's daily quota; whatever doesn't fit
-// waits for the next run.
+// waits for the next run. Only login codes and signup confirmations are
+// stored ready to send; every other email is stored "held" and waits until
+// an Admin sends (releaseHeld) or discards it (discardHeld) on /admin/outbox
+// (#88, hold.ts).
 
 const MAX_ATTEMPTS = 5;
 // A run that crashed mid-send leaves rows in "sending"; retry them after this.
@@ -63,6 +67,7 @@ export function emailSecret(): string {
 function messageValues(m: NewMessage) {
   return {
     kind: m.kind,
+    status: queuedStatus(m.kind),
     broadcastId: m.broadcastId ?? null,
     toEmail: m.toEmail,
     subject: m.subject,
@@ -164,7 +169,8 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
 // players can't use invites to flood an inbox.
 const PAIR_INVITES_PER_ADDRESS_PER_DAY = 3;
 
-// A partner invite (#21), sent at once. It goes to an address another player
+// A partner invite (#21), held for the Admin like every email but login codes
+// and signup confirmations (#88). It goes to an address another player
 // typed, so it has an unsubscribe link. An unsubscribed or bounced address,
 // or one over the daily cap, gets nothing; the invite still shows in the app
 // once they log in.
@@ -221,10 +227,11 @@ export async function queueSeasonEntryDecision(
   await deliver(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
 }
 
-// The groups are published (#24, D22): one email per player, queued at once
-// and sent as transactional mail (ahead of broadcasts); what doesn't fit the
-// day's quota goes with the next cron runs. Unsubscribed or bounced addresses
-// get nothing; the groups still show in the app.
+// The groups are published (#24, D22): one email per player, held until the
+// Admin sends it (#88), then sent as transactional mail (ahead of
+// broadcasts); what doesn't fit the day's quota goes with the next cron runs.
+// Unsubscribed or bounced addresses get nothing; the groups still show in the
+// app.
 export async function queueGroupsPublished(
   messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0] }[],
 ): Promise<void> {
@@ -495,6 +502,8 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
 }
 
 export type BroadcastSummary = typeof broadcasts.$inferSelect & {
+  // Waiting on /admin/outbox (#88).
+  held: number;
   sent: number;
   pending: number;
   failed: number;
@@ -511,8 +520,87 @@ export async function listBroadcasts(): Promise<BroadcastSummary[]> {
   ]);
   return list.map((b) => {
     const of = (s: string) => stats.filter((x) => x.broadcastId === b.id && x.status === s).reduce((a, x) => a + x.n, 0);
-    return { ...b, sent: of("sent"), pending: of("pending") + of("sending"), failed: of("failed") };
+    return { ...b, held: of("held"), sent: of("sent"), pending: of("pending") + of("sending"), failed: of("failed") };
   });
+}
+
+// --- Held mail (/admin/outbox, #88) -----------------------------------------
+
+export type HeldKind = {
+  kind: MessageKind;
+  count: number;
+  // The newest held id the page saw: sending or discarding stops there, so
+  // mail held after the page loaded isn't included without being counted.
+  upTo: number;
+  // The oldest held email of the kind, with every address hidden.
+  subject: string;
+  text: string;
+};
+
+// Held mail, one entry per kind, oldest kind first. No recipient.
+export async function listHeld(): Promise<HeldKind[]> {
+  const groups = await db
+    .select({
+      kind: emailMessages.kind,
+      n: count(),
+      first: sql<number>`min(${emailMessages.id})`,
+      last: sql<number>`max(${emailMessages.id})`,
+    })
+    .from(emailMessages)
+    .where(eq(emailMessages.status, "held"))
+    .groupBy(emailMessages.kind)
+    .orderBy(sql`min(${emailMessages.id})`);
+  if (groups.length === 0) return [];
+  const previews = await db
+    .select({ id: emailMessages.id, subject: emailMessages.subject, text: emailMessages.text })
+    .from(emailMessages)
+    .where(inArray(emailMessages.id, groups.map((g) => g.first)));
+  return groups.map((g) => {
+    const p = previews.find((x) => x.id === g.first);
+    return {
+      kind: g.kind,
+      count: g.n,
+      upTo: g.last,
+      subject: hideAddresses(p?.subject ?? ""),
+      text: hideAddresses(p?.text ?? ""),
+    };
+  });
+}
+
+const heldOfKind = (kind: MessageKind, upTo: number) =>
+  and(eq(emailMessages.status, "held"), eq(emailMessages.kind, kind), lte(emailMessages.id, upTo));
+
+// "Küldés": the kind's held mail joins the normal queue, where deliver()
+// keeps the daily quota and the send order. Mail to an address that
+// unsubscribed, bounced or complained while it was held is deleted instead,
+// as if it had never been queued. One D1 batch (a transaction).
+export async function releaseHeld(kind: MessageKind, upTo: number): Promise<{ released: number; skipped: number }> {
+  const suppressed = db.select({ email: emailSuppressions.email }).from(emailSuppressions);
+  const [skipped, released] = await db.batch([
+    db
+      .delete(emailMessages)
+      .where(and(heldOfKind(kind, upTo), inArray(sql`lower(${emailMessages.toEmail})`, suppressed)))
+      .returning({ id: emailMessages.id }),
+    db.update(emailMessages).set({ status: "pending" }).where(heldOfKind(kind, upTo)).returning({ id: emailMessages.id }),
+  ]);
+  return { released: released.length, skipped: skipped.length };
+}
+
+// "Elvetés": the kind's held mail is deleted unsent. Discarded registration
+// invites also lose their invited mark (invited_at, or invited2_at for a
+// partner's address), so the invite button offers those addresses again;
+// their account_invites rows stay. Returns how many.
+export async function discardHeld(kind: MessageKind, upTo: number): Promise<number> {
+  const rows = await db
+    .delete(emailMessages)
+    .where(heldOfKind(kind, upTo))
+    .returning({ toEmail: emailMessages.toEmail });
+  if (kind === "registration_invite" && rows.length > 0)
+    await markInvited(
+      rows.map((r) => r.toEmail.toLowerCase()),
+      null,
+    );
+  return rows.length;
 }
 
 // Deletion request: remove the stored emails sent to these addresses.

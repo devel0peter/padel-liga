@@ -19,10 +19,11 @@ export type Permission =
   | { kind: "app.enter" }
   // See the admin area at all.
   | { kind: "admin.enter" }
-  // Admin (superadmin) only: the interest list (and its CSV), broadcasts, traffic,
-  // leagues and Szervező appointments, the user list.
+  // Admin (superadmin) only: the interest list (and its CSV), broadcasts, the
+  // held outbox, traffic, leagues and Szervező appointments, the user list.
   | { kind: "signups.manage" }
   | { kind: "broadcasts.send" }
+  | { kind: "outbox.manage" }
   | { kind: "traffic.view" }
   | { kind: "leagues.manage" }
   | { kind: "cities.manage" }
@@ -58,7 +59,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "solos" | "signups" | "broadcasts" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "solos" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -70,6 +71,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Felhasználók", to: "/admin/users", icon: "users", permission: { kind: "users.view" } },
   { label: "Jelentkezők", to: "/admin/signups", icon: "signups", permission: { kind: "signups.manage" } },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
+  { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
 ];
 

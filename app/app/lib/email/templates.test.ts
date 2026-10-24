@@ -251,7 +251,7 @@ describe("pairDissolved", () => {
   it("tells the partner who dissolved the pair and links to /pair", () => {
     expect(email.subject).toBe("Nagy Anna megszüntette a párotokat – Padelpárbaj");
     expect(email.text).toContain("Szia Kovács Béla!");
-    expect(email.text).toContain("Nagy Anna megszüntette a párotokat (Padelpárbaj Győr). Új párt a Párom oldalon hívhatsz:");
+    expect(email.text).toContain("Nagy Anna megszüntette a párotokat (Padelpárbaj Győr). Új párt a Párom oldalon hívhatsz meg:");
     expect(email.text).toContain("https://padelparbaj.hu/pair");
     expect(email.html).toContain('href="https://padelparbaj.hu/pair"');
   });

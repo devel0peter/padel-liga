@@ -154,7 +154,7 @@ function ActivePair({ pair }: { pair: NonNullable<Overview["pair"]> }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Megszünteted a párt?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {pair.partnerName} és te nem lesztek többé pár. Utána új párt hívhatsz meg.
+                  {pair.partnerName} és te nem lesztek többé pár, erről e-mailt kap. Utána új párt hívhatsz meg.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

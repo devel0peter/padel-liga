@@ -57,7 +57,7 @@ function str(form: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isLevel(value: string): value is Level {
+export function isLevel(value: string): value is Level {
   return Object.hasOwn(LEVELS, value);
 }
 

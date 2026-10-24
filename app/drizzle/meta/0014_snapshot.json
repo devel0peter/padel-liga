@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7dcf448c-b0b3-4af4-b7e8-9a82205d5caa",
+  "id": "fe903170-d03c-443e-9733-d72378d8880d",
   "prevId": "b9561588-4c8e-444e-9a87-3fd55a40d3ad",
   "tables": {
     "account_invites": {
@@ -570,13 +570,6 @@
         },
         "paired_with": {
           "name": "paired_with",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "invited_at": {
-          "name": "invited_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -1303,6 +1296,20 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'player'"
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "consent_at": {
           "name": "consent_at",

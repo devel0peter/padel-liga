@@ -7,8 +7,8 @@ import { cityName } from "~/lib/cities";
 import { listCities } from "~/lib/cities.server";
 import { getLeague, organizersByLeague } from "~/lib/leagues.server";
 
-// A league's home for its Szervezők. Seasons, pairs and groups come here with
-// their own tickets (#22–#24).
+// A league's home for its Szervezők. Seasons have their own page (Szezonok);
+// entries, pairs and groups come here with their own tickets (#23, #24).
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const league = await getLeague(params.league);
@@ -31,7 +31,7 @@ export default function LeagueOverview({ loaderData }: Route.ComponentProps) {
         <p>{loaderData.organizers.length ? loaderData.organizers.join(", ") : "Még nincs szervezője."}</p>
       </div>
       <p className="max-w-xl rounded-lg border border-dashed p-6 text-muted-foreground">
-        A szezonok, a nevezések, a párok és a csoportok itt lesznek, amint elkészülnek.
+        A nevezések, a párok és a csoportok itt lesznek, amint elkészülnek. A szezonokat a Szezonok oldalon állítod be.
       </p>
     </AppPage>
   );

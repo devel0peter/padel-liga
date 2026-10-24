@@ -126,6 +126,13 @@ export const users = sqliteTable("users", {
   // "superadmin" (Admin) is set only by `npm run auth:superadmin -w app`;
   // no request handler writes this column. Organizer rights: league_admins.
   platformRole: text("platform_role", { enum: ["player", "superadmin"] }).notNull().default("player"),
+  // Self-assessed level (app/lib/interest.ts LEVELS keys), the base of the
+  // starting Elo. Required on the first-login page; null only for accounts
+  // from before it was asked (the home page prompts them).
+  level: text("level", { enum: ["kezdo", "kozephalado", "halado", "versenyzo"] }),
+  // Optional Hungarian phone number in E.164 ("+36301234567"). Personal data:
+  // never on a public page; only the current phase's opponents will see it.
+  phone: text("phone"),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -210,6 +217,47 @@ export const leagues = sqliteTable("leagues", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+// A run of a league: 4 phases of 3 weeks (spec section 4, issue #22). Days
+// are Budapest calendar days ("2026-11-09"); instants are UTC.
+export const seasons = sqliteTable(
+  "seasons",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    // Free text, e.g. "2026/27 tél".
+    name: text("name").notNull(),
+    // Registration: from 00:00 of its first day to 23:59 of its last, Budapest.
+    registrationOpensAt: integer("registration_opens_at", { mode: "timestamp" }).notNull(),
+    registrationClosesAt: integer("registration_closes_at", { mode: "timestamp" }).notNull(),
+    // The Monday the organizer picked; phase 1 may start later if a break covers it.
+    firstPhaseStart: text("first_phase_start").notNull(),
+    // JSON array of { start, end } days, both included.
+    breaks: text("breaks", { mode: "json" }).$type<{ start: string; end: string }[]>().notNull().default(sql`'[]'`),
+    updatedAt: integer("updated_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("seasons_league_idx").on(t.leagueId)],
+);
+
+// A season's phases, from packages/rules phaseCalendar; rewritten whenever the
+// season is saved, while it can still be edited.
+export const seasonPhases = sqliteTable(
+  "season_phases",
+  {
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(), // 1–4
+    startsAt: integer("starts_at", { mode: "timestamp" }).notNull(), // Monday 00:00 Budapest
+    deadline: integer("deadline", { mode: "timestamp" }).notNull(), // Sunday 23:59 Budapest
+  },
+  (t) => [primaryKey({ columns: [t.seasonId, t.number] })],
+);
 
 // Organizer ("Szervező") rights: one row per league and account.
 export const leagueAdmins = sqliteTable(

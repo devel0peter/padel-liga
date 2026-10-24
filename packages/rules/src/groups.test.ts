@@ -43,6 +43,11 @@ describe("seedOrder (spec 10: by average Elo, ties by input order)", () => {
     expect(sorted.map((x) => x.id)).toEqual(["B", "D", "A", "C"]);
   });
 
+  it("breaks ties by rank when given", () => {
+    const sorted = seedOrder([p("A", 1200), p("B", 1200), p("C", 1300)], (x) => (x.id === "B" ? 0 : 1));
+    expect(sorted.map((x) => x.id)).toEqual(["C", "B", "A"]);
+  });
+
   it("does not modify its input", () => {
     const input = [p("A", 1), p("B", 2)];
     seedOrder(input);
@@ -77,6 +82,17 @@ describe("movePair (#24: the organizer adjusts the draft)", () => {
     // A strong pair moved down is seeded first in its new group.
     const down = movePair(draft(), "P1", 2, (x) => x.id);
     expect(ids(down)[2]).toEqual(["P1", "P8", "P9", "P10"]);
+  });
+
+  it("breaks an Elo tie in the target group by rank (approval order) when given", () => {
+    const groups = [
+      [p("A", 1400), p("B", 1300)],
+      [p("C", 1400), p("D", 1200)],
+    ];
+    const approved = { A: 3, B: 4, C: 1, D: 2 } as Record<string, number>;
+    // C was approved before A: with the rank it is seeded above A, without it below.
+    expect(ids(movePair(groups, "C", 0, (x) => x.id, (x) => approved[x.id]!))[0]).toEqual(["C", "A", "B"]);
+    expect(ids(movePair(groups, "C", 0, (x) => x.id))[0]).toEqual(["A", "C", "B"]);
   });
 
   it("allows a move that leaves a group of 2 or 5, which then blocks publishing", () => {

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a1eff859-0305-42f8-96ac-d3506779f3b8",
+  "id": "2b551f50-f967-41d9-b355-e67762ea01fb",
   "prevId": "77963e06-b457-433b-89cd-452fb620b1be",
   "tables": {
     "account_invites": {
@@ -570,6 +570,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "published_at": {
           "name": "published_at",
@@ -1144,6 +1152,15 @@
         }
       },
       "indexes": {
+        "matches_group_pairs_idx": {
+          "name": "matches_group_pairs_idx",
+          "columns": [
+            "group_id",
+            "pair_a",
+            "pair_b"
+          ],
+          "isUnique": true
+        },
         "matches_group_idx": {
           "name": "matches_group_idx",
           "columns": [

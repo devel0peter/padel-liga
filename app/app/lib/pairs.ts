@@ -94,8 +94,8 @@ export function canCancel(invite: { status: InviteStatus; inviterId: string }, u
 
 export const DISSOLVE_REFUSED = "Kör közben nem lehet megszüntetni a párt, csak két kör között.";
 
-// Either player may dissolve an active pair, except while it is in a group
-// of a running phase. Until groups exist (#24) it is always allowed.
+// Either player may dissolve an active pair, except while it is in a
+// published group whose phase hasn't ended (#24).
 export function canDissolve(
   pair: { status: "active" | "dissolved"; playerA: string; playerB: string },
   userId: string,

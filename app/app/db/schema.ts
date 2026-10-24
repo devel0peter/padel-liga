@@ -508,6 +508,9 @@ export const groups = sqliteTable(
       .references(() => seasons.id, { onDelete: "cascade" }),
     phase: integer("phase").notNull(), // 1–4
     number: integer("number").notNull(), // 1 = strongest
+    // Bumped by every move into or out of the group, so publishing can tell
+    // that the draft it checked is still the one it locks.
+    revision: integer("revision").notNull().default(0),
     publishedAt: integer("published_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -557,6 +560,9 @@ export const matches = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (t) => [
+    // Two pairs meet once per group (spec section 5): a second publish of
+    // the same groups fails here instead of doubling the matches.
+    uniqueIndex("matches_group_pairs_idx").on(t.groupId, t.pairA, t.pairB),
     index("matches_group_idx").on(t.groupId),
     index("matches_pair_a_idx").on(t.pairA),
     index("matches_pair_b_idx").on(t.pairB),

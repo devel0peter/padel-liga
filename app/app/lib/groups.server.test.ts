@@ -9,11 +9,17 @@ vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockCl
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueGroupsPublished: async (messages: any[]) => h.mails.push(...messages),
+  queuePairDissolved: async (to: string) => h.mails.push({ kind: "dissolved", toEmail: to }),
+  queueSeasonEntryDecision: async (to: string, input: any) => h.mails.push({ kind: "decision", toEmail: to, input }),
+  queuePairInvite: async () => {},
+  queuePairAnswer: async () => {},
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const S = await import("~/lib/seasons.server");
+const P = await import("~/lib/pairs.server");
+const E = await import("~/lib/season-entries.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -262,5 +268,112 @@ describe("first-phase groups on real SQLite", () => {
 
   it("publishing without a draft is refused", async () => {
     expect(await G.publishGroups(1, "o", NOW)).toEqual({ ok: false, error: "Még nincs javaslat." });
+  });
+
+  it("a move made while publishing is checked stops the publish, with nothing written", async () => {
+    await G.generateDraft(1, "o");
+    // Right before the publish locks the groups, another organizer moves pair
+    // 5 into group 1 (5+2+3), as moveDraftPair would.
+    const raw = h.raw;
+    let moved = false;
+    h.raw = new Proxy(raw, {
+      get(target, prop) {
+        if (prop !== "prepare") {
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (q: string) => {
+          if (!moved && /^update "groups" set "published_at"/.test(q)) {
+            moved = true;
+            target.exec(`update group_pairs set group_id = (select id from groups where number = 1) where pair_id = 5`);
+            target.exec(`update groups set revision = revision + 1 where number in (1, 2)`);
+          }
+          return target.prepare(q);
+        };
+      },
+    });
+    const result = await G.publishGroups(1, "o", NOW);
+    h.raw = raw;
+    expect(moved).toBe(true);
+    expect(result).toEqual({ ok: false, error: "A javaslat közben változott. Frissítsd az oldalt." });
+    expect(all("select count(*) n from matches")[0].n).toBe(0);
+    expect(all("select count(*) n from groups where published_at is not null")[0].n).toBe(0);
+    expect(h.mails).toEqual([]);
+  });
+
+  it("a move bumps the revision of both groups it touches", async () => {
+    await G.generateDraft(1, "o");
+    await G.moveDraftPair(1, 3, 2, "o");
+    expect(all("select number, revision from groups order by number")).toEqual([
+      { number: 1, revision: 1 },
+      { number: 2, revision: 1 },
+      { number: 3, revision: 0 },
+    ]);
+  });
+
+  it("an Elo tie in the target group goes by approval order after a move (D20)", async () => {
+    // Pair 4 (1400, approved first) is in group 1 with pair 3 (1400). Move 3
+    // to group 2, then back: it is seeded below 4 again, not by move order.
+    await G.generateDraft(1, "o");
+    await G.moveDraftPair(1, 4, 2, "o");
+    await G.moveDraftPair(1, 4, 1, "o");
+    expect(draft()[0]).toEqual([1, 2, 4, 3]);
+  });
+
+  it("drafts and publishes a big league within D1's 100-parameter limit", async () => {
+    freshDb(0);
+    const levels = ["kezdo", "kozephalado", "halado", "versenyzo"];
+    for (let i = 1; i <= 100; i++) addPair(i, [levels[i % 4]!, levels[(i >> 2) % 4]!]);
+    expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
+    expect(draft()).toHaveLength(25);
+    expect(await G.moveDraftPair(1, draft()[0]![0]!, 25, "o")).toEqual({ ok: true });
+    expect(await G.moveDraftPair(1, draft()[24]![0]!, 1, "o")).toEqual({ ok: true });
+    expect(await G.publishGroups(1, "o", NOW)).toEqual({ ok: true });
+    expect(all("select count(*) n from matches")[0].n).toBe(150);
+    expect(h.mails).toHaveLength(200);
+  });
+
+  describe("after publishing", () => {
+    beforeEach(async () => {
+      await G.generateDraft(1, "o");
+      await G.publishGroups(1, "o", NOW);
+    });
+
+    const player = (id: string) => ({ id, email: `${id}@x.hu`, name: id, level: "halado" }) as any;
+
+    it("a pair in a published group can't be dissolved until its phase ends", async () => {
+      expect(await G.pairInRunningGroup(3, NOW)).toBe(true);
+      expect(await P.dissolvePair(player("p3a"), 3)).toEqual({
+        ok: false,
+        error: "Kör közben nem lehet megszüntetni a párt, csak két kör között.",
+      });
+      expect(all("select status from pairs where id = 3")[0].status).toBe("active");
+      expect(all("select status from season_entries where pair_id = 3")[0].status).toBe("approved");
+      // After phase 1's deadline it is between phases again.
+      expect(await G.pairInRunningGroup(3, new Date((PHASE_1_DEADLINE + 1) * 1000))).toBe(false);
+    });
+
+    it("a pair outside the groups can still be dissolved", async () => {
+      addPair(20, ["kezdo", "kezdo"], { status: "pending" });
+      expect(await G.pairInRunningGroup(20, NOW)).toBe(false);
+      expect(await P.dissolvePair(player("p20a"), 20)).toEqual({ ok: true });
+    });
+
+    it("a pair approved now joins phase 2, since phase 1 is locked", async () => {
+      addPair(20, ["kezdo", "kezdo"], { status: "pending" });
+      const id = all("select id from season_entries where pair_id = 20")[0].id;
+      expect(await E.decideEntry({ id: "o" }, 1, id, "approve", null, NOW)).toEqual({ ok: true });
+      expect(all("select joins_phase from season_entries where pair_id = 20")[0].joins_phase).toBe(2);
+      expect(h.mails.filter((m) => m.kind === "decision")[0].input.joins.phase).toBe(2);
+    });
+
+    it("a pair in a published group can't be rejected", async () => {
+      const id = all("select id from season_entries where pair_id = 3")[0].id;
+      expect(await E.decideEntry({ id: "o" }, 1, id, "reject", null, NOW)).toEqual({
+        ok: false,
+        error: "Ez a pár már a kiírt csoportjában játszik, ezért most nem utasíthatod el.",
+      });
+      expect(all("select status from season_entries where pair_id = 3")[0].status).toBe("approved");
+    });
   });
 });

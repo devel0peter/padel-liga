@@ -295,7 +295,7 @@ describe("seasonEntryDecision", () => {
 
   it("tells a late pair the phase it joins", () => {
     const email = seasonEntryDecision({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } });
-    expect(email.text).toContain("a 2. körtől játszotok (kezdés: nov. 30.)");
+    expect(email.text).toContain("A 2. körtől játszotok (kezdés: nov. 30.).");
   });
 
   it("tells a pair approved in the last phase that it moves into the next season", () => {

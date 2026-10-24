@@ -1,10 +1,10 @@
 import { movePair, phaseMatches, seedGroups } from "@padel-liga/rules";
-import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groupPairs, groups, leagues, matches, pairs, seasonEntries, users } from "~/db/schema";
+import { groupPairs, groups, leagues, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { queueGroupsPublished } from "~/lib/email/outbox.server";
 
 import { audit } from "./leagues.server";
@@ -36,7 +36,7 @@ export type GroupPair = {
   active: boolean;
 };
 
-export type StoredGroup = { id: number; number: number; publishedAt: Date | null; pairs: GroupPair[] };
+export type StoredGroup = { id: number; number: number; revision: number; publishedAt: Date | null; pairs: GroupPair[] };
 
 const pairColumns = {
   pairId: pairs.id,
@@ -93,7 +93,7 @@ export async function eligiblePairs(seasonId: number): Promise<GroupPair[]> {
 // A phase's groups (draft or published), 1. csoport first, each by seed.
 export async function phaseGroups(seasonId: number, phase = FIRST_PHASE): Promise<StoredGroup[]> {
   const list = await db
-    .select({ id: groups.id, number: groups.number, publishedAt: groups.publishedAt })
+    .select({ id: groups.id, number: groups.number, revision: groups.revision, publishedAt: groups.publishedAt })
     .from(groups)
     .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase)))
     .orderBy(asc(groups.number));
@@ -124,10 +124,33 @@ export async function groupsPublished(seasonId: number): Promise<boolean> {
   return !!row;
 }
 
-// D1 allows at most 100 bound parameters per statement.
-const GROUP_CHUNK = 30; // 3 per row
-const PAIR_CHUNK = 15; // 5 per row (the group id is a subquery)
-const MATCH_CHUNK = 20; // 5 per row
+// D1 allows at most 100 bound parameters per statement. Drizzle binds a
+// column's default too (revision 0), so count every column it writes.
+const GROUP_CHUNK = 20; // 4 per row: season, phase, number, revision
+const PAIR_CHUNK = 15; // 5 per row: the group id subquery binds 3
+const MATCH_CHUNK = 18; // 5 per row, plus 4 for the claim check
+
+// Whether the pair plays in a published group whose phase hasn't ended:
+// such a pair can't be dissolved (D16) or rejected, or the published groups
+// and their matches would change.
+export async function pairInRunningGroup(pairId: number, now = new Date()): Promise<boolean> {
+  const [row] = await db
+    .select({ id: groupPairs.groupId })
+    .from(groupPairs)
+    .innerJoin(groups, eq(groups.id, groupPairs.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(eq(groupPairs.pairId, pairId), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)))
+    .limit(1);
+  return !!row;
+}
+
+// The same check as a condition, for a write that must not run on such a
+// pair (checked inside the write, so a publish in the meantime wins).
+export function notInRunningGroup(pairId: number, now = new Date()) {
+  return sql`not exists (select 1 from group_pairs gp join groups g on g.id = gp.group_id
+    join season_phases sp on sp.season_id = g.season_id and sp.number = g.phase
+    where gp.pair_id = ${pairId} and g.published_at is not null and sp.deadline >= ${Math.floor(now.getTime() / 1000)})`;
+}
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -183,18 +206,26 @@ export async function moveDraftPair(seasonId: number, pairId: number, toNumber: 
   if (from < 0 || to < 0) return { ok: false, error: CHANGED };
   if (from === to) return { ok: true };
 
+  // Elo ties in the target group go by approval order (D20).
+  const approval = new Map((await eligiblePairs(seasonId)).map((p, i) => [p.pairId, i]));
   const moved = movePair(
     draft.map((g) => g.pairs),
     pairId,
     to,
     (p) => p.pairId,
+    (p) => approval.get(p.pairId) ?? Number.MAX_SAFE_INTEGER,
   );
   const ids = [draft[from]!.id, draft[to]!.id];
   const rows = [from, to].flatMap((i) => moved[i]!.map((p, seed) => ({ groupId: draft[i]!.id, pairId: p.pairId, seed: seed + 1 })));
   // One batch: only rows of unpublished groups are deleted, so if the groups
   // were published in the meantime the re-insert hits the primary key and
-  // the batch rolls back.
+  // the batch rolls back. The revision tells a publish running at the same
+  // time that the draft it checked has changed.
   const [first, ...rest] = [
+    db
+      .update(groups)
+      .set({ revision: sql`${groups.revision} + 1` })
+      .where(and(inArray(groups.id, ids), isNull(groups.publishedAt))),
     db
       .delete(groupPairs)
       .where(
@@ -241,39 +272,36 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
 
   const fixtures = phaseMatches(draft.map((g) => g.pairs));
   const ids = draft.map((g) => g.id);
-  // Claim the draft first, in one statement: a second publish (or a draft
-  // replaced in the meantime) gets fewer rows and stops.
-  const claimed = await db
-    .update(groups)
-    .set({ publishedAt: now })
-    .where(and(inArray(groups.id, ids), isNull(groups.publishedAt)))
-    .returning({ id: groups.id });
-  if (claimed.length !== ids.length) {
-    if (claimed.length > 0)
-      await db
-        .update(groups)
-        .set({ publishedAt: null })
-        .where(inArray(groups.id, claimed.map((c) => c.id)));
-    return { ok: false, error: CHANGED };
-  }
-  const matchRows = fixtures.map((m) => ({
-    groupId: draft[m.group]!.id,
-    pairA: m.a.pairId,
-    pairB: m.b.pairId,
-    week: m.week,
-    deadline: phase.deadline,
-  }));
+  const publishedAt = Math.floor(now.getTime() / 1000);
+  // The draft as checked above: its groups (the lowest id changes when it is
+  // regenerated) and their revisions (bumped by every move).
+  const draftOf = sql`${groups.seasonId} = ${seasonId} and ${groups.phase} = ${FIRST_PHASE} and ${groups.publishedAt} is null`;
+  const unchanged = sql`(select count(*) || ':' || min(${groups.id}) || ':' || sum(${groups.revision}) from ${groups} where ${draftOf}) = ${`${ids.length}:${Math.min(...ids)}:${draft.reduce((n, g) => n + g.revision, 0)}`}`;
+  // The matches go in only if this publish claimed every group.
+  const claimed = sql`(select count(*) from ${groups} where ${groups.seasonId} = ${seasonId} and ${groups.phase} = ${FIRST_PHASE} and ${groups.publishedAt} = ${publishedAt}) = ${ids.length}`;
+  const matchRows = fixtures.map((m) => sql`(${draft[m.group]!.id}, ${m.a.pairId}, ${m.b.pairId}, ${m.week}, ${Math.floor(phase.deadline.getTime() / 1000)})`);
+  // One batch (a transaction in D1): lock the groups, if the draft is still
+  // the one checked, and create their matches. A second publish at the same
+  // second hits the matches' unique index and rolls back.
   try {
-    const [first, ...rest] = chunks(matchRows, MATCH_CHUNK).map((rows) => db.insert(matches).values(rows));
-    await db.batch([first!, ...rest]);
-  } catch (e) {
     await db.batch([
-      db.delete(matches).where(inArray(matches.groupId, ids)),
-      db.update(groups).set({ publishedAt: null }).where(inArray(groups.id, ids)),
+      db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged)),
+      ...chunks(matchRows, MATCH_CHUNK).map((rows) =>
+        db.run(
+          sql`insert into ${matches} (group_id, pair_a, pair_b, week, deadline) select * from (values ${sql.join(rows, sql`, `)}) where ${claimed}`,
+        ),
+      ),
     ]);
+  } catch (e) {
+    if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
     throw e;
   }
-  await audit(actorId, "groups.publish", `season:${seasonId}`, `${draft.length} groups, ${matchRows.length} matches`);
+  const [done] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(groups)
+    .where(and(inArray(groups.id, ids), eq(groups.publishedAt, now)));
+  if ((done?.n ?? 0) !== ids.length) return { ok: false, error: (await groupsPublished(seasonId)) ? LOCKED : CHANGED };
+  await audit(actorId, "groups.publish", `season:${seasonId}`, `${draft.length} groups, ${fixtures.length} matches`);
 
   const [league] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, season.leagueId));
   const name = (p: Player) => p.name || "Névtelen";

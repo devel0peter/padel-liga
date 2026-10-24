@@ -19,25 +19,28 @@ export function groupProblems(sizes: readonly number[]): number[] {
 }
 
 /**
- * Seed order within a group: average Elo, strongest first. Equal ratings keep
- * their input order (stable sort), so callers pass pairs in approval order, as
- * for seedGroups. The input is not modified.
+ * Seed order within a group: average Elo, strongest first. Equal ratings go by
+ * `rank` when given (lower first: the approval order, D20), else keep their
+ * input order (stable sort), as for seedGroups. The input is not modified.
  */
-export function seedOrder<T extends SeedablePair>(pairs: readonly T[]): T[] {
-  return [...pairs].sort((a, b) => b.averageElo - a.averageElo);
+export function seedOrder<T extends SeedablePair>(pairs: readonly T[], rank?: (pair: T) => number): T[] {
+  return [...pairs].sort((a, b) => b.averageElo - a.averageElo || (rank ? rank(a) - rank(b) : 0));
 }
 
 /**
  * Moves one pair into another group of the draft (index 0 = 1. csoport) and
- * re-seeds that group by Elo. Sizes are not checked here: a move may leave a
- * group of 2 or 5, which groupProblems then reports, so the organizer can make
- * several moves before publishing. Returns a new draft; the input is unchanged.
+ * re-seeds that group by Elo, ties by `rank` (the approval order) when given,
+ * else the moved pair below the pairs already there. Sizes are not checked
+ * here: a move may leave a group of 2 or 5, which groupProblems then reports,
+ * so the organizer can make several moves before publishing. Returns a new
+ * draft; the input is unchanged.
  */
 export function movePair<T extends SeedablePair, K>(
   groups: readonly (readonly T[])[],
   pairKey: K,
   toGroup: number,
   keyOf: (pair: T) => K,
+  rank?: (pair: T) => number,
 ): T[][] {
   if (!Number.isInteger(toGroup) || toGroup < 0 || toGroup >= groups.length) {
     throw new Error(`There is no group ${toGroup} in a draft of ${groups.length}`);
@@ -48,9 +51,9 @@ export function movePair<T extends SeedablePair, K>(
   if (from === toGroup) return next;
   const pair = next[from]!.find((x) => keyOf(x) === pairKey)!;
   next[from] = next[from]!.filter((x) => keyOf(x) !== pairKey);
-  // The moved pair goes last before sorting, so on an Elo tie it is seeded
-  // below the pairs already there.
-  next[toGroup] = seedOrder([...next[toGroup]!, pair]);
+  // The moved pair goes last before sorting, so without a rank it is seeded
+  // below the pairs it ties with.
+  next[toGroup] = seedOrder([...next[toGroup]!, pair], rank);
   return next;
 }
 

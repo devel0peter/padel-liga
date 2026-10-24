@@ -232,8 +232,13 @@ export async function queueGroupsPublished(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, ...groupsPublished(m.input) }));
-  if (queued.length > 0) await deliver(await enqueue(queued));
+  const ids = await enqueue(queued);
+  // deliver() binds every id it is given: a few at a time keeps each
+  // statement under D1's 100 parameters.
+  for (let i = 0; i < ids.length; i += DELIVER_CHUNK) await deliver(ids.slice(i, i + DELIVER_CHUNK));
 }
+
+const DELIVER_CHUNK = 50;
 
 export async function createBroadcast(input: {
   subject: string;

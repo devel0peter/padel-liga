@@ -18,6 +18,8 @@ const { DatabaseSync } = await import(/* @vite-ignore */ `node:${"sqlite"}`);
 
 const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
 
+const D1_MAX_PARAMS = 100;
+
 // A fresh in-memory database with every migration applied.
 export function migratedDatabase(): any {
   const raw = new DatabaseSync(":memory:");
@@ -34,6 +36,9 @@ export function migratedDatabase(): any {
 // as on D1.
 export function mockClient(h: { raw: any }) {
   const exec = (sql: string, params: any[], method: string) => {
+    // D1 refuses a statement with more than 100 bound parameters; SQLite
+    // allows far more, so check it here or tests would miss it.
+    if (params.length > D1_MAX_PARAMS) throw new Error(`too many SQL variables: ${params.length} (D1 allows ${D1_MAX_PARAMS})`);
     const st = h.raw.prepare(sql);
     if (method === "run") {
       st.run(...params);

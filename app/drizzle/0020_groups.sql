@@ -13,6 +13,7 @@ CREATE TABLE `groups` (
 	`season_id` integer NOT NULL,
 	`phase` integer NOT NULL,
 	`number` integer NOT NULL,
+	`revision` integer DEFAULT 0 NOT NULL,
 	`published_at` integer,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	FOREIGN KEY (`season_id`) REFERENCES `seasons`(`id`) ON UPDATE no action ON DELETE cascade
@@ -33,6 +34,7 @@ CREATE TABLE `matches` (
 	FOREIGN KEY (`pair_b`) REFERENCES `pairs`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `matches_group_pairs_idx` ON `matches` (`group_id`,`pair_a`,`pair_b`);--> statement-breakpoint
 CREATE INDEX `matches_group_idx` ON `matches` (`group_id`);--> statement-breakpoint
 CREATE INDEX `matches_pair_a_idx` ON `matches` (`pair_a`);--> statement-breakpoint
 CREATE INDEX `matches_pair_b_idx` ON `matches` (`pair_b`);

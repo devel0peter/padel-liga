@@ -109,6 +109,15 @@ describe("queueGroupsPublished", () => {
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
   });
 
+  it("queues a whole league at once, within D1's parameter limit; what is over the day's quota waits", async () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
+    await O.queueGroupsPublished(many);
+    expect(messages()).toHaveLength(120);
+    // Daily limit 100, minus the 10 kept for login codes.
+    expect(h.sent).toHaveLength(90);
+    expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(30);
+  });
+
   it("does nothing for an empty list", async () => {
     await O.queueGroupsPublished([]);
     expect(messages()).toEqual([]);

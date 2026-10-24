@@ -276,7 +276,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
   return (
     <AppPage
       title="Párom"
-      description="Egy ligában egy párod lehet. E-mailben hívod meg, és akkor lesztek pár, ha elfogadja."
+      description="Egy ligában egy párod lehet. Az e-mail-címével hívod meg, és akkor lesztek pár, ha elfogadja."
     >
       {notice && !actionData?.error && (
         <p role="status" className="max-w-2xl rounded-md border border-nav-active bg-nav-active-bg p-3 text-sm font-medium">

@@ -245,10 +245,10 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>Levelek:</strong> a belépőkódon és a jelentkezés
-                visszaigazolásán kívül minden levél nálunk vár, amíg a szervező
-                el nem küldi vagy el nem veti. A szövegét a kiküldésig vagy az
-                elvetésig őrizzük; utána csak azt, hogy kinek, mikor és milyen
-                tárggyal ment.
+                visszaigazolásán kívül minden levél nálunk vár, amíg el nem
+                küldjük vagy el nem vetjük. A szövegét a kiküldésig őrizzük,
+                utána csak azt, hogy kinek, mikor és milyen tárggyal ment; az
+                elvetett levelet teljesen töröljük.
               </li>
             </ul>
           </Section>

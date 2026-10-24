@@ -147,12 +147,12 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button disabled={!ready || busy || recipients.length === 0}>
-                  Küldés {recipients.length} címzettnek
+                  Előkészítés {recipients.length} címzettnek
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
+                  <AlertDialogTitle>Előkészíted {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
                     „{subject}” · {label}. A levelek a Kimenő levelek közé kerülnek: ott még elvetheted, a
                     „Küldés” után már nem lehet visszavonni.
@@ -160,7 +160,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Mégse</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => submit("send")}>Küldés</AlertDialogAction>
+                  <AlertDialogAction onClick={() => submit("send")}>Előkészítés</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

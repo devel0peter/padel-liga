@@ -207,3 +207,43 @@ export function loginCode(code: string, validMinutes: number): Email {
     footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }
+
+// A player invites another to form a pair (#21). The invitee may have no
+// account: then the link goes through the login page (lib/pairs.ts inviteLink).
+export function pairInvite(input: { inviterName: string; league: string; link: string; hasAccount: boolean }): Email {
+  return build(
+    `${input.inviterName} meghívott párnak – ${SITE_NAME}`,
+    [
+      `Szia!`,
+      `${input.inviterName} meghívott, hogy legyetek pár a ${SITE_NAME}on (${input.league}). Itt elfogadhatod, vagy jelezheted, hogy nem kéred:`,
+      input.link,
+      input.hasAccount
+        ? null
+        : `Ehhez be kell lépned. Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be, a címedet kitöltöttük.`,
+      `Ha nem ismered, nem kell tenned semmit: más nem fogadhatja el helyetted.`,
+      SIGNATURE,
+    ]
+      .filter((p): p is string => p !== null)
+      .join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert ${input.inviterName} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`),
+  );
+}
+
+// The inviter learns the answer (#21, D15): accepted or declined.
+export function pairAnswer(input: { to: string; inviteeName: string; league: string; accepted: boolean }): Email {
+  const pairPage = `${SITE_URL}/pair`;
+  return build(
+    input.accepted
+      ? `${input.inviteeName} elfogadta a meghívásod – ${SITE_NAME}`
+      : `${input.inviteeName} nem fogadta el a meghívásod – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      input.accepted
+        ? `${input.inviteeName} elfogadta a meghívásod: mostantól pár vagytok (${input.league}). Ha nyílik a nevezés, együtt nevezhettek a szezonra.`
+        : `${input.inviteeName} most nem fogadta el a meghívásod (${input.league}). Meghívhatsz mást.`,
+      pairPage,
+      SIGNATURE,
+    ].join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert párnak hívtál meg valakit a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}

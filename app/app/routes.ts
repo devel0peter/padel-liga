@@ -19,6 +19,8 @@ export default [
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
     route("home", "routes/app.home.tsx"),
+    route("pair", "routes/pair.tsx"),
+    route("pair/invite/:token", "routes/pair-invite.tsx"),
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     layout("routes/admin.tsx", [

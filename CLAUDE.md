@@ -41,6 +41,7 @@
 - `npm run db:read -w app -- "<SELECT ...>" [--local]`: one read-only query, production by default. The script refuses writes. Treat the output as personal data: don't paste emails or names into PRs or public places.
 - Branches: `develop` is the default branch. Branch from `develop` and open PRs against `develop`. Merging into `develop` does not deploy; once CI is green and no review comment is open, agents may merge there.
 - Releases: `main` is production. A release is a merge of `develop` into `main` with a merge commit, done or approved by Peter only. Never push or merge to `main` yourself.
+- `npm run db:seed:local -w app`: fake data in the local D1 for the milestone 1 walkthrough (`docs/walkthrough.md`). Local only: it takes no options and refuses remote. Running it again resets its own rows.
 - Deploys are automatic: every push to `main` (so, only a release) runs GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests, build, then remote D1 migrations, then deploy. PR checks run for every base branch. Migrations must be additive and safe on live data.
 - `npm run deploy`: manual fallback only (CI down). Ask first.
 - Accounts: `npm run auth:invite -w app -- <email> [--remote]` (sign-up before 2 Nov), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Admin).

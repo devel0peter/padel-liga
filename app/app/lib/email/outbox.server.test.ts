@@ -320,4 +320,39 @@ describe("held outbox", () => {
     expect(count("kind = 'pair_dissolved' and status = 'held'")).toBe(2);
     expect(h.sent).toEqual([]);
   });
+
+  it("Elvetés on registration invites lets the invite button offer those addresses again", async () => {
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
+    const add = h.raw.prepare(
+      "insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', ?, ?, 'kezdo', 1, 'gyor')",
+    );
+    add.run("Zsófi", "zsofi@x.hu");
+    add.run("Ödön", "Odon@x.hu");
+    expect(await O.queueRegistrationInvites()).toBe(2);
+    expect((await O.pendingRegistrationInvites()).length).toBe(0);
+    const [held] = await O.listHeld();
+
+    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(2);
+    expect(count("kind = 'registration_invite'")).toBe(0);
+    expect(h.raw.prepare("select invited_at from interest_signups").all()).toEqual([{ invited_at: null }, { invited_at: null }]);
+    // The account invites stay, so the login link still works for them.
+    expect(h.raw.prepare("select email from account_invites order by email").all()).toEqual([
+      { email: "odon@x.hu" },
+      { email: "zsofi@x.hu" },
+    ]);
+    expect((await O.pendingRegistrationInvites()).map((r) => r.email).sort()).toEqual(["odon@x.hu", "zsofi@x.hu"]);
+    expect(await O.queueRegistrationInvites()).toBe(2);
+  });
+
+  it("Elvetés on another kind leaves the invite marks alone", async () => {
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
+    h.raw
+      .prepare("insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', 'Zsófi', 'zsofi@x.hu', 'kezdo', 1, 'gyor')")
+      .run();
+    await O.queueRegistrationInvites();
+    insert("broadcast", 1, "held", "zsofi@x.hu");
+    await O.discardHeld("broadcast", 1000);
+    expect(h.raw.prepare("select invited_at is not null as invited from interest_signups").get().invited).toBe(1);
+    expect(count("kind = 'registration_invite' and status = 'held'")).toBe(1);
+  });
 });

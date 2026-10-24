@@ -569,9 +569,19 @@ export async function releaseHeld(kind: MessageKind, upTo: number): Promise<{ re
   return { released: released.length, skipped: skipped.length };
 }
 
-// "Elvetés": the kind's held mail is deleted unsent. Returns how many.
+// "Elvetés": the kind's held mail is deleted unsent. Discarded registration
+// invites also lose their invited mark, so the invite button offers those
+// addresses again; their account_invites rows stay. Returns how many.
 export async function discardHeld(kind: MessageKind, upTo: number): Promise<number> {
-  const rows = await db.delete(emailMessages).where(heldOfKind(kind, upTo)).returning({ id: emailMessages.id });
+  const rows = await db
+    .delete(emailMessages)
+    .where(heldOfKind(kind, upTo))
+    .returning({ toEmail: emailMessages.toEmail });
+  if (kind === "registration_invite" && rows.length > 0)
+    await markInvited(
+      rows.map((r) => r.toEmail.toLowerCase()),
+      null,
+    );
   return rows.length;
 }
 

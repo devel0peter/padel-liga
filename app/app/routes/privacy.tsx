@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 23.";
+const EFFECTIVE_FROM = "2026. 10. 24.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -87,7 +87,11 @@ export default function Privacy() {
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>
-              <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja.</li>
+              <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
+              <li>
+                a párod a ligában, és a pármeghívók, amiket küldtél vagy kaptál
+                (kinek az e-mail-címére, mikor, és elfogadták-e).
+              </li>
             </ul>
             <p>
               Amikor elindul a liga, ehhez jön még a meccseid története
@@ -145,6 +149,21 @@ export default function Privacy() {
               jelentkezésről, és kérhesse az adatai törlését. Ezen kívül semmit
               nem küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
               meg a párod adatait, ha ő is benne van.
+            </p>
+          </Section>
+
+          <Section title="Ha párnak hívsz meg valakit">
+            <p>
+              A párodat az e-mail-címével hívod meg. Eltároljuk a címet, és
+              küldünk rá egy levelet a neveddel és egy linkkel, amivel elfogadhatja
+              vagy jelezheti, hogy nem kéri. Ha még nincs fiókja, ezzel a címmel
+              regisztrálhat. A válaszáról e-mailt kapsz. A meghívót csak az
+              fogadhatja el, akinek a címére ment. Kérjük, csak olyat hívj meg,
+              aki tud róla.
+            </p>
+            <p>
+              A pár oldalán a párod csak a neved látja, az e-mail-címedet és a
+              telefonszámodat nem.
             </p>
           </Section>
 

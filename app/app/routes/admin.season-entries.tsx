@@ -66,8 +66,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 type ActionData = { error?: string; notice?: string };
 
 const DONE: Record<Decision, string> = {
-  approve: "Jóváhagytad. Mindkét játékos kapott e-mailt.",
-  reject: "Elutasítottad. Mindkét játékos kapott e-mailt.",
+  approve: "Jóváhagytad. Mindkét játékosnak írunk e-mailt.",
+  reject: "Elutasítottad. Mindkét játékosnak írunk e-mailt.",
 };
 
 export async function action({ request, params }: Route.ActionArgs): Promise<ActionData> {
@@ -108,7 +108,8 @@ function DecisionDialog({ row, decision }: { row: Row; decision: Decision }) {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Mindkét játékos e-mailt kap, benne az üzeneteddel, ha írsz.
-              {approve && " Ha a szezon már elindult, a következő körtől játszanak."}
+              {approve &&
+                " Ha a szezon már elindult, a következő körtől játszanak; ha már az utolsó kör fut, a következő szezontól."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid gap-1.5">

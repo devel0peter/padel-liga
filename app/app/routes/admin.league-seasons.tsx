@@ -76,7 +76,7 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
   if (form.get("intent") === "delete") {
     if (!id) throw new Response("Hibás azonosító.", { status: 400 });
     if (!allowed?.canDelete) throw data("Ezt a szezont már nem lehet törölni: van nevezés.", { status: 409 });
-    await deleteSeason(id, actor.id);
+    if (!(await deleteSeason(id, actor.id))) throw data("Ezt a szezont már nem lehet törölni: van nevezés.", { status: 409 });
     return redirect(base);
   }
 

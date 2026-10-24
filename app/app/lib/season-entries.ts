@@ -32,9 +32,10 @@ export function entryOpen(season: Calendar, now: Date): boolean {
   return !!last && now >= season.registrationOpensAt && now < last.startsAt;
 }
 
-// Applying after the registration window: approved, the pair joins later.
-export function lateEntry(season: Calendar, now: Date): boolean {
-  return now > season.registrationClosesAt;
+// Applying once phase 1 has started: approved, the pair joins a later phase.
+export function lateEntry(season: Pick<Season, "phases">, now: Date): boolean {
+  const first = season.phases.reduce<StoredPhase | undefined>((a, p) => (!a || p.number < a.number ? p : a), undefined);
+  return !!first && now >= first.startsAt;
 }
 
 // The phase a pair approved at `at` starts in: the first phase that hasn't

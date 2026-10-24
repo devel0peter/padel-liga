@@ -296,7 +296,7 @@ export function seasonEntryDecision(input: {
   const start = !input.approved
     ? null
     : input.joins === null
-      ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok, újra nevezni nem kell."
+      ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok."
       : input.joins.phase === 1
         ? `Az 1. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`
         : `A szezon már elindult, ezért a ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;

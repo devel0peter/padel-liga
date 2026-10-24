@@ -42,7 +42,7 @@ export function SeasonEntry({ seasonId, view }: { seasonId: number; view: EntryV
       <input type="hidden" name="season" value={seasonId} />
       {view.late && (
         <p className="text-muted-foreground">
-          A nevezési időszak lezárult, de még nevezhettek: ha a szervező jóváhagyja, a következő körtől játszotok.
+          A szezon már elindult, de még nevezhettek: ha a szervező jóváhagyja, a következő körtől játszotok.
         </p>
       )}
       <div>

@@ -29,6 +29,9 @@ export const interestSignups = sqliteTable("interest_signups", {
   // A solo signup a Szervező paired with another solo (app/lib/solo-pairing.ts);
   // both rows point at each other.
   pairedWith: integer("paired_with"),
+  // When this address got the registration invite (#20). Set on every signup
+  // row of the address, so it is invited once (app/lib/email/audience.ts).
+  invitedAt: integer("invited_at", { mode: "timestamp" }),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -42,7 +45,9 @@ export const emailMessages = sqliteTable(
   "email_messages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    kind: text("kind", { enum: ["signup_confirmation", "partner_notice", "broadcast", "login_code", "pair_intro"] }).notNull(),
+    kind: text("kind", {
+      enum: ["signup_confirmation", "partner_notice", "broadcast", "login_code", "pair_intro", "registration_invite"],
+    }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
     toEmail: text("to_email").notNull(),
     subject: text("subject").notNull(),
@@ -180,7 +185,8 @@ export const loginCodes = sqliteTable("login_codes", {
 });
 
 // Until registration opens, only these emails can create an account
-// (`npm run auth:invite -w app`). Later also the interest-list invites (#20).
+// (`npm run auth:invite -w app`), Szervező appointments, and the interest-list
+// registration invites (#20, note INTEREST_INVITE_NOTE).
 export const accountInvites = sqliteTable("account_invites", {
   email: text("email").primaryKey(),
   note: text("note"),

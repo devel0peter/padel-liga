@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
+import { BULK_KINDS, LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
 
 describe("sendBudget", () => {
   it("gives login codes the whole remaining quota", () => {
@@ -17,6 +17,12 @@ describe("sendBudget", () => {
   it("keeps a reserve free from broadcasts", () => {
     expect(sendBudget(100, 0, "broadcast")).toBe(100 - TRANSACTIONAL_RESERVE);
     expect(sendBudget(100, 100 - TRANSACTIONAL_RESERVE, "broadcast")).toBe(0);
+  });
+
+  it("treats registration invites as bulk mail, behind the same reserve as broadcasts", () => {
+    expect(sendBudget(100, 0, "registration_invite")).toBe(100 - TRANSACTIONAL_RESERVE);
+    expect(sendBudget(100, 100 - TRANSACTIONAL_RESERVE, "registration_invite")).toBe(0);
+    expect(BULK_KINDS).toEqual(["broadcast", "registration_invite"]);
   });
 
   it("never goes negative", () => {

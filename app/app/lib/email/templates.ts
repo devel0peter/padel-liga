@@ -169,6 +169,29 @@ export function broadcastEmail(
   );
 }
 
+// The registration invite (#20) opens the login page with the address filled
+// in (routes/login.tsx); the first login creates the account.
+export function registrationLink(email: string): string {
+  return `${SITE_URL}/login?email=${encodeURIComponent(email)}`;
+}
+
+// Sent once to everyone on the interest list (spec section 3). It goes to the
+// whole list, so it has an unsubscribe link like a broadcast.
+export function registrationInvite(to: { name: string; email: string }, unsubscribeUrl: string): Email {
+  return build(
+    `Regisztrálj a ${SITE_NAME}ra`,
+    [
+      `Szia ${to.name}!`,
+      `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
+      registrationLink(to.email),
+      `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
+      `Hamarosan itt hívhatod meg a párodat, és együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      SIGNATURE,
+    ].join("\n\n"),
+    footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
+  );
+}
+
 // One-time login code (app/lib/auth). The code is in the subject too, so it
 // shows in the phone's notification.
 export function loginCode(code: string, validMinutes: number): Email {

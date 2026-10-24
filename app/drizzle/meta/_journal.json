@@ -113,6 +113,13 @@
       "when": 1792790173732,
       "tag": "0015_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792829280937,
+      "tag": "0016_club_active",
+      "breakpoints": true
     }
   ]
 }

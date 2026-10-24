@@ -1,0 +1,1 @@
+ALTER TABLE `clubs` ADD `active` integer DEFAULT true NOT NULL;

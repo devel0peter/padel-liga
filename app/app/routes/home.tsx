@@ -13,7 +13,7 @@ import {
 } from "~/components/ui/accordion";
 import { landingPairCounts, listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
-import { toClubOption } from "~/lib/clubs";
+import { activeVenues, toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { saveInterest } from "~/lib/interest.server";
@@ -42,7 +42,7 @@ export function meta({ location }: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Clubs only feed the optional "where do you play most" field.
-  const clubs = (await listClubs()).map(toClubOption);
+  const clubs = activeVenues(await listClubs()).map(toClubOption);
   const listed = await listedCities();
   const pairs = await landingPairCounts(listed);
   const cities = listed.map(({ slug, name }) => ({ slug, name, pairs: pairs.get(slug) ?? null }));
@@ -60,7 +60,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const [clubs, cities] = await Promise.all([listClubs(), listedCities()]);
   const result = parseInterest(
     form,
-    clubs.filter((c) => c.city === form.get("city")).map((c) => c.slug),
+    activeVenues(clubs, String(form.get("city"))).map((c) => c.slug),
     cities,
   );
   if (!result.ok) return result;

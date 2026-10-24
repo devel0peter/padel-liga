@@ -227,10 +227,11 @@ export async function queueSeasonEntryDecision(
   await deliver(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
 }
 
-// The groups are published (#24, D22): one email per player, queued at once
-// and sent as transactional mail (ahead of broadcasts); what doesn't fit the
-// day's quota goes with the next cron runs. Unsubscribed or bounced addresses
-// get nothing; the groups still show in the app.
+// The groups are published (#24, D22): one email per player, held until the
+// Admin sends it (#88), then sent as transactional mail (ahead of
+// broadcasts); what doesn't fit the day's quota goes with the next cron runs.
+// Unsubscribed or bounced addresses get nothing; the groups still show in the
+// app.
 export async function queueGroupsPublished(
   messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0] }[],
 ): Promise<void> {

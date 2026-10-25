@@ -65,7 +65,7 @@ export function canDecide(status: EntryStatus, decision: Decision, pairActive: b
 export type EntryRefusal = "no_pair" | "closed" | "entered" | "no_level" | "partner_no_level";
 
 export const ENTRY_REFUSALS: Record<EntryRefusal, string> = {
-  no_pair: "Nevezni párban lehet. Előbb hívd meg a párodat.",
+  no_pair: "Nevezni párban lehet, és még nincs párod.",
   closed: "Erre a szezonra most nem lehet nevezni.",
   entered: "Erre a szezonra már neveztetek.",
   no_level: "Nevezés előtt add meg a szinted a profilodban.",

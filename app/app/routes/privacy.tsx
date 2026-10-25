@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 24.";
+const EFFECTIVE_FROM = "2026. 10. 25.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -89,8 +89,9 @@ export default function Privacy() {
               </li>
               <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
               <li>
-                a párod a ligában, és a pármeghívók, amiket küldtél vagy kaptál
-                (kinek az e-mail-címére, mikor, és elfogadták-e),
+                a párod a ligában (a jelentkezésből, vagy akivel a szervező
+                párba tett), és ha korábban pármeghívót küldtél vagy kaptál, az
+                is (kinek az e-mail-címére, mikor, és elfogadták-e),
               </li>
               <li>
                 a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
@@ -169,24 +170,21 @@ export default function Privacy() {
             <p>
               Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
               csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
-              jelentkezésből, az e-mail-címét nem. Ha megszüntetitek a párt, nem
-              jön létre újra magától.
+              jelentkezésből, az e-mail-címét nem. Ha a szervező felbontja a
+              párt, nem jön létre újra magától.
             </p>
           </Section>
 
-          <Section title="Ha párnak hívsz meg valakit">
+          <Section title="Ha változik a párod">
             <p>
-              A párodat az e-mail-címével hívod meg. Eltároljuk a címet, és
-              küldünk rá egy levelet a neveddel és egy linkkel, amivel elfogadhatja
-              vagy jelezheti, hogy nem kéri. Ha még nincs fiókja, ezzel a címmel
-              regisztrálhat. A válaszáról e-mailt kapsz. A meghívót csak az
-              fogadhatja el, akinek a címére ment. Kérjük, csak olyat hívj meg,
-              aki tud róla.
+              Párt létrehozni, felbontani vagy cserélni a szervező tud: írj
+              nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
+              szól nektek. A Párok oldalon a szervező a játékosok nevét és
+              szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
             </p>
             <p>
-              A pár oldalán a párod csak a neved látja, az e-mail-címedet és a
-              telefonszámodat nem. Ha megszünteted a párt, e-mailt kap róla a
-              neveddel.
+              A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a
+              telefonszámodat nem.
             </p>
           </Section>
 

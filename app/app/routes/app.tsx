@@ -75,6 +75,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   notifications: Bell,
   overview: LayoutDashboard,
   seasons: CalendarDays,
+  pairs: Users,
   solos: HeartHandshake,
   signups: Users,
   broadcasts: Mail,

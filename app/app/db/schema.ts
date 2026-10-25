@@ -394,10 +394,11 @@ export const notificationOptOuts = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
-// Two players who play a league together (spec section 4, #21). Formed when
-// the invitee accepts a pair_invites row; a player is in at most one active
-// pair per league. The accept batch (pairs.server.ts) enforces it; the two
-// unique indexes only catch the same player twice in the same column.
+// Two players who play a league together (spec section 4). Formed from the
+// interest signup (#89) or by a Szervező on the Párok page (#97); a player is
+// in at most one active pair per league. The inserts (signup-partners.server.ts,
+// pairs.server.ts) enforce it; the two unique indexes only catch the same
+// player twice in the same column.
 // Dissolved pairs stay as history, so later matches keep their pair.
 export const pairs = sqliteTable(
   "pairs",
@@ -406,9 +407,10 @@ export const pairs = sqliteTable(
     leagueId: integer("league_id")
       .notNull()
       .references(() => leagues.id, { onDelete: "cascade" }),
-    // The player who sent the invite, and the one who accepted it. For a pair
-    // from the interest signup (no invite, #89): the one who registered first,
-    // and the one whose registration formed it.
+    // For a pair from the interest signup (#89): the one who registered first,
+    // and the one whose registration formed it. Before #97 also the inviter
+    // and the invitee of a pair invite. For a manual pair: as the Szervező
+    // picked them.
     playerA: text("player_a")
       .notNull()
       .references(() => users.id),
@@ -419,6 +421,9 @@ export const pairs = sqliteTable(
       .unique()
       .references((): AnySQLiteColumn => pairInvites.id, { onDelete: "set null" }),
     status: text("status", { enum: ["active", "dissolved"] }).notNull().default("active"),
+    // "signup": formed from the interest signup (#89), or by an invite before
+    // #97; "manual": made by a Szervező on the Párok page (#97).
+    source: text("source", { enum: ["signup", "manual"] }).notNull().default("signup"),
     dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
     dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -432,9 +437,8 @@ export const pairs = sqliteTable(
 );
 
 // A player's invite to another to form a pair in a league, by email (#21).
-// The emailed link carries a random token; only its SHA-256 is stored. No
-// expiry: the inviter can cancel. One pending invite per inviter and league.
-// Personal data: the invitee's email, typed by the inviter (privacy page).
+// Unused since #97 (pair changes are an organizer task): kept so no live data
+// is dropped; a later cleanup can drop it. Personal data: the invitee's email.
 export const pairInvites = sqliteTable(
   "pair_invites",
   {

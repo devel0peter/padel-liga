@@ -59,7 +59,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "solos" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "pairs" | "solos" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -80,6 +80,7 @@ function leagueItems(league: LeagueRef): NavItem[] {
   return [
     { label: "Áttekintés", to: base, icon: "overview", permission: { kind: "league.manage", league: league.slug } },
     { label: "Szezonok", to: `${base}/seasons`, icon: "seasons", permission: { kind: "league.manage", league: league.slug } },
+    { label: "Párok", to: `${base}/pairs`, icon: "pairs", permission: { kind: "league.manage", league: league.slug } },
     { label: "Párkeresők", to: `${base}/solos`, icon: "solos", permission: { kind: "league.manage", league: league.slug } },
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
   ];

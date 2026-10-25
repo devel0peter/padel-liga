@@ -1,293 +1,226 @@
-// pairs.server.ts against a real SQLite (node:sqlite, in memory) with every
-// migration in app/drizzle applied: the one-pair-per-league rule lives in the
-// accept batch's SQL, so it is tested on a database, not on mocks. Email and
-// the city list are stubbed; nothing leaves the process.
-import { drizzle } from "drizzle-orm/sqlite-proxy";
+// pairs.server.ts on a real SQLite with every migration applied
+// (~/test/sqlite): the organizer's create, dissolve and change partner (#97),
+// with the one-pair-per-league rule checked inside the SQL. Email is stubbed;
+// no pair change queues any.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Node built-ins: this file runs in Vitest (Node) but is type-checked with the
-// Workers types, which have no node:fs or node:sqlite.
-const { readdirSync, readFileSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
-const { DatabaseSync } = await import(/* @vite-ignore */ `node:${"sqlite"}`);
+const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 
-const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
-
-const h = vi.hoisted(() => ({ raw: null as any, db: null as any, mails: [] as any[] }));
-
-vi.mock("~/db/client.server", async () => {
-  const schema = await import("~/db/schema");
-  const exec = (sql: string, params: any[], method: string) => {
-    const st = h.raw.prepare(sql);
-    if (method === "run") {
-      st.run(...params);
-      return { rows: [] };
-    }
-    st.setReturnArrays(true);
-    if (method === "get") return { rows: st.get(...params) ?? undefined };
-    return { rows: st.all(...params) };
-  };
-  h.db = drizzle(
-    async (sql, params, method) => exec(sql, params, method),
-    async (queries) => {
-      h.raw.exec("BEGIN");
-      try {
-        const out = queries.map((q) => exec(q.sql, q.params, q.method));
-        h.raw.exec("COMMIT");
-        return out;
-      } catch (e) {
-        h.raw.exec("ROLLBACK");
-        throw e;
-      }
-    },
-    { schema },
-  );
-  return { get db() { return h.db; } };
-});
+vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queuePairInvite: async (to: string, input: any) => h.mails.push({ kind: "invite", to, ...input }),
-  queuePairAnswer: async (to: string, input: any) => h.mails.push({ kind: "answer", ...input, toEmail: to }),
-  queuePairDissolved: async (to: string, input: any) => h.mails.push({ kind: "dissolved", ...input, toEmail: to }),
+  queueSeasonEntryDecision: async (...args: any[]) => h.mails.push(args),
+  queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
 }));
 
+const { migratedDatabase } = await import("~/test/sqlite");
 const P = await import("~/lib/pairs.server");
+const { NEW_PAIR_REFUSALS } = await import("~/lib/pairs");
+
+// Node built-ins: this file runs in Vitest (Node) but is type-checked with the
+// Workers types, which have no node:fs.
+const { readdirSync, readFileSync, statSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
+
+const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+const NOW = new Date("2026-11-03T12:00:00Z");
+const one = (q: string) => h.raw.prepare(q).get();
+const all = (q: string) => h.raw.prepare(q).all();
+const audits = () => all("select actor_id, action, target from audit_log where action like 'pair.%' order by id");
 
 function freshDb() {
-  h.raw = new DatabaseSync(":memory:");
-  h.raw.exec("PRAGMA foreign_keys = ON");
-  const files = (readdirSync(MIGRATIONS) as string[]).filter((f) => f.endsWith(".sql")).sort();
-  for (const f of files)
-    for (const stmt of readFileSync(new URL(f, MIGRATIONS), "utf8").split("--> statement-breakpoint"))
-      if (stmt.trim()) h.raw.exec(stmt);
+  h.raw = migratedDatabase();
+  h.mails = [];
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1), ('deb', 'Debrecen', 0)`);
   h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr'), (2, 'deb', 'deb', 'Padelpárbaj Debrecen')`);
-  for (const [id, name] of [["a", "Anna"], ["b", "Béla"], ["c", "Cecil"], ["d", "Dóra"]])
-    h.raw.exec(`insert into users (id, email, name, consent_at) values ('${id}', '${id}@x.hu', '${name}', 1)`);
-  h.mails = [];
+  for (const [id, name, level] of [
+    ["a", "Anna", "halado"],
+    ["b", "Béla", "kezdo"],
+    ["c", "Cecil", "kozephalado"],
+    ["d", "Dóra", "versenyzo"],
+    ["o", "Org", null],
+  ])
+    h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
+  // Has an account but hasn't finished the first-login page.
+  h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', 'Nándor')`);
 }
 
-const user = (id: string) => ({ id, email: `${id}@x.hu`, name: id.toUpperCase() }) as any;
-const league = { id: 1, name: "Padelpárbaj Győr" };
-const one = (sql: string) => h.raw.prepare(sql).get();
-const all = (sql: string) => h.raw.prepare(sql).all();
-
-function lastToken(): string {
-  const link: string = h.mails.filter((m) => m.kind === "invite").at(-1).link;
-  const url = new URL(link);
-  const path = url.pathname === "/login" ? url.searchParams.get("returnTo")! : url.pathname;
-  return path.split("/").at(-1)!;
-}
-
-describe("pairs.server on real SQLite", () => {
+describe("pairs.server on real SQLite (#97)", () => {
   beforeEach(freshDb);
 
   it("lists only leagues in listed cities", async () => {
-    expect(await P.pairLeagues()).toEqual([league]);
+    expect(await P.pairLeagues()).toEqual([{ id: 1, name: "Padelpárbaj Győr" }]);
   });
 
-  it("A invites B, B accepts by token, both see the pair, A is emailed", async () => {
-    expect(await P.createInvite(user("a"), league, " B@x.hu ")).toEqual({ ok: true });
-    expect(h.mails[0]).toMatchObject({ kind: "invite", to: "b@x.hu", hasAccount: true, inviterName: "A" });
-    expect(h.mails[0].link).toMatch(/^https:\/\/padelparbaj\.hu\/pair\/invite\/[A-Za-z0-9_-]{43}$/);
-    const inv = await P.inviteByToken(lastToken());
-    expect(inv).toMatchObject({ inviterName: "Anna", inviteeEmail: "b@x.hu", status: "pending", league: "Padelpárbaj Győr" });
-    // Only the hash is stored.
-    expect(one("select token_hash from pair_invites").token_hash).not.toBe(lastToken());
-    expect(await P.answerInvite(user("b"), inv!.id, "accept")).toEqual({ ok: true });
-    expect(h.mails[1]).toMatchObject({ kind: "answer", toEmail: "a@x.hu", accepted: true, inviteeName: "B" });
-    const [oa] = await P.pairOverview(user("a"), [league]);
-    const [ob] = await P.pairOverview(user("b"), [league]);
-    expect(oa.pair).toMatchObject({ partnerName: "Béla", canDissolve: true });
-    expect(ob.pair).toMatchObject({ partnerName: "Anna", canDissolve: true });
-    expect(oa.sent).toBeNull();
-  });
-
-  it("shows sent and received invites", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    const [oa] = await P.pairOverview(user("a"), [league]);
-    const [ob] = await P.pairOverview(user("b"), [league]);
-    expect(oa.sent).toMatchObject({ email: "b@x.hu" });
-    expect(ob.received).toHaveLength(1);
-    expect(ob.received[0].inviterName).toBe("Anna");
-    expect(ob.sent).toBeNull();
-  });
-
-  it("refuses an invite to someone already in an active pair in the league", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    expect(await P.createInvite(user("c"), league, "b@x.hu")).toMatchObject({ ok: false, error: expect.stringContaining("már van párja") });
-    expect(await P.createInvite(user("a"), league, "c@x.hu")).toMatchObject({ ok: false, error: expect.stringContaining("már van párod") });
-  });
-
-  it("refuses self-invite and a second pending invite", async () => {
-    expect(await P.createInvite(user("a"), league, "A@x.hu")).toMatchObject({ ok: false });
-    await P.createInvite(user("a"), league, "b@x.hu");
-    expect(await P.createInvite(user("a"), league, "c@x.hu")).toMatchObject({ ok: false, error: expect.stringContaining("Már elküldtél") });
-    expect(all("select * from pair_invites")).toHaveLength(1);
-  });
-
-  it("a declined invite tells the inviter", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    expect(await P.answerInvite(user("b"), 1, "decline")).toEqual({ ok: true });
-    expect(h.mails[1]).toMatchObject({ kind: "answer", toEmail: "a@x.hu", accepted: false });
-    expect(one("select status from pair_invites").status).toBe("declined");
-    expect(await P.answerInvite(user("b"), 1, "accept")).toMatchObject({ ok: false });
-    expect(all("select * from pairs")).toHaveLength(0);
-  });
-
-  it("only the invitee can answer", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    expect(await P.answerInvite(user("c"), 1, "accept")).toMatchObject({ ok: false, error: expect.stringContaining("nem ehhez a fiókhoz") });
-    expect(all("select * from pairs")).toHaveLength(0);
-  });
-
-  it("an invitee without an account gets the login link and an account invite", async () => {
-    await P.createInvite(user("a"), league, "new@x.hu");
-    const url = new URL(h.mails[0].link);
-    expect(url.pathname).toBe("/login");
-    expect(url.searchParams.get("email")).toBe("new@x.hu");
-    expect(url.searchParams.get("returnTo")).toMatch(/^\/pair\/invite\//);
-    expect(one("select note from account_invites where email = 'new@x.hu'").note).toBe("Pármeghívó");
-  });
-
-  it("accepting cancels both players' other pending invites in the league", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu"); // 1: a -> b
-    await P.createInvite(user("c"), league, "b@x.hu"); // 2: c -> b
-    await P.createInvite(user("b"), league, "d@x.hu"); // 3: b -> d
-    await P.createInvite(user("d"), league, "a@x.hu"); // 4: d -> a
-    expect(await P.answerInvite(user("b"), 1, "accept")).toEqual({ ok: true });
-    expect(all("select id, status from pair_invites order by id").map((r: any) => r.status)).toEqual([
-      "accepted",
-      "cancelled",
-      "cancelled",
-      "cancelled",
-    ]);
-  });
-
-  it("a player who accepted elsewhere can't accept a second one", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu"); // 1
-    await P.createInvite(user("c"), league, "d@x.hu"); // 2
-    await P.answerInvite(user("b"), 1, "accept");
-    // A pending invite that slipped past the checks (a race): d -> a
-    h.raw.exec(`insert into pair_invites (league_id, inviter_id, invitee_email, token_hash) values (1, 'd', 'a@x.hu', 'h')`);
-    const id = one("select max(id) id from pair_invites").id;
-    expect(await P.answerInvite(user("a"), id, "accept")).toMatchObject({ ok: false, error: expect.stringContaining("már van párod") });
-    expect(all("select * from pairs where status = 'active'")).toHaveLength(1);
-  });
-
-  it("the batch itself refuses a second pair even when the pre-checks pass", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu"); // 1
-    await P.answerInvite(user("b"), 1, "accept");
-    h.raw.exec(`insert into pair_invites (league_id, inviter_id, invitee_email, token_hash) values (1, 'c', 'a@x.hu', 'h')`);
-    const id = one("select max(id) id from pair_invites").id;
-    const spy = vi.spyOn(await import("~/lib/pairs"), "checkAnswer").mockReturnValue(null);
-    const result = await P.answerInvite(user("a"), id, "accept");
-    spy.mockRestore();
-    expect(result.ok).toBe(false);
-    expect(all("select * from pairs where status = 'active'")).toHaveLength(1);
-    expect(one(`select status from pair_invites where id = ${id}`).status).toBe("pending");
-  });
-
-  it("cancel: only the inviter, only pending", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    expect(await P.cancelInvite(user("b"), 1)).toMatchObject({ ok: false });
-    expect(await P.cancelInvite(user("a"), 1)).toEqual({ ok: true });
-    expect(one("select status from pair_invites").status).toBe("cancelled");
-    expect(await P.answerInvite(user("b"), 1, "accept")).toMatchObject({ ok: false });
-    // and a new invite is allowed again
-    expect(await P.createInvite(user("a"), league, "c@x.hu")).toEqual({ ok: true });
-  });
-
-  it("dissolve: either player, then both are free; a dissolved pair's invite can't re-form it", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    const pairId = one("select id from pairs").id;
-    expect(await P.dissolvePair(user("c"), pairId)).toMatchObject({ ok: false });
-    expect(await P.dissolvePair(user("b"), pairId)).toEqual({ ok: true });
-    expect(one("select status, dissolved_by from pairs")).toMatchObject({ status: "dissolved", dissolved_by: "b" });
-    expect(await P.dissolvePair(user("a"), pairId)).toMatchObject({ ok: false });
-    expect(await P.answerInvite(user("b"), 1, "accept")).toMatchObject({ ok: false });
-    expect(await P.createInvite(user("a"), league, "c@x.hu")).toEqual({ ok: true });
-    const [oa] = await P.pairOverview(user("a"), [league]);
-    expect(oa.pair).toBeNull();
-  });
-
-  it("dissolve queues exactly one email, to the partner only, with the dissolver's name", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    const pairId = one("select id from pairs").id;
-    h.mails = [];
-    expect(await P.dissolvePair(user("a"), pairId)).toEqual({ ok: true });
-    expect(h.mails).toEqual([{ kind: "dissolved", toEmail: "b@x.hu", to: "Béla", dissolverName: "A", league: "Padelpárbaj Győr" }]);
-    // A second submit finds nothing to dissolve and sends nothing.
-    expect(await P.dissolvePair(user("a"), pairId)).toMatchObject({ ok: false });
-    expect(h.mails).toHaveLength(1);
-  });
-
-  it("dissolve by the invitee emails the inviter", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    h.mails = [];
-    await P.dissolvePair(user("b"), one("select id from pairs").id);
-    expect(h.mails).toEqual([{ kind: "dissolved", toEmail: "a@x.hu", to: "Anna", dissolverName: "B", league: "Padelpárbaj Győr" }]);
-  });
-
-  it("a refused dissolve sends no email", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    h.mails = [];
-    expect(await P.dissolvePair(user("c"), one("select id from pairs").id)).toMatchObject({ ok: false });
+  it("creates a manual pair, audited, and both players see it on /pair", async () => {
+    expect(await P.createPair("o", 1, "a", "b")).toEqual({ ok: true });
+    expect(one("select league_id, player_a, player_b, source, status from pairs")).toEqual({
+      league_id: 1,
+      player_a: "a",
+      player_b: "b",
+      source: "manual",
+      status: "active",
+    });
+    const id = one("select id from pairs").id;
+    expect(audits()).toEqual([{ actor_id: "o", action: "pair.create", target: `pair:${id}` }]);
+    const [oa] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
+    expect(oa.pair).toEqual({ id, partnerName: "Anna" });
     expect(h.mails).toEqual([]);
   });
 
-  it("caps invites per day", async () => {
-    for (const e of ["c", "d", "e", "f", "g"]) {
-      expect(await P.createInvite(user("a"), league, `${e}@x.hu`)).toEqual({ ok: true });
-      await P.cancelInvite(user("a"), one("select max(id) id from pair_invites").id);
+  it("refuses a player twice, an unregistered one, or one already paired in the league", async () => {
+    expect(await P.createPair("o", 1, "a", "a")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.same });
+    expect(await P.createPair("o", 1, "a", "n")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.unknown });
+    expect(await P.createPair("o", 1, "a", "nobody")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.unknown });
+    await P.createPair("o", 1, "a", "b");
+    expect(await P.createPair("o", 1, "c", "a")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    expect(await P.createPair("o", 1, "b", "d")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    expect(all("select id from pairs")).toHaveLength(1);
+    // Another league doesn't count.
+    expect(await P.createPair("o", 2, "a", "c")).toEqual({ ok: true });
+    expect(audits().map((r: any) => r.action)).toEqual(["pair.create", "pair.create"]);
+  });
+
+  it("the insert itself refuses a player paired in the meantime (two organizers at once)", async () => {
+    // As if the check had passed and someone paired Anna right after it.
+    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'c', 'a')`);
+    expect(await P.createPair("o", 1, "a", "b")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    expect(all("select player_a, player_b from pairs")).toEqual([{ player_a: "c", player_b: "a" }]);
+    expect(audits()).toEqual([]);
+  });
+
+  it("offers registered players without an active pair in the league as candidates", async () => {
+    await P.createPair("o", 1, "a", "b");
+    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["c", "d", "o"]);
+    // A dissolved pair frees them.
+    await P.dissolvePair("o", 1, one("select id from pairs").id, NOW);
+    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(2)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+  });
+
+  it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {
+    await P.createPair("o", 1, "a", "b");
+    const id = one("select id from pairs").id;
+    expect(await P.dissolvePair("o", 1, id, NOW)).toEqual({ ok: true });
+    expect(one("select status, dissolved_by from pairs")).toEqual({ status: "dissolved", dissolved_by: "o" });
+    expect(await P.dissolvePair("o", 1, id, NOW)).toMatchObject({ ok: false });
+    expect(audits().map((r: any) => [r.action, r.target])).toEqual([
+      ["pair.create", `pair:${id}`],
+      ["pair.dissolve", `pair:${id}`],
+    ]);
+    expect(h.mails).toEqual([]);
+  });
+
+  it("refuses a pair of another league (the URL's league decides)", async () => {
+    await P.createPair("o", 2, "a", "b");
+    const id = one("select id from pairs").id;
+    expect(await P.dissolvePair("o", 1, id, NOW)).toMatchObject({ ok: false });
+    expect(await P.changePartner("o", 1, id, "a", "c", NOW)).toMatchObject({ ok: false });
+    expect(one("select status from pairs").status).toBe("active");
+  });
+
+  it("changes the partner in one step: old pair dissolved, new manual pair, audited", async () => {
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (7, 1, 'a', 'b')`);
+    expect(await P.changePartner("o", 1, 7, "a", "c", NOW)).toEqual({ ok: true });
+    expect(all("select id, player_a, player_b, source, status from pairs order by id")).toEqual([
+      { id: 7, player_a: "a", player_b: "b", source: "signup", status: "dissolved" },
+      { id: 8, player_a: "a", player_b: "c", source: "manual", status: "active" },
+    ]);
+    expect(audits()).toEqual([{ actor_id: "o", action: "pair.change", target: "pair:8" }]);
+    expect(h.mails).toEqual([]);
+  });
+
+  it("refuses a change to the same pair, to an unregistered or a paired player, and changes nothing", async () => {
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (7, 1, 'a', 'b'), (8, 1, 'c', 'd')`);
+    for (const partner of ["a", "b"])
+      expect(await P.changePartner("o", 1, 7, "a", partner, NOW)).toEqual({ ok: false, error: P.NEW_PARTNER_REFUSED });
+    expect(await P.changePartner("o", 1, 7, "a", "n", NOW)).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.unknown });
+    expect(await P.changePartner("o", 1, 7, "a", "c", NOW)).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    // `keep` must be one of the pair's players.
+    expect(await P.changePartner("o", 1, 7, "c", "o", NOW)).toMatchObject({ ok: false });
+    expect(all("select status from pairs").map((r: any) => r.status)).toEqual(["active", "active"]);
+    expect(audits()).toEqual([]);
+  });
+
+  it("dissolve and change withdraw the old pair's entries it hasn't played in (D19)", async () => {
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (7, 1, 'a', 'b'), (8, 1, 'c', 'd')`);
+    h.raw
+      .prepare(
+        "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Tél', ?, ?, '2026-11-09')",
+      )
+      .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
+    h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec("2026-11-08T23:00:00Z"), sec("2026-11-29T22:59:00Z"));
+    h.raw.exec(`insert into season_entries (season_id, pair_id, status, joins_phase) values (1, 7, 'approved', 1), (1, 8, 'pending', null)`);
+    expect(await P.changePartner("o", 1, 7, "b", "o", NOW)).toEqual({ ok: true });
+    expect(await P.dissolvePair("o", 1, 8, NOW)).toEqual({ ok: true });
+    expect(all("select pair_id, status from season_entries order by pair_id")).toEqual([
+      { pair_id: 7, status: "withdrawn" },
+      { pair_id: 8, status: "withdrawn" },
+    ]);
+  });
+
+  it("lists the league's pairs with names, levels, average starting Elo, source, status and entry", async () => {
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b, status) values (7, 1, 'a', 'b', 'dissolved')`);
+    await P.createPair("o", 1, "c", "d");
+    h.raw
+      .prepare(
+        "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Tél', ?, ?, '2026-11-09')",
+      )
+      .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
+    h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec("2026-11-08T23:00:00Z"), sec("2026-11-29T22:59:00Z"));
+    h.raw.exec(`insert into season_entries (season_id, pair_id, status) values (1, 8, 'pending')`);
+    const rows = await P.leaguePairs(1, NOW);
+    expect(rows).toEqual([
+      {
+        id: 8,
+        players: [
+          { id: "c", name: "Cecil", level: "kozephalado" },
+          { id: "d", name: "Dóra", level: "versenyzo" },
+        ],
+        elo: 1400,
+        source: "manual",
+        status: "active",
+        locked: false,
+        entry: { season: "Tél", status: "pending" },
+      },
+      {
+        id: 7,
+        players: [
+          { id: "a", name: "Anna", level: "halado" },
+          { id: "b", name: "Béla", level: "kezdo" },
+        ],
+        elo: 1200,
+        source: "signup",
+        status: "dissolved",
+        locked: false,
+        entry: null,
+      },
+    ]);
+    // Never an email address or phone on the page's data.
+    expect(JSON.stringify(rows)).not.toContain("@");
+  });
+});
+
+describe("the player-side pair invite is gone (#97)", () => {
+  // Every app source file except tests and the files that only name the
+  // kinds and the table for rows already stored (schema, budget, hold
+  // labels, the local seed reset).
+  const ROOT = new URL("../", import.meta.url);
+  const KEEP = new Set(["db/schema.ts", "lib/email/budget.ts", "lib/email/hold.ts", "lib/seed.ts"]);
+  function sources(dir: URL, prefix = ""): string[] {
+    return (readdirSync(dir) as string[]).flatMap((name) => {
+      const url = new URL(name, dir);
+      const path = prefix + name;
+      if (statSync(url).isDirectory()) return name === "test" ? [] : sources(new URL(`${name}/`, dir), `${path}/`);
+      return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) && !KEEP.has(path) ? [path] : [];
+    });
+  }
+
+  it("no code path queues pair_invite, pair_answer or pair_dissolved, or reads pair_invites", () => {
+    const files = sources(ROOT);
+    expect(files.length).toBeGreaterThan(50);
+    for (const f of files) {
+      const text: string = readFileSync(new URL(f, ROOT), "utf8");
+      expect(text, f).not.toMatch(/pair_invite|pair_answer|pair_dissolved|pairInvites|queuePair(Invite|Answer|Dissolved)/);
     }
-    expect(await P.createInvite(user("a"), league, "h@x.hu")).toMatchObject({ ok: false, error: expect.stringContaining("legfeljebb 5") });
-  });
-
-  it("a double accept (two tabs) forms one pair and emails the inviter once", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    expect(await P.answerInvite(user("b"), 1, "accept")).toEqual({ ok: true });
-    expect(await P.answerInvite(user("b"), 1, "accept")).toEqual({ ok: true });
-    expect(all("select * from pairs")).toHaveLength(1);
-    expect(h.mails.filter((m) => m.kind === "answer")).toHaveLength(1);
-  });
-
-  it("mutual invites: accepting one cancels the other", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu"); // 1
-    await P.createInvite(user("b"), league, "a@x.hu"); // 2
-    expect(await P.answerInvite(user("a"), 2, "accept")).toEqual({ ok: true });
-    expect(all("select status from pair_invites order by id").map((r: any) => r.status)).toEqual(["cancelled", "accepted"]);
-    expect(await P.answerInvite(user("b"), 1, "accept")).toMatchObject({ ok: false });
-    expect(all("select * from pairs")).toHaveLength(1);
-  });
-
-  it("two invitees of the same inviter: the second accept is refused", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu"); // 1
-    // A second pending invite from a, as a race past the one-pending rule
-    // could leave it (the unique index allows it once the first is answered).
-    h.raw.exec("update pair_invites set status = 'declined' where id = 1");
-    await P.createInvite(user("a"), league, "c@x.hu"); // 2
-    h.raw.exec("drop index pair_invites_pending_idx");
-    h.raw.exec("update pair_invites set status = 'pending' where id = 1");
-    expect(await P.answerInvite(user("c"), 2, "accept")).toEqual({ ok: true });
-    expect(await P.answerInvite(user("b"), 1, "accept")).toMatchObject({ ok: false });
-    expect(all("select * from pairs where status = 'active'")).toHaveLength(1);
-  });
-
-  it("pairs in another league don't count", async () => {
-    h.raw.exec("insert into pairs (league_id, player_a, player_b) values (2, 'a', 'b')");
-    expect(await P.createInvite(user("a"), league, "b@x.hu")).toEqual({ ok: true });
-    expect(await P.answerInvite(user("b"), 1, "accept")).toEqual({ ok: true });
-  });
-
-  it("cancel after the invitee accepted is refused", async () => {
-    await P.createInvite(user("a"), league, "b@x.hu");
-    await P.answerInvite(user("b"), 1, "accept");
-    expect(await P.cancelInvite(user("a"), 1)).toMatchObject({ ok: false, error: expect.stringContaining("visszavonni") });
-    expect(one("select status from pair_invites").status).toBe("accepted");
   });
 });

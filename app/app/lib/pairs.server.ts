@@ -1,36 +1,28 @@
-import { and, asc, count, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { accountInvites, leagues, pairInvites, pairs, users } from "~/db/schema";
+import { groupPairs, groups, leagues, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
-import { queuePairAnswer, queuePairDissolved, queuePairInvite } from "~/lib/email/outbox.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
+import { audit } from "~/lib/leagues.server";
+import { averageStartingElo, type EntryStatus } from "~/lib/season-entries";
 import { withdrawEntries } from "~/lib/season-entries.server";
-import { SITE_URL } from "~/lib/site";
+import { homeSeasons } from "~/lib/seasons";
+import { listSeasons } from "~/lib/seasons.server";
 
-import { normalizeEmail } from "./auth/rules";
 import type { User } from "./auth/session.server";
-import { randomToken, sha256Hex } from "./auth/tokens";
-import {
-  ANSWER_REFUSALS,
-  CANCEL_REFUSED,
-  canCancel,
-  canDissolve,
-  checkAnswer,
-  checkInvite,
-  DISSOLVE_REFUSED,
-  INVITE_REFUSALS,
-  inviteLink,
-  PAIR_INVITE_NOTE,
-  type InviteStatus,
-} from "./pairs";
+import { canDissolve, checkNewPair, DISSOLVE_REFUSED, NEW_PAIR_REFUSALS, type PairSource } from "./pairs";
 
-// Pairs and partner invites in D1 (#21). The rules are in pairs.ts.
+// Pairs in D1. The rules are in pairs.ts. Players only see their pair
+// (/pair); a Szervező changes pairs on the Párok page (#97). No email goes
+// out for a pair change: the organizer tells the players.
 
 export type PairLeague = { id: number; name: string };
 
-// Where a player can form a pair: every league in a listed city (players
+type Result = { ok: true } | { ok: false; error: string };
+
+// Where a player can be in a pair: every league in a listed city (players
 // don't belong to a league yet; a city still being set up stays hidden).
 export async function pairLeagues(): Promise<PairLeague[]> {
   const listed = (await listedCities()).map((c) => c.slug);
@@ -48,294 +40,274 @@ export function activePairWith(leagueId: number, userIds: string[]) {
     and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))`;
 }
 
-async function isPaired(leagueId: number, userId: string): Promise<boolean> {
+export type PairOverview = {
+  league: PairLeague;
+  pair: { id: number; partnerName: string } | null;
+};
+
+// What /pair shows, per league: the active pair, if any.
+export async function pairOverview(user: User, list: PairLeague[]): Promise<PairOverview[]> {
+  if (list.length === 0) return [];
+  const partner = alias(users, "partner");
+  const active = await db
+    .select({ id: pairs.id, leagueId: pairs.leagueId, partnerName: partner.name })
+    .from(pairs)
+    .innerJoin(partner, sql`${partner.id} = case when ${pairs.playerA} = ${user.id} then ${pairs.playerB} else ${pairs.playerA} end`)
+    .where(
+      and(
+        inArray(
+          pairs.leagueId,
+          list.map((l) => l.id),
+        ),
+        eq(pairs.status, "active"),
+        or(eq(pairs.playerA, user.id), eq(pairs.playerB, user.id)),
+      ),
+    );
+  return list.map((league) => {
+    const p = active.find((a) => a.leagueId === league.id);
+    return { league, pair: p ? { id: p.id, partnerName: p.partnerName } : null };
+  });
+}
+
+// --- The organizer's Párok page (#97) ----------------------------------------
+
+export type LeaguePairRow = {
+  id: number;
+  players: { id: string; name: string; level: string | null }[];
+  elo: number | null;
+  source: PairSource;
+  status: "active" | "dissolved";
+  // In a published group whose round hasn't ended: can't be dissolved or changed.
+  locked: boolean;
+  // The entry in the league's current (or next) season, if any.
+  entry: { season: string; status: EntryStatus } | null;
+};
+
+const playerA = alias(users, "pair_player_a");
+const playerB = alias(users, "pair_player_b");
+
+// Those of these pairs that are in a published group before its round's deadline.
+async function lockedPairs(pairIds: number[], now: Date): Promise<Set<number>> {
+  if (pairIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ id: groupPairs.pairId })
+    .from(groupPairs)
+    .innerJoin(groups, eq(groups.id, groupPairs.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(inArray(groupPairs.pairId, pairIds), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
+  return new Set(rows.map((r) => r.id));
+}
+
+// Every pair of the league, active ones first, newest first.
+export async function leaguePairs(leagueId: number, now = new Date()): Promise<LeaguePairRow[]> {
+  const rows = await db
+    .select({
+      id: pairs.id,
+      source: pairs.source,
+      status: pairs.status,
+      aId: pairs.playerA,
+      aName: playerA.name,
+      aLevel: playerA.level,
+      bId: pairs.playerB,
+      bName: playerB.name,
+      bLevel: playerB.level,
+    })
+    .from(pairs)
+    .innerJoin(playerA, eq(playerA.id, pairs.playerA))
+    .innerJoin(playerB, eq(playerB.id, pairs.playerB))
+    .where(eq(pairs.leagueId, leagueId))
+    .orderBy(asc(pairs.status), desc(pairs.id));
+  if (rows.length === 0) return [];
+  const seasons = homeSeasons(await listSeasons(leagueId), now);
+  const [locked, entries] = await Promise.all([
+    lockedPairs(
+      rows.filter((r) => r.status === "active").map((r) => r.id),
+      now,
+    ),
+    seasons.length
+      ? db
+          .select({ pairId: seasonEntries.pairId, seasonId: seasonEntries.seasonId, status: seasonEntries.status })
+          .from(seasonEntries)
+          .where(
+            inArray(
+              seasonEntries.seasonId,
+              seasons.map((s) => s.id),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+  return rows.map((r) => {
+    // The first home season (current before next) the pair has an entry in.
+    let entry: LeaguePairRow["entry"] = null;
+    for (const s of seasons) {
+      const e = entries.find((x) => x.pairId === r.id && x.seasonId === s.id);
+      if (e) {
+        entry = { season: s.name, status: e.status };
+        break;
+      }
+    }
+    return {
+      id: r.id,
+      players: [
+        { id: r.aId, name: r.aName, level: r.aLevel },
+        { id: r.bId, name: r.bName, level: r.bLevel },
+      ],
+      elo: averageStartingElo(r.aLevel, r.bLevel),
+      source: r.source,
+      status: r.status,
+      locked: locked.has(r.id),
+      entry,
+    };
+  });
+}
+
+export type PairCandidate = { id: string; name: string; level: string | null };
+
+// Registered players (first-login page done) without an active pair in the
+// league, by name. Players don't belong to a league yet, so everyone counts.
+export async function pairCandidates(leagueId: number): Promise<PairCandidate[]> {
+  return db
+    .select({ id: users.id, name: users.name, level: users.level })
+    .from(users)
+    .where(
+      and(
+        isNotNull(users.consentAt),
+        sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
+          and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+      ),
+    )
+    .orderBy(asc(users.name), asc(users.id));
+}
+
+// Why `a` and `b` can't be a new pair, or null. `free`: the players who must
+// not be in an active pair (both, unless one leaves their pair in the same
+// step).
+async function newPairRefusal(leagueId: number, a: string, b: string, free = [a, b]): Promise<string | null> {
+  if (!a || !b || a === b) return NEW_PAIR_REFUSALS.same;
+  const [registered, paired] = await db.batch([
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, [a, b]), isNotNull(users.consentAt))),
+    db.select({ id: pairs.id }).from(pairs).where(activePairWith(leagueId, free)).limit(1),
+  ]);
+  const refusal = checkNewPair({ a, b, registered: registered.length === 2, paired: paired.length > 0 });
+  return refusal ? NEW_PAIR_REFUSALS[refusal] : null;
+}
+
+// The active pair of exactly these two players in the league, if any.
+async function activePairOf(leagueId: number, a: string, b: string): Promise<number | null> {
   const [row] = await db
     .select({ id: pairs.id })
     .from(pairs)
-    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))))
-    .limit(1);
-  return !!row;
-}
-
-
-export type PairOverview = {
-  league: PairLeague;
-  pair: { id: number; partnerName: string; canDissolve: boolean } | null;
-  // The invite this player sent and nobody has answered yet.
-  sent: { id: number; email: string; createdAt: Date } | null;
-  // Invites to this player's email, from players without a pair here.
-  received: { id: number; inviterName: string; createdAt: Date }[];
-};
-
-// What /pair shows, per league.
-export async function pairOverview(user: User, list: PairLeague[]): Promise<PairOverview[]> {
-  if (list.length === 0) return [];
-  const ids = list.map((l) => l.id);
-  const partner = alias(users, "partner");
-  const inviter = alias(users, "inviter");
-  const [active, sent, received] = await db.batch([
-    db
-      .select({ id: pairs.id, leagueId: pairs.leagueId, playerA: pairs.playerA, playerB: pairs.playerB, partnerName: partner.name })
-      .from(pairs)
-      .innerJoin(
-        partner,
-        sql`${partner.id} = case when ${pairs.playerA} = ${user.id} then ${pairs.playerB} else ${pairs.playerA} end`,
-      )
-      .where(and(inArray(pairs.leagueId, ids), eq(pairs.status, "active"), or(eq(pairs.playerA, user.id), eq(pairs.playerB, user.id)))),
-    db
-      .select({ id: pairInvites.id, leagueId: pairInvites.leagueId, email: pairInvites.inviteeEmail, createdAt: pairInvites.createdAt })
-      .from(pairInvites)
-      .where(and(inArray(pairInvites.leagueId, ids), eq(pairInvites.inviterId, user.id), eq(pairInvites.status, "pending"))),
-    db
-      .select({ id: pairInvites.id, leagueId: pairInvites.leagueId, inviterName: inviter.name, createdAt: pairInvites.createdAt })
-      .from(pairInvites)
-      .innerJoin(inviter, eq(inviter.id, pairInvites.inviterId))
-      .where(
-        and(
-          inArray(pairInvites.leagueId, ids),
-          eq(pairInvites.inviteeEmail, normalizeEmail(user.email)),
-          eq(pairInvites.status, "pending"),
-        ),
-      )
-      .orderBy(desc(pairInvites.id)),
-  ]);
-  return Promise.all(
-    list.map(async (league) => {
-      const p = active.find((a) => a.leagueId === league.id);
-      const s = sent.find((x) => x.leagueId === league.id);
-      return {
-        league,
-        pair: p
-          ? { id: p.id, partnerName: p.partnerName, canDissolve: canDissolve({ ...p, status: "active" }, user.id, await pairInRunningGroup(p.id)) }
-          : null,
-        sent: s ? { id: s.id, email: s.email, createdAt: s.createdAt } : null,
-        received: received.filter((r) => r.leagueId === league.id).map(({ id, inviterName, createdAt }) => ({ id, inviterName, createdAt })),
-      };
-    }),
-  );
-}
-
-type Result = { ok: true } | { ok: false; error: string };
-
-// Sends a partner invite (D13-D15). An invitee without an account is added to
-// account_invites, so they can sign up before registration opens (D14).
-export async function createInvite(user: User, league: PairLeague, rawEmail: string): Promise<Result> {
-  const email = normalizeEmail(rawEmail);
-  const [[invitee], [sentLastDay], [pending]] = await db.batch([
-    db.select({ id: users.id }).from(users).where(eq(users.email, email)),
-    db
-      .select({ n: count() })
-      .from(pairInvites)
-      .where(and(eq(pairInvites.inviterId, user.id), gt(pairInvites.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)))),
-    db
-      .select({ n: count() })
-      .from(pairInvites)
-      .where(and(eq(pairInvites.leagueId, league.id), eq(pairInvites.inviterId, user.id), eq(pairInvites.status, "pending"))),
-  ]);
-  const check = checkInvite({
-    inviterEmail: user.email,
-    inviteeEmail: email,
-    inviterPaired: await isPaired(league.id, user.id),
-    inviteePaired: invitee ? await isPaired(league.id, invitee.id) : false,
-    pendingOutgoing: pending.n > 0,
-    sentLastDay: sentLastDay.n,
-  });
-  if (!check.ok) return { ok: false, error: INVITE_REFUSALS[check.reason] };
-
-  const token = randomToken();
-  // The unique index on pending invites per inviter and league settles a
-  // double submit: the second insert does nothing.
-  const inserted = await db
-    .insert(pairInvites)
-    .values({ leagueId: league.id, inviterId: user.id, inviteeEmail: check.email, tokenHash: await sha256Hex(token) })
-    .onConflictDoNothing()
-    .returning({ id: pairInvites.id });
-  if (inserted.length === 0) return { ok: false, error: INVITE_REFUSALS.already_inviting };
-  if (!invitee) await db.insert(accountInvites).values({ email: check.email, note: PAIR_INVITE_NOTE }).onConflictDoNothing();
-  await queuePairInvite(check.email, {
-    inviterName: user.name,
-    league: league.name,
-    link: inviteLink(SITE_URL, token, { email: check.email, hasAccount: !!invitee }),
-    hasAccount: !!invitee,
-  });
-  return { ok: true };
-}
-
-export async function cancelInvite(user: User, inviteId: number): Promise<Result> {
-  const [invite] = await db
-    .select({ status: pairInvites.status, inviterId: pairInvites.inviterId })
-    .from(pairInvites)
-    .where(eq(pairInvites.id, inviteId));
-  if (!invite || !canCancel(invite, user.id)) return { ok: false, error: CANCEL_REFUSED };
-  // Only while still pending: the invitee may have answered in the meantime.
-  const updated = await db
-    .update(pairInvites)
-    .set({ status: "cancelled", respondedAt: new Date() })
-    .where(and(eq(pairInvites.id, inviteId), eq(pairInvites.inviterId, user.id), eq(pairInvites.status, "pending")))
-    .returning({ id: pairInvites.id });
-  return updated.length ? { ok: true } : { ok: false, error: CANCEL_REFUSED };
-}
-
-export type InviteDetails = {
-  id: number;
-  leagueId: number;
-  league: string;
-  inviterId: string;
-  inviterName: string;
-  inviterEmail: string;
-  inviteeEmail: string;
-  status: InviteStatus;
-};
-
-const inviter = alias(users, "inviter");
-
-function inviteDetails() {
-  return db
-    .select({
-      id: pairInvites.id,
-      leagueId: pairInvites.leagueId,
-      league: leagues.name,
-      inviterId: pairInvites.inviterId,
-      inviterName: inviter.name,
-      inviterEmail: inviter.email,
-      inviteeEmail: pairInvites.inviteeEmail,
-      status: pairInvites.status,
-    })
-    .from(pairInvites)
-    .innerJoin(inviter, eq(inviter.id, pairInvites.inviterId))
-    .innerJoin(leagues, eq(leagues.id, pairInvites.leagueId));
-}
-
-// The invite behind an emailed link (only the token's hash is stored).
-export async function inviteByToken(token: string): Promise<InviteDetails | undefined> {
-  const [row] = await inviteDetails().where(eq(pairInvites.tokenHash, await sha256Hex(token)));
-  return row;
-}
-
-export async function inviteById(id: number): Promise<InviteDetails | undefined> {
-  const [row] = await inviteDetails().where(eq(pairInvites.id, id));
-  return row;
-}
-
-// Accept or decline as the invitee. Accepting forms the pair and cancels both
-// players' other pending invites in the league, in one D1 batch (a
-// transaction), so two accepts at once can't put a player in two pairs.
-export async function answerInvite(user: User, inviteId: number, answer: "accept" | "decline"): Promise<Result> {
-  const invite = await inviteById(inviteId);
-  if (!invite) return { ok: false, error: ANSWER_REFUSALS.answered };
-  const refusal = async () =>
-    checkAnswer(
-      {
-        status: invite.status,
-        inviteeEmail: invite.inviteeEmail,
-        userEmail: user.email,
-        inviterPaired: await isPaired(invite.leagueId, invite.inviterId),
-        userPaired: await isPaired(invite.leagueId, user.id),
-      },
-      answer,
-    );
-  // Accepting again (a second tab, a double submit) finds the pair this
-  // invite formed: done, and the inviter was told the first time.
-  const formedHere = async () => {
-    const [formed] = await db
-      .select({ id: pairs.id })
-      .from(pairs)
-      .where(and(eq(pairs.inviteId, inviteId), eq(pairs.status, "active"), eq(pairs.playerB, user.id)));
-    return !!formed;
-  };
-  if (answer === "accept" && invite.status === "accepted" && (await formedHere())) return { ok: true };
-  const refused = await refusal();
-  if (refused) return { ok: false, error: ANSWER_REFUSALS[refused] };
-  const now = new Date();
-
-  if (answer === "decline") {
-    const updated = await db
-      .update(pairInvites)
-      .set({ status: "declined", respondedAt: now })
-      .where(and(eq(pairInvites.id, inviteId), eq(pairInvites.status, "pending")))
-      .returning({ id: pairInvites.id });
-    if (updated.length === 0) return { ok: false, error: ANSWER_REFUSALS.answered };
-    await queuePairAnswer(invite.inviterEmail, { to: invite.inviterName, inviteeName: user.name, league: invite.league, accepted: false });
-    return { ok: true };
-  }
-
-  const players = [invite.inviterId, user.id];
-  const emails = [normalizeEmail(invite.inviterEmail), normalizeEmail(user.email)];
-  const pairOfInvite = sql`exists (select 1 from ${pairs} where ${pairs.inviteId} = ${inviteId} and ${pairs.status} = 'active')`;
-  const [accepted] = await db.batch([
-    db
-      .update(pairInvites)
-      .set({ status: "accepted", respondedAt: now })
-      .where(
-        and(
-          eq(pairInvites.id, inviteId),
-          eq(pairInvites.status, "pending"),
-          eq(pairInvites.inviteeEmail, emails[1]),
-          sql`not ${activePairWith(invite.leagueId, players)}`,
-        ),
-      )
-      .returning({ id: pairInvites.id }),
-    db.run(sql`insert into ${pairs} (league_id, player_a, player_b, invite_id)
-      select ${invite.leagueId}, ${invite.inviterId}, ${user.id}, ${inviteId}
-      where exists (select 1 from ${pairInvites} where ${pairInvites.id} = ${inviteId} and ${pairInvites.status} = 'accepted')
-        and not exists (select 1 from ${pairs} where ${pairs.inviteId} = ${inviteId})
-        and not ${activePairWith(invite.leagueId, players)}`),
-    db
-      .update(pairInvites)
-      .set({ status: "cancelled", respondedAt: now })
-      .where(
-        and(
-          eq(pairInvites.leagueId, invite.leagueId),
-          eq(pairInvites.status, "pending"),
-          or(inArray(pairInvites.inviterId, players), inArray(pairInvites.inviteeEmail, emails)),
-          pairOfInvite,
-        ),
+    .where(
+      and(
+        eq(pairs.leagueId, leagueId),
+        eq(pairs.status, "active"),
+        or(and(eq(pairs.playerA, a), eq(pairs.playerB, b)), and(eq(pairs.playerA, b), eq(pairs.playerB, a))),
       ),
-  ]);
-  // Statement 1 changed the invite only if this batch formed the pair.
-  if (accepted.length === 0) {
-    // Two submits at once: the other one formed it and told the inviter.
-    if (await formedHere()) return { ok: true };
-    // Someone was quicker: say why, from the state now.
-    const again = await inviteById(inviteId);
-    if (again) invite.status = again.status;
-    return { ok: false, error: ANSWER_REFUSALS[(await refusal()) ?? "answered"] };
-  }
-  await queuePairAnswer(invite.inviterEmail, { to: invite.inviterName, inviteeName: user.name, league: invite.league, accepted: true });
+    );
+  return row?.id ?? null;
+}
+
+// The insert of a manual pair: only if neither player is in an active pair
+// of the league by then (checked inside the statement, so two organizers at
+// once can't put a player in two pairs). `also`: an extra condition.
+function insertManualPair(leagueId: number, a: string, b: string, also = sql`1`) {
+  return db.run(sql`insert into ${pairs} (league_id, player_a, player_b, source)
+    select ${leagueId}, ${a}, ${b}, 'manual'
+    where not ${activePairWith(leagueId, [a, b])} and ${also}`);
+}
+
+// "Pár létrehozása": two registered players without a pair in the league.
+export async function createPair(actorId: string, leagueId: number, a: string, b: string): Promise<Result> {
+  const refused = await newPairRefusal(leagueId, a, b);
+  if (refused) return { ok: false, error: refused };
+  await insertManualPair(leagueId, a, b);
+  const id = await activePairOf(leagueId, a, b);
+  // Someone was quicker with one of them.
+  if (!id) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
+  await audit(actorId, "pair.create", `pair:${id}`, `league:${leagueId}; ${a} + ${b}`);
   return { ok: true };
 }
 
-// "Pár megszüntetése" (D16): either player, not while the pair plays in a
-// group of a running phase. The partner is emailed (#85); the player who
-// dissolved it is not. Its season entries not played yet are withdrawn (D19).
-export async function dissolvePair(user: User, pairId: number): Promise<Result> {
-  const [pair] = await db
-    .select({ status: pairs.status, playerA: pairs.playerA, playerB: pairs.playerB, league: leagues.name })
+type StoredPair = { status: "active" | "dissolved"; playerA: string; playerB: string };
+
+async function pairInLeague(leagueId: number, pairId: number): Promise<StoredPair | undefined> {
+  const [row] = await db
+    .select({ status: pairs.status, playerA: pairs.playerA, playerB: pairs.playerB })
     .from(pairs)
-    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
-    .where(eq(pairs.id, pairId));
-  if (!pair || (pair.playerA !== user.id && pair.playerB !== user.id) || pair.status !== "active")
-    return { ok: false, error: "Ez a pár már nem létezik." };
-  const now = new Date();
-  if (!canDissolve(pair, user.id, await pairInRunningGroup(pairId, now))) return { ok: false, error: DISSOLVE_REFUSED };
-  // With its entries for seasons it hasn't played in yet (D19), in one batch.
-  // The running-group check is repeated in the update, so groups published
-  // in the meantime win; the withdrawal only runs once the pair is dissolved.
-  const [dissolved] = await db.batch([
+    .where(and(eq(pairs.id, pairId), eq(pairs.leagueId, leagueId)));
+  return row;
+}
+
+const GONE = "Ez a pár már nem aktív.";
+
+export const NEW_PARTNER_REFUSED = "Válassz új partnert.";
+
+// The dissolve itself: the update, then the withdrawal of the entries it
+// hasn't played in yet (D19), in one batch with whatever follows. The
+// running-group check is repeated in the update, so a group published in the
+// meantime wins; the withdrawal only runs once the pair is dissolved.
+// `also`: an extra condition for the update.
+function dissolveStatements(actorId: string, pairId: number, now: Date, also = sql`1`) {
+  return [
     db
       .update(pairs)
-      .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: user.id })
-      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active"), notInRunningGroup(pairId, now)))
+      .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: actorId })
+      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active"), notInRunningGroup(pairId, now), also))
       .returning({ id: pairs.id }),
     withdrawEntries(pairId, now),
+  ] as const;
+}
+
+// Why a dissolve in a batch changed nothing, from the state now.
+async function whyNotDissolved(leagueId: number, pairId: number, now: Date): Promise<string> {
+  const pair = await pairInLeague(leagueId, pairId);
+  if (!pair || pair.status !== "active") return GONE;
+  return (await pairInRunningGroup(pairId, now)) ? DISSOLVE_REFUSED : NEW_PAIR_REFUSALS.paired;
+}
+
+// "Felbontás": not while the pair plays in a running round.
+export async function dissolvePair(actorId: string, leagueId: number, pairId: number, now = new Date()): Promise<Result> {
+  const pair = await pairInLeague(leagueId, pairId);
+  if (!pair || pair.status !== "active") return { ok: false, error: GONE };
+  if (!canDissolve(pair, await pairInRunningGroup(pairId, now))) return { ok: false, error: DISSOLVE_REFUSED };
+  const [dissolved] = await db.batch(dissolveStatements(actorId, pairId, now));
+  if (dissolved.length === 0) return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
+  await audit(actorId, "pair.dissolve", `pair:${pairId}`, `league:${leagueId}`);
+  return { ok: true };
+}
+
+// "Partner cseréje": dissolves the pair and pairs `keep` (one of its players)
+// with `partner`, in one batch: both happen or neither.
+export async function changePartner(
+  actorId: string,
+  leagueId: number,
+  pairId: number,
+  keep: string,
+  partner: string,
+  now = new Date(),
+): Promise<Result> {
+  const pair = await pairInLeague(leagueId, pairId);
+  if (!pair || pair.status !== "active" || (keep !== pair.playerA && keep !== pair.playerB)) return { ok: false, error: GONE };
+  const leaving = keep === pair.playerA ? pair.playerB : pair.playerA;
+  if (partner === keep || partner === leaving) return { ok: false, error: NEW_PARTNER_REFUSED };
+  if (!canDissolve(pair, await pairInRunningGroup(pairId, now))) return { ok: false, error: DISSOLVE_REFUSED };
+  // `keep` leaves this pair in the same step: only the new partner must be free.
+  const refused = await newPairRefusal(leagueId, keep, partner, [partner]);
+  if (refused) return { ok: false, error: refused };
+  const seconds = Math.floor(now.getTime() / 1000);
+  // The old pair only goes if the new partner is still free; the new pair
+  // only comes if this batch dissolved the old one.
+  const dissolvedHere = sql`exists (select 1 from ${pairs} where ${pairs.id} = ${pairId} and ${pairs.status} = 'dissolved'
+    and ${pairs.dissolvedAt} = ${seconds} and ${pairs.dissolvedBy} = ${actorId})`;
+  const [dissolved] = await db.batch([
+    ...dissolveStatements(actorId, pairId, now, sql`not ${activePairWith(leagueId, [partner])}`),
+    insertManualPair(leagueId, keep, partner, dissolvedHere),
   ]);
-  // Two submits at once: only the one that dissolved it sends the email.
-  if (dissolved.length === 0)
-    return (await pairInRunningGroup(pairId, now)) ? { ok: false, error: DISSOLVE_REFUSED } : { ok: true };
-  const [partner] = await db
-    .select({ email: users.email, name: users.name })
-    .from(users)
-    .where(eq(users.id, pair.playerA === user.id ? pair.playerB : pair.playerA));
-  if (partner) await queuePairDissolved(partner.email, { to: partner.name, dissolverName: user.name, league: pair.league });
+  if (dissolved.length === 0) return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
+  const id = await activePairOf(leagueId, keep, partner);
+  await audit(actorId, "pair.change", `pair:${id ?? "?"}`, `league:${leagueId}; from pair:${pairId}; ${leaving} -> ${partner}`);
   return { ok: true };
 }

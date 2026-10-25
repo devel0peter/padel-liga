@@ -22,28 +22,6 @@ const O = await import("~/lib/email/outbox.server");
 
 const messages = () => h.raw.prepare("select kind, to_email, subject, status from email_messages").all();
 
-describe("queuePairDissolved", () => {
-  beforeEach(() => {
-    h.raw = migratedDatabase();
-    h.sent = [];
-  });
-
-  it("queues one email to the partner, held for the Admin (#88)", async () => {
-    await O.queuePairDissolved("bela@x.hu", { to: "Béla", dissolverName: "Anna", league: "Padelpárbaj Győr" });
-    expect(messages()).toEqual([
-      { kind: "pair_dissolved", to_email: "bela@x.hu", subject: "Anna megszüntette a párotokat – Padelpárbaj", status: "held" },
-    ]);
-    expect(h.sent).toEqual([]);
-  });
-
-  it.each(["unsubscribed", "bounced", "complained"])("sends nothing to an address that %s", async (reason) => {
-    h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", reason);
-    await O.queuePairDissolved("Bela@x.hu", { to: "Béla", dissolverName: "Anna", league: "Padelpárbaj Győr" });
-    expect(messages()).toEqual([]);
-    expect(h.sent).toEqual([]);
-  });
-});
-
 describe("queueSeasonEntryDecision", () => {
   const input = {
     to: "Béla",
@@ -185,9 +163,6 @@ describe("held outbox", () => {
       { name: "Dani", email: "dani@x.hu", level: "kezdo" },
       "Győr",
     );
-    await O.queuePairInvite("eva@x.hu", { inviterName: "Anna", league, link: "https://padelparbaj.hu/pair", hasAccount: true });
-    await O.queuePairAnswer("anna@x.hu", { to: "Anna", inviteeName: "Éva", league, accepted: true });
-    await O.queuePairDissolved("bela@x.hu", { to: "Béla", dissolverName: "Anna", league });
     await O.queueSeasonEntryDecision("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
@@ -228,9 +203,6 @@ describe("held outbox", () => {
       login_code: "sent",
       partner_notice: "held",
       pair_intro: "held",
-      pair_invite: "held",
-      pair_answer: "held",
-      pair_dissolved: "held",
       season_entry_decision: "held",
       broadcast: "held",
       registration_invite: "held",

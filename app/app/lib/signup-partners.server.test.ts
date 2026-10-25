@@ -8,9 +8,8 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queuePairInvite: async () => {},
-  queuePairAnswer: async () => {},
-  queuePairDissolved: async () => {},
+  queueSeasonEntryDecision: async () => {},
+  queueGroupsPublished: async () => {},
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -73,8 +72,8 @@ describe("signup pairs on real SQLite", () => {
     // Both see it as their active pair on /pair.
     const [oa] = await P.pairOverview(user("a"), [league]);
     const [ob] = await P.pairOverview(user("b"), [league]);
-    expect(oa.pair).toMatchObject({ partnerName: "Béla", canDissolve: true });
-    expect(ob.pair).toMatchObject({ partnerName: "Anna", canDissolve: true });
+    expect(oa.pair).toMatchObject({ partnerName: "Béla" });
+    expect(ob.pair).toMatchObject({ partnerName: "Anna" });
   });
 
   it("works from the partner's side and for solos a Szervező paired", async () => {
@@ -125,12 +124,11 @@ describe("signup pairs on real SQLite", () => {
     register("c", "Cecil");
     await SP.formSignupPairs("b");
     const [pair] = all("select id from pairs");
-    expect(await P.dissolvePair(user("b"), pair.id)).toEqual({ ok: true });
-    expect(await P.createInvite(user("b"), league, "c@x.hu")).toEqual({ ok: true });
+    // A Szervező dissolves it on the Párok page (#97).
+    expect(await P.dissolvePair("c", 1, pair.id)).toEqual({ ok: true });
     await SP.formSignupPairs("a");
     await SP.formSignupPairs("b");
     expect(activePairs()).toEqual([]);
-    expect(all("select status from pair_invites")).toEqual([{ status: "pending" }]);
   });
 
   it("needs both sides: someone else's signup alone puts nobody in a pair", async () => {
@@ -152,23 +150,6 @@ describe("signup pairs on real SQLite", () => {
     expect(activePairs()).toEqual([]);
   });
 
-  it("leaves pending invites alone when it forms nothing", async () => {
-    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu" });
-    register("a", "Anna");
-    register("b", "Béla");
-    register("c", "Cecil");
-    register("d", "Dóra");
-    // Already a pair by invite: a later login changes nothing.
-    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'a', 'b')`);
-    h.raw.exec(`insert into pair_invites (league_id, inviter_id, invitee_email, token_hash) values (1, 'c', 'a@x.hu', 'h1')`);
-    await SP.formSignupPairs("b");
-    // Blocked because Béla is paired with Dóra: nothing changes either.
-    h.raw.exec(`update pairs set status = 'dissolved'`);
-    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'b', 'd')`);
-    await SP.formSignupPairs("a");
-    expect(all("select status from pair_invites")).toEqual([{ status: "pending" }]);
-  });
-
   it("forms nothing in a city that isn't listed yet", async () => {
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 0)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')`);
@@ -186,20 +167,6 @@ describe("signup pairs on real SQLite", () => {
     for (const [u, n] of [["a", "Anna"], ["b", "Béla"], ["c", "Cili"], ["d", "Dani"]]) register(u, n);
     for (const u of ["a", "b", "c", "d"]) await SP.formSignupPairs(u);
     expect(activePairs()).toEqual([]);
-  });
-
-  it("cancels the pending invites either of them sent or got in the league", async () => {
-    signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu" });
-    register("a", "Anna");
-    register("c", "Cecil");
-    expect(await P.createInvite(user("a"), league, "e@x.hu")).toEqual({ ok: true });
-    expect(await P.createInvite(user("c"), league, "b@x.hu")).toEqual({ ok: true });
-    register("b", "Béla");
-    await SP.formSignupPairs("b");
-    expect(all("select inviter_id, status from pair_invites order by id")).toEqual([
-      { inviter_id: "a", status: "cancelled" },
-      { inviter_id: "c", status: "cancelled" },
-    ]);
   });
 
   it("names the partner who hasn't registered yet for /pair, never the email", async () => {

@@ -44,8 +44,8 @@ export const PAIR_SIGNUPS: { a: Person; b: Person; level: Level }[] = [
   { a: person("Oláh Kinga", "olah.kinga"), b: person("Fodor Péter", "fodor.peter"), level: "kezdo" },
 ];
 
-// Four solo signups. The first two are already paired by a Szervező (they
-// get the invite); the other two wait, so the walkthrough can pair them.
+// Four solo signups. The first two are already paired by a Szervező; the
+// other two wait (their invite says so, #96), so the walkthrough can pair them.
 export const SOLO_SIGNUPS: { who: Person; level: Level; pairedWithNext: boolean }[] = [
   { who: person("Varga Dóra", "varga.dora"), level: "kozephalado", pairedWithNext: true },
   { who: person("Kiss Miklós", "kiss.miklos"), level: "kozephalado", pairedWithNext: false },

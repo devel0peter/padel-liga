@@ -6,7 +6,7 @@ import { db } from "~/db/client.server";
 import { accountInvites, broadcasts, emailMessages, emailSuppressions, interestSignups, leagues, users } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
 
-import { INTEREST_INVITE_NOTE, inviteRecipients, type Recipient } from "./audience";
+import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
 import { BULK_KINDS, parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses, queuedStatus } from "./hold";
 import { MAX_BATCH, sendBatch } from "./resend.server";
@@ -229,7 +229,7 @@ export async function createBroadcast(input: {
 }
 
 // Who would get the registration invite now (#20, audience.ts inviteRecipients).
-export async function pendingRegistrationInvites(): Promise<Recipient[]> {
+export async function pendingRegistrationInvites(): Promise<InviteRecipient[]> {
   const [rows, leagueCities, accounts, suppressed] = await Promise.all([
     db
       .select({
@@ -295,9 +295,10 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // none of them and nobody is invited twice. Then, in one D1 batch (a
 // transaction): the emails and the account_invites rows (so the link works
 // before registration opens). If that fails, the claim is released. Returns
-// how many were queued.
-export async function queueRegistrationInvites(now = new Date()): Promise<number> {
-  const pending = await pendingRegistrationInvites();
+// how many were queued. `only`: just these (lowercase) addresses, e.g. the
+// partner's address a player just added (#96); the same rules apply.
+export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
+  const pending = (await pendingRegistrationInvites()).filter((r) => !only || only.includes(r.email));
   if (pending.length === 0) return 0;
   const claimed = await markInvited(
     pending.map((r) => r.email),

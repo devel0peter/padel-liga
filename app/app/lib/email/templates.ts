@@ -189,7 +189,13 @@ export function registrationLink(email: string): string {
 
 // Sent once to everyone on the interest list (spec section 3). It goes to the
 // whole list, so it has an unsubscribe link like a broadcast.
-export function registrationInvite(to: { name: string; email: string }, unsubscribeUrl: string): Email {
+// `variant` (audience.ts, #96): a solo still waiting for a partner gets its
+// own line; the signer of a pair signup without the partner's email is asked
+// to add it after logging in.
+export function registrationInvite(
+  to: { name: string; email: string; variant?: "solo" | "no_partner_email" },
+  unsubscribeUrl: string,
+): Email {
   return build(
     `Regisztrálj a ${SITE_NAME}ra`,
     [
@@ -197,7 +203,10 @@ export function registrationInvite(to: { name: string; email: string }, unsubscr
       `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
       registrationLink(to.email),
       `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
-      `Ha a párod is regisztrált, együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      to.variant === "solo"
+        ? `Még keresünk neked párt, addig regisztrálj.`
+        : `Ha a párod is regisztrált, együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      ...(to.variant === "no_partner_email" ? [`A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.`] : []),
       SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),

@@ -1,18 +1,20 @@
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
+import { PartnerEmailBox } from "~/components/partner-email";
 import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { requireUser } from "~/lib/auth/session.server";
 import { pairLeagues, pairOverview } from "~/lib/pairs.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { waitingMessage } from "~/lib/signup-partners";
-import { waitingPartners } from "~/lib/signup-partners.server";
+import { missingPartnerEmails, partnerEmailAction, waitingPartners } from "~/lib/signup-partners.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
 // "Párom": the pair (from the interest signup, #89, or made by a Szervező,
-// #97), or the partner who hasn't registered yet, and the league's open
+// #97), or the partner who hasn't registered yet, or the box to add the
+// partner's address when the signup had none (#96), and the league's open
 // seasons to enter together (#23). Players can't change their pair here: a
 // Szervező does that on the Párok page (#97). One block per league; the
 // league is only named when there are several.
@@ -26,8 +28,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   const leagues = await pairLeagues();
   // The partner the interest signup names, while they haven't registered
   // (#89): the pair forms by itself once they do.
-  const [pairs, waiting] = await Promise.all([pairOverview(user, leagues), waitingPartners(user.email)]);
-  const overview = pairs.map((o) => ({ ...o, waiting: o.pair ? null : (waiting.get(o.league.id) ?? null) }));
+  // Or the partner the signup names without an email (#96): the box to add it.
+  const [pairs, waiting, missing] = await Promise.all([
+    pairOverview(user, leagues),
+    waitingPartners(user.email),
+    missingPartnerEmails(user),
+  ]);
+  const overview = pairs.map((o) => ({
+    ...o,
+    waiting: o.pair ? null : (waiting.get(o.league.id) ?? null),
+    missingEmail: o.pair ? null : (missing.find((m) => m.leagueId === o.league.id) ?? null),
+  }));
   // The seasons the home page shows (the current or next one per league),
   // with this pair's entry or the "Nevezünk" button.
   const now = new Date();
@@ -44,13 +55,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-type ActionData = { intent: string; error?: string; notice?: string };
+type ActionData = { intent: string; error?: string; notice?: string; ok?: true };
 
-// "Nevezünk".
+// "Nevezünk", and the partner's address (#96).
 export async function action({ request }: Route.ActionArgs): Promise<ActionData> {
   const user = await requireUser(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  if (intent === "partner_email") return { intent, ...(await partnerEmailAction(user, form)) };
   const id = Number(form.get("season") || 0);
   if (intent !== "enter" || !Number.isInteger(id) || id <= 0) throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, id);
@@ -101,7 +113,7 @@ function Waiting({ name }: { name: string }) {
 }
 
 export default function Pair({ loaderData: d, actionData }: Route.ComponentProps) {
-  const shown = d.overview.filter((o) => o.pair || o.waiting);
+  const shown = d.overview.filter((o) => o.pair || o.waiting || o.missingEmail);
 
   return (
     <AppPage title="Párom" description={`Egy ligában egy párod lehet. Ha változna, írj nekünk: ${CONTACT_EMAIL}`}>
@@ -128,6 +140,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
             <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
           )}
           {o.waiting && <Waiting name={o.waiting} />}
+          {o.missingEmail && <PartnerEmailBox signupId={o.missingEmail.signupId} name={o.missingEmail.name} />}
         </section>
       ))}
     </AppPage>

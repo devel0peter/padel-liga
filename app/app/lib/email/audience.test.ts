@@ -92,8 +92,13 @@ describe("inviteRecipients", () => {
     ).toEqual(["anna@example.com", "bela@example.com"]);
   });
 
-  it("invites only the signer of a pair signup without a partner email", () => {
-    expect(emails([pair({ email2: null })])).toEqual(["anna@example.com"]);
+  it("invites only the signer of a pair signup without a partner email, with the extra sentence (#96)", () => {
+    expect(inviteRecipients([pair({ email2: null })], ctx)).toEqual([
+      { name: "Anna", email: "anna@example.com", variant: "no_partner_email" },
+    ]);
+    expect(inviteRecipients([pair({ email2: "" })], ctx)).toEqual([
+      { name: "Anna", email: "anna@example.com", variant: "no_partner_email" },
+    ]);
   });
 
   it("invites each address once, case-insensitively", () => {
@@ -109,14 +114,18 @@ describe("inviteRecipients", () => {
     ]);
   });
 
-  it("invites no solo still waiting for a partner", () => {
-    expect(emails([solo({ email1: "solo@example.com" })])).toEqual([]);
+  it("invites a solo still waiting for a partner too, with the solo text (#96)", () => {
+    expect(inviteRecipients([solo({ email1: "solo@example.com" })], ctx)).toEqual([
+      { name: "Anna", email: "solo@example.com", variant: "solo" },
+    ]);
     // Only one row pointing at the other is no pairing.
     const [x, y] = soloDuo();
     y.pairedWith = null;
-    expect(emails([x, y])).toEqual([]);
+    expect(inviteRecipients([x, y], ctx).map((r) => r.variant)).toEqual(["solo", "solo"]);
     // A partner who withdrew leaves the other waiting.
-    expect(emails(soloDuo({}, { status: "withdrawn" }))).toEqual([]);
+    expect(inviteRecipients(soloDuo({}, { status: "withdrawn" }), ctx)).toEqual([
+      { name: "Cili", email: "cili@example.com", variant: "solo" },
+    ]);
   });
 
   it("skips signups in a city without a league, and 'other' cities", () => {

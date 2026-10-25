@@ -211,15 +211,16 @@ describe("the seed carries the walkthrough", () => {
 
   const userRow = async (email: string) => (await db.select().from(users)).find((u) => u.email === email)!;
 
-  it("queues the registration invite held, for the 20 pair players and the 2 paired solos", async () => {
-    expect(await O.queueRegistrationInvites()).toBe(22);
-    const held = rows("select to_email, status from email_messages where kind = 'registration_invite'");
-    expect(held).toHaveLength(22);
+  it("queues the registration invite held, for the 20 pair players and all 4 solos (#96)", async () => {
+    expect(await O.queueRegistrationInvites()).toBe(24);
+    const held = rows("select to_email, status, text from email_messages where kind = 'registration_invite'");
+    expect(held).toHaveLength(24);
     expect(new Set(held.map((m) => m.status))).toEqual(new Set(["held"]));
+    // The two solos still waiting for a partner get the solo text.
     const waiting = ["pal.boglarka@example.test", "sandor.akos@example.test"];
-    for (const w of waiting) expect(held.map((m) => m.to_email)).not.toContain(w);
+    for (const m of held) expect(m.text.includes("Még keresünk neked párt"), m.to_email).toBe(waiting.includes(m.to_email));
     // They can register before 2 Nov because of the account invites.
-    expect(count("account_invites")).toBe(22);
+    expect(count("account_invites")).toBe(24);
     // Nothing goes out until an Admin releases it, and a second run adds nothing.
     expect(await O.queueRegistrationInvites()).toBe(0);
   });

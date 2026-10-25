@@ -6,6 +6,7 @@
 // (both solo rows point at each other with paired_with). Withdrawn signups
 // count for nothing.
 
+import { isValidEmail, normalizeEmail } from "./auth/rules";
 import type { SignupRow } from "./signups-admin";
 
 export type SignupLink = Pick<
@@ -64,8 +65,48 @@ export function waitingMessage(name: string): string {
   return `A párod, ${name}, még nem regisztrált.`;
 }
 
-// Whether a solo signup has a partner yet (registration invites go to paired
-// solos only, D26).
+export type MissingPartnerEmail = { signupId: number; city: string; name: string };
+
+// "Partner has no email" (#96, D35): per city, the player's own newest signup
+// (as the signer) decides; if it is a pair signup naming a partner without an
+// email, the player may add the address. The partner's name only.
+export function partnerWithoutEmail(rows: readonly SignupLink[], email: string): MissingPartnerEmail[] {
+  const me = lower(email);
+  if (!me) return [];
+  const own = rows
+    .filter((r) => r.status !== "withdrawn" && lower(r.email1) === me)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id);
+  const decided = new Set<string>();
+  const out: MissingPartnerEmail[] = [];
+  for (const r of own) {
+    if (decided.has(r.city)) continue;
+    decided.add(r.city);
+    const name = (r.name2 ?? "").trim();
+    if (r.mode === "pair" && !lower(r.email2) && name) out.push({ signupId: r.id, city: r.city, name });
+  }
+  return out;
+}
+
+export type PartnerEmailRefusal = "email" | "self" | "paired";
+
+export const PARTNER_EMAIL_REFUSALS: Record<PartnerEmailRefusal, string> = {
+  email: "Adj meg egy érvényes e-mail-címet.",
+  self: "A saját címedet nem adhatod meg.",
+  paired: "Ezzel a címmel már van pár ebben a ligában.",
+};
+
+// The address typed in the box: valid, not the player's own, and not of
+// someone already in an active pair in that league.
+export function checkPartnerEmail(c: { email: string; userEmail: string; paired: boolean }): { ok: true; email: string } | { ok: false; error: string } {
+  const email = normalizeEmail(c.email);
+  if (!isValidEmail(email)) return { ok: false, error: PARTNER_EMAIL_REFUSALS.email };
+  if (email === normalizeEmail(c.userEmail)) return { ok: false, error: PARTNER_EMAIL_REFUSALS.self };
+  if (c.paired) return { ok: false, error: PARTNER_EMAIL_REFUSALS.paired };
+  return { ok: true, email };
+}
+
+// Whether a solo signup has a partner yet (a solo still waiting gets the
+// registration invite with its own text, D34).
 export function soloIsPaired<T extends SignupLink>(row: T, byId: ReadonlyMap<number, T>): boolean {
   return !!soloPartner(row, byId);
 }

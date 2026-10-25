@@ -185,6 +185,26 @@ describe("registrationInvite", () => {
     expect(e.html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
     expect(e.html).not.toContain("<b>Anna</b>");
   });
+
+  it("tells a player with a partner they enter together, and promises no pair invite (#97)", () => {
+    expect(email.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
+    expect(email.text).not.toContain("hívhatod meg");
+    expect(email.text).not.toContain("Még keresünk neked párt");
+    expect(email.text).not.toContain("add meg");
+  });
+
+  it("has its own text for a solo still waiting for a partner (#96)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "solo" }, unsub);
+    expect(e.text).toContain("Még keresünk neked párt, addig regisztrálj.");
+    expect(e.text).not.toContain("Ha a párod is regisztrált");
+    expect(e.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
+  });
+
+  it("asks for the partner's address when the pair signup had none (#96)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "no_partner_email" }, unsub);
+    expect(e.text).toContain("A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.");
+    expect(e.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
+  });
 });
 
 describe("seasonEntryDecision", () => {

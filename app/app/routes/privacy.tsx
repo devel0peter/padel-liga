@@ -168,6 +168,11 @@ export default function Privacy() {
               meg a párod adatait, ha ő is benne van.
             </p>
             <p>
+              Ha a jelentkezéskor nem adtad meg a párod e-mail-címét, belépés
+              után megadhatod. Ugyanúgy eltároljuk, mintha a jelentkezésben
+              szerepelt volna, és küldünk rá egy regisztrációs meghívót.
+            </p>
+            <p>
               Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
               csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
               jelentkezésből, az e-mail-címét nem. Ha a szervező felbontja a
@@ -197,9 +202,9 @@ export default function Privacy() {
               írd meg a megjegyzésben, vagy írj nekünk.
             </p>
             <p>
-              Ha párt kaptál, a regisztráció indulásakor mindketten meghívót
-              kaptok, és ha mindketten regisztráltatok, a ligában magától pár
-              lesztek. Amíg csak egyikőtök regisztrált, ő a Párom oldalon látja a
+              A regisztráció indulásakor akkor is kapsz meghívót, ha még nincs
+              párod. Ha párt kaptál, és mindketten regisztráltatok, a ligában
+              magától pár lesztek. Amíg csak egyikőtök regisztrált, ő a Párom oldalon látja a
               másik nevét.
             </p>
           </Section>

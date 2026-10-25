@@ -61,13 +61,26 @@ describe("queueRegistrationInvites", () => {
     expect(invites()).toEqual(["bela@x.hu", "cili@x.hu"]);
   });
 
-  it("invites paired solos, and no solo still waiting", async () => {
+  it("invites paired solos, and a solo still waiting with the solo text, all held (#96)", async () => {
     const c = signup({ mode: "solo", name1: "Cili", email1: "cili@x.hu" });
     const d = signup({ mode: "solo", name1: "Dani", email1: "dani@x.hu" });
     signup({ mode: "solo", name1: "Ede", email1: "ede@x.hu" });
     h.raw.prepare("update interest_signups set paired_with = ?, status = 'paired' where id = ?").run(d, c);
     h.raw.prepare("update interest_signups set paired_with = ?, status = 'paired' where id = ?").run(c, d);
-    expect(await O.queueRegistrationInvites()).toBe(2);
-    expect(queued()).toEqual(["cili@x.hu", "dani@x.hu"]);
+    expect(await O.queueRegistrationInvites()).toBe(3);
+    expect(queued()).toEqual(["cili@x.hu", "dani@x.hu", "ede@x.hu"]);
+    const text = (to: string) =>
+      h.raw.prepare("select text, status from email_messages where to_email = ?").get(to) as { text: string; status: string };
+    expect(text("ede@x.hu").status).toBe("held");
+    expect(text("ede@x.hu").text).toContain("Még keresünk neked párt, addig regisztrálj.");
+    expect(text("cili@x.hu").text).not.toContain("Még keresünk neked párt");
+  });
+
+  it("asks the signer of a pair signup without the partner's email to add it (#96)", async () => {
+    signup({ mode: "pair", name1: "Anna", email1: "anna@x.hu", name2: "Béla" });
+    expect(await O.queueRegistrationInvites()).toBe(1);
+    const row = h.raw.prepare("select to_email, text, status from email_messages").get();
+    expect(row).toMatchObject({ to_email: "anna@x.hu", status: "held" });
+    expect(row.text).toContain("Belépés után add meg, és ő is kap meghívót.");
   });
 });

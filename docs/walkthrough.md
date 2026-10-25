@@ -117,10 +117,10 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Account: `admin@example.test`
 - Expect:
   - The header reads "14 jelentkezés · 10 pár · 4 egyéni · 24 játékos".
-  - The button reads "Regisztrációs meghívó (22 cím)": both players of the 10 pair signups (20) plus the two solos a Szervező already paired. Pál Boglárka and Sándor Ákos wait for a partner, so they get nothing yet.
+  - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
-  - The dialog says "Meghívók sorban": "22 levél vár a Kimenő levelek között".
+  - The dialog says "Meghívók sorban": "24 levél vár a Kimenő levelek között".
   - The button is now disabled (everyone is invited once).
   - Nothing appears in the terminal: nothing was sent.
 
@@ -129,17 +129,17 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Page: `/admin/outbox` ("Kimenő levelek")
 - Account: `admin@example.test`
 - Expect:
-  - One card, "Regisztrációs meghívó", with "22 levél". The preview shows a subject and text with no address in it (the login link's `?email=` is hidden).
+  - One card, "Regisztrációs meghívó", with "24 levél". The preview shows a subject and text with no address in it (the login link's `?email=` is hidden).
 - Do: press "Küldés" on the card and confirm in "Elküldöd?".
 - Expect:
   - A notice at the top, and the card is gone ("Nincs visszatartott levél.").
-  - The terminal prints 22 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
-- Optional, instead of "Küldés": press "Elvetés" and confirm in "Elveted?". The 22 emails are deleted unsent, and on "Jelentkezők" the invite button offers those addresses again (queue them again as in step 3).
+  - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
+- Optional, instead of "Küldés": press "Elvetés" and confirm in "Elveted?". The 24 emails are deleted unsent, and on "Jelentkezők" the invite button offers those addresses again (queue them again as in step 3).
 
 ### 5. Players register
 
 - Page: `/login?email=<address>` (on localhost), then `/welcome` ("Üdv!"), then `/home`
-- Accounts: the players from the tables above. Minimum: both players of 3 pair signups (6 logins, enough for one group of 3 pairs). For the full run use all 22 invited players: 11 pairs split into groups of 4, 4 and 3.
+- Accounts: the players from the tables above. Minimum: both players of 3 pair signups (6 logins, enough for one group of 3 pairs). For the full run use the 22 players who start with a partner: 11 pairs split into groups of 4, 4 and 3.
 - Per player:
   1. Open the link from the terminal with the host changed to `http://localhost:5173`. The address is already filled in; press "Kódot kérek" and log in with the code from the terminal.
   2. On "Üdv!": type "Neved" (the name from the table), check that "Szinted" is already set to the signup's level, leave the phone empty (or try a Hungarian number), tick the privacy consent and press "Kész".
@@ -223,7 +223,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Expect:
   - "0 egyedül jelentkező keres párt, 2 párt hoztál össze".
   - A card "Párkeresők bemutatása" with 2 emails on "Kimenő levelek".
-  - On "Jelentkezők" the invite button now reads "Regisztrációs meghívó (2 cím)". Queue and send it as in steps 3 and 4, then register them as in steps 5 to 7: their pair forms like the others once both have registered. "Szétválasztom" on this page undoes a pairing.
+  - They got the registration invite already (step 3). Register them as in steps 5 to 7: their pair forms like the others once both have registered. "Szétválasztom" on this page undoes a pairing.
 
 ### 14. Szervező changes pairs (side path)
 

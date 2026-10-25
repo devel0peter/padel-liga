@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { signupPartners, waitingMessage, type SignupLink } from "./signup-partners";
+import { checkPartnerEmail, PARTNER_EMAIL_REFUSALS, partnerWithoutEmail, signupPartners, waitingMessage, type SignupLink } from "./signup-partners";
 
 describe("waitingMessage", () => {
   it("names the partner, nothing else", () => {
@@ -92,5 +92,52 @@ describe("signupPartners", () => {
     expect(signupPartners([old, soloNow], "anna@x.hu")).toEqual([]);
     const noEmail = row({ email2: null, createdAt: new Date("2026-10-10T10:00:00Z") });
     expect(signupPartners([old, noEmail], "anna@x.hu")).toEqual([]);
+  });
+});
+
+describe("partnerWithoutEmail (#96)", () => {
+  it("finds the player's own pair signup that names a partner without an email: the name, never an address", () => {
+    const r = row({ email2: null });
+    expect(partnerWithoutEmail([r], "ANNA@x.hu")).toEqual([{ signupId: r.id, city: "gyor", name: "Béla" }]);
+    const empty = row({ email2: "  " });
+    expect(partnerWithoutEmail([empty], "anna@x.hu")).toEqual([{ signupId: empty.id, city: "gyor", name: "Béla" }]);
+  });
+
+  it("finds nothing for a partner with an email, a solo, a withdrawn signup or a nameless partner", () => {
+    expect(partnerWithoutEmail([row()], "anna@x.hu")).toEqual([]);
+    expect(partnerWithoutEmail([row({ mode: "solo", name2: null, email2: null })], "anna@x.hu")).toEqual([]);
+    expect(partnerWithoutEmail([row({ email2: null, status: "withdrawn" })], "anna@x.hu")).toEqual([]);
+    expect(partnerWithoutEmail([row({ email2: null, name2: " " })], "anna@x.hu")).toEqual([]);
+  });
+
+  it("only the player's own signup counts: being the named partner shows nothing", () => {
+    expect(partnerWithoutEmail([row({ email2: null })], "bela@x.hu")).toEqual([]);
+  });
+
+  it("takes the newest own signup per city, as for the pair", () => {
+    const old = row({ email2: null, createdAt: new Date("2026-09-01T10:00:00Z") });
+    const newer = row({ createdAt: new Date("2026-10-10T10:00:00Z") });
+    expect(partnerWithoutEmail([old, newer], "anna@x.hu")).toEqual([]);
+    expect(partnerWithoutEmail([{ ...old, createdAt: new Date("2026-10-11T10:00:00Z") }, newer], "anna@x.hu")).toHaveLength(1);
+    const elsewhere = row({ city: "deb", email2: null });
+    expect(partnerWithoutEmail([newer, elsewhere], "anna@x.hu")).toEqual([{ signupId: elsewhere.id, city: "deb", name: "Béla" }]);
+  });
+});
+
+describe("checkPartnerEmail (#96)", () => {
+  const ok = { email: " Bela@X.hu ", userEmail: "anna@x.hu", paired: false };
+
+  it("accepts and normalizes another player's address", () => {
+    expect(checkPartnerEmail(ok)).toEqual({ ok: true, email: "bela@x.hu" });
+  });
+
+  it("refuses an invalid address, your own (any case), or one already paired in the league", () => {
+    expect(checkPartnerEmail({ ...ok, email: "nem cím" })).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.email });
+    expect(checkPartnerEmail({ ...ok, email: "ANNA@x.hu" })).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.self });
+    expect(checkPartnerEmail({ ...ok, paired: true })).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.paired });
+  });
+
+  it("says why in Hungarian", () => {
+    for (const text of Object.values(PARTNER_EMAIL_REFUSALS)) expect(text).toMatch(/[áéíóöőúüű]/);
   });
 });

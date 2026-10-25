@@ -81,9 +81,18 @@ describe("pairs.server on real SQLite (#97)", () => {
   });
 
   it("the insert itself refuses a player paired in the meantime (two organizers at once)", async () => {
-    // As if the check had passed and someone paired Anna right after it.
-    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'c', 'a')`);
+    // The check passes; right before the insert runs, someone pairs Anna.
+    const prepare = h.raw.prepare.bind(h.raw);
+    let raced = false;
+    h.raw.prepare = (q: string) => {
+      if (!raced && /^insert into "pairs"/.test(q)) {
+        raced = true;
+        prepare(`insert into pairs (league_id, player_a, player_b) values (1, 'c', 'a')`).run();
+      }
+      return prepare(q);
+    };
     expect(await P.createPair("o", 1, "a", "b")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    expect(raced).toBe(true);
     expect(all("select player_a, player_b from pairs")).toEqual([{ player_a: "c", player_b: "a" }]);
     expect(audits()).toEqual([]);
   });

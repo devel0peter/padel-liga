@@ -356,6 +356,8 @@ describe("first-phase groups on real SQLite", () => {
     expect(await G.publishGroups(1, "o", NOW)).toEqual({ ok: true });
     expect(all("select count(*) n from matches")[0].n).toBe(150);
     expect(h.mails).toHaveLength(200);
+    // The Párok page lists 100 locked pairs within the limit too (#97).
+    expect((await P.leaguePairs(1, NOW)).filter((r) => r.locked)).toHaveLength(100);
   });
 
   describe("after publishing", () => {
@@ -371,6 +373,8 @@ describe("first-phase groups on real SQLite", () => {
       expect(await P.changePartner("o", 1, 3, "p3a", "free", NOW)).toEqual({ ok: false, error: DISSOLVE_REFUSED });
       expect(all("select count(*) n from pairs where player_b = 'free'")[0].n).toBe(0);
       expect(all("select count(*) n from audit_log where action like 'pair.%'")[0].n).toBe(0);
+      // The Párok page shows it as locked (#97).
+      expect((await P.leaguePairs(1, NOW)).find((r) => r.id === 3)!.locked).toBe(true);
       expect(all("select status from pairs where id = 3")[0].status).toBe("active");
       expect(all("select status from season_entries where pair_id = 3")[0].status).toBe("approved");
       // After phase 1's deadline it is between phases again.

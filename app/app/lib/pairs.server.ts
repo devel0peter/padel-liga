@@ -297,16 +297,21 @@ export async function changePartner(
   // `keep` leaves this pair in the same step: only the new partner must be free.
   const refused = await newPairRefusal(leagueId, keep, partner, [partner]);
   if (refused) return { ok: false, error: refused };
-  const seconds = Math.floor(now.getTime() / 1000);
-  // The old pair only goes if the new partner is still free; the new pair
-  // only comes if this batch dissolved the old one.
-  const dissolvedHere = sql`exists (select 1 from ${pairs} where ${pairs.id} = ${pairId} and ${pairs.status} = 'dissolved'
-    and ${pairs.dissolvedAt} = ${seconds} and ${pairs.dissolvedBy} = ${actorId})`;
-  const [dissolved] = await db.batch([
-    ...dissolveStatements(actorId, pairId, now, sql`not ${activePairWith(leagueId, [partner])}`),
-    insertManualPair(leagueId, keep, partner, dissolvedHere),
-  ]);
-  if (dissolved.length === 0) return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
+  // One batch (a transaction in D1). The old pair only goes if the new
+  // partner is still free. The new pair keeps `keep` in the same column, so
+  // if the old pair is still active its unique index (one active pair per
+  // player and column) fails the insert, and the whole batch rolls back.
+  // A raw db.run() can't go in a D1 batch, hence the builder.
+  const values = keep === pair.playerA ? { playerA: keep, playerB: partner } : { playerA: partner, playerB: keep };
+  try {
+    await db.batch([
+      ...dissolveStatements(actorId, pairId, now, sql`not ${activePairWith(leagueId, [partner])}`),
+      db.insert(pairs).values({ leagueId, ...values, source: "manual" }),
+    ]);
+  } catch (e) {
+    if (!/UNIQUE/i.test(String(e))) throw e;
+    return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
+  }
   const id = await activePairOf(leagueId, keep, partner);
   await audit(actorId, "pair.change", `pair:${id ?? "?"}`, `league:${leagueId}; from pair:${pairId}; ${leaving} -> ${partner}`);
   return { ok: true };

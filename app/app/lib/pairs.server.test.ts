@@ -141,6 +141,26 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(audits()).toEqual([]);
   });
 
+  it("a change whose new partner got paired in the meantime changes nothing at all (one transaction)", async () => {
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (7, 1, 'a', 'b')`);
+    // Right before the batch starts, someone pairs Cecil.
+    const exec = h.raw.exec.bind(h.raw);
+    let raced = false;
+    h.raw.exec = (q: string) => {
+      if (q === "BEGIN" && !raced) {
+        raced = true;
+        exec(`insert into pairs (id, league_id, player_a, player_b) values (9, 1, 'c', 'd')`);
+      }
+      return exec(q);
+    };
+    expect(await P.changePartner("o", 1, 7, "b", "c", NOW)).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
+    expect(all("select id, player_a, player_b, status from pairs order by id")).toEqual([
+      { id: 7, player_a: "a", player_b: "b", status: "active" },
+      { id: 9, player_a: "c", player_b: "d", status: "active" },
+    ]);
+    expect(audits()).toEqual([]);
+  });
+
   it("dissolve and change withdraw the old pair's entries it hasn't played in (D19)", async () => {
     h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (7, 1, 'a', 'b'), (8, 1, 'c', 'd')`);
     h.raw

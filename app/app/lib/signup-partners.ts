@@ -92,7 +92,7 @@ export type PartnerEmailRefusal = "email" | "self" | "paired";
 export const PARTNER_EMAIL_REFUSALS: Record<PartnerEmailRefusal, string> = {
   email: "Adj meg egy érvényes e-mail-címet.",
   self: "A saját címedet nem adhatod meg.",
-  paired: "Ezzel a címmel már van pár ebben a ligában.",
+  paired: "Neki már van párja ebben a ligában.",
 };
 
 // The address typed in the box: valid, not the player's own, and not of

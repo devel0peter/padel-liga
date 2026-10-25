@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { interestSignups, leagues, pairInvites, pairs, users } from "~/db/schema";
+import { interestSignups, leagues, pairs, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
 
 import { activePairWith } from "./pairs.server";
@@ -75,9 +75,8 @@ async function partnersFor(email: string): Promise<Partner[]> {
 }
 
 // Any pair, active or dissolved, of these two players in the league.
-function pairOf(leagueId: number, a: string, b: string, status?: "active") {
+function pairOf(leagueId: number, a: string, b: string) {
   return sql`exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId}
-    ${status ? sql`and ${pairs.status} = ${status}` : sql``}
     and ((${pairs.playerA} = ${a} and ${pairs.playerB} = ${b}) or (${pairs.playerA} = ${b} and ${pairs.playerB} = ${a})))`;
 }
 
@@ -86,10 +85,8 @@ function pairOf(leagueId: number, a: string, b: string, status?: "active") {
 // too, so whichever of the two arrives second makes it (D27). Only once: if
 // the two have ever been a pair in that league (a dissolved pair included),
 // nothing happens, so a dissolve sticks. Skipped silently if either is
-// already in an active pair in that league. In the same D1 batch, the pending
-// pair invites either of them sent or got in that league are cancelled, as
-// when an invite is accepted. Never throws: a problem here must not stop a
-// login.
+// already in an active pair in that league (a Szervező may have paired them
+// differently, #97). Never throws: a problem here must not stop a login.
 export async function formSignupPairs(userId: string): Promise<void> {
   try {
     const [me] = await db
@@ -114,23 +111,10 @@ export async function formSignupPairs(userId: string): Promise<void> {
         .limit(1);
       if (ever) continue;
       const players = [p.userId, me.id];
-      await db.batch([
-        // The partner registered first, so plays the inviter's part.
-        db.run(sql`insert into ${pairs} (league_id, player_a, player_b)
-          select ${p.leagueId}, ${p.userId}, ${me.id}
-          where not ${activePairWith(p.leagueId, players)} and not ${pairOf(p.leagueId, p.userId, me.id)}`),
-        db
-          .update(pairInvites)
-          .set({ status: "cancelled", respondedAt: new Date() })
-          .where(
-            and(
-              eq(pairInvites.leagueId, p.leagueId),
-              eq(pairInvites.status, "pending"),
-              or(inArray(pairInvites.inviterId, players), inArray(pairInvites.inviteeEmail, [p.email, me.email.toLowerCase()])),
-              pairOf(p.leagueId, p.userId, me.id, "active"),
-            ),
-          ),
-      ]);
+      // The partner registered first, so is player A.
+      await db.run(sql`insert into ${pairs} (league_id, player_a, player_b)
+        select ${p.leagueId}, ${p.userId}, ${me.id}
+        where not ${activePairWith(p.leagueId, players)} and not ${pairOf(p.leagueId, p.userId, me.id)}`);
     }
   } catch (e) {
     console.error("signup pair failed", e);

@@ -9,16 +9,14 @@ vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockCl
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueGroupsPublished: async (messages: any[]) => h.mails.push(...messages),
-  queuePairDissolved: async (to: string) => h.mails.push({ kind: "dissolved", toEmail: to }),
   queueSeasonEntryDecision: async (to: string, input: any) => h.mails.push({ kind: "decision", toEmail: to, input }),
-  queuePairInvite: async () => {},
-  queuePairAnswer: async () => {},
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const S = await import("~/lib/seasons.server");
 const P = await import("~/lib/pairs.server");
+const { DISSOLVE_REFUSED } = await import("~/lib/pairs");
 const E = await import("~/lib/season-entries.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -366,14 +364,13 @@ describe("first-phase groups on real SQLite", () => {
       await G.publishGroups(1, "o", NOW);
     });
 
-    const player = (id: string) => ({ id, email: `${id}@x.hu`, name: id, level: "halado" }) as any;
-
-    it("a pair in a published group can't be dissolved until its phase ends", async () => {
+    it("a pair in a published group can't be dissolved or changed until its round's deadline (#97)", async () => {
       expect(await G.pairInRunningGroup(3, NOW)).toBe(true);
-      expect(await P.dissolvePair(player("p3a"), 3)).toEqual({
-        ok: false,
-        error: "Kör közben nem lehet megszüntetni a párt, csak két kör között.",
-      });
+      expect(await P.dissolvePair("o", 1, 3, NOW)).toEqual({ ok: false, error: DISSOLVE_REFUSED });
+      h.raw.exec("insert into users (id, email, name, consent_at) values ('free', 'free@x.hu', 'Free', 1)");
+      expect(await P.changePartner("o", 1, 3, "p3a", "free", NOW)).toEqual({ ok: false, error: DISSOLVE_REFUSED });
+      expect(all("select count(*) n from pairs where player_b = 'free'")[0].n).toBe(0);
+      expect(all("select count(*) n from audit_log where action like 'pair.%'")[0].n).toBe(0);
       expect(all("select status from pairs where id = 3")[0].status).toBe("active");
       expect(all("select status from season_entries where pair_id = 3")[0].status).toBe("approved");
       // After phase 1's deadline it is between phases again.
@@ -383,7 +380,7 @@ describe("first-phase groups on real SQLite", () => {
     it("a pair outside the groups can still be dissolved", async () => {
       addPair(20, ["kezdo", "kezdo"], { status: "pending" });
       expect(await G.pairInRunningGroup(20, NOW)).toBe(false);
-      expect(await P.dissolvePair(player("p20a"), 20)).toEqual({ ok: true });
+      expect(await P.dissolvePair("o", 1, 20, NOW)).toEqual({ ok: true });
     });
 
     it("a pair approved now joins phase 2, since phase 1 is locked", async () => {

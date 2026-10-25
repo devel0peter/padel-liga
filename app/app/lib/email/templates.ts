@@ -197,7 +197,7 @@ export function registrationInvite(to: { name: string; email: string }, unsubscr
       `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
       registrationLink(to.email),
       `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
-      `Hamarosan itt hívhatod meg a párodat, és együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      `Ha a párod is regisztrált, együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
       SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
@@ -217,66 +217,6 @@ export function loginCode(code: string, validMinutes: number): Email {
       `Ha nem te kérted, nem kell tenned semmit: a kód nélkül senki nem tud belépni.`,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
-  );
-}
-
-// A player invites another to form a pair (#21). The invitee may have no
-// account: then the link goes through the login page (lib/pairs.ts inviteLink).
-export function pairInvite(
-  input: { inviterName: string; league: string; link: string; hasAccount: boolean },
-  unsubscribeUrl?: string,
-): Email {
-  return buildPlain(
-    `${input.inviterName} meghívott párnak – ${SITE_NAME}`,
-    [
-      `Szia!`,
-      `${input.inviterName} meghívott, hogy legyetek pár a ${SITE_NAME}on (${input.league}). Itt elfogadhatod, vagy jelezheted, hogy nem kéred:`,
-      input.link,
-      input.hasAccount
-        ? null
-        : `Ehhez be kell lépned. Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be, a címedet kitöltöttük.`,
-      `Ha nem ismered, nem kell tenned semmit: más nem fogadhatja el helyetted.`,
-      SIGNATURE,
-    ].filter((p): p is string => p !== null),
-    [input.link],
-    footer(`Azért kaptad ezt a levelet, mert ${input.inviterName} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`, unsubscribeUrl),
-  );
-}
-
-// The inviter learns the answer (#21, D15): accepted or declined.
-export function pairAnswer(input: { to: string; inviteeName: string; league: string; accepted: boolean }): Email {
-  const pairPage = `${SITE_URL}/pair`;
-  return buildPlain(
-    input.accepted
-      ? `${input.inviteeName} elfogadta a meghívásod – ${SITE_NAME}`
-      : `${input.inviteeName} nem fogadta el a meghívásod – ${SITE_NAME}`,
-    [
-      `Szia ${input.to}!`,
-      input.accepted
-        ? `${input.inviteeName} elfogadta a meghívásod: mostantól pár vagytok (${input.league}). Ha megnyílik a nevezés, együtt nevezhettek a szezonra.`
-        : `${input.inviteeName} most nem fogadta el a meghívásod (${input.league}). Meghívhatsz mást.`,
-      pairPage,
-      SIGNATURE,
-    ],
-    [pairPage],
-    footer(`Azért kaptad ezt a levelet, mert párnak hívtál meg valakit a ${SITE_URL.replace("https://", "")} oldalon.`),
-  );
-}
-
-// The partner learns the pair was dissolved (#85). Only the dissolving
-// player's name, never their email or phone; the name stays plain text.
-export function pairDissolved(input: { to: string; dissolverName: string; league: string }): Email {
-  const pairPage = `${SITE_URL}/pair`;
-  return buildPlain(
-    `${input.dissolverName} megszüntette a párotokat – ${SITE_NAME}`,
-    [
-      `Szia ${input.to}!`,
-      `${input.dissolverName} megszüntette a párotokat (${input.league}). Új párt a Párom oldalon hívhatsz meg:`,
-      pairPage,
-      SIGNATURE,
-    ],
-    [pairPage],
-    footer(`Azért kaptad ezt a levelet, mert pár voltatok a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }
 

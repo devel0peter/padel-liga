@@ -20,7 +20,6 @@ export default [
   layout("routes/app.tsx", [
     route("home", "routes/app.home.tsx"),
     route("pair", "routes/pair.tsx"),
-    route("pair/invite/:token", "routes/pair-invite.tsx"),
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     layout("routes/admin.tsx", [
@@ -38,6 +37,7 @@ export default [
       route("admin/leagues/:league/seasons", "routes/admin.league-seasons.tsx"),
       route("admin/leagues/:league/seasons/:season/entries", "routes/admin.season-entries.tsx"),
       route("admin/leagues/:league/seasons/:season/groups", "routes/admin.season-groups.tsx"),
+      route("admin/leagues/:league/pairs", "routes/admin.league-pairs.tsx"),
       route("admin/leagues/:league/solos", "routes/admin.league-solos.tsx"),
       route("admin/leagues/:league/clubs", "routes/admin.league-clubs.tsx"),
     ]),

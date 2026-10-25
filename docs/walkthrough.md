@@ -68,7 +68,7 @@ Every user needs their own session. Use one browser window per account (a privat
 
 Only login codes and signup confirmations go out by themselves. Every other email waits as a card on "Kimenő levelek" (`/admin/outbox`, Admin only, sidebar section Platform): one card per kind with the number of held emails and the oldest one's subject and text, with every address hidden. "Küldés" releases the whole kind; in the local dev server it prints each email to the terminal as `[email] to=... subject=...` and the text, and that is how you read what a player would get. "Elvetés" deletes them unsent.
 
-The links in those emails point to `https://padelparbaj.hu/...`. Locally, open the same path on <http://localhost:5173> instead (for example `/login?email=...` or `/pair/invite/<token>`).
+The links in those emails point to `https://padelparbaj.hu/...`. Locally, open the same path on <http://localhost:5173> instead (for example `/login?email=...`).
 
 ## The flow
 
@@ -85,7 +85,7 @@ flowchart TD
   I --> J["11. Szervező publishes"]
   J --> K["12. Admin sends the group emails"]
   L["13. Szervező pairs the waiting solos"] --> B
-  M["14. Pair invite by email"] -.-> F
+  M["14. Szervező changes pairs"] -.-> F
 ```
 
 ## Steps
@@ -99,7 +99,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Expect:
   - You land on Kezdőlap with a "Teszt szezon" card (league Padelpárbaj Mintaváros): "Nevezés" dates, the four rounds with their deadlines, "Szezon vége:".
   - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Párkeresők, Klubok.
-  - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet. Előbb hívd meg a párodat." with a link to Párom.
+  - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet, és még nincs párod." with a link to Párom.
 
 ### 2. Admin checks the setup pages
 
@@ -153,7 +153,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Page: `/pair` ("Párom")
 - Account: the second player of the pair, right after step 5 for them
 - Expect:
-  - After "Kész" the pair exists: Párom shows the partner's name and "Pár megszüntetése". No invite step is needed.
+  - After "Kész" the pair exists: Párom shows the partner's name. No invite step is needed.
   - The first partner sees the same after a reload.
   - A "Nevezés" card with the "Teszt szezon" and a "Nevezünk" button.
 - Check for a pair of two solos (Varga Dóra and Kiss Miklós): the same, because the Szervező paired them before.
@@ -205,7 +205,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Do: press "Közzététel", read "Közzéteszed a csoportokat?", confirm.
 - Expect:
   - The groups are locked: no select, no "Újragenerálás". The "1. kör" link on Szezonok now reads "Közzétéve", and the season can't be edited or deleted.
-  - A pair in a published group can't be dissolved ("Pár megszüntetése" on Párom is refused until the round's deadline) and its entry can't be rejected.
+  - A pair in a published group can't be dissolved or changed ("Felbontás" and "Partner cseréje" on Párok are disabled, with the reason, until the round's deadline) and its entry can't be rejected.
   - A pair approved after publishing joins round 2 (to see it, keep one pair out of steps 7 and 8 until now, then let it enter and approve it: "Jóváhagyva: a 2. körtől játszotok.").
 
 ### 12. Admin sends the group emails
@@ -225,22 +225,21 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
   - A card "Párkeresők bemutatása" with 2 emails on "Kimenő levelek".
   - On "Jelentkezők" the invite button now reads "Regisztrációs meghívó (2 cím)". Queue and send it as in steps 3 and 4, then register them as in steps 5 to 7: their pair forms like the others once both have registered. "Szétválasztom" on this page undoes a pairing.
 
-### 14. A pair invite by email (side path)
+### 14. Szervező changes pairs (side path)
 
-For two players who did not sign up as a pair. Use two addresses that are not in the seed, still on `@example.test`.
+Players can't invite a partner or dissolve a pair themselves: the Szervező does it.
 
-- Pages: `/pair`, `/pair/invite/<token>`
-- Accounts: `inviter@example.test` and `invitee@example.test`
+- Page: `/admin/leagues/minta/pairs` ("Párok")
+- Account: `szervezo@example.test`
+- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("jelentkezésből" or "kézzel"), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
 - Do:
-  1. Let the inviter log in: `npm run auth:invite -w app -- inviter@example.test` (local only, no `--remote`), then log in as in step 5.
-  2. On Párom ("Hívd meg a párodat"): enter `invitee@example.test` and press "Meghívó küldése". The card now reads "Meghívtad: invitee@example.test" with "Visszavonás".
-  3. As Admin, release "Pármeghívó" on Kimenő levelek. Take the link `https://padelparbaj.hu/pair/invite/<token>` from the terminal and open it on localhost in the invitee's window.
-  4. Log in as the invitee (the invite already allows the account) and press "Elfogadom". Or "Nem kérem".
+  1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
+  2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
+  3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
 - Expect:
-  - The invitee sees "<name> meghívott párnak" on Párom, or on the emailed link.
-  - "Elfogadom" forms the pair; the inviter gets a "Válasz a pármeghívóra" email on Kimenő levelek. A forwarded link opened by another account shows nothing about the invite.
-  - Inviting yourself, or someone already in a pair, is refused with a message.
-  - From here the pair enters the season like any other (step 7).
+  - Nothing new on Kimenő levelek: no email goes out for a pair change.
+  - The players see the change on Párom. From here a new pair enters the season like any other (step 7).
+  - After step 11, a pair in a published group has both buttons disabled, with the reason.
 
 ## Start over
 

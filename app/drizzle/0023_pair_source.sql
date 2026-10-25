@@ -1,0 +1,1 @@
+ALTER TABLE `pairs` ADD `source` text DEFAULT 'signup' NOT NULL;

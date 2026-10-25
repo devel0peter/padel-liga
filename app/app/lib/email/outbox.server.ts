@@ -18,10 +18,7 @@ import {
   broadcastEmail,
   groupsPublished,
   loginCode,
-  pairAnswer,
-  pairDissolved,
   pairIntro,
-  pairInvite,
   partnerNotice,
   registrationInvite,
   seasonEntryDecision,
@@ -163,57 +160,6 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
     { kind: "login_code", toEmail: email, ...loginCode(code, CODE_TTL_MS / 60_000) },
   ]);
   await deliver(ids);
-}
-
-// Partner invite emails one address gets in 24 hours, from anyone: several
-// players can't use invites to flood an inbox.
-const PAIR_INVITES_PER_ADDRESS_PER_DAY = 3;
-
-// A partner invite (#21), held for the Admin like every email but login codes
-// and signup confirmations (#88). It goes to an address another player
-// typed, so it has an unsubscribe link. An unsubscribed or bounced address,
-// or one over the daily cap, gets nothing; the invite still shows in the app
-// once they log in.
-export async function queuePairInvite(
-  toEmail: string,
-  input: { inviterName: string; league: string; link: string; hasAccount: boolean },
-  now = new Date(),
-): Promise<void> {
-  if (await isSuppressed(toEmail)) return;
-  const [recent] = await db
-    .select({ n: count() })
-    .from(emailMessages)
-    .where(
-      and(
-        eq(emailMessages.kind, "pair_invite"),
-        eq(emailMessages.toEmail, toEmail),
-        gt(emailMessages.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000)),
-      ),
-    );
-  if (recent.n >= PAIR_INVITES_PER_ADDRESS_PER_DAY) return;
-  const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(toEmail, emailSecret()));
-  await deliver(
-    await enqueue([{ kind: "pair_invite", toEmail, headers: unsubscribeHeaders(url), ...pairInvite(input, url) }]),
-  );
-}
-
-// The inviter learns whether the invite was accepted or declined (#21).
-export async function queuePairAnswer(
-  toEmail: string,
-  input: { to: string; inviteeName: string; league: string; accepted: boolean },
-): Promise<void> {
-  if (await isSuppressed(toEmail)) return;
-  await deliver(await enqueue([{ kind: "pair_answer", toEmail, ...pairAnswer(input) }]));
-}
-
-// The partner learns the pair was dissolved (#85). An unsubscribed or bounced
-// address gets nothing, like the other pair emails.
-export async function queuePairDissolved(
-  toEmail: string,
-  input: { to: string; dissolverName: string; league: string },
-): Promise<void> {
-  if (await isSuppressed(toEmail)) return;
-  await deliver(await enqueue([{ kind: "pair_dissolved", toEmail, ...pairDissolved(input) }]));
 }
 
 // A Szervező approved or rejected a season entry (#23): each player of the

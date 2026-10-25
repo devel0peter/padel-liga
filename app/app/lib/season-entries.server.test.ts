@@ -7,9 +7,6 @@ const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queuePairInvite: async () => {},
-  queuePairAnswer: async () => {},
-  queuePairDissolved: async (to: string, input: any) => h.mails.push({ kind: "dissolved", toEmail: to, ...input }),
   queueSeasonEntryDecision: async (to: string, input: any) => h.mails.push({ kind: "decision", toEmail: to, ...input }),
 }));
 
@@ -163,7 +160,7 @@ describe("season entries on real SQLite", () => {
   });
 
   it("D19: dissolving withdraws entries for seasons not started, and no one can approve them", async () => {
-    // dissolvePair reads the clock: keep it before phase 1.
+    // withdrawEntries compares with the clock: keep it before phase 1.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(DURING_REGISTRATION);
     addSeason(2, 1, "Tavasz");
@@ -171,7 +168,7 @@ describe("season entries on real SQLite", () => {
     await E.applyToSeason(user("a"), 2, DURING_REGISTRATION);
     const [s1, s2] = all("select id from season_entries order by season_id").map((r: any) => r.id);
     await E.decideEntry(org, 1, s1, "approve", null, DURING_REGISTRATION);
-    expect(await P.dissolvePair(user("b"), 1)).toEqual({ ok: true });
+    expect(await P.dissolvePair("o", 1, 1)).toEqual({ ok: true });
     expect(all("select status from season_entries order by season_id")).toEqual([{ status: "withdrawn" }, { status: "withdrawn" }]);
     expect(await E.decideEntry(org, 1, s1, "approve", null, DURING_REGISTRATION)).toMatchObject({ ok: false });
     expect(await E.decideEntry(org, 2, s2, "reject", null, DURING_REGISTRATION)).toMatchObject({ ok: false });
@@ -185,7 +182,7 @@ describe("season entries on real SQLite", () => {
     try {
       await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
       await E.decideEntry(org, 1, entry().id, "reject", "Nem.", DURING_REGISTRATION);
-      await P.dissolvePair(user("a"), 1);
+      await P.dissolvePair("o", 1, 1);
       h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (3, 1, 'b', 'a')`);
       expect(await E.applyToSeason(user("b"), 1, DURING_REGISTRATION)).toMatchObject({ ok: false, error: expect.stringContaining("már neveztetek") });
       const season = (await S.getSeason(1))!;
@@ -221,7 +218,7 @@ describe("season entries on real SQLite", () => {
       await E.decideEntry(org, 2, s2, "reject", null, DURING_REGISTRATION);
       // Between phase 1 and 2 (the pair isn't in a running group: no groups yet).
       vi.setSystemTime(at("2026-11-30T12:00:00Z"));
-      expect(await P.dissolvePair(user("a"), 1)).toEqual({ ok: true });
+      expect(await P.dissolvePair("o", 1, 1)).toEqual({ ok: true });
       expect(all("select status from season_entries order by season_id")).toEqual([{ status: "approved" }, { status: "rejected" }]);
     } finally {
       vi.useRealTimers();
@@ -234,7 +231,7 @@ describe("season entries on real SQLite", () => {
       vi.setSystemTime(IN_PHASE_1);
       await E.applyToSeason(user("a"), 1, IN_PHASE_1);
       await E.decideEntry(org, 1, entry().id, "approve", null, IN_PHASE_1);
-      await P.dissolvePair(user("a"), 1);
+      await P.dissolvePair("o", 1, 1);
       expect(entry()).toMatchObject({ status: "withdrawn" });
     } finally {
       vi.useRealTimers();

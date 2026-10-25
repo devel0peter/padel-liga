@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { emailMessages } from "~/db/schema";
-import { inviteLink } from "~/lib/pairs";
 import { CONTACT_EMAIL, SITE_URL } from "~/lib/site";
 
 import { AUTOMATIC_KINDS, HIDDEN, hideAddresses, isAutomatic, kindLabel, parseKind, queuedStatus } from "./hold";
-import { pairIntro, pairInvite, registrationInvite } from "./templates";
+import { pairIntro, registrationInvite } from "./templates";
 import { unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 const ALL_KINDS = emailMessages.kind.enumValues;
@@ -78,15 +77,6 @@ describe("hideAddresses", () => {
     expect(leak(hidden, email)).toEqual([]);
     expect(hidden).toContain(`${SITE_URL}/login?email=${HIDDEN}`);
     expect(hidden).toContain(`?t=${HIDDEN}`);
-  });
-
-  it("hides the invitee's address in a pair invite for someone without an account", async () => {
-    const email = "uj.jatekos@example.com";
-    const link = inviteLink(SITE_URL, "a".repeat(43), { email, hasAccount: false });
-    const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(email, "secret"));
-    const { text } = pairInvite({ inviterName: "Anna", league: "Padelpárbaj Győr", link, hasAccount: false }, url);
-    expect(leak(hideAddresses(text), email)).toEqual([]);
-    expect(hideAddresses(text)).toContain(CONTACT_EMAIL);
   });
 
   it("hides a percent-encoded address outside a link parameter", () => {

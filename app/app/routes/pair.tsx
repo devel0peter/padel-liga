@@ -1,3 +1,4 @@
+import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
 import { PartnerEmailBox } from "~/components/partner-email";
@@ -18,6 +19,12 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // seasons to enter together (#23). Players can't change their pair here: a
 // Szervező does that on the Párok page (#97). One block per league; the
 // league is only named when there are several.
+
+// After the partner's address is saved (#96) the box stays to say so: no
+// reload, which would remove it before the notice shows.
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return formData?.get("intent") === "partner_email" ? false : defaultShouldRevalidate;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párom – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];

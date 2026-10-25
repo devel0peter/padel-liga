@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
@@ -21,6 +21,12 @@ import { SITE_NAME } from "~/lib/site";
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. For now
 // a greeting and shortcuts; with the season it becomes "your group, your next
 // match". The public landing page stays at "/".
+
+// After the partner's address is saved (#96) the box stays to say so: no
+// reload, which would remove it before the notice shows.
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return formData?.get("intent") === "partner_email" ? false : defaultShouldRevalidate;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Kezdőlap – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];

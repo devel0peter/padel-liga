@@ -86,15 +86,17 @@ export type LeaguePairRow = {
 const playerA = alias(users, "pair_player_a");
 const playerB = alias(users, "pair_player_b");
 
-// Those of these pairs that are in a published group before its round's deadline.
-async function lockedPairs(pairIds: number[], now: Date): Promise<Set<number>> {
-  if (pairIds.length === 0) return new Set();
+// The league's active pairs that are in a published group before its round's
+// deadline. Filtered by league, not by a list of ids (D1: at most 100 bound
+// parameters per statement).
+async function lockedPairs(leagueId: number, now: Date): Promise<Set<number>> {
   const rows = await db
     .selectDistinct({ id: groupPairs.pairId })
     .from(groupPairs)
+    .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(inArray(groupPairs.pairId, pairIds), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
+    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
   return new Set(rows.map((r) => r.id));
 }
 
@@ -120,10 +122,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
   if (rows.length === 0) return [];
   const seasons = homeSeasons(await listSeasons(leagueId), now);
   const [locked, entries] = await Promise.all([
-    lockedPairs(
-      rows.filter((r) => r.status === "active").map((r) => r.id),
-      now,
-    ),
+    lockedPairs(leagueId, now),
     seasons.length
       ? db
           .select({ pairId: seasonEntries.pairId, seasonId: seasonEntries.seasonId, status: seasonEntries.status })

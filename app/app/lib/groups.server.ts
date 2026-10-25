@@ -308,7 +308,7 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     ]);
   } catch (e) {
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
-    if (/NOT NULL/i.test(String(e))) return { ok: false, error: CHANGED };
+    if (/NOT NULL constraint failed: matches\.group_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) return { ok: false, error: CHANGED };
     throw e;
   }
   const [done] = await db

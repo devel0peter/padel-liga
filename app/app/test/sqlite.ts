@@ -7,6 +7,7 @@
 //   beforeEach(() => { h.raw = migratedDatabase(); });
 //
 // Not a test file itself; only imported by tests.
+import { entityKind } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 
 import * as schema from "~/db/schema";
@@ -33,7 +34,7 @@ export function migratedDatabase(): any {
 
 // The module that replaces ~/db/client.server: `db` runs on whatever
 // database `h.raw` holds at the time of the query. A batch is a transaction,
-// as on D1.
+// as on D1, and refuses what D1 refuses (see rejectRawInBatch).
 export function mockClient(h: { raw: any }) {
   const exec = (sql: string, params: any[], method: string) => {
     // D1 refuses a statement with more than 100 bound parameters; SQLite
@@ -63,5 +64,23 @@ export function mockClient(h: { raw: any }) {
     },
     { schema },
   );
+  const batch = db.batch.bind(db) as (queries: any[]) => Promise<any>;
+  (db as any).batch = async (queries: any[]) => {
+    rejectRawInBatch(queries);
+    return batch(queries);
+  };
   return { db };
+}
+
+// On D1 a raw statement with bound parameters (db.run(sql`... ${x}`)) can't
+// go in db.batch: drizzle has no prepared statement for it and the batch
+// throws before anything runs. sqlite-proxy accepts it, so refuse it here.
+function rejectRawInBatch(queries: any[]) {
+  for (const q of queries) {
+    if (q?.constructor?.[entityKind] !== "SQLiteRaw") continue;
+    if (q.getQuery().params.length > 0)
+      throw new TypeError(
+        "Cannot read properties of undefined (reading 'bind'): a raw statement with parameters can't go in a D1 batch, use a query builder",
+      );
+  }
 }

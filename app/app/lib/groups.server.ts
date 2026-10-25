@@ -128,7 +128,7 @@ export async function groupsPublished(seasonId: number): Promise<boolean> {
 // column's default too (revision 0), so count every column it writes.
 const GROUP_CHUNK = 20; // 4 per row: season, phase, number, revision
 const PAIR_CHUNK = 15; // 5 per row: the group id subquery binds 3
-const MATCH_CHUNK = 18; // 5 per row, plus 4 for the claim check
+const MATCH_CHUNK = 16; // 6 per row (the status default is bound), plus 4 for the claim check in the first
 
 // Whether the pair plays in a published group whose phase hasn't ended:
 // such a pair can't be dissolved (D16) or rejected, or the published groups
@@ -284,21 +284,31 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
       select 1 from season_entries se where se.season_id = dg.season_id and se.pair_id = gp.pair_id and se.status = 'approved' and se.joins_phase = ${FIRST_PHASE})))`;
   // The matches go in only if this publish claimed every group.
   const claimed = sql`(select count(*) from ${groups} where ${groups.seasonId} = ${seasonId} and ${groups.phase} = ${FIRST_PHASE} and ${groups.publishedAt} = ${publishedAt}) = ${ids.length}`;
-  const matchRows = fixtures.map((m) => sql`(${draft[m.group]!.id}, ${m.a.pairId}, ${m.b.pairId}, ${m.week}, ${Math.floor(phase.deadline.getTime() / 1000)})`);
+  // The batch is one transaction, so checking the claim on the first match
+  // covers them all: if it fails, group_id comes out null, NOT NULL fails and
+  // the whole batch rolls back. (A raw `insert ... select ... where claimed`
+  // can't go in a D1 batch; drizzle has no prepared statement for it.)
+  const matchRows = fixtures.map((m, i) => {
+    const groupId = draft[m.group]!.id;
+    return {
+      groupId: i === 0 ? sql<number>`(select ${groups.id} from ${groups} where ${groups.id} = ${groupId} and ${claimed})` : groupId,
+      pairA: m.a.pairId,
+      pairB: m.b.pairId,
+      week: m.week,
+      deadline: phase.deadline,
+    };
+  });
   // One batch (a transaction in D1): lock the groups, if the draft is still
   // the one checked, and create their matches. A second publish at the same
   // second hits the matches' unique index and rolls back.
   try {
     await db.batch([
       db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged, pairsStillIn)),
-      ...chunks(matchRows, MATCH_CHUNK).map((rows) =>
-        db.run(
-          sql`insert into ${matches} (group_id, pair_a, pair_b, week, deadline) select * from (values ${sql.join(rows, sql`, `)}) where ${claimed}`,
-        ),
-      ),
+      ...chunks(matchRows, MATCH_CHUNK).map((rows) => db.insert(matches).values(rows)),
     ]);
   } catch (e) {
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
+    if (/NOT NULL/i.test(String(e))) return { ok: false, error: CHANGED };
     throw e;
   }
   const [done] = await db

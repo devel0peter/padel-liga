@@ -19,6 +19,8 @@ test.describe("guard", () => {
     expect(() => devVarsText({ ...DEV_VARS, RESEND_API_KEY: "re_123" })).toThrow(/RESEND_API_KEY/);
     expect(devVarsText()).toContain('RESEND_API_KEY=""');
     expect(devVarsText()).toContain('TURNSTILE_SITE_KEY=""');
+    // Nothing reaches the production analytics site either.
+    expect(devVarsText()).toContain('CF_WEB_ANALYTICS_TOKEN=""');
   });
 
   test("refuses a production environment or another Cloudflare config", () => {
@@ -51,7 +53,8 @@ test.describe("guard", () => {
     walk(join(APP_DIR, "app"));
     walk(join(APP_DIR, "workers"));
     expect(files.length).toBeGreaterThan(50);
-    const importers = files.filter((f) => /from ["'][^"']*e2e\//.test(readFileSync(f, "utf8")));
+    // `from "…/e2e/…"`, `import "…/e2e/…"` and `import("…/e2e/…")`.
+    const importers = files.filter((f) => /(from|import)\s*\(?\s*["'][^"']*\be2e\//.test(readFileSync(f, "utf8")));
     expect(importers).toEqual([]);
   });
 });

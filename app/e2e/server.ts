@@ -5,7 +5,7 @@
 // server on its own port with app/.dev.vars.e2e, writing everything it prints
 // to app/e2e/.state/server.log: the specs read login codes and emails there.
 import { spawn, execFileSync } from "node:child_process";
-import { createWriteStream, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { seedSql } from "../app/lib/seed";
@@ -27,6 +27,8 @@ assertSafeEnvironment(process.argv.slice(2), process.env);
 rmSync(STATE_DIR, { recursive: true, force: true });
 mkdirSync(STATE_DIR, { recursive: true });
 writeFileSync(DEV_VARS_FILE, devVarsText());
+// Without it wrangler would fall back to app/.dev.vars, which may hold a real key.
+if (!existsSync(DEV_VARS_FILE)) throw new Error(`e2e refused: ${DEV_VARS_FILE} is missing.`);
 
 const env = { ...process.env, CLOUDFLARE_ENV, E2E_PERSIST_DIR: PERSIST_DIR, FORCE_COLOR: "0" };
 const wrangler = (args: string[]) =>
@@ -52,4 +54,8 @@ const stop = () => dev.kill("SIGTERM");
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
 process.on("exit", stop);
-dev.on("exit", (code) => process.exit(code ?? 0));
+dev.on("exit", (code) => {
+  // A dev server that didn't start says why only in the log: show its end.
+  if (code) console.error(readFileSync(SERVER_LOG, "utf8").split("\n").slice(-30).join("\n"));
+  process.exit(code ?? 0);
+});

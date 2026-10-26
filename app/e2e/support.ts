@@ -83,6 +83,9 @@ export function emailsSince(offset: number): Email[] {
 // Waits until `count` emails matching `filter` were printed since `offset`.
 export async function waitForEmails(offset: number, count: number, filter: (e: Email) => boolean = () => true): Promise<Email[]> {
   await expect.poll(() => emailsSince(offset).filter(filter).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(count);
+  // The last email's text may still be on its way: wait until the log stops growing.
+  let size = -1;
+  await expect.poll(() => size === (size = logOffset()), { intervals: [250] }).toBe(true);
   return emailsSince(offset).filter(filter);
 }
 
@@ -96,7 +99,7 @@ async function loginCode(email: string, offset: number): Promise<string> {
 // --- Logging in -----------------------------------------------------------------
 
 export async function logIn(page: Page, email: string): Promise<void> {
-  await page.goto(`/login?email=${encodeURIComponent(email)}`);
+  await visit(page, `/login?email=${encodeURIComponent(email)}`);
   await expect(page.getByLabel("E-mail-cím")).toHaveValue(email);
   const offset = logOffset();
   await page.getByRole("button", { name: "Kódot kérek" }).click();
@@ -154,6 +157,8 @@ export async function registerAll(browser: Browser, players: Player[]): Promise<
 // --- The suite's D1 -------------------------------------------------------------
 
 // One read-only query against the suite's local D1 (never the developer's).
+// It starts a second local runtime on the dev server's state dir: fine for a
+// read, and the only way to see rows no page shows (matches, held mail).
 export function d1(select: string): Record<string, unknown>[] {
   if (!/^\s*select\b/i.test(select)) throw new Error("d1() only reads.");
   const out = execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--json", "--command", select])], {

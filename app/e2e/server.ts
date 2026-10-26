@@ -15,6 +15,7 @@ import {
   DEV_VARS_FILE,
   PERSIST_DIR,
   PORT,
+  SEED_ONLY_MARKER,
   SERVER_LOG,
   STATE_DIR,
   assertSafeEnvironment,
@@ -29,6 +30,8 @@ assertSafeEnvironment(process.argv.slice(2), process.env);
 const keep = process.argv.includes("--keep");
 if (keep) {
   if (!existsSync(PERSIST_DIR)) throw new Error("e2e refused: --keep needs the state of an earlier `npm run e2e` run.");
+  // A `--data seed` run of e2e:shots leaves this file: the state is the bare seed, not a walkthrough's.
+  if (existsSync(SEED_ONLY_MARKER)) throw new Error("e2e refused: the state was replaced by the bare seed. Run `npm run e2e` again.");
 } else {
   rmSync(STATE_DIR, { recursive: true, force: true });
 }

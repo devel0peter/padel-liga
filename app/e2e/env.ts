@@ -75,3 +75,7 @@ export function wranglerLocal(args: readonly string[]): string[] {
   if (bad) throw new Error(`e2e refused: the wrangler command has ${bad}.`);
   return full;
 }
+
+// Left by `npm run e2e:shots --data seed` (shots.ts): the state is the bare seed, so
+// `--data walked` (server.ts --keep) refuses it. A new `npm run e2e` wipes it with the state.
+export const SEED_ONLY_MARKER = join(STATE_DIR, "seed-only");

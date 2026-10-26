@@ -18,7 +18,8 @@
     "test": "vitest run",
     "auth:invite": "node scripts/invite.mjs",
     "auth:superadmin": "node scripts/superadmin.mjs",
-    "e2e": "playwright test -c e2e/playwright.config.ts"
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:shots": "tsx e2e/shots.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",

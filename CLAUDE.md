@@ -20,6 +20,7 @@
 - The **rules engine** (standings, tiebreakers, walkovers, promotion and relegation, Elo, fixture generation) is a separate project or module made of pure functions, with **unit tests for every rule**. The UI may be rough; this part can't be.
 - Every rule in the spec has at least one test. Edge cases: three-way ties, pairs dropping out mid-season, unplayed matches.
 - Auth, emails and personal data: always flag them for human review in the PR or summary.
+- Before a UI PR merges, call the `e2e-tester` agent (`.claude/agents/e2e-tester.md`, see README) on it and link its report in the PR.
 - Never expose another player's email or phone number on a public page.
 
 ## Stack

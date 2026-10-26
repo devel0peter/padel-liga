@@ -1,4 +1,4 @@
-# Checks every PR and push; on main, applies D1 migrations and deploys.
+# Checks every PR (typecheck, tests, build, browser suite, commitlint) and push; on main, applies D1 migrations and deploys.
 # Secrets (repo settings → Secrets → Actions): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
 name: CI
 
@@ -20,6 +20,59 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The browser suite (#102): `npm run e2e` walks through milestone 1 in
+  # Chromium on its own local D1 and a dev server without a Resend key, so
+  # it needs no secrets and sends no email. Runs next to `check` on every PR.
+  e2e:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Read-only token, no `env` and no `secrets`: nothing of Cloudflare or Resend reaches this job.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Get the Playwright version
+        id: playwright
+        run: echo "version=$(npx --no-install playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        working-directory: app
+      - name: Cache the Playwright browser
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # A cache hit has the browser but not the system libraries it needs.
+      - name: Install Chromium and its system libraries
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: npx --no-install playwright install --with-deps chromium
+        working-directory: app
+      - name: Install the system libraries for the cached Chromium
+        if: steps.browser-cache.outputs.cache-hit == 'true'
+        run: npx --no-install playwright install-deps chromium
+        working-directory: app
+      - run: npm run e2e
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          # The HTML report plus the trace and screenshots of each failed test,
+          # and the dev server's log (the emails it printed contain only fake data).
+          path: |
+            app/e2e/playwright-report/
+            app/e2e/test-results/
+            app/e2e/.state/server.log
+          # app/e2e/.state is a hidden folder, which upload-artifact skips by default.
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
 
   commitlint:
     if: github.event_name == 'pull_request'

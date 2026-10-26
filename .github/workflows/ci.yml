@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
       # A cache hit has the browser but not the system libraries it needs.
       - name: Install Chromium and its system libraries
         if: steps.browser-cache.outputs.cache-hit != 'true'
@@ -59,7 +59,7 @@ jobs:
         working-directory: app
       - run: npm run e2e
       - name: Upload the Playwright report
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v5
         with:
           name: playwright-report

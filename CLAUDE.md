@@ -36,6 +36,7 @@
 ## Commands (from the repo root)
 - `npm run dev`: local dev server with a local D1.
 - `npm test`: rules engine tests.
+- `npm run e2e`: end-to-end browser suite (Playwright, own local D1); needs `npx playwright install chromium` once. Runs in CI as the `e2e` job.
 - `npm run typecheck`, `npm run build`.
 - `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
 - `npm run db:read -w app -- "<SELECT ...>" [--local]`: one read-only query, production by default. The script refuses writes. Treat the output as personal data: don't paste emails or names into PRs or public places.

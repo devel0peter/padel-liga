@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["vite.config.ts", "vitest.config.ts", "drizzle.config.ts"],
+  "include": ["vite.config.ts", "vitest.config.ts", "drizzle.config.ts", "e2e/**/*.ts", "app/lib/seed.ts"],
   "compilerOptions": {
     "composite": true,
     "strict": true,

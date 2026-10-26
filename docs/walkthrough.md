@@ -4,6 +4,20 @@ A click-through checklist for milestone 1, "Registration opens": from the regist
 
 The page labels below are the Hungarian ones you see on screen.
 
+`npm run e2e` runs the same steps in a browser on its own local database (#101, see the README). Which spec covers which step:
+
+| Steps | Spec |
+|---|---|
+| 1-2 | [`01-admin-setup.spec.ts`](../app/e2e/01-admin-setup.spec.ts) |
+| 3-4 | [`02-invite.spec.ts`](../app/e2e/02-invite.spec.ts) |
+| 5-6 | [`03-register.spec.ts`](../app/e2e/03-register.spec.ts) |
+| 5, partner without an email (#96) | [`04-partner-email.spec.ts`](../app/e2e/04-partner-email.spec.ts) |
+| 7-9 | [`05-entries.spec.ts`](../app/e2e/05-entries.spec.ts) |
+| 10-12 | [`06-groups.spec.ts`](../app/e2e/06-groups.spec.ts) |
+| 11, a pair approved after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
+| 13 | [`08-solos.spec.ts`](../app/e2e/08-solos.spec.ts) |
+| 14 | [`09-pairs.spec.ts`](../app/e2e/09-pairs.spec.ts) |
+
 ## Set up
 
 1. Install and configure once, from the repo root:

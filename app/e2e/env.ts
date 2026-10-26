@@ -36,6 +36,9 @@ export const DEV_VARS: Record<string, string> = {
   RESEND_WEBHOOK_SECRET: "",
   // A run sends far more than the production quota of 100 (login codes too).
   EMAIL_DAILY_LIMIT: "1000",
+  // No beacon to the production Web Analytics site, no Google button.
+  CF_WEB_ANALYTICS_TOKEN: "",
+  GOOGLE_CLIENT_ID: "",
 };
 
 export type Env = Readonly<Record<string, string | undefined>>;

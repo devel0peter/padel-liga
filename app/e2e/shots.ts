@@ -14,15 +14,17 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Page } from "@playwright/test";
 
-import { APP_DIR, BASE_URL, E2E_DIR, assertSafeEnvironment } from "./env";
+import { APP_DIR, BASE_URL, E2E_DIR, SEED_ONLY_MARKER, assertSafeEnvironment } from "./env";
 import { WIDTHS, parseShotsArgs, shotName, type Role, type ShotsArgs, type Size } from "./shots-args";
-import { ADMIN, ORGANIZER, PAIRS, as, visit } from "./support";
+import { ADMIN, ORGANIZER, PAIRS, as } from "./support";
 
 const argv = process.argv.slice(2);
 assertSafeEnvironment(argv, process.env);
 const args = parseShotsArgs(argv);
 
 const OUT = join(E2E_DIR, ".reports", "shots", args.label);
+// Hosts the browser tried to reach and was refused.
+const offHost = new Set<string>();
 
 type PageResult = {
   role: Role;
@@ -41,6 +43,13 @@ type PageResult = {
 };
 
 async function startServer(a: ShotsArgs): Promise<ChildProcess> {
+  // Never reuse a server that is already there: a leftover one would serve
+  // the wrong state, and a new one wipes the state under it.
+  const taken = await fetch(`${BASE_URL}/login`).then(
+    () => true,
+    () => false,
+  );
+  if (taken) throw new Error(`Something already answers on ${BASE_URL}. Stop that server first (a leftover of an earlier run?).`);
   const child = spawn("npx", ["--no-install", "tsx", "e2e/server.ts", ...(a.data === "walked" ? ["--keep"] : [])], {
     cwd: APP_DIR,
     env: process.env,
@@ -83,6 +92,24 @@ async function pageFor(browser: Browser, role: Role): Promise<{ page: Page; clos
   const who = role === "admin" ? ADMIN.email : role === "organizer" ? ORGANIZER.email : PAIRS.p1[0];
   const { context, page } = await as(browser, who);
   return { page, close: () => context.close() };
+}
+
+function failedRow(role: Role, path: string, problem: string): PageResult {
+  return {
+    role,
+    path,
+    status: null,
+    finalUrl: "",
+    title: "",
+    pageErrors: [],
+    consoleErrors: [],
+    failedRequests: [],
+    mobileOverflow: false,
+    clicked: null,
+    screenshots: [],
+    failed: true,
+    problem,
+  };
 }
 
 async function look(page: Page, role: Role, path: string, click: string | null): Promise<PageResult> {
@@ -150,7 +177,7 @@ async function look(page: Page, role: Role, path: string, click: string | null):
     page.off("console", onConsole);
     page.off("response", onResponse);
   }
-  r.failed = r.problem !== null && r.status === null ? true : (r.status ?? 0) >= 500 || r.pageErrors.length > 0 || r.failedRequests.length > 0;
+  r.failed = r.problem !== null || (r.status ?? 0) >= 500 || r.pageErrors.length > 0 || r.failedRequests.length > 0;
   return r;
 }
 
@@ -160,16 +187,47 @@ async function main() {
   const server = await startServer(args);
   const results: PageResult[] = [];
   let browser: Browser | null = null;
+  // The tool timing out or Ctrl-C must not leave the dev server running.
+  for (const signal of ["SIGINT", "SIGTERM"] as const)
+    process.on(signal, () => {
+      stopServer(server);
+      process.exit(130);
+    });
+  // A seed run replaces the walkthrough's state: say so, so `--data walked` refuses it.
+  if (args.data === "seed") writeFileSync(SEED_ONLY_MARKER, "bare seed\n");
   try {
     browser = await chromium.launch();
     // The helpers in support.ts open contexts without options; outside the
     // test runner nothing gives them the base URL and locale, so add them.
     const newContext = browser.newContext.bind(browser);
-    browser.newContext = (options = {}) => newContext({ baseURL: BASE_URL, locale: "hu-HU", timezoneId: "Europe/Budapest", ...options });
+    // Only the suite's own server: a redirect or a clicked link to another host
+    // (Facebook, the production site) is aborted and reported, never loaded.
+    const ownHost = new URL(BASE_URL).host;
+    browser.newContext = async (options = {}) => {
+      const context = await newContext({ baseURL: BASE_URL, locale: "hu-HU", timezoneId: "Europe/Budapest", ...options });
+      await context.route(
+        (url) => /^https?:$/.test(url.protocol) && url.host !== ownHost,
+        (route) => {
+          offHost.add(new URL(route.request().url()).host);
+          return route.abort();
+        },
+      );
+      return context;
+    };
+    // The dev server compiles a page on its first request, which can be slow
+    // enough to trip the login steps: ask for each page once first.
+    await Promise.all(args.paths.map((p) => fetch(BASE_URL + p, { redirect: "manual" }).catch(() => null)));
     for (const role of args.roles) {
-      const { page, close } = await pageFor(browser, role);
-      for (const path of args.paths) results.push(await look(page, role, path, args.click));
-      await close();
+      let session: Awaited<ReturnType<typeof pageFor>>;
+      try {
+        session = await pageFor(browser, role);
+      } catch (e) {
+        // One role that cannot log in does not end the run.
+        for (const path of args.paths) results.push(failedRow(role, path, `Could not log in as ${role}: ${(e as Error).message.split("\n")[0]}`));
+        continue;
+      }
+      for (const path of args.paths) results.push(await look(session.page, role, path, args.click));
+      await session.close();
     }
   } finally {
     await browser?.close();
@@ -189,8 +247,9 @@ async function main() {
       r.problem ?? "",
     ].filter(Boolean);
     console.log(`${r.role.padEnd(9)} ${r.path}  ${flags.join("  ")}`);
-    console.log(`          repro: npm run e2e:shots -- --data ${args.data} --as ${r.role} ${r.path}`);
+    console.log(`          repro: npm run e2e:shots -- --data ${args.data} --as ${r.role}${args.click ? ` --click "${args.click}"` : ""} ${r.path}`);
   }
+  if (offHost.size > 0) console.log(`Blocked requests to other hosts (never loaded): ${[...offHost].join(", ")}`);
   console.log(`Screenshots and summary.json: ${OUT}`);
   process.exitCode = results.some((r) => r.failed) ? 1 : 0;
 }

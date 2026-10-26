@@ -24,7 +24,14 @@ import {
 
 assertSafeEnvironment(process.argv.slice(2), process.env);
 
-rmSync(STATE_DIR, { recursive: true, force: true });
+// --keep (npm run e2e:shots --data walked, #103): start on the state the last
+// run left, without wiping or seeding it. Everything else is the same.
+const keep = process.argv.includes("--keep");
+if (keep) {
+  if (!existsSync(PERSIST_DIR)) throw new Error("e2e refused: --keep needs the state of an earlier `npm run e2e` run.");
+} else {
+  rmSync(STATE_DIR, { recursive: true, force: true });
+}
 mkdirSync(STATE_DIR, { recursive: true });
 writeFileSync(DEV_VARS_FILE, devVarsText());
 // Without it wrangler would fall back to app/.dev.vars, which may hold a real key.
@@ -35,9 +42,11 @@ const wrangler = (args: string[]) =>
   execFileSync("npx", ["--no-install", ...wranglerLocal(args)], { cwd: APP_DIR, env, stdio: ["ignore", "ignore", "inherit"] });
 
 wrangler(["d1", "migrations", "apply", "DB"]);
-const seedFile = join(STATE_DIR, "seed.sql");
-writeFileSync(seedFile, seedSql(new Date()));
-wrangler(["d1", "execute", "DB", "--file", seedFile]);
+if (!keep) {
+  const seedFile = join(STATE_DIR, "seed.sql");
+  writeFileSync(seedFile, seedSql(new Date()));
+  wrangler(["d1", "execute", "DB", "--file", seedFile]);
+}
 
 const log = createWriteStream(SERVER_LOG, { flags: "a" });
 const dev = spawn("npx", ["--no-install", "react-router", "dev", "--port", String(PORT), "--strictPort"], {

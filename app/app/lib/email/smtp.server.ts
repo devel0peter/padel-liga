@@ -90,7 +90,7 @@ export async function sendViaRelay(emails: OutgoingEmail[], now = new Date()): P
   const sent = await smtpSend(openSocket, { hostname: SENDER_DOMAIN, from: SENDER.address, ...login }, messages);
   messages.forEach((m, k) => {
     const r = sent[k];
-    results[m.index] = r.ok ? r : { ok: false, error: `relay: ${r.error}` };
+    results[m.index] = r.ok ? r : { ...r, error: `relay: ${r.error}` };
   });
   return results as SmtpResult[];
 }

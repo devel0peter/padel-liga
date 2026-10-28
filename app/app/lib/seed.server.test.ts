@@ -13,6 +13,7 @@ vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
+  relayConfigured: () => false,
   sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));

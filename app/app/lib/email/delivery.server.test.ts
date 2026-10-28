@@ -3,7 +3,14 @@
 // cloudflare:sockets connect(); Resend is stubbed. Nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Relay = { down: boolean; refuse: Set<string>; received: { to: string; data: string }[]; connects: number };
+type Relay = {
+  down: boolean;
+  refuse: Set<string>;
+  // Drops the connection after this recipient's message, before answering.
+  dropAfterData?: string;
+  received: { to: string; data: string }[];
+  connects: number;
+};
 const h = vi.hoisted(() => ({
   raw: null as any,
   env: {} as Record<string, string>,
@@ -66,6 +73,10 @@ vi.mock("cloudflare:sockets", () => {
               h.relay.received.push({ to: rcpt, data: buf.slice(0, end + 2) });
               buf = buf.slice(end + 5);
               inData = false;
+              if (h.relay.dropAfterData === rcpt) {
+                ctrl.close();
+                return;
+              }
               say("250 2.0.0 OK");
               continue;
             }
@@ -234,6 +245,34 @@ describe("delivery through the SMTP relay (#111)", () => {
     insert("pair_answer", "bad@x.hu");
     await O.deliver();
     expect(rows()[0]).toMatchObject({ status: "pending", attempts: 1, last_error: "relay: RCPT TO: 550 5.1.1 Invalid recipient" });
+  });
+
+  it("an email whose message the relay took without answering is failed for good, never sent again (no Resend)", async () => {
+    h.relay.dropAfterData = "bela@x.hu";
+    insert("pair_intro", "anna@x.hu");
+    insert("pair_intro", "bela@x.hu");
+    insert("pair_intro", "cili@x.hu");
+    expect(await O.deliver()).toEqual({ sent: 2 });
+    // Cili never reached the relay: Resend takes her. Béla's may have gone out.
+    expect(h.resend.batches.map((b) => b.map((e: any) => e.to))).toEqual([["cili@x.hu"]]);
+    const byTo = Object.fromEntries(rows().map((r: any) => [r.to_email, r]));
+    expect(byTo["anna@x.hu"].status).toBe("sent");
+    expect(byTo["cili@x.hu"].status).toBe("sent");
+    expect(byTo["bela@x.hu"]).toMatchObject({ status: "failed", attempts: 1 });
+    expect(byTo["bela@x.hu"].last_error).toMatch(/^relay: no answer after the message, it may have been sent/);
+    nextRun();
+    h.relay.received = [];
+    await O.deliver();
+    expect(h.relay.received).toEqual([]);
+    expect(h.resend.batches).toHaveLength(1);
+  });
+
+  it("the daily limit is 2,000 with the relay, Resend's 100 (EMAIL_DAILY_LIMIT) without it", () => {
+    expect(O.dailyLimit()).toBe(2000);
+    delete h.env.SMTP_PASSWORD;
+    expect(O.dailyLimit()).toBe(100);
+    h.env.EMAIL_DAILY_LIMIT = "100";
+    expect(O.dailyLimit()).toBe(100);
   });
 
   it("uses one relay connection per batch", async () => {

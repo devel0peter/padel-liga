@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { BULK_KINDS, DEFAULT_DAILY_LIMIT, LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
+import {
+  BULK_KINDS,
+  effectiveDailyLimit,
+  LOGIN_RESERVE,
+  parseDailyLimit,
+  RELAY_DAILY_LIMIT,
+  RESEND_DAILY_LIMIT,
+  sendBudget,
+  TRANSACTIONAL_RESERVE,
+} from "./budget";
 
 describe("sendBudget", () => {
   it("gives login codes the whole remaining quota", () => {
@@ -39,10 +48,31 @@ describe("sendBudget", () => {
 });
 
 describe("parseDailyLimit", () => {
-  it("reads a positive integer and falls back to 2,000 (#111)", () => {
-    expect(DEFAULT_DAILY_LIMIT).toBe(2000);
+  it("reads a positive integer and falls back to Resend's 100", () => {
+    expect(RESEND_DAILY_LIMIT).toBe(100);
     expect(parseDailyLimit("3000")).toBe(3000);
-    for (const v of [undefined, "", "abc", "0", "-5", "1.5"]) expect(parseDailyLimit(v)).toBe(2000);
+    for (const v of [undefined, "", "abc", "0", "-5", "1.5"]) expect(parseDailyLimit(v)).toBe(100);
+  });
+});
+
+describe("effectiveDailyLimit (#111)", () => {
+  it("is 2,000 with the SMTP relay", () => {
+    expect(RELAY_DAILY_LIMIT).toBe(2000);
+    expect(effectiveDailyLimit(true, "100")).toBe(2000);
+    expect(effectiveDailyLimit(true, undefined)).toBe(2000);
+  });
+
+  it("stays Resend-safe without the relay: EMAIL_DAILY_LIMIT, else 100", () => {
+    expect(effectiveDailyLimit(false, "100")).toBe(100);
+    expect(effectiveDailyLimit(false, undefined)).toBe(100);
+    expect(effectiveDailyLimit(false, "1000")).toBe(1000);
+  });
+
+  it("keeps the login code reserve without the relay: bulk and personal mail stop short of Resend's 100", () => {
+    const limit = effectiveDailyLimit(false, undefined);
+    expect(sendBudget(limit, 100 - LOGIN_RESERVE, "pair_intro")).toBe(0);
+    expect(sendBudget(limit, 100 - TRANSACTIONAL_RESERVE, "broadcast")).toBe(0);
+    expect(sendBudget(limit, 100 - LOGIN_RESERVE, "login_code")).toBe(LOGIN_RESERVE);
   });
 });
 

@@ -47,7 +47,10 @@ export type SmtpMessage = {
   id: string;
 };
 
-export type SmtpResult = { ok: true; id: string } | { ok: false; error: string };
+// unknown: the whole message was written but the relay's answer never came
+// (timeout, dropped connection). It may have been accepted, so it must not be
+// sent again anywhere.
+export type SmtpResult = { ok: true; id: string } | { ok: false; error: string; unknown?: true };
 
 export type SmtpSession = {
   // Our name in EHLO.
@@ -69,7 +72,8 @@ const utf8Base64 = (s: string) => {
 // Sends each message in its own transaction and returns one result per
 // message, in order. A refused recipient or message fails only that email
 // (RSET, then the next one). A connection, TLS or login failure fails every
-// email not sent yet with the same reason.
+// email not sent yet with the same reason; the email in flight at that moment
+// is "unknown" once its message was written.
 export async function smtpSend(
   open: () => Promise<SmtpTransport>,
   session: SmtpSession,
@@ -78,6 +82,7 @@ export async function smtpSend(
   const results: SmtpResult[] = [];
   if (messages.length === 0) return results;
   let transport: SmtpTransport | null = null;
+  let inFlight = false;
 
   const command = async (line: string | null, expected: number[], what: string): Promise<SmtpReply> => {
     if (line !== null) await transport!.write(`${line}\r\n`);
@@ -100,8 +105,11 @@ export async function smtpSend(
         await command(`MAIL FROM:<${session.from}>`, [250], "MAIL FROM");
         await command(`RCPT TO:<${m.to}>`, [250, 251], "RCPT TO");
         await command("DATA", [354], "DATA");
+        inFlight = true;
         await transport.write(m.data);
-        await command(null, [250], "message");
+        const reply = await transport.reply();
+        inFlight = false;
+        if (reply.code !== 250) throw new SmtpError(`message: ${reply.code} ${reply.text}`.trim());
         results.push({ ok: true, id: m.id });
       } catch (e) {
         if (!(e instanceof SmtpError)) throw e;
@@ -112,6 +120,8 @@ export async function smtpSend(
     await transport.write("QUIT\r\n").catch(() => {});
   } catch (e) {
     const error = e instanceof SmtpError ? e.message : `connection: ${e instanceof Error ? e.message : String(e)}`;
+    if (inFlight && results.length < messages.length)
+      results.push({ ok: false, error: `no answer after the message, it may have been sent: ${error}`, unknown: true });
     while (results.length < messages.length) results.push({ ok: false, error });
   } finally {
     transport?.close();

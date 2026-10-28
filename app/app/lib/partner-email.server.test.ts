@@ -14,6 +14,7 @@ vi.mock("~/lib/cities.server", () => ({
 }));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
+  relayConfigured: () => false,
   sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));

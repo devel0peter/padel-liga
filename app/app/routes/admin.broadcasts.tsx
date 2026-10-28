@@ -36,8 +36,9 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
     >
       <p className="text-sm text-muted-foreground">
         Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
-        onnan a „Levél nekik” gombbal. Naponta legfeljebb {limit} levél megy ki; a többi a következő
-        napokon automatikusan.
+        onnan a „Levél nekik” gombbal. Az új körlevél a{" "}
+        <Link to="/admin/outbox" className="underline">Kimenő levelek</Link> közé kerül, onnan küldöd ki. Naponta
+        legfeljebb {limit} levél megy ki; a többi a következő napokon automatikusan.
       </p>
 
       {broadcasts.length === 0 ? (
@@ -65,6 +66,7 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
                   </TableCell>
                   <TableCell className="flex flex-wrap gap-1">
                     <Badge variant="secondary">{b.sent} kiment</Badge>
+                    {b.held > 0 && <Badge variant="outline">{b.held} vár a küldésre</Badge>}
                     {b.pending > 0 && <Badge variant="outline">{b.pending} sorban</Badge>}
                     {b.failed > 0 && <Badge variant="destructive">{b.failed} hiba</Badge>}
                   </TableCell>

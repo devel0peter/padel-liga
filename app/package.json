@@ -14,9 +14,12 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:read": "node scripts/db-read.mjs",
+    "db:seed:local": "tsx scripts/seed-local.ts",
     "test": "vitest run",
     "auth:invite": "node scripts/invite.mjs",
-    "auth:superadmin": "node scripts/superadmin.mjs"
+    "auth:superadmin": "node scripts/superadmin.mjs",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:shots": "tsx e2e/shots.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
@@ -38,6 +41,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.62.4",
+    "@playwright/test": "^1.64.1",
     "@react-router/dev": "^8.4.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^22.20.4",
@@ -45,6 +49,7 @@
     "@types/react-dom": "^19.2.7",
     "drizzle-kit": "^0.31.11",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^8.0.3",
     "vitest": "^5.0.3",

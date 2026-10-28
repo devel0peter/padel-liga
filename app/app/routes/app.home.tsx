@@ -1,8 +1,9 @@
-import { Link } from "react-router";
+import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
 import { PhaseList } from "~/components/season-calendar";
+import { PartnerEmailBox } from "~/components/partner-email";
 import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
@@ -14,11 +15,18 @@ import { listLeagues } from "~/lib/leagues.server";
 import { homeSeasons } from "~/lib/seasons";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
+import { missingPartnerEmails, partnerEmailAction } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. For now
 // a greeting and shortcuts; with the season it becomes "your group, your next
 // match". The public landing page stays at "/".
+
+// After the partner's address is saved (#96) the box stays to say so: no
+// reload, which would remove it before the notice shows.
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return formData?.get("intent") === "partner_email" ? false : defaultShouldRevalidate;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Kezdőlap – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -49,15 +57,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
+    // The signup named a partner without an email (#96): the box to add it.
+    missingEmails: (await missingPartnerEmails(user)).map(({ signupId, name }) => ({ signupId, name })),
     seasons,
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
 }
 
-// "Nevezünk" on a season card.
-export async function action({ request }: Route.ActionArgs) {
+// "Nevezünk" on a season card, and the partner's address (#96).
+// `season` 0: not about a season card (the box's fetcher reads its own result).
+export async function action({ request }: Route.ActionArgs): Promise<{ season: number; error?: string; notice?: string; ok?: true }> {
   const user = await requireUser(request);
   const form = await request.formData();
+  if (form.get("intent") === "partner_email") return { season: 0, ...(await partnerEmailAction(user, form)) };
   const season = Number(form.get("season") || 0);
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
     throw new Response("Hibás kérés.", { status: 400 });
@@ -79,6 +91,9 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </p>
         </section>
       )}
+      {d.missingEmails.map((m) => (
+        <PartnerEmailBox key={m.signupId} signupId={m.signupId} name={m.name} />
+      ))}
       {d.seasons.map((s) => (
         <Card key={s.id} className="max-w-2xl">
           <CardHeader>

@@ -2,7 +2,8 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatShortDate } from "../format";
+import { formatDeadline, formatShortDate } from "../format";
+import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { SHARE_REFS, shareUrl } from "../share";
@@ -188,7 +189,13 @@ export function registrationLink(email: string): string {
 
 // Sent once to everyone on the interest list (spec section 3). It goes to the
 // whole list, so it has an unsubscribe link like a broadcast.
-export function registrationInvite(to: { name: string; email: string }, unsubscribeUrl: string): Email {
+// `variant` (audience.ts, #96): a solo still waiting for a partner gets its
+// own line; the signer of a pair signup without the partner's email is asked
+// to add it after logging in.
+export function registrationInvite(
+  to: { name: string; email: string; variant?: "solo" | "no_partner_email" },
+  unsubscribeUrl: string,
+): Email {
   return build(
     `Regisztrálj a ${SITE_NAME}ra`,
     [
@@ -196,7 +203,10 @@ export function registrationInvite(to: { name: string; email: string }, unsubscr
       `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
       registrationLink(to.email),
       `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
-      `Hamarosan itt hívhatod meg a párodat, és együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      to.variant === "solo"
+        ? `Még keresünk neked párt, addig regisztrálj.`
+        : `Ha a párod is regisztrált, együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
+      ...(to.variant === "no_partner_email" ? [`A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.`] : []),
       SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
@@ -216,66 +226,6 @@ export function loginCode(code: string, validMinutes: number): Email {
       `Ha nem te kérted, nem kell tenned semmit: a kód nélkül senki nem tud belépni.`,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
-  );
-}
-
-// A player invites another to form a pair (#21). The invitee may have no
-// account: then the link goes through the login page (lib/pairs.ts inviteLink).
-export function pairInvite(
-  input: { inviterName: string; league: string; link: string; hasAccount: boolean },
-  unsubscribeUrl?: string,
-): Email {
-  return buildPlain(
-    `${input.inviterName} meghívott párnak – ${SITE_NAME}`,
-    [
-      `Szia!`,
-      `${input.inviterName} meghívott, hogy legyetek pár a ${SITE_NAME}on (${input.league}). Itt elfogadhatod, vagy jelezheted, hogy nem kéred:`,
-      input.link,
-      input.hasAccount
-        ? null
-        : `Ehhez be kell lépned. Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be, a címedet kitöltöttük.`,
-      `Ha nem ismered, nem kell tenned semmit: más nem fogadhatja el helyetted.`,
-      SIGNATURE,
-    ].filter((p): p is string => p !== null),
-    [input.link],
-    footer(`Azért kaptad ezt a levelet, mert ${input.inviterName} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`, unsubscribeUrl),
-  );
-}
-
-// The inviter learns the answer (#21, D15): accepted or declined.
-export function pairAnswer(input: { to: string; inviteeName: string; league: string; accepted: boolean }): Email {
-  const pairPage = `${SITE_URL}/pair`;
-  return buildPlain(
-    input.accepted
-      ? `${input.inviteeName} elfogadta a meghívásod – ${SITE_NAME}`
-      : `${input.inviteeName} nem fogadta el a meghívásod – ${SITE_NAME}`,
-    [
-      `Szia ${input.to}!`,
-      input.accepted
-        ? `${input.inviteeName} elfogadta a meghívásod: mostantól pár vagytok (${input.league}). Ha megnyílik a nevezés, együtt nevezhettek a szezonra.`
-        : `${input.inviteeName} most nem fogadta el a meghívásod (${input.league}). Meghívhatsz mást.`,
-      pairPage,
-      SIGNATURE,
-    ],
-    [pairPage],
-    footer(`Azért kaptad ezt a levelet, mert párnak hívtál meg valakit a ${SITE_URL.replace("https://", "")} oldalon.`),
-  );
-}
-
-// The partner learns the pair was dissolved (#85). Only the dissolving
-// player's name, never their email or phone; the name stays plain text.
-export function pairDissolved(input: { to: string; dissolverName: string; league: string }): Email {
-  const pairPage = `${SITE_URL}/pair`;
-  return buildPlain(
-    `${input.dissolverName} megszüntette a párotokat – ${SITE_NAME}`,
-    [
-      `Szia ${input.to}!`,
-      `${input.dissolverName} megszüntette a párotokat (${input.league}). Új párt a Párom oldalon hívhatsz meg:`,
-      pairPage,
-      SIGNATURE,
-    ],
-    [pairPage],
-    footer(`Azért kaptad ezt a levelet, mert pár voltatok a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }
 
@@ -299,7 +249,7 @@ export function seasonEntryDecision(input: {
       ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok."
       : input.joins.phase === 1
         ? `Az 1. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`
-        : `A szezon már elindult, ezért a ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
+        : `A ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
   return buildPlain(
     input.approved
       ? `Jóváhagyták a nevezéseteket – ${SITE_NAME}`
@@ -316,6 +266,41 @@ export function seasonEntryDecision(input: {
       SIGNATURE,
     ].filter((p): p is string => p !== null),
     [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+// The groups are published (#24, D22): each player gets their group, the
+// pair they play each week (names only, never an email or phone) and the
+// deadline. Names stay plain text.
+export function groupsPublished(input: {
+  to: string;
+  partnerName: string;
+  league: string;
+  season: string;
+  phase: number;
+  group: number;
+  // One per week: the date range and the opponents' two names, or null for
+  // the rest week of a group of 3.
+  weeks: { week: number; range: string; opponents: [string, string] | null }[];
+  deadline: Date;
+}): Email {
+  const home = `${SITE_URL}/home`;
+  const schedule = input.weeks
+    .map((w) => `${w.week}. hét (${w.range}): ${w.opponents ? `${w.opponents.join(" és ")} ellen` : "pihenőhét"}`)
+    .join("\n");
+  return buildPlain(
+    `Itt a csoportod: ${input.group}. csoport – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Kész ${withArticle(input.phase)} kör csoportbeosztása (${input.season}, ${input.league}). ${input.partnerName} pároddal ${withArticle(input.group)} csoportban játszotok.`,
+      `A meccseitek:\n${schedule}`,
+      `Határidő: ${formatDeadline(input.deadline)}. Addig bármikor lejátszhatjátok a meccseket, de érdemes a kiírt héten.`,
+      `Belépés:`,
+      home,
+      SIGNATURE,
+    ],
+    [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

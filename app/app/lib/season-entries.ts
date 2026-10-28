@@ -39,10 +39,13 @@ export function lateEntry(season: Pick<Season, "phases">, now: Date): boolean {
 }
 
 // The phase a pair approved at `at` starts in: the first phase that hasn't
-// started yet (1 before the season starts), or null once the last phase has
-// started (it moves into the next season).
-export function joinsPhase(phases: readonly StoredPhase[], at: Date): number | null {
-  const next = [...phases].sort((a, b) => a.number - b.number).find((p) => p.startsAt > at);
+// started yet (1 before the season starts) and whose groups aren't published
+// yet (#24: a published phase is locked), or null once there is none (it
+// moves into the next season).
+export function joinsPhase(phases: readonly StoredPhase[], at: Date, published: readonly number[] = []): number | null {
+  const next = [...phases]
+    .sort((a, b) => a.number - b.number)
+    .find((p) => p.startsAt > at && !published.includes(p.number));
   return next?.number ?? null;
 }
 
@@ -62,7 +65,7 @@ export function canDecide(status: EntryStatus, decision: Decision, pairActive: b
 export type EntryRefusal = "no_pair" | "closed" | "entered" | "no_level" | "partner_no_level";
 
 export const ENTRY_REFUSALS: Record<EntryRefusal, string> = {
-  no_pair: "Nevezni párban lehet. Előbb hívd meg a párodat.",
+  no_pair: "Nevezni párban lehet, és még nincs párod.",
   closed: "Erre a szezonra most nem lehet nevezni.",
   entered: "Erre a szezonra már neveztetek.",
   no_level: "Nevezés előtt add meg a szinted a profilodban.",

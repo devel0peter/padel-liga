@@ -32,6 +32,9 @@ export const interestSignups = sqliteTable("interest_signups", {
   // When this address got the registration invite (#20). Set on every signup
   // row of the address, so it is invited once (app/lib/email/audience.ts).
   invitedAt: integer("invited_at", { mode: "timestamp" }),
+  // The same for email2, the partner of a pair signup (D26): invited_at
+  // stays about email1, so each address is still invited once.
+  invited2At: integer("invited2_at", { mode: "timestamp" }),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -57,6 +60,7 @@ export const emailMessages = sqliteTable(
         "pair_answer",
         "pair_dissolved",
         "season_entry_decision",
+        "groups_published",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -66,7 +70,8 @@ export const emailMessages = sqliteTable(
     text: text("text"),
     // JSON object of extra headers, e.g. List-Unsubscribe.
     headers: text("headers"),
-    status: text("status", { enum: ["pending", "sending", "sent", "failed"] })
+    // "held": waits for an Admin on /admin/outbox (#88); the sender skips it.
+    status: text("status", { enum: ["held", "pending", "sending", "sent", "failed"] })
       .notNull()
       .default("pending"),
     attempts: integer("attempts").notNull().default(0),
@@ -389,10 +394,11 @@ export const notificationOptOuts = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
-// Two players who play a league together (spec section 4, #21). Formed when
-// the invitee accepts a pair_invites row; a player is in at most one active
-// pair per league. The accept batch (pairs.server.ts) enforces it; the two
-// unique indexes only catch the same player twice in the same column.
+// Two players who play a league together (spec section 4). Formed from the
+// interest signup (#89) or by a Szervező on the Párok page (#97); a player is
+// in at most one active pair per league. The inserts (signup-partners.server.ts,
+// pairs.server.ts) enforce it; the two unique indexes only catch the same
+// player twice in the same column.
 // Dissolved pairs stay as history, so later matches keep their pair.
 export const pairs = sqliteTable(
   "pairs",
@@ -401,7 +407,10 @@ export const pairs = sqliteTable(
     leagueId: integer("league_id")
       .notNull()
       .references(() => leagues.id, { onDelete: "cascade" }),
-    // The player who sent the invite, and the one who accepted it.
+    // For a pair from the interest signup (#89): the one who registered first,
+    // and the one whose registration formed it. Before #97 also the inviter
+    // and the invitee of a pair invite. For a manual pair: as the Szervező
+    // picked them.
     playerA: text("player_a")
       .notNull()
       .references(() => users.id),
@@ -412,6 +421,9 @@ export const pairs = sqliteTable(
       .unique()
       .references((): AnySQLiteColumn => pairInvites.id, { onDelete: "set null" }),
     status: text("status", { enum: ["active", "dissolved"] }).notNull().default("active"),
+    // "signup": formed from the interest signup (#89), or by an invite before
+    // #97; "manual": made by a Szervező on the Párok page (#97).
+    source: text("source", { enum: ["signup", "manual"] }).notNull().default("signup"),
     dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
     dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -425,9 +437,8 @@ export const pairs = sqliteTable(
 );
 
 // A player's invite to another to form a pair in a league, by email (#21).
-// The emailed link carries a random token; only its SHA-256 is stored. No
-// expiry: the inviter can cancel. One pending invite per inviter and league.
-// Personal data: the invitee's email, typed by the inviter (privacy page).
+// Unused since #97 (pair changes are an organizer task): kept so no live data
+// is dropped; a later cleanup can drop it. Personal data: the invitee's email.
 export const pairInvites = sqliteTable(
   "pair_invites",
   {
@@ -491,5 +502,79 @@ export const seasonEntries = sqliteTable(
   (t) => [
     uniqueIndex("season_entries_season_pair_idx").on(t.seasonId, t.pairId),
     index("season_entries_pair_idx").on(t.pairId),
+  ],
+);
+
+// A phase's groups (#24, D21), 1. csoport the strongest. Until published_at
+// is set they are the Szervező's draft: regenerated or adjusted at will, and
+// stored so moves persist. Publishing creates the matches and the emails;
+// after that the groups are locked.
+export const groups = sqliteTable(
+  "groups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    phase: integer("phase").notNull(), // 1–4
+    number: integer("number").notNull(), // 1 = strongest
+    // Bumped by every move into or out of the group, so publishing can tell
+    // that the draft it checked is still the one it locks.
+    revision: integer("revision").notNull().default(0),
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [uniqueIndex("groups_season_phase_number_idx").on(t.seasonId, t.phase, t.number)],
+);
+
+// The pairs of a group, with their seed (1 = strongest in the group), which
+// sets the fixture order (spec section 5).
+export const groupPairs = sqliteTable(
+  "group_pairs",
+  {
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    seed: integer("seed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.pairId] }), index("group_pairs_pair_idx").on(t.pairId)],
+);
+
+// A match between two pairs of a group (spec section 4), created when the
+// groups are published. Minimal for now (D21): scheduling, results and the
+// other statuses come with milestone 2.
+export const matches = sqliteTable(
+  "matches",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    pairA: integer("pair_a")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    pairB: integer("pair_b")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    week: integer("week").notNull(), // the scheduled week, 1–3
+    // The end of the phase: its last Sunday 23:59 Budapest (spec section 5).
+    deadline: integer("deadline", { mode: "timestamp" }).notNull(),
+    status: text("status", { enum: ["open"] }).notNull().default("open"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    // Two pairs meet once per group (spec section 5): a second publish of
+    // the same groups fails here instead of doubling the matches.
+    uniqueIndex("matches_group_pairs_idx").on(t.groupId, t.pairA, t.pairB),
+    index("matches_group_idx").on(t.groupId),
+    index("matches_pair_a_idx").on(t.pairA),
+    index("matches_pair_b_idx").on(t.pairB),
   ],
 );

@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 24.";
+const EFFECTIVE_FROM = "2026. 10. 25.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -89,8 +89,9 @@ export default function Privacy() {
               </li>
               <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
               <li>
-                a párod a ligában, és a pármeghívók, amiket küldtél vagy kaptál
-                (kinek az e-mail-címére, mikor, és elfogadták-e),
+                a párod a ligában (a jelentkezésből, vagy akivel a szervező
+                párba tett), és ha korábban pármeghívót küldtél vagy kaptál, az
+                is (kinek az e-mail-címére, mikor, és elfogadták-e),
               </li>
               <li>
                 a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
@@ -149,31 +150,46 @@ export default function Privacy() {
                 szintjét és azt, hogy mikor neveztetek; az e-mail-címeteket és a
                 telefonszámotokat nem.
               </li>
+              <li>
+                A csoportok összeállításakor a szervező a pár két tagjának nevét
+                és az értékszámotokat látja. A csoportbeosztásról mindenki
+                e-mailt kap, benne az ellenfelei nevével; az e-mail-címeteket és
+                a telefonszámotokat nem.
+              </li>
             </ul>
           </Section>
 
           <Section title="Ha a párodat is jelentkezteted">
             <p>
               Ha megadod a párod e-mail-címét, egyszer írunk neki, hogy tudjon a
-              jelentkezésről, és kérhesse az adatai törlését. Ezen kívül semmit
-              nem küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
+              jelentkezésről, és kérhesse az adatai törlését. Amikor indul a
+              regisztráció, neki is küldünk egy meghívót. Ezen kívül semmit nem
+              küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
               meg a párod adatait, ha ő is benne van.
+            </p>
+            <p>
+              Ha a jelentkezéskor nem adtad meg a párod e-mail-címét, belépés
+              után megadhatod. Ugyanúgy eltároljuk, mintha a jelentkezésben
+              szerepelt volna, és küldünk rá egy regisztrációs meghívót.
+            </p>
+            <p>
+              Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
+              csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
+              jelentkezésből, az e-mail-címét nem. Ha a szervező felbontja a
+              párt, nem jön létre újra magától.
             </p>
           </Section>
 
-          <Section title="Ha párnak hívsz meg valakit">
+          <Section title="Ha változik a párod">
             <p>
-              A párodat az e-mail-címével hívod meg. Eltároljuk a címet, és
-              küldünk rá egy levelet a neveddel és egy linkkel, amivel elfogadhatja
-              vagy jelezheti, hogy nem kéri. Ha még nincs fiókja, ezzel a címmel
-              regisztrálhat. A válaszáról e-mailt kapsz. A meghívót csak az
-              fogadhatja el, akinek a címére ment. Kérjük, csak olyat hívj meg,
-              aki tud róla.
+              Párt létrehozni, felbontani vagy cserélni a szervező tud: írj
+              nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
+              szól nektek. A Párok oldalon a szervező a játékosok nevét és
+              szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
             </p>
             <p>
-              A pár oldalán a párod csak a neved látja, az e-mail-címedet és a
-              telefonszámodat nem. Ha megszünteted a párt, e-mailt kap róla a
-              neveddel.
+              A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a
+              telefonszámodat nem.
             </p>
           </Section>
 
@@ -184,6 +200,12 @@ export default function Privacy() {
               szintjét és e-mail-címét, hogy megbeszélhessétek. Mást nem adunk át,
               és a szervező sem látja az e-mail-címedet. Ha ezt nem szeretnéd,
               írd meg a megjegyzésben, vagy írj nekünk.
+            </p>
+            <p>
+              A regisztráció indulásakor akkor is kapsz meghívót, ha még nincs
+              párod. Ha párt kaptál, és mindketten regisztráltatok, a ligában
+              magától pár lesztek. Amíg csak egyikőtök regisztrált, ő a Párom oldalon látja a
+              másik nevét.
             </p>
           </Section>
 
@@ -242,6 +264,13 @@ export default function Privacy() {
                 anonimizáljuk, hogy a korábbi eredmények megmaradjanak, de ne
                 lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
                 töröljük.
+              </li>
+              <li>
+                <strong>Levelek:</strong> a belépőkódon és a jelentkezés
+                visszaigazolásán kívül minden levél nálunk vár, amíg el nem
+                küldjük vagy el nem vetjük. A szövegét a kiküldésig őrizzük,
+                utána csak azt, hogy kinek, mikor és milyen tárggyal ment; az
+                elvetett levelet teljesen töröljük.
               </li>
             </ul>
           </Section>

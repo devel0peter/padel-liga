@@ -11,10 +11,12 @@ import { interestLevelFor } from "~/lib/interest.server";
 import { formatPhone } from "~/lib/phone";
 import { safeReturnTo, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
 import { requireAccount } from "~/lib/auth/session.server";
-import { SITE_NAME } from "~/lib/site";
+import { formSignupPairs, signupPartnerNames } from "~/lib/signup-partners.server";
+import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
 // First login: name, level, an optional phone number and the privacy consent
-// (spec section 3) before anything else.
+// (spec section 3) before anything else. A player the signups pair with
+// someone sees the partner's name, with our address if it's wrong (#96).
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Üdv a ${SITE_NAME}on` }, { name: "robots", content: "noindex" }];
@@ -26,7 +28,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (user.consentAt) throw redirect(returnTo);
   // Someone from the interest list already told us their level.
   const level = user.level ?? (await interestLevelFor(user.email));
-  return { name: user.name, email: user.email, level, phone: formatPhone(user.phone), returnTo };
+  const partners = await signupPartnerNames(user.email);
+  return { name: user.name, email: user.email, level, phone: formatPhone(user.phone), returnTo, partners };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -38,6 +41,8 @@ export async function action({ request }: Route.ActionArgs) {
   );
   if (!result.ok) return { errors: result.errors };
   await saveProfile(user.id, result.value);
+  // Registered now: the pair from the interest signup, if the partner is too (D27).
+  await formSignupPairs(user.id);
   return redirect(safeReturnTo(String(form.get("returnTo") ?? "")));
 }
 
@@ -46,6 +51,11 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
   const errors: ProfileErrors = actionData?.errors ?? {};
   return (
     <AuthPage title="Üdv!" intro={<>Pár adat, és kész. Belépve: {loaderData.email}</>}>
+      {loaderData.partners.map((name) => (
+        <p key={name} role="status" className="mb-5 rounded-md border border-nav-active bg-nav-active-bg p-3 text-sm">
+          <span className="font-semibold">A párod: {name}.</span> Nem ő? Írj nekünk: {CONTACT_EMAIL}
+        </p>
+      ))}
       <Form method="post" className="grid gap-5">
         <input type="hidden" name="returnTo" value={loaderData.returnTo} />
         <ProfileFields errors={errors} values={{ name: loaderData.name, level: loaderData.level, phone: loaderData.phone }} />

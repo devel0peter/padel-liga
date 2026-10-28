@@ -166,13 +166,13 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                   {chosen[0].name} és {chosen[1].name}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Mindkettőjüknek küldünk egy e-mailt a másik nevével, szintjével és
-                  e-mail-címével, hogy megbeszélhessék. Ezt nem lehet visszavonni.
+                  Mindkettőjüknek e-mail készül a másik nevével, szintjével és
+                  e-mail-címével, hogy megbeszélhessék; az Admin küldi ki. A párosítást nem lehet visszavonni.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Mégse</AlertDialogCancel>
-                <AlertDialogAction onClick={pair}>Párba teszem, mehet az e-mail</AlertDialogAction>
+                <AlertDialogAction onClick={pair}>Párba teszem</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           )}

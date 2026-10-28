@@ -7,7 +7,7 @@ import type { EntryView } from "~/lib/season-entries";
 // status with the organizer's note, the "Nevezünk" button, or why they can't
 // apply yet. The form posts intent "enter" to the page's own action.
 
-export const ENTERED_NOTICE = "Neveztetek. Ha a szervező döntött, mindkettőtöknek írunk.";
+export const ENTERED_NOTICE = "Neveztetek. A szervező döntését a Párom oldalon látjátok.";
 
 const BLOCKED_LINKS: Partial<Record<Extract<EntryView, { kind: "blocked" }>["reason"], { to: string; label: string }>> = {
   no_pair: { to: "/pair", label: "Párom" },

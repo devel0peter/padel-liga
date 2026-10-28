@@ -25,7 +25,8 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Until registration opens (2 Nov 2026), only invited emails can create an account.
 - First login asks for a name and privacy consent.
 - Facebook login: after the MVP (Meta business verification and app review take weeks).
-- Onboarding from the interest list: when registration opens, everyone on the interest list (the person who signed up, not the partner they entered) gets one invite email with a registration link, their email pre-filled. Pairs are then formed in the app (section 4), not taken from the signup.
+- Onboarding from the interest list: when registration opens, everyone on the list gets one invite email each with a registration link, their email pre-filled: both addresses of a pair signup, and every solo. A solo still waiting for a partner gets its own short text ("Még keresünk neked párt, addig regisztrálj."); the signer of a pair signup without the partner's email gets one extra sentence asking them to add it after logging in. Like every email but login codes and signup confirmations, these wait on "Kimenő levelek" until the Admin sends them. For the first season everyone starts with the partner from the signup: the pair forms by itself once both have registered (section 4; README decision log, 2026-10-24, #89, and 2026-10-25, #96).
+- Partner without an email (#96): a logged-in player whose pair signup names a partner without an address sees a box on the home page and Párom ("A párodnak (<név>) nincs e-mail-címe nálunk. Add meg, és ő is kap meghívót."). Saving fills the signup's partner address, as if it had been on the form, and queues the partner's registration invite (held like every invite); no token, no confirmation. Refused: the player's own address, or one that already has an active pair in that league. The partner's first-login page shows "A párod: <név>." with "Nem ő? Írj nekünk: <contact address>"; the organizer fixes such cases on the Párok page (section 4).
 - Same email = same account, whichever way they log in. A Google login links to an existing account only if Google reports the email as verified.
 - Profile:
   - Required: name, email.
@@ -47,7 +48,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
   - Sizes from the number of groups `n` in the phase: each division gets `floor(n / 3)` groups; a remainder of 1 goes to Réz, a remainder of 2 to Réz and Rookie (15 = 5+5+5, 16 = 5+6+5, 17 = 5+6+6). With fewer than 3 groups, top-down: 1 group = Bronz; 2 groups = Bronz, Réz.
   - Recalculated every phase, so the borders move as groups are added or removed. A pair's division is the division of its current group.
   - The signup level "versenyző" has no division of its own.
-- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. A pair is formed by one player inviting the other by email; the pair exists once the invitee accepts. Invites, refusals and dissolving a pair: README decision log, 2026-10-24.
+- **Pair:** 2 players. A pair is a separate entity; a player can be in at most one active pair per league. Pairs are fixed within a phase: forming a new pair or changing partner is only possible between phases. Players start with the partner they signed up with: a pair named on the interest signup (section 3) forms by itself when the second of the two finishes registering, if neither player's own newer signup names someone else or nobody, and unless either is already in an active pair in that league. It forms only once: after a dissolve it doesn't come back. Every other change is an organizer task (README decision log, 2026-10-25, #97): on the league's "Párok" page the Szervező (or the Admin) creates a pair from two registered players without a pair in the league, dissolves a pair ("Felbontás"), or changes one player's partner ("Partner cseréje": dissolve and new pair in one step). Dissolving or changing is refused while the pair is in a published group whose phase hasn't reached its deadline. Dissolving withdraws the entries the pair hasn't played in yet. Every change is audited; no email is sent, the organizer tells the players. Players have no invite, accept or dissolve of their own.
 - **Withdrawal:** if a pair drops out mid-phase (injury, moving away), the organizer withdraws it: all its matches in that phase, played or not, are removed from the group's standings, and the group continues without it. No replacement mid-phase.
 - **Substitute:** if a player can't play (injury, illness, absence), the pair may field a substitute for one or more matches in the current phase, with the organizer's approval before the match. Rules:
   - The pair requests it, naming the substitute; the organizer sees the substitute's and the absent player's Elo side by side and approves or rejects. The opponents are notified and see the substitute on the match page.
@@ -141,7 +142,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
   4. **No free spot at or below the target:** the new pair goes into the target group, and from there down each group passes its lowest-Elo pair one group down; the bottom groups are re-cut to the sizes in section 4. Groups above the target don't change.
   5. Several new pairs are placed one by one, highest placement rating first, after promotion and relegation of the continuing pairs.
   6. The result is part of the round switch draft; the organizer can move pairs before publishing.
-- First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes.
+- First phase of a season: the system sorts the approved pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes. Publishing creates the phase's matches, emails every player and locks the groups (README decision log, 2026-10-24, #24).
 - **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly approved pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - **Season end and switch** (README decision log, 2026-10-05):
   1. **Final standings:** each pair's group and place in the last phase.
@@ -171,6 +172,8 @@ Group size, phase length in weeks, phases per season (4), catch-up week on or of
 
 ## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
 Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
+
+Every email except login codes and signup confirmations is held until an Admin sends or discards it on "Kimenő levelek" (`/admin/outbox`), per kind (README decision log, 2026-10-24, #88). The "instant" emails below leave only then.
 
 **Instant** (email and push), only when someone has to act soon or the groups change:
 - New phase (Monday morning after the deadline): your group, opponents and the deadline.
@@ -232,7 +235,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Accounts: kept until deletion, then anonymized (section 3).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address.
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
-- **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion. Nothing else is sent to them until they register themselves.
+- **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion, and they get the registration invite (section 3). Nothing else is sent to them until they register themselves. Until then, the player who registered sees only the partner's name from the signup on "Párom", never the email.
 
 ## 18. MVP plan and calendar (decided 2026-10-03)
 Dates are Europe/Budapest.

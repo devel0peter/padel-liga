@@ -10,7 +10,9 @@
     "build": "npm run build -w app",
     "deploy": "npm run deploy -w app",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "e2e": "npm run e2e -w app --",
+    "e2e:shots": "npm run e2e:shots -w app --"
   },
   "type": "module",
   "devDependencies": {

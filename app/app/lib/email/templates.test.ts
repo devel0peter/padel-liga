@@ -3,12 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { InterestSignup } from "../interest";
 import {
   broadcastEmail,
+  groupsPublished,
   escapeHtml,
   loginCode,
-  pairAnswer,
-  pairDissolved,
   pairIntro,
-  pairInvite,
   partnerNotice,
   registrationInvite,
   registrationLink,
@@ -187,87 +185,25 @@ describe("registrationInvite", () => {
     expect(e.html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
     expect(e.html).not.toContain("<b>Anna</b>");
   });
-});
 
-describe("pairInvite", () => {
-  const link = "https://padelparbaj.hu/pair/invite/tok";
-
-  it("names the inviter and the league and links to the invite", () => {
-    const email = pairInvite({ inviterName: "Nagy Anna", league: "Padelpárbaj Győr", link, hasAccount: true });
-    expect(email.subject).toBe("Nagy Anna meghívott párnak – Padelpárbaj");
-    expect(email.text).toContain("Nagy Anna meghívott, hogy legyetek pár a Padelpárbajon (Padelpárbaj Győr).");
-    expect(email.text).toContain(link);
-    expect(email.html).toContain(`href="${link}"`);
-    expect(email.text).not.toContain("be kell lépned");
+  it("tells a player with a partner they enter together, and promises no pair invite (#97)", () => {
+    expect(email.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
+    expect(email.text).not.toContain("hívhatod meg");
+    expect(email.text).not.toContain("Még keresünk neked párt");
+    expect(email.text).not.toContain("add meg");
   });
 
-  it("tells someone without an account how to log in, and keeps the login link intact", () => {
-    const login = "https://padelparbaj.hu/login?email=bela%40example.com&returnTo=%2Fpair%2Finvite%2Ftok";
-    const email = pairInvite({ inviterName: "Nagy Anna", league: "Padelpárbaj Győr", link: login, hasAccount: false });
-    expect(email.text).toContain(login);
-    expect(email.text).toContain("Jelszó nem kell");
-    // & is escaped in the attribute; a browser reads it back as &.
-    expect(email.html).toContain('href="https://padelparbaj.hu/login?email=bela%40example.com&amp;returnTo=%2Fpair%2Finvite%2Ftok"');
+  it("has its own text for a solo still waiting for a partner (#96)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "solo" }, unsub);
+    expect(e.text).toContain("Még keresünk neked párt, addig regisztrálj.");
+    expect(e.text).not.toContain("Ha a párod is regisztrált");
+    expect(e.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
   });
 
-  it("never turns the inviter's name into a link: anyone can type a URL as their name", () => {
-    const email = pairInvite({ inviterName: "Nyertél https://evil.example/x", league: "Győr", link, hasAccount: true });
-    expect(email.html).not.toContain('href="https://evil.example');
-    expect(email.html).toContain(`href="${link}"`);
-  });
-
-  it("has an unsubscribe link when given one: it goes to an address another player typed", () => {
-    const unsub = "https://padelparbaj.hu/unsubscribe?t=abc";
-    const email = pairInvite({ inviterName: "Nagy Anna", league: "Győr", link, hasAccount: true }, unsub);
-    expect(email.text).toContain(`Leiratkozás: ${unsub}`);
-  });
-
-  it("escapes the inviter's name in the HTML", () => {
-    const email = pairInvite({ inviterName: "<b>Anna</b>", league: "Győr", link, hasAccount: true });
-    expect(email.html).not.toContain("<b>Anna</b>");
-    expect(email.html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
-  });
-});
-
-describe("pairAnswer", () => {
-  it("tells the inviter the invite was accepted", () => {
-    const email = pairAnswer({ to: "Nagy Anna", inviteeName: "Kovács Béla", league: "Padelpárbaj Győr", accepted: true });
-    expect(email.subject).toBe("Kovács Béla elfogadta a meghívásod – Padelpárbaj");
-    expect(email.text).toContain("Szia Nagy Anna!");
-    expect(email.text).toContain("mostantól pár vagytok (Padelpárbaj Győr)");
-    expect(email.text).toContain("https://padelparbaj.hu/pair");
-  });
-
-  it("tells the inviter the invite was declined", () => {
-    const email = pairAnswer({ to: "Nagy Anna", inviteeName: "Kovács Béla", league: "Padelpárbaj Győr", accepted: false });
-    expect(email.subject).toBe("Kovács Béla nem fogadta el a meghívásod – Padelpárbaj");
-    expect(email.text).toContain("most nem fogadta el a meghívásod (Padelpárbaj Győr). Meghívhatsz mást.");
-  });
-});
-
-describe("pairDissolved", () => {
-  const email = pairDissolved({ to: "Kovács Béla", dissolverName: "Nagy Anna", league: "Padelpárbaj Győr" });
-
-  it("tells the partner who dissolved the pair and links to /pair", () => {
-    expect(email.subject).toBe("Nagy Anna megszüntette a párotokat – Padelpárbaj");
-    expect(email.text).toContain("Szia Kovács Béla!");
-    expect(email.text).toContain("Nagy Anna megszüntette a párotokat (Padelpárbaj Győr). Új párt a Párom oldalon hívhatsz meg:");
-    expect(email.text).toContain("https://padelparbaj.hu/pair");
-    expect(email.html).toContain('href="https://padelparbaj.hu/pair"');
-  });
-
-  it("has no email address or phone number in it, only the contact address in the footer", () => {
-    for (const part of [email.subject, email.text, email.html]) {
-      const addresses = part.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) ?? [];
-      expect(addresses.every((a) => a === "hello@padelparbaj.hu")).toBe(true);
-      expect(part).not.toMatch(/\+36|06[ -]?\d{2}/);
-    }
-  });
-
-  it("never turns the dissolver's name into a link, and escapes it", () => {
-    const evil = pairDissolved({ to: "Béla", dissolverName: "<b>https://evil.example/x</b>", league: "Győr" });
-    expect(evil.html).not.toContain('href="https://evil.example');
-    expect(evil.html).toContain("&lt;b&gt;");
+  it("asks for the partner's address when the pair signup had none (#96)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "no_partner_email" }, unsub);
+    expect(e.text).toContain("A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.");
+    expect(e.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
   });
 });
 
@@ -294,7 +230,7 @@ describe("seasonEntryDecision", () => {
 
   it("tells a late pair the phase it joins", () => {
     const email = seasonEntryDecision({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } });
-    expect(email.text).toContain("a 2. körtől játszotok (kezdés: nov. 30.)");
+    expect(email.text).toContain("A 2. körtől játszotok (kezdés: nov. 30.).");
   });
 
   it("tells a pair approved in the last phase that it moves into the next season", () => {
@@ -314,5 +250,50 @@ describe("seasonEntryDecision", () => {
     expect(email.html).not.toContain('href="https://evil.example');
     expect(email.html).toContain("&lt;i&gt;Béla&lt;/i&gt;");
     expect(email.text).toContain("https://evil.example/x");
+  });
+});
+
+describe("groupsPublished (#24, D22)", () => {
+  const base = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [
+      { week: 1, range: "nov. 9. – nov. 15.", opponents: ["Kiss Cecil", "Tóth Dóra"] as [string, string] },
+      { week: 2, range: "nov. 16. – nov. 22.", opponents: ["Szabó Emil", "Varga Flóra"] as [string, string] },
+      { week: 3, range: "nov. 23. – nov. 29.", opponents: null },
+    ],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  };
+
+  it("tells the player their group, the opponents each week and the deadline", () => {
+    const email = groupsPublished(base);
+    expect(email.subject).toBe("Itt a csoportod: 1. csoport – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain(
+      "Kész az 1. kör csoportbeosztása (2026/27 tél, Padelpárbaj Győr). Kovács Béla pároddal az 1. csoportban játszotok.",
+    );
+    expect(email.text).toContain(
+      "A meccseitek:\n1. hét (nov. 9. – nov. 15.): Kiss Cecil és Tóth Dóra ellen\n2. hét (nov. 16. – nov. 22.): Szabó Emil és Varga Flóra ellen\n3. hét (nov. 23. – nov. 29.): pihenőhét",
+    );
+    expect(email.text).toContain("Határidő: nov. 29., vasárnap 23:59.");
+    expect(email.html).toContain('href="https://padelparbaj.hu/home"');
+  });
+
+  it("uses the right article for the group", () => {
+    expect(groupsPublished({ ...base, group: 2 }).text).toContain("pároddal a 2. csoportban játszotok.");
+  });
+
+  it("keeps the names plain text and has no contact details", () => {
+    const email = groupsPublished({
+      ...base,
+      weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["<b>X</b>", "https://evil.example/y"] }],
+    });
+    expect(email.html).toContain("&lt;b&gt;X&lt;/b&gt;");
+    expect(email.html).not.toContain('href="https://evil.example');
+    expect(email.text).not.toMatch(/@|\+36/);
   });
 });

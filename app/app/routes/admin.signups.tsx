@@ -297,7 +297,9 @@ function InviteButton({ pending }: { pending: number }) {
           <>
             <AlertDialogHeader>
               <AlertDialogTitle>Meghívók sorban</AlertDialogTitle>
-              <AlertDialogDescription>{queued} levél sorban (napi kvóta szerint)</AlertDialogDescription>
+              <AlertDialogDescription>
+                {queued} levél vár a Kimenő levelek között; onnan küldöd ki (napi kvóta szerint).
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogAction>Rendben</AlertDialogAction>
@@ -309,7 +311,7 @@ function InviteButton({ pending }: { pending: number }) {
               <AlertDialogTitle>Küldöd a regisztrációs meghívót?</AlertDialogTitle>
               <AlertDialogDescription>
                 {pending} cím kap egy levelet a belépés linkjével, kitöltött e-mail-címmel. Mindenki csak egyszer
-                kapja meg; a párként megadott társak nem kapnak levelet.
+                kapja meg: a párok mindkét tagja és az egyedül jelentkezők is (aki még párt vár, saját szöveggel).
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

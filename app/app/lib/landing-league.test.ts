@@ -64,6 +64,25 @@ describe("leagueLanding", () => {
     });
   });
 
+  it("round 1's groups published, round 1 not started: joining round 2 (as the app does)", () => {
+    const published = { ...FIRST, publishedPhases: [1] };
+    // Registration over (7 Nov), and the days before it ends, before publishing.
+    expect(leagueLanding([published], at("2026-11-07")).joining).toEqual({ kind: "round", number: 2, start: "2026-11-30" });
+    expect(leagueLanding([published], at("2026-11-03")).joining).toEqual({ kind: "round", number: 2, start: "2026-11-30" });
+    expect(landingBlock(leagueLanding([published], at("2026-11-07"))).joining).toBe(
+      "Nevezz most, és a 2. körtől játszotok (nov. 30.).",
+    );
+    // Not published: still round 1.
+    expect(leagueLanding([{ ...FIRST, publishedPhases: [] }], at("2026-11-07")).joining).toMatchObject({ number: 1 });
+  });
+
+  it("published rounds are skipped, and when none is left the joining point is the next season", () => {
+    expect(leagueLanding([{ ...FIRST, publishedPhases: [1, 2] }], at("2026-11-12")).joining).toMatchObject({ number: 3 });
+    const all = { ...FIRST, publishedPhases: [2, 3, 4] };
+    expect(leagueLanding([all], at("2026-11-12")).joining).toEqual({ kind: "soon" });
+    expect(leagueLanding([all, SECOND], at("2026-11-12")).joining).toMatchObject({ kind: "season", opens: "2027-02-08" });
+  });
+
   it("round 1 on (12 Nov): the round and its deadline, joining round 2", () => {
     const s = leagueLanding([FIRST], at("2026-11-12"));
     expect(s.kind).toBe("running");

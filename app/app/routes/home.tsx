@@ -18,6 +18,7 @@ import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { landingByCity } from "~/lib/landing-league";
 import { listLeagues } from "~/lib/leagues.server";
+import { publishedPhases } from "~/lib/groups.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { OTHER_CITY } from "~/lib/cities";
 import { LeagueStatus } from "~/components/league-status";
@@ -53,9 +54,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // A listed city with a league shows where it is and sends visitors to
   // registration; the others keep the interest signup (#83).
   const slugs = new Set(listed.map((c) => c.slug));
+  const published = await publishedPhases();
   const league = landingByCity(
     (await listLeagues()).filter((l) => slugs.has(l.city)),
-    await listSeasons(),
+    (await listSeasons()).map((s) => ({ ...s, publishedPhases: published.get(s.id) })),
     new Date(),
   );
   const cities = listed.map(({ slug, name }) => ({

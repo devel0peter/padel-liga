@@ -124,6 +124,19 @@ export async function groupsPublished(seasonId: number): Promise<boolean> {
   return !!row;
 }
 
+// The rounds whose groups are published, per season (the landing page's
+// joining point skips them, landing-league.ts).
+export async function publishedPhases(): Promise<Map<number, number[]>> {
+  const rows = await db
+    .selectDistinct({ seasonId: groups.seasonId, phase: groups.phase })
+    .from(groups)
+    .where(isNotNull(groups.publishedAt))
+    .orderBy(asc(groups.seasonId), asc(groups.phase));
+  const out = new Map<number, number[]>();
+  for (const { seasonId, phase } of rows) out.set(seasonId, [...(out.get(seasonId) ?? []), phase]);
+  return out;
+}
+
 // D1 allows at most 100 bound parameters per statement. Drizzle binds a
 // column's default too (revision 0), so count every column it writes.
 const GROUP_CHUNK = 20; // 4 per row: season, phase, number, revision

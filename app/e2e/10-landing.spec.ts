@@ -15,7 +15,9 @@ test("a league city shows the league and leads to registration, not the interest
   await expect(league).toContainText("Nyitva a nevezés");
   await expect(league).toContainText("Nevezés zárul");
   await expect(league).toContainText("23:59");
-  await expect(league).toContainText("Nevezz most, és az 1. körtől játszotok");
+  // 06-groups published round 1's groups, so a pair entering now joins round 2
+  // (the Szervező's approval does the same, joinsPhase).
+  await expect(league).toContainText("Nevezz most, és a 2. körtől játszotok");
   // No interest form for this city, and no pair threshold anywhere.
   await expect(page.locator("#name1")).toHaveCount(0);
   // The FAQ answer is only in the page while its item is open.

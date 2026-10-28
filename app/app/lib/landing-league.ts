@@ -12,6 +12,10 @@ import type { Season } from "./seasons";
 // What the page needs of a season.
 export type LandingSeason = Pick<Season, "registrationOpensAt" | "registrationClosesAt"> & {
   phases: readonly { number: number; startsAt: Date; deadline: Date }[];
+  // Rounds whose groups are published (locked). A pair approved now joins
+  // the first round that has not started and is not published (joinsPhase in
+  // season-entries.ts), so the joining point skips them. Default: none.
+  publishedPhases?: readonly number[];
 };
 
 // When a new pair can next start playing (README decision log, 2026-10-28).
@@ -35,7 +39,7 @@ export type LeagueLanding =
   | { kind: "between"; next: { opens: Day; closes: Day } | null; joining: Joining };
 
 type Round = { number: number; start: Day; end: Day; deadline: Date };
-type Prepared = { opens: Day; closes: Day; rounds: Round[]; end: Day };
+type Prepared = { opens: Day; closes: Day; rounds: Round[]; end: Day; published: readonly number[] };
 
 function prepare(season: LandingSeason): Prepared | null {
   const rounds = season.phases
@@ -48,6 +52,7 @@ function prepare(season: LandingSeason): Prepared | null {
     closes: budapestDay(season.registrationClosesAt),
     rounds,
     end: last.end,
+    published: season.publishedPhases ?? [],
   };
 }
 
@@ -70,7 +75,7 @@ export function leagueLanding(seasons: readonly LandingSeason[], now: Date): Lea
   const later = list.slice(list.indexOf(current) + 1).find((s) => s.closes >= today);
   const nextSeason: Joining = later ? { kind: "season", opens: later.opens, closes: later.closes } : { kind: "soon" };
   const nextRound = (): Joining => {
-    const r = current.rounds.find((round) => round.start > today);
+    const r = current.rounds.find((round) => round.start > today && !current.published.includes(round.number));
     return r ? { kind: "round", number: r.number, start: r.start } : nextSeason;
   };
 

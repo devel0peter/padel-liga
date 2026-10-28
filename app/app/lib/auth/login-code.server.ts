@@ -1,8 +1,8 @@
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, count, eq, gt, lt, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { loginCodes } from "~/db/schema";
-import { queueLoginCode } from "~/lib/email/outbox.server";
+import { accountInvites, emailMessages, emailSuppressions, loginCodes, users } from "~/db/schema";
+import { dailyLimit, queueLoginCode } from "~/lib/email/outbox.server";
 
 import { createUser, findUserIdByEmail } from "./accounts.server";
 import {
@@ -12,6 +12,7 @@ import {
   codeSendDecision,
   isValidEmail,
   MAX_CODE_ATTEMPTS,
+  newAddressCodeDecision,
   normalizeCode,
   normalizeEmail,
 } from "./rules";
@@ -25,13 +26,49 @@ function codeHash(email: string, code: string): Promise<string> {
 
 export type SendResult = { ok: true; email: string } | { ok: false; error: string };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Whether a code may go to this address (rules.ts newAddressCodeDecision):
+// always for an account; for a new address not when it bounced or complained,
+// nor past the daily cap for new, uninvited addresses.
+async function mayEmailCode(email: string, now: Date): Promise<boolean> {
+  if (await findUserIdByEmail(email)) return true;
+  const [[invite], [suppression], [{ n: sentToNewLast24h }]] = await Promise.all([
+    db.select({ email: accountInvites.email }).from(accountInvites).where(eq(accountInvites.email, email)),
+    db.select({ reason: emailSuppressions.reason }).from(emailSuppressions).where(eq(emailSuppressions.email, email)),
+    db
+      .select({ n: count() })
+      .from(emailMessages)
+      .where(
+        and(
+          eq(emailMessages.kind, "login_code"),
+          gt(emailMessages.createdAt, new Date(now.getTime() - DAY_MS)),
+          notInArray(emailMessages.toEmail, db.select({ email: users.email }).from(users)),
+          notInArray(emailMessages.toEmail, db.select({ email: accountInvites.email }).from(accountInvites)),
+        ),
+      ),
+  ]);
+  const decision = newAddressCodeDecision({
+    hasAccount: false,
+    invited: !!invite,
+    suppression: suppression?.reason ?? null,
+    sentToNewLast24h,
+    dailyLimit: dailyLimit(),
+  });
+  if (decision === "capped") console.warn("Login code to a new address skipped: daily cap for new addresses reached");
+  return decision === "send";
+}
+
 export async function sendLoginCode(input: string): Promise<SendResult> {
   const email = normalizeEmail(input);
   if (!isValidEmail(email)) return { ok: false, error: "Ez nem tűnik e-mail-címnek." };
   // Any address may log in; a new one gets an account at its first login
-  // (#113). The bot check (login route) and the code limit below stay.
-
+  // (#113). The bot check (login route) and the code limits stay. No code and
+  // no error when the address may not get one (mayEmailCode): an error would
+  // tell anyone which addresses have an account.
   const now = new Date();
+  if (!(await mayEmailCode(email, now))) return { ok: true, email };
+
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
   const decision = codeSendDecision(existing ?? null, now);
   if (!decision.ok) return { ok: false, error: "Túl sok kódot kértél. Próbáld újra egy óra múlva." };

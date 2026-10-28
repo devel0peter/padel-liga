@@ -11,6 +11,8 @@ import {
   loginEmailParam,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_WINDOW,
+  newAddressCodeCap,
+  newAddressCodeDecision,
   nextExpiry,
   normalizeCode,
   normalizeEmail,
@@ -142,6 +144,34 @@ describe("checking codes", () => {
   it(`locks after ${MAX_CODE_ATTEMPTS} wrong tries, even the right code`, () => {
     expect(checkCode(record({ attempts: MAX_CODE_ATTEMPTS - 1 }), true, now)).toBe("ok");
     expect(checkCode(record({ attempts: MAX_CODE_ATTEMPTS }), true, now)).toBe("locked");
+  });
+});
+
+describe("codes to new addresses (#113)", () => {
+  const base = { hasAccount: false, invited: false, suppression: null, sentToNewLast24h: 0, dailyLimit: 100 } as const;
+
+  it("caps them at a quarter of the daily limit", () => {
+    expect(newAddressCodeCap(100)).toBe(25);
+    expect(newAddressCodeCap(2000)).toBe(500);
+    expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 24 })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 25 })).toBe("capped");
+  });
+
+  it("never caps an account or an invited address", () => {
+    expect(newAddressCodeDecision({ ...base, hasAccount: true, sentToNewLast24h: 99 })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, invited: true, sentToNewLast24h: 99 })).toBe("send");
+  });
+
+  it("skips a new address that bounced or complained, invited or not", () => {
+    for (const suppression of ["bounced", "complained"] as const) {
+      expect(newAddressCodeDecision({ ...base, suppression })).toBe("suppressed");
+      expect(newAddressCodeDecision({ ...base, suppression, invited: true })).toBe("suppressed");
+    }
+  });
+
+  it("sends to an unsubscribed new address and to an account whose address bounced", () => {
+    expect(newAddressCodeDecision({ ...base, suppression: "unsubscribed" })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, hasAccount: true, suppression: "bounced" })).toBe("send");
   });
 });
 

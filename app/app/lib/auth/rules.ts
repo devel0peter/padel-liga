@@ -85,6 +85,37 @@ export function codeSendDecision(existing: Pick<CodeRecord, "windowStart" | "sen
   return { ok: true, windowStart: existing.windowStart, sentInWindow: existing.sentInWindow + 1 };
 }
 
+// Codes to an address without an account (#113). Anyone may sign up, so a
+// bot past the bot check could otherwise type random addresses and use up the
+// daily email quota that every login shares. An address with an account
+// always gets its code. A new address gets none when it bounced or complained
+// before, and none once codes to new, uninvited addresses reached
+// NEW_ADDRESS_CODE_SHARE of the daily limit in the last 24 hours. An invited
+// address (registration invite, Szervező appointment) is not capped.
+// Skipped codes look like sent ones, so the form doesn't tell which addresses
+// have an account.
+export const NEW_ADDRESS_CODE_SHARE = 0.25;
+
+export function newAddressCodeCap(dailyLimit: number): number {
+  return Math.floor(dailyLimit * NEW_ADDRESS_CODE_SHARE);
+}
+
+export type NewAddressCode = "send" | "suppressed" | "capped";
+
+export function newAddressCodeDecision(input: {
+  hasAccount: boolean;
+  invited: boolean;
+  suppression: "unsubscribed" | "bounced" | "complained" | null;
+  sentToNewLast24h: number;
+  dailyLimit: number;
+}): NewAddressCode {
+  if (input.hasAccount) return "send";
+  // Unsubscribing stops bulk mail, not a code the person asked for.
+  if (input.suppression === "bounced" || input.suppression === "complained") return "suppressed";
+  if (input.invited) return "send";
+  return input.sentToNewLast24h >= newAddressCodeCap(input.dailyLimit) ? "capped" : "send";
+}
+
 export type CodeCheck = "ok" | "wrong" | "expired" | "locked" | "missing";
 
 // `matches`: whether the submitted code's hash equals record.codeHash

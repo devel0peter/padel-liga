@@ -19,8 +19,9 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // partner's address when the signup had none (#96), and the league's open
 // seasons to enter together (#23). Without any of these (a new account
 // without a signup, #113, or a solo): the organizer pairs them. Players
-// can't change their pair here: a Szervező does that on the Párok page (#97). One block per league; the
-// league is only named when there are several.
+// can't change their pair here: a Szervező does that on the Párok page
+// (#97). One block per league; the league is only named when there are
+// several.
 
 // After the partner's address is saved (#96) the box stays to say so: no
 // reload, which would remove it before the notice shows.

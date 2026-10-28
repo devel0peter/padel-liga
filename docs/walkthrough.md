@@ -17,6 +17,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 11, a pair approved after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
 | 13 | [`08-solos.spec.ts`](../app/e2e/08-solos.spec.ts) |
 | 14 | [`09-pairs.spec.ts`](../app/e2e/09-pairs.spec.ts) |
+| 15 | [`10-open-signup.spec.ts`](../app/e2e/10-open-signup.spec.ts) |
 
 ## Set up
 
@@ -254,6 +255,19 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   - Nothing new on Kimenő levelek: no email goes out for a pair change.
   - The players see the change on Párom. From here a new pair enters the season like any other (step 7).
   - After step 11, a pair in a published group has both buttons disabled, with the reason.
+
+### 15. A new player without a signup registers (side path)
+
+Anyone can create an account, no invite needed (#113).
+
+- Page: `/login`, then `/welcome` and `/pair` ("Párom")
+- Account: a new address that is not in the seed, for example `uj.jatekos@example.test`
+- Do: ask for a login code, enter the code from the terminal, then fill in the first-login page (name, level, phone, consent) and press "Kész".
+- Expect:
+  - The code arrives like for anyone else; nothing about 2 November.
+  - The first-login page names no partner and prefills no level.
+  - Párom: "Még nincs párod." with "A szervező keres neked párt." and the contact address `hello@padelparbaj.hu`.
+  - The Szervező can now pick this player on "Párok" (step 14).
 
 ## Start over
 

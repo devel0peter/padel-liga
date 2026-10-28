@@ -550,12 +550,17 @@ export async function discardHeld(kind: MessageKind, upTo: number): Promise<numb
   return rows.length;
 }
 
+// The line of a pair intro that carries the partner's address (templates.ts
+// pairIntro), lowercase.
+const PAIR_INTRO_ADDRESS_LINE = "az e-mail-címe: ";
+
 // A signup was withdrawn (#114): delete the registration invites and pair
 // introductions to these addresses that are not sent yet (held or pending,
 // so also once nothing is held), and the introductions to other people that
-// carry one of these addresses (the partner's). Registration invites also
-// lose their invited mark, so a later invite run can offer the address again
-// if another signup of it is still active. Mail already sent stays.
+// name one of these addresses (the partner's), matched on the whole address
+// line the template writes, never on part of an address (anna@ is not
+// hanna@). Registration invites also lose their invited mark, so a later
+// invite run can offer the address again if another signup of it is still active. Mail already sent stays.
 export async function cancelUnsentSignupMail(emails: string[]): Promise<number> {
   const lowered = [...new Set(emails.map((e) => e.toLowerCase()))];
   if (lowered.length === 0) return 0;
@@ -574,7 +579,9 @@ export async function cancelUnsentSignupMail(emails: string[]): Promise<number> 
             eq(emailMessages.kind, "pair_intro"),
             or(
               inArray(sql`lower(${emailMessages.toEmail})`, lowered),
-              ...lowered.map((e) => sql`instr(lower(${emailMessages.text}), ${e}) > 0`),
+              ...lowered.map(
+                (e) => sql`instr(lower(${emailMessages.text}), ${PAIR_INTRO_ADDRESS_LINE + e + "\n"}) > 0`,
+              ),
             ),
           ),
         ),

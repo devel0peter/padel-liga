@@ -177,6 +177,23 @@ describe("withdrawing a paired solo signup (#114)", () => {
     expect(row(c)).toEqual({ status: "new", paired_with: null });
   });
 
+  it("matches whole addresses: withdrawing anna@ leaves the intros of hanna@ and her partner alone", async () => {
+    const a = solo("Anna", "anna@x.hu");
+    const b = solo("Bea", "bea@x.hu");
+    const h2 = solo("Hanna", "hanna@x.hu");
+    const z = solo("Zoli", "zoli@x.hu");
+    await SOLO.pairSolos(a, b, "gyor", "Győr");
+    await SOLO.pairSolos(h2, z, "gyor", "Győr");
+    await O.queueRegistrationInvites();
+    await S.updateSignup(a, { status: "withdrawn" });
+    expect(mail("kind = 'pair_intro'").map((m: any) => m.to_email)).toEqual(["hanna@x.hu", "zoli@x.hu"]);
+    expect(mail("kind = 'registration_invite'").map((m: any) => m.to_email)).toEqual([
+      "bea@x.hu",
+      "hanna@x.hu",
+      "zoli@x.hu",
+    ]);
+  });
+
   it("leaves mail to other people alone", async () => {
     const { c } = await pairedAndInvited();
     const e = solo("Ede", "e@x.hu");

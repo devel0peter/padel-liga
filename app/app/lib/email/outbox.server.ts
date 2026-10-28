@@ -7,9 +7,9 @@ import { accountInvites, broadcasts, emailMessages, emailSuppressions, interestS
 import type { InterestSignup } from "~/lib/interest";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
-import { BULK_KINDS, parseDailyLimit, sendBudget, type MessageKind } from "./budget";
+import { BULK_KINDS, effectiveDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses } from "./outbox-view";
-import { MAX_BATCH, sendEmails, type SendResult } from "./send.server";
+import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { listCities } from "~/lib/cities.server";
@@ -35,8 +35,11 @@ import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscr
 // #88); /admin/outbox only shows the log (outboxLog).
 
 const MAX_ATTEMPTS = 5;
-// A run that crashed mid-send leaves rows in "sending"; retry them after this.
+// A run that crashed mid-send leaves rows in "sending". After this they are
+// marked failed, never sent again: the provider may have taken them before
+// the crash, and an email must not go out twice.
 const STALE_CLAIM_MS = 10 * 60 * 1000;
+export const INTERRUPTED = "interrupted while sending; not retried, so it can't go out twice";
 // Keeps one run well inside the Workers subrequest limit.
 const MAX_BATCHES_PER_RUN = 5;
 // D1 allows 100 bound parameters per statement; a message row binds 7.
@@ -49,8 +52,10 @@ type NewMessage = Email & {
   headers?: Record<string, string>;
 };
 
+// 2,000 with the SMTP relay, else Resend's 100 (EMAIL_DAILY_LIMIT), so login
+// codes keep their reserve until the relay is set up (#111, budget.ts).
 export function dailyLimit(): number {
-  return parseDailyLimit(env.EMAIL_DAILY_LIMIT);
+  return effectiveDailyLimit(relayConfigured(), env.EMAIL_DAILY_LIMIT);
 }
 
 export function emailSecret(): string {
@@ -185,13 +190,16 @@ export async function queueGroupsPublished(
   await deliverNow(await enqueue(queued));
 }
 
-const DELIVER_CHUNK = 50;
+// At most this many of the emails just queued are sent inside the request
+// that queued them (one deliver() call: a handful of D1 queries and one relay
+// connection, well inside a Workers Free invocation); the rest wait for the
+// hourly cron. Also keeps each statement under D1's 100 bound parameters.
+export const SEND_NOW_MAX = 50;
 
-// Sends the emails just queued, within the daily limit. deliver() binds every
-// id it is given: a few at a time keeps each statement under D1's 100
-// parameters.
+// Sends the first SEND_NOW_MAX of the emails just queued, within the daily
+// limit; the cron sends the rest.
 async function deliverNow(ids: number[]): Promise<void> {
-  for (let i = 0; i < ids.length; i += DELIVER_CHUNK) await deliver(ids.slice(i, i + DELIVER_CHUNK));
+  if (ids.length > 0) await deliver(ids.slice(0, SEND_NOW_MAX));
 }
 
 export async function createBroadcast(input: {
@@ -396,8 +404,9 @@ async function claim(limit: number, group: Group, runStart: Date, ids?: number[]
 }
 
 // Marks each email by its own result (#111): sent, back in the queue
-// (retryLater: no attempt counted), or one more failed attempt. Stops the
-// run when a provider asks to wait or when nothing in the batch went out.
+// (retryLater: no attempt counted), failed for good (final: it may have gone
+// out, so it is never retried), or one more failed attempt. Stops the run
+// when a provider asks to wait or when nothing in the batch went out.
 async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boolean }> {
   const results: SendResult[] = await sendEmails(
     rows.map((r) => ({
@@ -419,6 +428,11 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
         .set({ status: "sent", sentAt: now, providerId: result.id || null, html: null, text: null, lastError: null })
         .where(row);
     if (result.retryLater) return db.update(emailMessages).set({ status: "pending", lastError: result.error }).where(row);
+    if (result.final)
+      return db
+        .update(emailMessages)
+        .set({ attempts: sql`${emailMessages.attempts} + 1`, status: "failed", lastError: result.error })
+        .where(row);
     return db
       .update(emailMessages)
       .set({
@@ -431,7 +445,9 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
   await db.batch([first, ...rest]);
 
   const failed = results.filter((r): r is Extract<SendResult, { ok: false }> => !r.ok);
-  if (failed.length) console.error(`${failed.length} of ${rows.length} emails failed`, failed[0].error);
+  const errors = failed.filter((r) => !r.retryLater);
+  if (errors.length) console.error(`${errors.length} of ${rows.length} emails failed`, errors[0].error);
+  else if (failed.length) console.warn(`${failed.length} of ${rows.length} emails wait for a provider`, failed[0].error);
   const sent = rows.length - failed.length;
   return { sent, stop: sent === 0 || failed.some((r) => r.retryLater) };
 }
@@ -453,7 +469,7 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   const runStart = new Date(now);
   await db
     .update(emailMessages)
-    .set({ status: "pending" })
+    .set({ status: "failed", lastError: INTERRUPTED })
     .where(and(eq(emailMessages.status, "sending"), lt(emailMessages.claimedAt, new Date(now - STALE_CLAIM_MS))));
 
   const sentBefore = await sentLast24h(now);
@@ -555,8 +571,8 @@ export async function outboxLog(): Promise<KindLog[]> {
 const PAIR_INTRO_ADDRESS_LINE = "az e-mail-címe: ";
 
 // A signup was withdrawn (#114): delete the registration invites and pair
-// introductions to these addresses that are not sent yet (held or pending,
-// so also once nothing is held), and the introductions to other people that
+// introductions to these addresses that are not sent yet (pending: waiting
+// for the daily limit or a retry, #112), and the introductions to other people that
 // name one of these addresses (the partner's), matched on the whole address
 // line the template writes, never on part of an address (anna@ is not
 // hanna@). Registration invites also lose their invited mark, so a later
@@ -564,7 +580,7 @@ const PAIR_INTRO_ADDRESS_LINE = "az e-mail-címe: ";
 export async function cancelUnsentSignupMail(emails: string[]): Promise<number> {
   const lowered = [...new Set(emails.map((e) => e.toLowerCase()))];
   if (lowered.length === 0) return 0;
-  const unsent = inArray(emailMessages.status, ["held", "pending"]);
+  const unsent = eq(emailMessages.status, "pending");
   const rows = await db
     .delete(emailMessages)
     .where(

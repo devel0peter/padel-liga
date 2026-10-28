@@ -36,8 +36,8 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
     >
       <p className="text-sm text-muted-foreground">
         Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
-        onnan a „Levél nekik” gombbal. Az új körlevél azonnal indul. Naponta legfeljebb {limit} levél megy ki; a
-        többi a következő napokon automatikusan.
+        onnan a „Levél nekik” gombbal. Az új körlevél azonnal indul: az első 50 levél rögtön, a többi óránként.
+        Naponta legfeljebb {limit} levél megy ki; a többi a következő napokon automatikusan.
       </p>
 
       {broadcasts.length === 0 ? (

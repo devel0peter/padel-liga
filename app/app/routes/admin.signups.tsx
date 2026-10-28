@@ -298,7 +298,9 @@ function InviteButton({ pending }: { pending: number }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Meghívók elindultak</AlertDialogTitle>
               <AlertDialogDescription>
-                {queued} levél most megy ki. Ami ma nem fér bele a napi limitbe, magától megy a következő napokon.
+                {queued <= 50
+                  ? `${queued} levél most megy ki.`
+                  : `${queued} levél indul: az első 50 most, a többi óránként, a napi limit szerint.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

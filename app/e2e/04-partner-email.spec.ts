@@ -17,19 +17,22 @@ async function sendHeld(page: Page, kind: string, count: number) {
 }
 
 test("a pair signup without the partner's address asks for it on Párom", async ({ browser }) => {
-  // The public signup form, as a new player.
+  // A signup from before the city had a league. The landing page no longer
+  // offers the form for a league city (#83, see 10-landing), so the post goes
+  // to the page's action directly, the way an old open tab would send it.
   const anon = await browser.newPage();
-  await visit(anon, "/");
-  await anon.locator("#city").click();
-  await anon.getByRole("option", { name: "Mintaváros" }).click();
-  await anon.locator("#name1").fill(elek.name);
-  await anon.locator("#email1").fill(elek.email);
-  await anon.locator("#name2").fill(PARTNER);
-  await anon.locator("#level").click();
-  await anon.getByRole("option", { name: /^Haladó/ }).click();
-  await anon.locator("#consent").check();
-  await anon.getByRole("button", { name: "Jelentkezem" }).click();
-  await expect(anon.getByText(/Köszönjük!/)).toBeVisible();
+  const sent = await anon.request.post("/?index", {
+    form: {
+      city: "minta",
+      mode: "pair",
+      name1: elek.name,
+      email1: elek.email,
+      name2: PARTNER,
+      level: elek.level,
+      consent: "on",
+    },
+  });
+  expect(sent.ok()).toBe(true);
   await anon.close();
 
   // The Admin invites the new signup like the seeded ones.

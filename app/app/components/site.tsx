@@ -1,4 +1,4 @@
-import { Link, useRouteLoaderData } from "react-router";
+import { Link, useLocation, useRouteLoaderData } from "react-router";
 
 import { CONTACT_EMAIL, FACEBOOK_URL, SITE_NAME } from "~/lib/site";
 
@@ -31,30 +31,42 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
-// `cta`: the "Jelentkezem" button (landing and rules). Someone logged in
-// gets "Saját oldalam" instead, on every public page.
+const headerLink = "rounded-full border-2 border-foreground px-4 py-2 font-bold no-underline sm:px-5";
+
+// `cta`: the "Jelentkezem" button (landing and rules). "Belépés" is on every
+// public page; someone logged in gets "Kezdőlap" (the app's home) instead of
+// both. The login page itself has no link to itself.
 export function SiteHeader({ cta = true }: { cta?: boolean }) {
   const signedIn = useRouteLoaderData<{ signedIn?: boolean }>("root")?.signedIn ?? false;
+  const { pathname } = useLocation();
   return (
     <header className="py-4">
-      <Wrap className="flex items-center justify-between gap-4">
+      <Wrap className="flex items-center justify-between gap-3">
         <Link to="/" className="text-lg no-underline" aria-label={SITE_NAME}>
           <Logo />
         </Link>
-        {signedIn ? (
-          <Link to="/home" className="rounded-full border-2 border-foreground px-5 py-2 font-bold no-underline">
-            Saját oldalam
-          </Link>
-        ) : (
-          cta && (
-            <a
-              href="/#jelentkezes"
-              className="rounded-full border-2 border-foreground px-5 py-2 font-bold no-underline"
-            >
-              Jelentkezem
-            </a>
-          )
-        )}
+        <nav className="flex items-center gap-2">
+          {signedIn ? (
+            <Link to="/home" className={headerLink}>
+              Kezdőlap
+            </Link>
+          ) : (
+            <>
+              {cta && (
+                // Not on a phone: two buttons don't fit beside the logo at 360 px,
+                // and the page has its own "Jelentkezem".
+                <a href="/#jelentkezes" className={`${headerLink} max-sm:hidden`}>
+                  Jelentkezem
+                </a>
+              )}
+              {pathname !== "/login" && (
+                <Link to="/login" className={headerLink}>
+                  Belépés
+                </Link>
+              )}
+            </>
+          )}
+        </nav>
       </Wrap>
     </header>
   );

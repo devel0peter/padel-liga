@@ -18,9 +18,8 @@
 	"placement": { "mode": "smart" },
 	"routes": [{ "pattern": "padelparbaj.hu", "custom_domain": true }],
 	"vars": {
-		// The league's own daily email limit (#111): Google's SMTP relay allows
-		// 10,000 per user, but Google can lower an account's limit.
-		"EMAIL_DAILY_LIMIT": "2000",
+		// Resend plan's daily quota (free: 100). Raise it after upgrading.
+		"EMAIL_DAILY_LIMIT": "100",
 		// Cloudflare Web Analytics site token (public, it ships in the page).
 		// Site "padelparbaj.hu", manual JS snippet. Empty: no beacon.
 		"CF_WEB_ANALYTICS_TOKEN": "e54368f7d73948ffb95eed22d5ee9a9d",
@@ -38,10 +37,7 @@
 		"TURNSTILE_HOSTNAMES": "padelparbaj.hu"
 	},
 	// Set with `npx wrangler secret put <NAME>`; locally in .dev.vars.
-	// SMTP_USER, SMTP_PASSWORD (optional, not in the required list): the
-	// Google Workspace user the SMTP relay logs in as (#111, send.server.ts);
-	// without them every email goes through Resend.
-	// RESEND_API_KEY: sending-only key (the fallback). EMAIL_SECRET: signs unsubscribe links.
+	// RESEND_API_KEY: sending-only key. EMAIL_SECRET: signs unsubscribe links.
 	// VAPID_PRIVATE_KEY: web push (app/lib/push/). TURNSTILE_SECRET: signup bot
 	// check. RESEND_WEBHOOK_SECRET: signs Resend's bounce and complaint events
 	// (/webhooks/resend), "whsec_..." from the Resend webhook page.

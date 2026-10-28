@@ -6,14 +6,16 @@ import { relayConfigured, sendViaRelay } from "./smtp.server";
 // relay first; what it refuses or can't take goes through Resend. Without
 // either (local dev) emails are printed to the console.
 
-export { MAX_BATCH };
+export { MAX_BATCH, relayConfigured };
 export type { OutgoingEmail };
 
 export type SendResult =
   | { ok: true; id: string }
   // retryLater: no provider could take it now (quota, rate limit, nothing
   // configured); try again later without counting it as a failed attempt.
-  | { ok: false; error: string; retryLater: boolean };
+  // final: it may have gone out already (the relay never answered after the
+  // message), so it is never sent again, by any provider.
+  | { ok: false; error: string; retryLater: boolean; final?: true };
 
 // One result per email, in order: one bad address doesn't fail the others.
 export async function sendEmails(emails: OutgoingEmail[]): Promise<SendResult[]> {
@@ -36,6 +38,7 @@ export async function sendEmails(emails: OutgoingEmail[]): Promise<SendResult[]>
     fallback = [];
     sent.forEach((r, i) => {
       if (r.ok) results[i] = r;
+      else if (r.unknown) results[i] = { ok: false, error: r.error, retryLater: false, final: true };
       else {
         relayErrors.set(i, r.error);
         fallback.push(i);

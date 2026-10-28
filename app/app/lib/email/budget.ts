@@ -1,6 +1,8 @@
-// How many emails we may send right now within the league's own daily limit
-// (2,000 since #111: Google's SMTP relay allows 10,000 per user a day, but
-// Google can lower an account's limit). Pure (no I/O).
+// How many emails we may send right now within the league's own daily limit.
+// Pure (no I/O). The limit follows the transport (#111): 2,000 with Google's
+// SMTP relay (it allows 10,000 per user a day, but Google can lower an
+// account's limit); without the relay everything goes through Resend, whose
+// free plan sends 100 a day, so EMAIL_DAILY_LIMIT (default 100) applies.
 
 // Kept free for signup confirmations, so a large broadcast can't block them.
 export const TRANSACTIONAL_RESERVE = 15;
@@ -34,9 +36,15 @@ export function sendBudget(dailyLimit: number, sentLast24h: number, kind: Messag
   return Math.max(0, dailyLimit - sentLast24h - reserve);
 }
 
-export const DEFAULT_DAILY_LIMIT = 2000;
+export const RESEND_DAILY_LIMIT = 100;
+export const RELAY_DAILY_LIMIT = 2000;
 
 export function parseDailyLimit(value: string | undefined): number {
   const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : DEFAULT_DAILY_LIMIT;
+  return Number.isInteger(n) && n > 0 ? n : RESEND_DAILY_LIMIT;
+}
+
+// relay: the SMTP relay's login is set (smtp.server.ts relayConfigured).
+export function effectiveDailyLimit(relay: boolean, value: string | undefined): number {
+  return relay ? RELAY_DAILY_LIMIT : parseDailyLimit(value);
 }

@@ -4,7 +4,9 @@ import { ReplyParser, smtpSend, type SmtpMessage, type SmtpReply, type SmtpTrans
 
 // A scripted relay: answers each command like smtp-relay.gmail.com, refuses
 // the recipients in `refuse`, and can drop the connection at a given step.
-function fakeRelay(opts: { refuse?: string[]; auth?: number; greeting?: number; dropAfter?: string; dataReply?: number } = {}) {
+function fakeRelay(
+  opts: { refuse?: string[]; auth?: number; greeting?: number; dropAfter?: string; dataReply?: number; dropAfterData?: boolean } = {},
+) {
   const log: string[] = [];
   let tls = false;
   let inData = false;
@@ -19,7 +21,8 @@ function fakeRelay(opts: { refuse?: string[]; auth?: number; greeting?: number; 
         expect(data.endsWith("\r\n.\r\n")).toBe(true);
         log.push(`DATA:${data.length}`);
         inData = false;
-        respond(opts.dataReply ?? 250, "2.0.0 OK");
+        if (opts.dropAfterData) closed = true;
+        else respond(opts.dataReply ?? 250, "2.0.0 OK");
         return;
       }
       const line = data.replace(/\r\n$/, "");
@@ -141,6 +144,14 @@ describe("smtpSend", () => {
       { ok: false, error: "connection: connection closed" },
     ]);
     expect(log.at(-1)).toBe("<close>");
+  });
+
+  it("marks the email in flight unknown when the answer to its message never comes, and fails the rest", async () => {
+    const { transport } = fakeRelay({ dropAfterData: true });
+    expect(await smtpSend(async () => transport, session, [msg("a@x.hu"), msg("b@x.hu")])).toEqual([
+      { ok: false, error: "no answer after the message, it may have been sent: connection: connection closed", unknown: true },
+      { ok: false, error: "connection: connection closed" },
+    ]);
   });
 
   it("fails an email the relay doesn't accept after DATA", async () => {

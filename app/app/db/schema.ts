@@ -70,8 +70,9 @@ export const emailMessages = sqliteTable(
     text: text("text"),
     // JSON object of extra headers, e.g. List-Unsubscribe.
     headers: text("headers"),
-    // "held": waits for an Admin on /admin/outbox (#88); the sender skips it.
-    status: text("status", { enum: ["held", "pending", "sending", "sent", "failed"] })
+    // "held" (waiting for an Admin, #88) is gone since #112: migration 0024
+    // turned the rows left into "pending".
+    status: text("status", { enum: ["pending", "sending", "sent", "failed"] })
       .notNull()
       .default("pending"),
     attempts: integer("attempts").notNull().default(0),

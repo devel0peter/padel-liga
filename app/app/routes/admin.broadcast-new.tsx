@@ -24,7 +24,6 @@ import { TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
 import {
   createBroadcast,
   dailyLimit,
-  deliver,
   sendTestBroadcast,
   suppressedSet,
 } from "~/lib/email/outbox.server";
@@ -66,8 +65,8 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   // Recomputed from the same filters, so the list is current at send time.
   const { label, recipients } = await audience(new URL(request.url).searchParams);
   if (recipients.length === 0) return { error: "Nincs címzett." };
+  // Sent right away, within the daily limit (#112); the rest by the cron.
   await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email });
-  await deliver();
   return redirect("/admin/broadcasts");
 }
 
@@ -147,20 +146,19 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button disabled={!ready || busy || recipients.length === 0}>
-                  Előkészítés {recipients.length} címzettnek
+                  Küldés {recipients.length} címzettnek
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Előkészíted {recipients.length} címzettnek?</AlertDialogTitle>
+                  <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. A levelek a Kimenő levelek közé kerülnek: ott még elvetheted, a
-                    „Küldés” után már nem lehet visszavonni.
+                    „{subject}” · {label}. A levelek most indulnak, és nem lehet visszavonni őket.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Mégse</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => submit("send")}>Előkészítés</AlertDialogAction>
+                  <AlertDialogAction onClick={() => submit("send")}>Küldés</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

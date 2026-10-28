@@ -266,11 +266,9 @@ export default function Privacy() {
                 töröljük.
               </li>
               <li>
-                <strong>Levelek:</strong> a belépőkódon és a jelentkezés
-                visszaigazolásán kívül minden levél nálunk vár, amíg el nem
-                küldjük vagy el nem vetjük. A szövegét a kiküldésig őrizzük,
-                utána csak azt, hogy kinek, mikor és milyen tárggyal ment; az
-                elvetett levelet teljesen töröljük.
+                <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
+                őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
+                azt, hogy kinek, mikor és milyen tárggyal ment.
               </li>
             </ul>
           </Section>

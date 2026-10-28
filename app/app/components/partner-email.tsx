@@ -9,7 +9,7 @@ import { Label } from "~/components/ui/label";
 // pair signup names a partner without an address. The form posts intent
 // "partner_email" to the page's own action. Shows the partner's name only.
 
-export const PARTNER_EMAIL_SAVED = "Elmentettük. A meghívót a szervező küldi ki.";
+export const PARTNER_EMAIL_SAVED = "Elmentettük. Ha még nincs fiókja, most megkapja a meghívót.";
 
 export function partnerEmailPrompt(name: string): string {
   return `A párodnak (${name}) nincs e-mail-címe nálunk. Add meg, és ő is kap meghívót.`;

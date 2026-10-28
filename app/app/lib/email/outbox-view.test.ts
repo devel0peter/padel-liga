@@ -3,43 +3,16 @@ import { describe, expect, it } from "vitest";
 import { emailMessages } from "~/db/schema";
 import { CONTACT_EMAIL, SITE_URL } from "~/lib/site";
 
-import { AUTOMATIC_KINDS, HIDDEN, hideAddresses, isAutomatic, kindLabel, parseKind, queuedStatus } from "./hold";
+import { HIDDEN, hideAddresses, kindLabel } from "./outbox-view";
 import { pairIntro, registrationInvite } from "./templates";
 import { unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 const ALL_KINDS = emailMessages.kind.enumValues;
 
-describe("queuedStatus", () => {
-  it("lets only login codes and signup confirmations go out by themselves", () => {
-    expect(AUTOMATIC_KINDS).toEqual(["login_code", "signup_confirmation"]);
-    expect(queuedStatus("login_code")).toBe("pending");
-    expect(queuedStatus("signup_confirmation")).toBe("pending");
-  });
-
-  it("holds every other kind in the schema", () => {
-    const others = ALL_KINDS.filter((k) => k !== "login_code" && k !== "signup_confirmation");
-    expect(others.length).toBeGreaterThan(0);
-    for (const kind of others) expect(queuedStatus(kind), kind).toBe("held");
-  });
-
-  it("holds the group publish emails (#24) and a kind it has never heard of (allowlist)", () => {
-    expect(ALL_KINDS).toContain("groups_published");
-    expect(queuedStatus("groups_published")).toBe("held");
-    expect(isAutomatic("anything_new")).toBe(false);
-  });
-});
-
 describe("kindLabel", () => {
   it("names every kind in Hungarian, and falls back to the code name for a new one", () => {
     for (const kind of ALL_KINDS) expect(kindLabel(kind), kind).not.toBe(kind);
     expect(kindLabel("anything_new")).toBe("anything_new");
-  });
-});
-
-describe("parseKind", () => {
-  it("accepts a known kind only", () => {
-    expect(parseKind("pair_answer")).toBe("pair_answer");
-    for (const v of [null, "", "nope", "pair_answer ", new File([], "x")]) expect(parseKind(v)).toBeNull();
   });
 });
 
@@ -54,6 +27,12 @@ describe("hideAddresses", () => {
     expect(hideAddresses(`Írj neki: anna.nagy+liga@example.com. Kapcsolat: ${CONTACT_EMAIL}`)).toBe(
       `Írj neki: ${HIDDEN}. Kapcsolat: ${CONTACT_EMAIL}`,
     );
+  });
+
+  it("hides the recipient in an SMTP refusal (#112: the log shows failure reasons)", () => {
+    expect(
+      hideAddresses("relay: RCPT TO: 550 5.1.1 The email account <bela.kovacs@example.hu> does not exist; resend: 422 x"),
+    ).toBe(`relay: RCPT TO: 550 5.1.1 The email account <${HIDDEN}> does not exist; resend: 422 x`);
   });
 
   it("hides the partner's address in a pair intro", () => {

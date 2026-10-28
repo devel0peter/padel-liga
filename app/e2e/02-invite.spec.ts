@@ -16,7 +16,7 @@ test("3. the registration invite goes out at once", async ({ browser }) => {
   await expect(dialog.getByRole("heading", { name: "Küldöd a regisztrációs meghívót?" })).toBeVisible();
   await dialog.getByRole("button", { name: "Küldés" }).click();
   await expect(dialog.getByRole("heading", { name: "Meghívók elindultak" })).toBeVisible();
-  await expect(dialog).toContainText("24 levél most megy ki.");
+  await expect(dialog).toContainText("24 levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap.");
   await dialog.getByRole("button", { name: "Rendben" }).click();
 
   // Everyone is invited once.

@@ -20,7 +20,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { audienceLabel, signupRecipients } from "~/lib/email/audience";
-import { TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
+import { SEND_NOW_MAX, TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
 import {
   createBroadcast,
   dailyLimit,
@@ -153,7 +153,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. Az első 50 levél most megy ki, a többi óránként, a napi limit szerint. Nem lehet
+                    „{subject}” · {label}. Az első {SEND_NOW_MAX} levél most megy ki, a többi óránként, a napi limit szerint. Nem lehet
                     visszavonni.
                   </AlertDialogDescription>
                 </AlertDialogHeader>

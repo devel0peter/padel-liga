@@ -37,6 +37,11 @@ export function sendBudget(dailyLimit: number, sentLast24h: number, kind: Messag
 }
 
 export const RESEND_DAILY_LIMIT = 100;
+
+// At most this many of the emails just queued are sent inside the request
+// that queued them (outbox.server.ts deliverNow); the hourly cron sends the
+// rest. Here (pure) so the admin pages can say it.
+export const SEND_NOW_MAX = 50;
 export const RELAY_DAILY_LIMIT = 2000;
 
 export function parseDailyLimit(value: string | undefined): number {

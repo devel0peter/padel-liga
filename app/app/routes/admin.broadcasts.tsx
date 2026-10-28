@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
+import { SEND_NOW_MAX } from "~/lib/email/budget";
 import { dailyLimit, listBroadcasts, suppressedSet } from "~/lib/email/outbox.server";
 import { formatDateTime } from "~/lib/format";
 
@@ -36,7 +37,7 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
     >
       <p className="text-sm text-muted-foreground">
         Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
-        onnan a „Levél nekik” gombbal. Az új körlevél azonnal indul: az első 50 levél rögtön, a többi óránként.
+        onnan a „Levél nekik” gombbal. Az új körlevél azonnal indul: az első {SEND_NOW_MAX} levél rögtön, a többi óránként.
         Naponta legfeljebb {limit} levél megy ki; a többi a következő napokon automatikusan.
       </p>
 

@@ -7,7 +7,7 @@ import { accountInvites, broadcasts, emailMessages, emailSuppressions, interestS
 import type { InterestSignup } from "~/lib/interest";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
-import { BULK_KINDS, effectiveDailyLimit, sendBudget, type MessageKind } from "./budget";
+import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
@@ -190,11 +190,10 @@ export async function queueGroupsPublished(
   await deliverNow(await enqueue(queued));
 }
 
-// At most this many of the emails just queued are sent inside the request
-// that queued them (one deliver() call: a handful of D1 queries and one relay
-// connection, well inside a Workers Free invocation); the rest wait for the
-// hourly cron. Also keeps each statement under D1's 100 bound parameters.
-export const SEND_NOW_MAX = 50;
+// SEND_NOW_MAX (budget.ts): one deliver() call, a handful of D1 queries and
+// one relay connection, well inside a Workers Free invocation; it also keeps
+// each statement under D1's 100 bound parameters.
+export { SEND_NOW_MAX };
 
 // Sends the first SEND_NOW_MAX of the emails just queued, within the daily
 // limit; the cron sends the rest.

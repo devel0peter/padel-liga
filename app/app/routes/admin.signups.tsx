@@ -52,6 +52,7 @@ import {
   STATUSES,
   type SignupRow,
 } from "~/lib/signups-admin";
+import { SEND_NOW_MAX } from "~/lib/email/budget";
 import { pendingRegistrationInvites, queueRegistrationInvites } from "~/lib/email/outbox.server";
 import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.server";
 
@@ -298,9 +299,9 @@ function InviteButton({ pending }: { pending: number }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Meghívók elindultak</AlertDialogTitle>
               <AlertDialogDescription>
-                {queued <= 50
-                  ? `${queued} levél most megy ki.`
-                  : `${queued} levél indul: az első 50 most, a többi óránként, a napi limit szerint.`}
+                {queued <= SEND_NOW_MAX
+                  ? `${queued} levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
+                  : `${queued} levél indul: az első ${SEND_NOW_MAX} most, a többi óránként, a napi limit szerint.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

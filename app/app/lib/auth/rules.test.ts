@@ -194,45 +194,56 @@ describe("profile", () => {
   const first = { requireConsent: true };
   const edit = { requireConsent: false };
 
-  it("first login needs a name, a level and consent; the phone is optional", () => {
-    expect(validateProfile({ name: "  Kiss   Anna ", level: "halado", phone: "", consent: "on" }, first)).toEqual({
+  const PHONE = "06 30 123 4567";
+
+  it("first login needs a name, a level, a phone number and consent", () => {
+    expect(validateProfile({ name: "  Kiss   Anna ", level: "halado", phone: PHONE, consent: "on" }, first)).toEqual({
       ok: true,
-      value: { name: "Kiss Anna", level: "halado", phone: null, consent: true },
+      value: { name: "Kiss Anna", level: "halado", phone: "+36301234567", consent: true },
     });
     const r = validateProfile({ name: " ", level: "", phone: "", consent: null }, first);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["consent", "level", "name"]);
+    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["consent", "level", "name", "phone"]);
+  });
+
+  it("refuses a missing phone number with its own message", () => {
+    for (const phone of ["", "   ", null, undefined]) {
+      const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone, consent: "on" }, first);
+      expect(r, String(phone)).toEqual({ ok: false, errors: { phone: "Add meg a telefonszámod, a meccsek egyeztetéséhez kell." } });
+    }
   });
 
   it("stores the phone number as E.164", () => {
-    const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: "06 30 123 4567", consent: "on" }, first);
-    expect(r).toEqual({ ok: true, value: { name: "Kiss Anna", level: "kezdo", phone: "+36301234567", consent: true } });
+    const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: "+36 1 234 5678", consent: "on" }, first);
+    expect(r).toEqual({ ok: true, value: { name: "Kiss Anna", level: "kezdo", phone: "+3612345678", consent: true } });
   });
 
   it("refuses a phone number that is not Hungarian", () => {
     const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: "+43 660 1234567", consent: "on" }, first);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(Object.keys(r.errors)).toEqual(["phone"]);
+    expect(r).toEqual({ ok: false, errors: { phone: "Magyar telefonszámot adj meg, pl. +36 30 123 4567." } });
   });
 
   it("requires a known level", () => {
     for (const level of ["", "expert", undefined, 3, "constructor", "__proto__"]) {
-      const r = validateProfile({ name: "Kiss Anna", level, phone: "", consent: "on" }, first);
+      const r = validateProfile({ name: "Kiss Anna", level, phone: PHONE, consent: "on" }, first);
       expect(r.ok, String(level)).toBe(false);
     }
     for (const level of ["kezdo", "kozephalado", "halado", "versenyzo"])
-      expect(validateProfile({ name: "Kiss Anna", level, phone: "", consent: "on" }, first).ok, level).toBe(true);
+      expect(validateProfile({ name: "Kiss Anna", level, phone: PHONE, consent: "on" }, first).ok, level).toBe(true);
   });
 
-  it("the profile page needs no consent and can clear the phone number", () => {
-    expect(validateProfile({ name: "Kiss Anna", level: "versenyzo", phone: "  ", consent: null }, edit)).toEqual({
+  it("the profile page needs no consent but can't clear the phone number", () => {
+    expect(validateProfile({ name: "Kiss Anna", level: "versenyzo", phone: PHONE, consent: null }, edit)).toEqual({
       ok: true,
-      value: { name: "Kiss Anna", level: "versenyzo", phone: null, consent: false },
+      value: { name: "Kiss Anna", level: "versenyzo", phone: "+36301234567", consent: false },
     });
+    const r = validateProfile({ name: "Kiss Anna", level: "versenyzo", phone: "  ", consent: null }, edit);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(Object.keys(r.errors)).toEqual(["phone"]);
   });
 
   it("caps the name length", () => {
-    const r = validateProfile({ name: "a".repeat(81), level: "kezdo", phone: "", consent: "on" }, first);
+    const r = validateProfile({ name: "a".repeat(81), level: "kezdo", phone: PHONE, consent: "on" }, first);
     expect(r.ok).toBe(false);
   });
 });

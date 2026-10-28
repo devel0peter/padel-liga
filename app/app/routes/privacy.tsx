@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 25.";
+const EFFECTIVE_FROM = "2026. 10. 28.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -80,8 +80,8 @@ export default function Privacy() {
                 állítasz be, és amiből az induló értékszámod lesz,
               </li>
               <li>
-                ha megadod, a telefonszámod (magyar szám lehet, nem kötelező, a
-                profilodban bármikor módosíthatod vagy törölheted),
+                a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
+                telefonon egyeztetitek; a profilodban bármikor módosíthatod),
               </li>
               <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből

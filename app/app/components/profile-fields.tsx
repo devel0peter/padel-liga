@@ -46,13 +46,14 @@ export function LevelField({ error, defaultValue }: { error?: string; defaultVal
 
 export function PhoneField({ error, defaultValue }: { error?: string; defaultValue: string }) {
   return (
-    <Field name="phone" label="Telefonszám (nem kötelező)" error={error}>
+    <Field name="phone" label="Telefonszám" error={error}>
       <Input
         id="phone"
         name="phone"
         type="tel"
         autoComplete="tel"
         inputMode="tel"
+        required
         maxLength={30}
         placeholder="+36 30 123 4567"
         defaultValue={defaultValue}

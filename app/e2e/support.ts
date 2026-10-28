@@ -132,11 +132,13 @@ export async function save(context: BrowserContext, email: string): Promise<void
   await context.storageState({ path: authFile(email) });
 }
 
-// "Üdv!": the name, the level from the signup (already set), consent, Kész.
+// "Üdv!": the name, the level from the signup (already set), a phone number,
+// consent, Kész.
 export async function completeWelcome(page: Page, player: Player): Promise<void> {
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
   await expect(page.getByLabel("Szinted")).toContainText(levelLabel(player));
   await page.getByLabel("Neved").fill(player.name);
+  await page.getByLabel("Telefonszám").fill("+36 30 123 4567");
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);

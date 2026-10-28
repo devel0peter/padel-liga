@@ -14,7 +14,7 @@ import { requireAccount } from "~/lib/auth/session.server";
 import { formSignupPairs, signupPartnerNames } from "~/lib/signup-partners.server";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
-// First login: name, level, an optional phone number and the privacy consent
+// First login: name, level, phone number and the privacy consent
 // (spec section 3) before anything else. A player the signups pair with
 // someone sees the partner's name, with our address if it's wrong (#96).
 

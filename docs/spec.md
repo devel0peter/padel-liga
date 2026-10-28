@@ -171,7 +171,7 @@ Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set di
 Group size, phase length in weeks, phases per season (4), catch-up week on or off, deadline day, slot rules (minimum number of slots and days, time window, lead time), match format, scoring system, walkover rules, list of venues, number of fast-calibration switches (section 10), season prizes and sponsors per division.
 
 ## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
-Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
+Channels: the in-app list, email and web push (PWA). Every user chooses on the profile (Profil → Értesítések) whether notifications also come by email, by push, or both; both switches are on by default (README decision log, 2026-10-28, #115, D50). No player gets more than one non-urgent email a day.
 
 Emails are sent from `hello@padelparbaj.hu` through Google Workspace's SMTP relay; what the relay refuses or can't take goes through Resend. Each email is marked sent or failed on its own. The league's own limit is 2,000 emails a day, sent in this order: login codes, personal emails, bulk mail (README decision log, 2026-10-28, #111).
 
@@ -200,8 +200,9 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 **Rules for all notifications:**
 - Every notification has a one-tap action link (accept, confirm, record a time) and a shareable link ("küldd el a párodnak / ellenfélnek").
 - The home screen shows the same open items as a "Teendők" list.
-- Every notification is also kept in the app's notification list (`/notifications`): unread ones first, opening one marks it read. Each kind can be switched off on the profile page.
-- Web push: offered after the first login ("Kérsz értesítést?"), opt-in, can be turned off. On iPhone it needs iOS 16.4+ and the site added to the home screen; the app explains this. Push never replaces email for instant items.
+- Every notification is also kept in the app's notification list (`/notifications`), whatever the switches: unread ones first, opening one marks it read. Szervezők and Admins can switch off their own kinds (e.g. a new signup) on the profile page; a kind switched off is not stored or sent at all. Players have no per-kind switches, only the two channels.
+- **Email switch:** off, no notification email goes to that account. Login codes and signup confirmations always go out, and so do the emails that are not notifications of an account: the one-time partner notice, the pair intro and the registration invite (they go to the signup list), and broadcasts (they have their own unsubscribe link).
+- **Push switch:** off, no push goes to any of the account's devices. Turning it on asks this browser for permission and subscribes this device; other devices are switched on from themselves ("Bekapcsolom ezen az eszközön"). On iPhone it needs iOS 16.4+ and the site added to the home screen; the profile explains this. A player who switches email off gets instant items by push and in the app only.
 
 ## 14. Public pages
 - League home: groups, standings, matches this week. The ladder is one list with three colored division bands (Bronz, Réz, Rookie) and a header at each border. In the last phase, each group card shows what is at stake: "Divízió döntő" with the prize and its sponsor on a division's top group, the group-winner prize on the others; earlier phases show a hint instead. A "Hogyan működik?" explainer (3 short points and a picture of the bands) is linked from every badge.
@@ -226,6 +227,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
 - **What we collect:**
   - Landing page: names, emails, level, comment.
   - Later: account data, the phone number, match history, ratings.
+  - Notifications: the in-app list, the email and push choices, and each device's push subscription (the browser's push address; the push itself goes encrypted through the browser maker's push service: Google, Apple, Mozilla, Microsoft).
 - **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
 - **Who sees what:**
   - Public: names, results, standings and ratings.

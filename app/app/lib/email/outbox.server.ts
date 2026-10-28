@@ -550,6 +550,49 @@ export async function outboxLog(): Promise<KindLog[]> {
     });
 }
 
+// The line of a pair intro that carries the partner's address (templates.ts
+// pairIntro), lowercase.
+const PAIR_INTRO_ADDRESS_LINE = "az e-mail-címe: ";
+
+// A signup was withdrawn (#114): delete the registration invites and pair
+// introductions to these addresses that are not sent yet (pending: waiting
+// for the daily limit or a retry, #112), and the introductions to other people that
+// name one of these addresses (the partner's), matched on the whole address
+// line the template writes, never on part of an address (anna@ is not
+// hanna@). Registration invites also lose their invited mark, so a later
+// invite run can offer the address again if another signup of it is still active. Mail already sent stays.
+export async function cancelUnsentSignupMail(emails: string[]): Promise<number> {
+  const lowered = [...new Set(emails.map((e) => e.toLowerCase()))];
+  if (lowered.length === 0) return 0;
+  const unsent = eq(emailMessages.status, "pending");
+  const rows = await db
+    .delete(emailMessages)
+    .where(
+      and(
+        unsent,
+        or(
+          and(
+            eq(emailMessages.kind, "registration_invite"),
+            inArray(sql`lower(${emailMessages.toEmail})`, lowered),
+          ),
+          and(
+            eq(emailMessages.kind, "pair_intro"),
+            or(
+              inArray(sql`lower(${emailMessages.toEmail})`, lowered),
+              ...lowered.map(
+                (e) => sql`instr(lower(${emailMessages.text}), ${PAIR_INTRO_ADDRESS_LINE + e + "\n"}) > 0`,
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+    .returning({ kind: emailMessages.kind, toEmail: emailMessages.toEmail });
+  const invited = rows.filter((r) => r.kind === "registration_invite").map((r) => r.toEmail.toLowerCase());
+  if (invited.length > 0) await markInvited(invited, null);
+  return rows.length;
+}
+
 // Deletion request: remove the stored emails sent to these addresses.
 export async function deleteMessagesTo(emails: string[]) {
   if (emails.length === 0) return;

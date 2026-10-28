@@ -3,7 +3,7 @@ import { and, count, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { accountInvites, interestSignups } from "~/db/schema";
 import { INTEREST_INVITE_NOTE } from "~/lib/email/audience";
-import { deleteMessagesTo } from "~/lib/email/outbox.server";
+import { cancelUnsentSignupMail, deleteMessagesTo } from "~/lib/email/outbox.server";
 
 import type { SignupRow, Status } from "./signups-admin";
 
@@ -13,14 +13,45 @@ export async function listSignups(): Promise<SignupRow[]> {
   return db.select().from(interestSignups).orderBy(desc(interestSignups.createdAt), desc(interestSignups.id));
 }
 
+// Marking a signup withdrawn (#114) also undoes its solo pairing: the partner
+// goes back to the waiting list ("Párkeresők"), and the withdrawn row points
+// at nobody. Setting the status back later re-pairs nobody.
 export async function updateSignup(
   id: number,
   changes: { status?: Status; adminNote?: string | null },
 ): Promise<void> {
-  await db
+  const now = new Date();
+  const [row] = changes.status === "withdrawn"
+    ? await db
+        .select({ email1: interestSignups.email1, email2: interestSignups.email2 })
+        .from(interestSignups)
+        .where(eq(interestSignups.id, id))
+    : [];
+  const update = db
     .update(interestSignups)
-    .set({ ...changes, updatedAt: new Date() })
+    .set(changes.status === "withdrawn" ? { ...changes, pairedWith: null, updatedAt: now } : { ...changes, updatedAt: now })
     .where(eq(interestSignups.id, id));
+  if (changes.status !== "withdrawn") {
+    await update;
+    return;
+  }
+  // One batch (a transaction): the partner is freed together with the status
+  // change. A partner who is withdrawn too stays withdrawn.
+  await db.batch([
+    db
+      .update(interestSignups)
+      .set({
+        pairedWith: null,
+        status: sql`case when ${interestSignups.status} = 'paired' then 'new' else ${interestSignups.status} end`,
+        updatedAt: now,
+      })
+      .where(eq(interestSignups.pairedWith, id)),
+    update,
+  ]);
+  // No invite or pair introduction may still go out to them, or tell their
+  // partner about them (also once mail is no longer held, #112). Runs on
+  // every withdrawal, so setting "Visszalépett" again repeats it if it failed.
+  if (row) await cancelUnsentSignupMail([row.email1, row.email2].filter((e): e is string => !!e));
 }
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").

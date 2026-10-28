@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -547,6 +547,42 @@ export async function discardHeld(kind: MessageKind, upTo: number): Promise<numb
       rows.map((r) => r.toEmail.toLowerCase()),
       null,
     );
+  return rows.length;
+}
+
+// A signup was withdrawn (#114): delete the registration invites and pair
+// introductions to these addresses that are not sent yet (held or pending,
+// so also once nothing is held), and the introductions to other people that
+// carry one of these addresses (the partner's). Registration invites also
+// lose their invited mark, so a later invite run can offer the address again
+// if another signup of it is still active. Mail already sent stays.
+export async function cancelUnsentSignupMail(emails: string[]): Promise<number> {
+  const lowered = [...new Set(emails.map((e) => e.toLowerCase()))];
+  if (lowered.length === 0) return 0;
+  const unsent = inArray(emailMessages.status, ["held", "pending"]);
+  const rows = await db
+    .delete(emailMessages)
+    .where(
+      and(
+        unsent,
+        or(
+          and(
+            eq(emailMessages.kind, "registration_invite"),
+            inArray(sql`lower(${emailMessages.toEmail})`, lowered),
+          ),
+          and(
+            eq(emailMessages.kind, "pair_intro"),
+            or(
+              inArray(sql`lower(${emailMessages.toEmail})`, lowered),
+              ...lowered.map((e) => sql`instr(lower(${emailMessages.text}), ${e}) > 0`),
+            ),
+          ),
+        ),
+      ),
+    )
+    .returning({ kind: emailMessages.kind, toEmail: emailMessages.toEmail });
+  const invited = rows.filter((r) => r.kind === "registration_invite").map((r) => r.toEmail.toLowerCase());
+  if (invited.length > 0) await markInvited(invited, null);
   return rows.length;
 }
 

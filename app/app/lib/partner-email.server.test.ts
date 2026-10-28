@@ -1,10 +1,10 @@
 // "Partner has no email" (#96, D35) on a real SQLite (~/test/sqlite): the
-// box, saving the address, the one held invite, and the pair forming once the
-// partner registers. Resend is stubbed and fails the test if called: nothing
-// is sent, the invite waits on Kimenő levelek.
+// box, saving the address, the one invite (sent right away, #112), and the
+// pair forming once the partner registers. The sender is stubbed and records
+// what it gets; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any }));
+const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
@@ -12,10 +12,12 @@ vi.mock("~/lib/cities.server", () => ({
   listedCities: async () => [{ slug: "gyor" }],
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
 }));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
-    throw new Error("nothing may be sent");
+  relayConfigured: () => false,
+  sendEmails: async (emails: any[]) => {
+    h.sent.push(...emails);
+    return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
 }));
 
@@ -40,6 +42,7 @@ const user = (id: string) => ({ id, email: `${id}@x.hu`, name: id.toUpperCase() 
 describe("partner without an email (#96)", () => {
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.sent = [];
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
   });
@@ -57,13 +60,14 @@ describe("partner without an email (#96)", () => {
     expect(await SP.missingPartnerEmails(user("a"))).toEqual([]);
   });
 
-  it("saving fills email2 and queues one held invite to it; saving twice queues no second one", async () => {
+  it("saving fills email2 and sends one invite to it right away; saving twice sends no second one", async () => {
     const id = signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla" });
     register("a", "Anna");
     expect(await SP.savePartnerEmail(user("a"), id, " Bela@X.hu ")).toEqual({ ok: true });
     expect(all("select email2 from interest_signups")).toEqual([{ email2: "bela@x.hu" }]);
     expect(invites()).toHaveLength(1);
-    expect(invites()[0]).toMatchObject({ to_email: "bela@x.hu", status: "held" });
+    expect(invites()[0]).toMatchObject({ to_email: "bela@x.hu", status: "sent" });
+    expect(h.sent.map((m) => m.to)).toEqual(["bela@x.hu"]);
     expect(all("select email from account_invites")).toEqual([{ email: "bela@x.hu" }]);
     // The box is gone; a second submit (another tab) changes nothing.
     expect(await SP.missingPartnerEmails(user("a"))).toEqual([]);
@@ -71,6 +75,7 @@ describe("partner without an email (#96)", () => {
     expect(await SP.savePartnerEmail(user("a"), id, "mas@x.hu")).toMatchObject({ ok: false });
     expect(all("select email2 from interest_signups")).toEqual([{ email2: "bela@x.hu" }]);
     expect(invites()).toHaveLength(1);
+    expect(h.sent).toHaveLength(1);
   });
 
   it("the partner registers: the pair forms as for any signup pair (#89)", async () => {

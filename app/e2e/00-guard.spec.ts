@@ -23,6 +23,14 @@ test.describe("guard", () => {
     expect(devVarsText()).toContain('CF_WEB_ANALYTICS_TOKEN=""');
   });
 
+  test("refuses an SMTP relay login, in the environment or in the dev vars (#111)", () => {
+    for (const name of ["SMTP_USER", "SMTP_PASSWORD"]) {
+      expect(() => assertSafeEnvironment([], { [name]: "x" })).toThrow(new RegExp(name));
+      expect(() => devVarsText({ ...DEV_VARS, [name]: "x" })).toThrow(new RegExp(name));
+      expect(devVarsText()).toContain(`${name}=""`);
+    }
+  });
+
   test("refuses a production environment or another Cloudflare config", () => {
     expect(() => assertSafeEnvironment([], { NODE_ENV: "production" })).toThrow(/NODE_ENV/);
     expect(() => assertSafeEnvironment([], { CLOUDFLARE_ENV: "production" })).toThrow(/CLOUDFLARE_ENV/);

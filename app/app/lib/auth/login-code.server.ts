@@ -4,7 +4,7 @@ import { db } from "~/db/client.server";
 import { loginCodes } from "~/db/schema";
 import { queueLoginCode } from "~/lib/email/outbox.server";
 
-import { createUser, findUserIdByEmail, mayLogIn } from "./accounts.server";
+import { createUser, findUserIdByEmail } from "./accounts.server";
 import {
   checkCode,
   CODE_MESSAGES,
@@ -14,7 +14,6 @@ import {
   MAX_CODE_ATTEMPTS,
   normalizeCode,
   normalizeEmail,
-  REGISTRATION_CLOSED_MESSAGE,
 } from "./rules";
 import { generateCode, sha256Hex, timingSafeEqual } from "./tokens";
 
@@ -29,9 +28,8 @@ export type SendResult = { ok: true; email: string } | { ok: false; error: strin
 export async function sendLoginCode(input: string): Promise<SendResult> {
   const email = normalizeEmail(input);
   if (!isValidEmail(email)) return { ok: false, error: "Ez nem tűnik e-mail-címnek." };
-  // No code and no error for an address that can't log in yet: an error would
-  // tell anyone which addresses have an account or an invite.
-  if (!(await mayLogIn(email))) return { ok: true, email };
+  // Any address may log in; a new one gets an account at its first login
+  // (#113). The bot check (login route) and the code limit below stay.
 
   const now = new Date();
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
@@ -84,7 +82,5 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
 
   const existing = await findUserIdByEmail(email);
   if (existing) return { ok: true, userId: existing };
-  // Registration may have closed or the invite been removed since the code was sent.
-  if (!(await mayLogIn(email))) return { ok: false, error: REGISTRATION_CLOSED_MESSAGE };
   return { ok: true, userId: await createUser(email) };
 }

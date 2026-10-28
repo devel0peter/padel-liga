@@ -18,10 +18,6 @@ export const MAX_CODE_ATTEMPTS = 5;
 const CODE_WINDOW_MS = HOUR;
 export const MAX_CODES_PER_WINDOW = 5;
 
-// Registration opens Mon 2 Nov 2026 00:00 Budapest time (spec section 18).
-// Before that only invited emails can create an account.
-export const REGISTRATION_OPENS_AT = new Date("2026-11-01T23:00:00Z");
-
 export const DEFAULT_RETURN_TO = "/home";
 const MAX_NAME = 80;
 const MAX_EMAIL = 254;
@@ -110,35 +106,23 @@ export const CODE_MESSAGES: Record<Exclude<CodeCheck, "ok">, string> = {
 
 // --- Accounts ---------------------------------------------------------------
 
-export function registrationOpen(now: Date): boolean {
-  return now.getTime() >= REGISTRATION_OPENS_AT.getTime();
-}
-
-// A login for an email without an account creates one only if registration
-// is open or the email is invited.
-export function canCreateAccount({ invited, now }: { invited: boolean; now: Date }): boolean {
-  return invited || registrationOpen(now);
-}
-
 export type GoogleLogin =
   | { kind: "existing"; userId: string }
   | { kind: "link"; userId: string }
   | { kind: "create" }
-  | { kind: "refused"; reason: "unverified" | "closed" };
+  | { kind: "refused"; reason: "unverified" };
 
 // Same email = same account: a Google login attaches to the account with
-// that email, but only when Google says the email is verified.
+// that email, but only when Google says the email is verified. Anyone may
+// create an account (#113): no invite needed.
 export function resolveGoogleLogin(input: {
   linkedUserId: string | null;
   emailUserId: string | null;
   emailVerified: boolean;
-  invited: boolean;
-  now: Date;
 }): GoogleLogin {
   if (input.linkedUserId) return { kind: "existing", userId: input.linkedUserId };
   if (!input.emailVerified) return { kind: "refused", reason: "unverified" };
   if (input.emailUserId) return { kind: "link", userId: input.emailUserId };
-  if (!canCreateAccount(input)) return { kind: "refused", reason: "closed" };
   return { kind: "create" };
 }
 
@@ -161,9 +145,6 @@ export function initials(name: string, email: string): string {
   const letters = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? email).slice(0, 2);
   return letters.toUpperCase();
 }
-
-export const REGISTRATION_CLOSED_MESSAGE =
-  "A regisztráció november 2-án nyílik. Ha meghívót kaptál, azzal az e-mail-címmel lépj be.";
 
 export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean };
 export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;

@@ -16,6 +16,11 @@ import { STEPS } from "~/lib/how-it-works";
 import { activeVenues, toClubOption } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
+import { landingByCity } from "~/lib/landing-league";
+import { listLeagues } from "~/lib/leagues.server";
+import { listSeasons } from "~/lib/seasons.server";
+import { OTHER_CITY } from "~/lib/cities";
+import { LeagueStatus } from "~/components/league-status";
 import { saveInterest } from "~/lib/interest.server";
 import { organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
@@ -45,7 +50,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const clubs = activeVenues(await listClubs()).map(toClubOption);
   const listed = await listedCities();
   const pairs = await landingPairCounts(listed);
-  const cities = listed.map(({ slug, name }) => ({ slug, name, pairs: pairs.get(slug) ?? null }));
+  // A listed city with a league shows where it is and sends visitors to
+  // registration; the others keep the interest signup (#83).
+  const slugs = new Set(listed.map((c) => c.slug));
+  const league = landingByCity(
+    (await listLeagues()).filter((l) => slugs.has(l.city)),
+    await listSeasons(),
+    new Date(),
+  );
+  const cities = listed.map(({ slug, name }) => ({
+    slug,
+    name,
+    pairs: pairs.get(slug) ?? null,
+    league: league.get(slug) ?? null,
+  }));
   const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
   return { ref, clubs, cities, turnstileSiteKey: turnstileSiteKey() };
 }
@@ -126,7 +144,7 @@ const RULES = [
 
 const FAQ = [
   ["Mennyibe kerül?", "Nevezési díj nincs, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor indul?", "Amint összegyűlik legalább 12 pár, a cél a novemberi indulás. Mindenkinek írunk e-mailben, aki jelentkezett."],
+  ["Mikor csatlakozhatok?", "Ahol már fut a liga, nevezhetsz rögtön: a következő kör elejétől játszotok, a dátumot a Jelentkezz résznél látod. Ahol még nincs liga, írd fel magad, és e-mailben szólunk, ha indul."],
   ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
@@ -161,6 +179,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   // back from the rules) on the cleaned address, which has no source.
   const [ref] = useState(loaderData.ref);
   useLandingCount(ref);
+  // The chosen city is shared by the form and the league block next to it.
+  const [city, setCity] = useState<string>(cities[0]?.slug ?? OTHER_CITY);
+  const chosen = cities.find((c) => c.slug === city);
   return (
     <>
       <SiteHeader />
@@ -192,6 +213,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     <li key={c.slug}>
                       <a
                         href="#jelentkezes"
+                        onClick={() => setCity(c.slug)}
                         className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
                       >
                         <span className="relative flex size-2.5">
@@ -208,6 +230,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <li>
                     <a
                       href="#jelentkezes"
+                      onClick={() => setCity(OTHER_CITY)}
                       title="Szólunk, ha nálatok is indul"
                       className="inline-flex items-center rounded-full border-[1.5px] border-dashed px-4 py-2 font-bold text-muted-foreground no-underline"
                     >
@@ -276,11 +299,25 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
         <section id="jelentkezes" className="scroll-mt-4 bg-muted py-16">
           <Wrap className="grid items-start gap-12 lg:grid-cols-[1fr_1.2fr]">
-            <SectionHead
-              title="Jelentkezz az első szezonra"
-              lede="A jelentkezés nem kötelez semmire. Ha összejön elég pár, e-mailben értesítünk az indulásról és a részletekről."
+            <div className="grid gap-6">
+              <SectionHead
+                title={chosen?.league ? "Nevezz a ligába" : "Jelentkezz, és szólunk"}
+                lede={
+                  chosen?.league
+                    ? "Itt már fut a liga. Így látod, hol tart, és mikor tudtok becsatlakozni."
+                    : "Nálatok még nincs liga. Írd fel magad, és e-mailben szólunk, ha indul. A jelentkezés nem kötelez semmire."
+                }
+              />
+              {chosen?.league && <LeagueStatus city={chosen.name} block={chosen.league} />}
+            </div>
+            <SignupForm
+              signupRef={ref}
+              clubs={clubs}
+              cities={cities}
+              city={city}
+              onCityChange={setCity}
+              turnstileSiteKey={loaderData.turnstileSiteKey}
             />
-            <SignupForm signupRef={ref} clubs={clubs} cities={cities} turnstileSiteKey={loaderData.turnstileSiteKey} />
           </Wrap>
         </section>
       </main>

@@ -114,19 +114,27 @@ export function SignupForm({
   signupRef,
   clubs = [],
   cities,
+  city,
+  onCityChange,
   turnstileSiteKey,
 }: {
   signupRef?: string | null;
   // Null: no bot check (app/lib/turnstile.server.ts).
   turnstileSiteKey?: string | null;
   clubs?: ClubOption[];
-  // The listed cities (cities.server.ts); "Más város" is always offered.
-  cities: Pick<City, "slug" | "name">[];
+  // The listed cities (cities.server.ts); "Más város" is always offered. A
+  // city with a league (`league` set) has no interest form: it sends people
+  // to registration (#83).
+  cities: (Pick<City, "slug" | "name"> & { league?: unknown })[];
+  // The chosen city is the page's, which shows that city's league next to the form.
+  city: string;
+  onCityChange: (city: string) => void;
 }) {
   const fetcher = useFetcher<SignupActionData>();
   const [mode, setMode] = useState<Mode>("pair");
-  const [city, setCity] = useState<string>(cities[0]?.slug ?? OTHER_CITY);
+  const setCity = onCityChange;
   const otherCity = city === OTHER_CITY;
+  const hasLeague = !!cities.find((c) => c.slug === city)?.league;
   const cityClubs = clubs.filter((c) => c.city === city);
   const doneRef = useRef<HTMLDivElement>(null);
 
@@ -153,18 +161,18 @@ export function SignupForm({
           <p>
             Köszönjük! Felírtunk ({data.cityOther}), és szólunk, ha nálatok is
             indul liga. Addig is küldd el az oldalt a többi helyi padelesnek: minél
-            többen jelentkeztek, annál hamarabb indulhat.
+            többen jelentkeztek, annál hamarabb lehet nálatok liga.
           </p>
         ) : mode === "solo" ? (
           <p>
-            Köszönjük! Segítünk párt találni, és írunk, amint elég pár
-            összegyűlik. Minél többen jelentkeznek, annál könnyebb hozzád illő
-            párt találni, úgyhogy küldd el az oldalt más padeleseknek is.
+            Köszönjük! Segítünk párt találni, és írunk az indulásról. Minél
+            többen jelentkeznek, annál könnyebb hozzád illő párt találni,
+            úgyhogy küldd el az oldalt más padeleseknek is.
           </p>
         ) : (
           <p>
-            Köszönjük! Írunk, amint elég pár összegyűlik. Addig is küldd el az
-            oldalt annak, akivel szívesen játszanál.
+            Köszönjük! Írunk az indulásról. Addig is küldd el az oldalt annak,
+            akivel szívesen játszanál.
           </p>
         )}
         <ShareLinks text={shareText(mode, otherCity ? (data.cityOther ?? null) : (where ?? null))} />
@@ -175,27 +183,56 @@ export function SignupForm({
   const invalid = (field: InterestField) =>
     errors[field] ? { "aria-invalid": true, "aria-describedby": `${field}-error` } : {};
 
+  const cityField = (
+    <Field name="city" label="Város" error={errors.city}>
+      <Select name="city" value={city} onValueChange={setCity}>
+        <SelectTrigger id="city" className="h-11! w-full bg-background text-base" {...invalid("city")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {cities.map((c) => (
+            <SelectItem key={c.slug} value={c.slug}>
+              {c.name}
+            </SelectItem>
+          ))}
+          <SelectItem value={OTHER_CITY}>Más város</SelectItem>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+
+  // A city with a league: no interest form, registration goes through the
+  // account (login, then the pair's entry on the Kezdőlap).
+  if (hasLeague) {
+    return (
+      <div className="grid gap-5 rounded-2xl border-2 border-foreground bg-background p-6">
+        {cityField}
+        <div className="grid gap-3">
+          <h3 className="font-display text-xl font-bold">Itt már fut a liga</h3>
+          <p>
+            Nem kell külön jelentkezni: lépj be, vagy hozz létre egy fiókot, és a Kezdőlapon tudtok nevezni a
+            párotokkal.
+          </p>
+          <div>
+            <Button
+              asChild
+              className="h-auto rounded-full bg-ball px-6 py-3 text-base font-bold text-ball-foreground hover:bg-ball/85"
+            >
+              <Link to="/login">Tovább a nevezéshez</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <fetcher.Form
       method="post"
       noValidate
       className="grid gap-5 rounded-2xl border-2 border-foreground bg-background p-6"
     >
-      <Field name="city" label="Város" error={errors.city}>
-        <Select name="city" value={city} onValueChange={setCity}>
-          <SelectTrigger id="city" className="h-11! w-full bg-background text-base" {...invalid("city")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((c) => (
-              <SelectItem key={c.slug} value={c.slug}>
-                {c.name}
-              </SelectItem>
-            ))}
-            <SelectItem value={OTHER_CITY}>Más város</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      {cityField}
 
       {otherCity && (
         <Field name="cityOther" label="Melyik városban játszanál?" error={errors.cityOther}>

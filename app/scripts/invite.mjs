@@ -1,4 +1,6 @@
-// Lets an email create an account before registration opens (2 Nov 2026).
+// Adds an account_invites row for an email. Optional since #113: anyone can
+// create an account; the row only exempts the address from the daily cap on
+// login codes to new addresses (auth/rules.ts).
 //   npm run auth:invite -w app -- anna@example.com [--remote] [--note "Szervező"]
 // Without --remote it writes the local dev database.
 import { execFileSync } from "node:child_process";

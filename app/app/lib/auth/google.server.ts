@@ -7,7 +7,7 @@ import { db } from "~/db/client.server";
 import { oauthAccounts } from "~/db/schema";
 import { formSignupPairs } from "~/lib/signup-partners.server";
 
-import { createUser, findUserIdByEmail, isInvited, setProfileImage } from "./accounts.server";
+import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.server";
 import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
 import { createSession } from "./session.server";
 import { timingSafeEqual } from "./tokens";
@@ -31,7 +31,7 @@ function client(request: Request): Google {
 }
 
 // Error codes for /login?error=… (messages in app/routes/login.tsx).
-export type GoogleError = "google" | "closed" | "unverified";
+export type GoogleError = "google" | "unverified";
 
 function fail(error: GoogleError): never {
   throw redirect(`/login?error=${error}`, {
@@ -82,14 +82,12 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
     linkedUserId: linked?.userId ?? null,
     emailUserId: await findUserIdByEmail(email),
     emailVerified: claims.email_verified === true,
-    invited: await isInvited(email),
-    now: new Date(),
   });
 
   let userId: string;
   switch (decision.kind) {
     case "refused":
-      fail(decision.reason === "closed" ? "closed" : "unverified");
+      fail(decision.reason);
     case "existing":
       userId = decision.userId;
       break;

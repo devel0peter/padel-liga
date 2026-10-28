@@ -223,7 +223,7 @@ describe("the seed carries the walkthrough", () => {
     // The two solos still waiting for a partner get the solo text.
     const waiting = ["pal.boglarka@example.test", "sandor.akos@example.test"];
     for (const m of h.sent) expect(m.text.includes("Még keresünk neked párt"), m.to).toBe(waiting.includes(m.to));
-    // They can register before 2 Nov because of the account invites.
+    // Each invited address also gets an account_invites row (it exempts the address from the new-address code cap, #113).
     expect(count("account_invites")).toBe(24);
     // A second run adds nothing.
     expect(await O.queueRegistrationInvites()).toBe(0);

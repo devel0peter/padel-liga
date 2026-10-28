@@ -13,14 +13,35 @@ export async function listSignups(): Promise<SignupRow[]> {
   return db.select().from(interestSignups).orderBy(desc(interestSignups.createdAt), desc(interestSignups.id));
 }
 
+// Marking a signup withdrawn (#114) also undoes its solo pairing: the partner
+// goes back to the waiting list ("Párkeresők"), and the withdrawn row points
+// at nobody. Setting the status back later re-pairs nobody.
 export async function updateSignup(
   id: number,
   changes: { status?: Status; adminNote?: string | null },
 ): Promise<void> {
-  await db
+  const now = new Date();
+  const update = db
     .update(interestSignups)
-    .set({ ...changes, updatedAt: new Date() })
+    .set(changes.status === "withdrawn" ? { ...changes, pairedWith: null, updatedAt: now } : { ...changes, updatedAt: now })
     .where(eq(interestSignups.id, id));
+  if (changes.status !== "withdrawn") {
+    await update;
+    return;
+  }
+  // One batch (a transaction): the partner is freed together with the status
+  // change. A partner who is withdrawn too stays withdrawn.
+  await db.batch([
+    db
+      .update(interestSignups)
+      .set({
+        pairedWith: null,
+        status: sql`case when ${interestSignups.status} = 'paired' then 'new' else ${interestSignups.status} end`,
+        updatedAt: now,
+      })
+      .where(eq(interestSignups.pairedWith, id)),
+    update,
+  ]);
 }
 
 // Permanent: used for deletion requests (privacy page, "Mik a jogaid?").

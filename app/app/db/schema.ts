@@ -149,7 +149,8 @@ export const users = sqliteTable("users", {
   // starting Elo. Required on the first-login page; null only for accounts
   // from before it was asked (the home page prompts them).
   level: text("level", { enum: ["kezdo", "kozephalado", "halado", "versenyzo"] }),
-  // Optional Hungarian phone number in E.164 ("+36301234567"). Personal data:
+  // Hungarian phone number in E.164 ("+36301234567"), required on the profile
+  // form since 2026-10-28 (older accounts may lack it). Personal data:
   // never on a public page; only the current phase's opponents will see it.
   phone: text("phone"),
   // Set on the first-login page; until then the account can't use the app.

@@ -3,7 +3,7 @@
 // database side is in *.server.ts next to this file.
 
 import { EMAIL_RE, isLevel, type Level } from "../interest";
-import { parsePhone } from "../phone";
+import { PHONE_REQUIRED, parsePhone } from "../phone";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -165,11 +165,11 @@ export function initials(name: string, email: string): string {
 export const REGISTRATION_CLOSED_MESSAGE =
   "A regisztráció november 2-án nyílik. Ha meghívót kaptál, azzal az e-mail-címmel lépj be.";
 
-export type ProfileInput = { name: string; level: Level; phone: string | null; consent: boolean };
+export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean };
 export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;
 
-// The profile form (first login and the profile page): name and level are
-// required, the phone number is optional and stored as E.164 (phone.ts).
+// The profile form (first login and the profile page): name, level and phone
+// number are all required; the phone is stored as E.164 (phone.ts).
 // `requireConsent`: the first-login page also asks for the privacy consent.
 export function validateProfile(
   input: { name: unknown; level: unknown; phone: unknown; consent?: unknown },
@@ -184,8 +184,9 @@ export function validateProfile(
   if (!level) errors.level = "Válaszd ki a szinted.";
   const phone = parsePhone(input.phone);
   if (!phone.ok) errors.phone = phone.error;
+  else if (!phone.value) errors.phone = PHONE_REQUIRED;
   if (requireConsent && !consent) errors.consent = "A belépéshez fogadd el az adatkezelési tájékoztatót.";
-  if (Object.keys(errors).length || !level || !phone.ok) return { ok: false, errors };
+  if (Object.keys(errors).length || !level || !phone.ok || !phone.value) return { ok: false, errors };
   return { ok: true, value: { name, level, phone: phone.value, consent } };
 }
 

@@ -31,7 +31,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Profile:
   - Required: name, email.
   - Required: self-assessed level (kezdő / középhaladó / haladó / versenyző; asked at first login, prefilled from the interest signup with the same email; accounts that predate it are prompted on the home page, and the level is required to apply for a season).
-  - Optional: phone number (Hungarian numbers only, stored as +36…, shown as `+36 30 123 4567`; visible only to opponents in the current round, never public; collected at registration, not on the interest form). Name, level and phone are editable on the profile page.
+  - Required: phone number (Hungarian numbers only, stored as +36…, shown as `+36 30 123 4567`; visible only to opponents in the current round, never public; asked at first login, not on the interest form; it can be changed but not removed on the profile page; README decision log, 2026-10-28). Name, level and phone are editable on the profile page.
 - GDPR:
   - Privacy notice (section 17) and consent at registration.
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".
@@ -223,7 +223,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
 - **Who handles the data:** the organizer (Peter), with a contact email.
 - **What we collect:**
   - Landing page: names, emails, level, comment.
-  - Later: account data, an optional phone number, match history, ratings.
+  - Later: account data, the phone number, match history, ratings.
 - **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
 - **Who sees what:**
   - Public: names, results, standings and ratings.

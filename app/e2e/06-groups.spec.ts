@@ -58,7 +58,7 @@ test("11. Közzététel locks the groups, creates the matches and emails every p
   await page.getByRole("button", { name: "Közzététel" }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog.getByRole("heading", { name: "Közzéteszed a csoportokat?" })).toBeVisible();
-  await expect(dialog).toContainText("mind a 12 játékos most e-mailt kap");
+  await expect(dialog).toContainText("mind a 12 játékos most értesítést kap");
   await dialog.getByRole("button", { name: "Közzététel" }).click();
   await expect(page.getByRole("status")).toContainText("Közzétetted a csoportokat.");
 

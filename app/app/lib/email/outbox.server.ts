@@ -3,8 +3,18 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { accountInvites, broadcasts, emailMessages, emailSuppressions, interestSignups, leagues, users } from "~/db/schema";
+import {
+  accountInvites,
+  broadcasts,
+  emailMessages,
+  emailSuppressions,
+  interestSignups,
+  leagues,
+  notificationOptOuts,
+  users,
+} from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
+import { channelKey, followsEmailSwitch } from "~/lib/notifications";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
@@ -77,7 +87,23 @@ function messageValues(m: NewMessage) {
   };
 }
 
-async function enqueue(messages: NewMessage[]): Promise<number[]> {
+// The addresses of the accounts that switched email notifications off on the
+// profile (#115), lowercase. One query without bound addresses: there are
+// few such rows, and a long list would pass D1's parameter limit.
+export async function emailSwitchedOff(): Promise<Set<string>> {
+  const rows = await db
+    .select({ email: users.email })
+    .from(notificationOptOuts)
+    .innerJoin(users, eq(users.id, notificationOptOuts.userId))
+    .where(eq(notificationOptOuts.kind, channelKey("email")));
+  return new Set(rows.map((r) => r.email.toLowerCase()));
+}
+
+// Stores the emails, except notifications to an account that switched email
+// off (#115, followsEmailSwitch); the in-app list still has them.
+async function enqueue(queued: NewMessage[]): Promise<number[]> {
+  const off = queued.some((m) => followsEmailSwitch(m.kind)) ? await emailSwitchedOff() : new Set<string>();
+  const messages = queued.filter((m) => !followsEmailSwitch(m.kind) || !off.has(m.toEmail.toLowerCase()));
   const ids: number[] = [];
   for (let i = 0; i < messages.length; i += INSERT_CHUNK) {
     const rows = await db
@@ -166,20 +192,21 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
 }
 
 // A Szervező approved or rejected a season entry (#23): each player of the
-// pair gets one. An unsubscribed or bounced address gets nothing; the status
-// still shows in the app.
+// pair gets one. An unsubscribed or bounced address, or a player who switched
+// email off (#115), gets nothing; the status still shows in the app.
 export async function queueSeasonEntryDecision(
   toEmail: string,
   input: Parameters<typeof seasonEntryDecision>[0],
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  await deliver(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
+  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
 }
 
 // The groups are published (#24, D22): one email per player, sent right away
 // as transactional mail (ahead of broadcasts); what doesn't fit the day's
-// limit goes with the next cron runs. Unsubscribed or bounced addresses get
-// nothing; the groups still show in the app.
+// limit goes with the next cron runs. Unsubscribed or bounced addresses, and
+// players who switched email off (#115), get nothing; the groups still show
+// in the app.
 export async function queueGroupsPublished(
   messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0] }[],
 ): Promise<void> {

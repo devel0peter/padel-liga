@@ -4,11 +4,15 @@ import { useFetcher } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
+import { CHANNELS } from "~/lib/notifications";
 import { fromBase64Url } from "~/lib/push/webpush";
 
-// Web push on this device: subscribe or unsubscribe this browser (stored via
-// /api/push), and send a test. Everything here runs in the browser; the
-// server render shows a neutral state until the checks are done.
+// The push switch of the profile (#115) and this device's subscription.
+// The switch is per account (on by default; saved by the profile action):
+// off, no device gets a push. Turning it on also asks this browser for
+// permission and subscribes it (stored via /api/push). Everything about the
+// device runs in the browser; the server render shows a neutral state until
+// the checks are done.
 
 type State =
   | "checking"
@@ -31,12 +35,20 @@ async function registration() {
   return navigator.serviceWorker.register("/sw.js");
 }
 
-export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+const IPHONE =
+  "iPhone-on iOS 16.4 vagy újabb kell, és a Padelpárbajt a főképernyőhöz kell adnod (Safariban Megosztás → Főképernyőhöz adás), aztán onnan megnyitnod.";
+
+export function PushSettings({ vapidPublicKey, enabled }: { vapidPublicKey: string | null; enabled: boolean }) {
   const [state, setState] = useState<State>("checking");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const channel = useFetcher();
   const save = useFetcher<{ ok?: true; error?: string }>();
   const test = useFetcher<{ ok?: true; devices?: number; error?: string }>();
+
+  // Optimistic: show the new value while it saves.
+  const pending = channel.formData?.get("enabled");
+  const on = pending != null ? pending === "1" : enabled;
 
   function post(fetcher: typeof save, sub: PushSubscription | null, intent: string) {
     const keys = sub?.toJSON().keys;
@@ -65,7 +77,7 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
     if (save.data?.error) setError(save.data.error);
   }, [save.data]);
 
-  async function turnOn() {
+  async function subscribeDevice() {
     if (!vapidPublicKey) return;
     setBusy(true);
     setError(null);
@@ -86,7 +98,7 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
     }
   }
 
-  async function turnOff() {
+  async function unsubscribeDevice() {
     setBusy(true);
     setError(null);
     try {
@@ -101,48 +113,71 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
     }
   }
 
-  if (!vapidPublicKey) return <p className="text-sm text-muted-foreground">A telefonos értesítés még nincs beállítva.</p>;
+  function toggle(next: boolean) {
+    channel.submit({ intent: "channel", channel: "push", enabled: next ? "1" : "0" }, { method: "post", action: "/profile" });
+    if (next && state === "off") void subscribeDevice();
+  }
 
   const notice: Partial<Record<State, string>> = {
     unsupported: "Ez a böngésző nem tud értesítést küldeni. Próbáld Chrome-mal, Firefoxszal vagy Safarival.",
-    "ios-browser":
-      "iPhone-on akkor kapsz értesítést, ha a Padelpárbajt a főképernyőről nyitod meg (iOS 16.4 vagy újabb kell): Safariban Megosztás → Főképernyőhöz adás, aztán nyisd meg onnan, és itt kapcsold be.",
+    "ios-browser": "Böngészőből ezen az iPhone-on nem megy: add a főképernyőhöz, nyisd meg onnan, és ott kapcsold be.",
     denied: "Ebben a böngészőben letiltottad az értesítéseket. A böngésző beállításaiban engedélyezheted a padelparbaj.hu-nak, aztán töltsd újra az oldalt.",
   };
 
   return (
     <div className="grid gap-3">
       <div className="flex items-start gap-3">
-        <Switch
-          id="push-device"
-          checked={state === "on"}
-          disabled={busy || (state !== "on" && state !== "off")}
-          onCheckedChange={(on) => (on ? turnOn() : turnOff())}
-          className="mt-0.5"
-        />
+        <Switch id="channel-push" checked={on} disabled={busy} onCheckedChange={toggle} className="mt-0.5" />
         <div className="grid gap-0.5">
-          <Label htmlFor="push-device">Értesítés ezen az eszközön</Label>
-          <p className="text-sm text-muted-foreground">
-            {state === "on" ? "Bekapcsolva. A többi eszközödön külön kell bekapcsolni." : "Push értesítés a telefonodra vagy a gépedre, akkor is, ha nincs nyitva az oldal."}
-          </p>
+          <Label htmlFor="channel-push">{CHANNELS.push.label}</Label>
+          <p className="text-sm text-muted-foreground">{CHANNELS.push.description}</p>
+          <p className="text-sm text-muted-foreground">{IPHONE}</p>
         </div>
       </div>
-      {notice[state] && <p className="text-sm text-muted-foreground">{notice[state]}</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {state === "on" && (
-        <div className="flex flex-wrap items-center gap-3">
-          <test.Form method="post" action="/api/push">
-            <Button type="submit" name="intent" value="test" variant="outline" size="sm" disabled={test.state !== "idle"}>
-              Próba értesítés
-            </Button>
-          </test.Form>
-          {test.data?.devices !== undefined && (
-            <span className="text-sm text-muted-foreground">
-              {test.data.devices > 0 ? `Elküldtük ${test.data.devices} eszközre.` : "Egy eszközre sem ment ki. Kapcsold ki és be újra."}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="grid gap-3 pl-11">
+        {!on ? (
+          <p className="text-sm text-muted-foreground">Kikapcsolva: egy eszközödre sem küldünk push értesítést.</p>
+        ) : !vapidPublicKey ? (
+          <p className="text-sm text-muted-foreground">A push értesítés még nincs beállítva.</p>
+        ) : (
+          <>
+            {state === "on" && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Ezen az eszközön be van kapcsolva. A többi eszközödön ott kell bekapcsolni.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <test.Form method="post" action="/api/push">
+                    <Button type="submit" name="intent" value="test" variant="outline" size="sm" disabled={test.state !== "idle"}>
+                      Próba értesítés
+                    </Button>
+                  </test.Form>
+                  <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={unsubscribeDevice}>
+                    Kikapcsolom ezen az eszközön
+                  </Button>
+                  {test.data?.devices !== undefined && (
+                    <span className="text-sm text-muted-foreground">
+                      {test.data.devices > 0
+                        ? `Elküldtük ${test.data.devices} eszközre.`
+                        : "Egy eszközre sem ment ki. Kapcsold ki és be újra ezen az eszközön."}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+            {state === "off" && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-muted-foreground">Ezen az eszközön még nincs bekapcsolva.</p>
+                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={subscribeDevice}>
+                  Bekapcsolom ezen az eszközön
+                </Button>
+              </div>
+            )}
+            {notice[state] && <p className="text-sm text-muted-foreground">{notice[state]}</p>}
+          </>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
     </div>
   );
 }

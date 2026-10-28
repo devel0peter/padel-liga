@@ -8,13 +8,17 @@ import { listCities } from "./cities.server";
 import { cityName, OTHER_CITY } from "./cities";
 import type { InterestSignup } from "./interest";
 import {
+  channelEnabled,
+  channelKey,
   isEnabled,
   newSignupMessage,
   pushPayload,
   signupRecipients,
   TEST_MESSAGE,
+  type Channel,
   type Message,
   type NotificationKind,
+  type PlayerKind,
   type StoredKind,
   type SubscriptionInput,
 } from "./notifications";
@@ -70,19 +74,34 @@ async function pushTo(userId: string, id: number, message: Message): Promise<num
   return results.filter(Boolean).length;
 }
 
-// Stores and pushes one message per user, skipping users who switched the kind off.
+const NONE: ReadonlySet<string> = new Set();
+
+// Stores one message per user, skipping users who switched the kind off, and
+// pushes it to those who didn't switch push off (#115).
 async function notify(kind: StoredKind, messages: { userId: string; message: Message }[]): Promise<void> {
   const disabled = await disabledKinds(messages.map((m) => m.userId));
-  const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? new Set(), kind));
+  const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? NONE, kind));
   await Promise.all(
     wanted.map(async ({ userId, message }) => {
       const [row] = await db
         .insert(notifications)
         .values({ userId, kind, ...message })
         .returning({ id: notifications.id });
-      await pushTo(userId, row.id, message);
+      if (channelEnabled(disabled.get(userId) ?? NONE, "push")) await pushTo(userId, row.id, message);
     }),
   );
+}
+
+// A player notification (#115): always in the in-app list, pushed unless the
+// player switched push off. The email goes through the outbox, which checks
+// the email switch. A push failure never fails the caller; neither does a
+// failure here, since the decision it reports is already saved.
+export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[]): Promise<void> {
+  try {
+    await notify(kind, messages);
+  } catch (error) {
+    console.error(`${kind} notification failed`, error);
+  }
 }
 
 // A landing page signup was saved: tell the city's Szervezők and the Admins.
@@ -111,13 +130,14 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
   await notify("new_signup", recipients.map((r) => ({ userId: r.userId, message: newSignupMessage(summary, r) })));
 }
 
-// The profile's "Próba" button. Returns how many devices got the push.
+// The profile's "Próba" button. Returns how many devices got the push (none
+// with push switched off).
 export async function sendTestNotification(userId: string): Promise<number> {
   const [row] = await db
     .insert(notifications)
     .values({ userId, kind: "test", ...TEST_MESSAGE })
     .returning({ id: notifications.id });
-  return pushTo(userId, row.id, TEST_MESSAGE);
+  return channelEnabled(await disabledKindsFor(userId), "push") ? pushTo(userId, row.id, TEST_MESSAGE) : 0;
 }
 
 // --- Inbox ------------------------------------------------------------------
@@ -168,13 +188,21 @@ export async function disabledKindsFor(userId: string): Promise<Set<string>> {
   return (await disabledKinds([userId])).get(userId) ?? new Set();
 }
 
-export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
+// On: no row. Off: one row.
+async function setOptOut(userId: string, kind: string, enabled: boolean): Promise<void> {
   if (enabled)
     await db.delete(notificationOptOuts).where(and(eq(notificationOptOuts.userId, userId), eq(notificationOptOuts.kind, kind)));
   else await db.insert(notificationOptOuts).values({ userId, kind }).onConflictDoNothing();
 }
 
+export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
+  await setOptOut(userId, kind, enabled);
+}
 
+// The email and push switches (#115), stored like the kinds.
+export async function setChannelEnabled(userId: string, channel: Channel, enabled: boolean): Promise<void> {
+  await setOptOut(userId, channelKey(channel), enabled);
+}
 
 // A browser subscribed: store it for this user (a shared device moves over).
 export async function saveSubscription(userId: string, s: SubscriptionInput): Promise<void> {

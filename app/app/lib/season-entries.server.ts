@@ -4,6 +4,8 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import { leagues, pairs, seasonEntries, users } from "~/db/schema";
 import { queueSeasonEntryDecision } from "~/lib/email/outbox.server";
+import { seasonEntryDecisionMessage } from "~/lib/notifications";
+import { notifyPlayers } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
 import { audit } from "./leagues.server";
@@ -264,8 +266,8 @@ export async function decideEntry(
       pairId: seasonEntries.pairId,
       pairStatus: pairs.status,
       league: leagues.name,
-      a: { email: playerA.email, name: playerA.name },
-      b: { email: playerB.email, name: playerB.name },
+      a: { id: playerA.id, email: playerA.email, name: playerA.name },
+      b: { id: playerB.id, email: playerB.email, name: playerB.name },
     })
     .from(seasonEntries)
     .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
@@ -313,6 +315,9 @@ export async function decideEntry(
   await audit(actor.id, `season_entry.${decision}`, `season_entry:${entryId}`, note ?? undefined);
 
   const joins = phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt };
+  // In the app (and by push) for both, whatever their email switch says (#115).
+  const message = seasonEntryDecisionMessage({ league: entry.league, season: season.name, approved: decision === "approve", joins });
+  await notifyPlayers("season_entry_decision", [entry.a, entry.b].map((p) => ({ userId: p.id, message })));
   for (const [to, partner] of [
     [entry.a, entry.b],
     [entry.b, entry.a],

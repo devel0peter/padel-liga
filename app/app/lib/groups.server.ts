@@ -6,6 +6,8 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import { groupPairs, groups, leagues, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { queueGroupsPublished } from "~/lib/email/outbox.server";
+import { groupsPublishedMessage } from "~/lib/notifications";
+import { notifyPlayers } from "~/lib/notifications.server";
 
 import { audit } from "./leagues.server";
 import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
@@ -25,8 +27,8 @@ const CHANGED = "A javaslat közben változott. Frissítsd az oldalt.";
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
 
-// Email stays on the server: only the publish emails use it.
-type Player = { name: string; level: string | null; email: string };
+// Id and email stay on the server: only the publish notifications use them.
+type Player = { id: string; name: string; level: string | null; email: string };
 
 export type GroupPair = {
   pairId: number;
@@ -41,22 +43,35 @@ export type StoredGroup = { id: number; number: number; revision: number; publis
 const pairColumns = {
   pairId: pairs.id,
   pairStatus: pairs.status,
+  idA: playerA.id,
   nameA: playerA.name,
   levelA: playerA.level,
   emailA: playerA.email,
+  idB: playerB.id,
   nameB: playerB.name,
   levelB: playerB.level,
   emailB: playerB.email,
 };
 
-type PairRow = { pairId: number; pairStatus: "active" | "dissolved"; nameA: string; levelA: string | null; emailA: string; nameB: string; levelB: string | null; emailB: string };
+type PairRow = {
+  pairId: number;
+  pairStatus: "active" | "dissolved";
+  idA: string;
+  nameA: string;
+  levelA: string | null;
+  emailA: string;
+  idB: string;
+  nameB: string;
+  levelB: string | null;
+  emailB: string;
+};
 
 function groupPair(r: PairRow): GroupPair {
   return {
     pairId: r.pairId,
     players: [
-      { name: r.nameA, level: r.levelA, email: r.emailA },
-      { name: r.nameB, level: r.levelB, email: r.emailB },
+      { id: r.idA, name: r.nameA, level: r.levelA, email: r.emailA },
+      { id: r.idB, name: r.nameB, level: r.levelB, email: r.emailB },
     ],
     // Both levels are required to enter (D18); until Elo exists the pair's
     // rating is the average starting Elo of its levels (D20).
@@ -357,5 +372,21 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     });
   });
   await queueGroupsPublished(messages);
+  // Then in the app (and by push) for every player, whatever their email
+  // switch says (#115). After the emails, so the pushes can't use up the
+  // request's subrequests before the relay connects.
+  await notifyPlayers(
+    "groups_published",
+    draft.flatMap((g) => {
+      const message = groupsPublishedMessage({
+        league: league?.name ?? "",
+        season: season.name,
+        phase: FIRST_PHASE,
+        group: g.number,
+        deadline: phase.deadline,
+      });
+      return g.pairs.flatMap((pair) => pair.players.map((p) => ({ userId: p.id, message })));
+    }),
+  );
   return { ok: true };
 }

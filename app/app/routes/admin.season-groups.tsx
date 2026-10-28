@@ -206,8 +206,9 @@ function PublishDialog({ players, disabled }: { players: number; disabled: boole
           <AlertDialogHeader>
             <AlertDialogTitle>Közzéteszed a csoportokat?</AlertDialogTitle>
             <AlertDialogDescription>
-              Létrehozzuk a meccseket, és mind a {players} játékos most e-mailt kap a csoportjáról, az ellenfeleiről
-              és a határidőről. Utána a csoportok nem módosíthatók.
+              Létrehozzuk a meccseket, és mind a {players} játékos most értesítést kap a csoportjáról, az
+              ellenfeleiről és a határidőről (az e-mailt csak az, aki nem kapcsolta ki). Utána a csoportok nem
+              módosíthatók.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

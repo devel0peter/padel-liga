@@ -153,7 +153,8 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. A levelek most indulnak, és nem lehet visszavonni őket.
+                    „{subject}” · {label}. Az első 50 levél most megy ki, a többi óránként, a napi limit szerint. Nem lehet
+                    visszavonni.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

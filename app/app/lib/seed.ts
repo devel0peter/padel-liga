@@ -6,7 +6,7 @@
 // @example.test (a reserved domain, so mail to them goes nowhere), and the
 // city, league and clubs have fixed slugs. Running it again first deletes all
 // of that, including what a walkthrough created on top (pairs, entries,
-// groups, held mail), then writes the same starting state again.
+// groups, emails), then writes the same starting state again.
 
 import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar } from "@padel-liga/rules";
 

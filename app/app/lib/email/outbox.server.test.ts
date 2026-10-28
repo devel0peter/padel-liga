@@ -11,6 +11,7 @@ vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
+  relayConfigured: () => false,
   sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
@@ -93,12 +94,17 @@ describe("queueGroupsPublished", () => {
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
   });
 
-  it("queues a whole league at once, within D1's parameter limit; what is over the day's limit waits", async () => {
+  it("queues a whole league at once; sends at most 50 in the request, the cron the rest within the day's limit", async () => {
     const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
     await O.queueGroupsPublished(many);
     expect(messages()).toHaveLength(120);
-    // Daily limit 100, minus the 10 kept for login codes.
+    expect(O.SEND_NOW_MAX).toBe(50);
+    expect(h.sent).toHaveLength(50);
+    expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(70);
+    // The cron: daily limit 100, minus the 10 kept for login codes.
+    await O.deliver();
     expect(h.sent).toHaveLength(90);
+    expect(new Set(h.sent.map((m) => m.to)).size).toBe(90);
     expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(30);
   });
 
@@ -211,6 +217,30 @@ describe("automatic outbox", () => {
     });
     expect(h.sent).toHaveLength(10);
     expect(h.sent.at(-1).subject).toMatch(/^123 456 a belépőkódod/);
+  });
+
+  it("a broadcast to many sends at most 50 in the request", async () => {
+    const recipients = Array.from({ length: 70 }, (_, i) => ({ email: `p${i}@x.hu`, name: `P${i}` }));
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu" });
+    expect(h.sent).toHaveLength(50);
+    expect(count("kind = 'broadcast' and status = 'pending'")).toBe(20);
+  });
+
+  it("never sends an email twice: one left in 'sending' by a crashed run is marked failed, not retried", async () => {
+    insert("pair_intro", 1, "sending");
+    insert("pair_intro", 1, "sending", "fresh@x.hu");
+    // The first was claimed 11 minutes ago, the second just now.
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() - 660 where to_email = 'x@x.hu'").run();
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() where to_email = 'fresh@x.hu'").run();
+    expect(await O.deliver()).toEqual({ sent: 0 });
+    expect(h.sent).toEqual([]);
+    expect(h.raw.prepare("select to_email, status, last_error from email_messages order by id").all()).toEqual([
+      { to_email: "x@x.hu", status: "failed", last_error: O.INTERRUPTED },
+      { to_email: "fresh@x.hu", status: "sending", last_error: null },
+    ]);
+    // A claimed row is never claimed again by another run.
+    expect(await O.deliver()).toEqual({ sent: 0 });
+    expect(h.sent).toEqual([]);
   });
 
   it("registration invites go out right away, only the ones just queued", async () => {

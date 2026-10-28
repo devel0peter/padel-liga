@@ -11,9 +11,9 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
+  sendEmails: async () => {
     throw new Error("nothing may be sent");
   },
 }));

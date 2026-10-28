@@ -22,7 +22,7 @@ The page labels below are the Hungarian ones you see on screen.
 
 1. Install and configure once, from the repo root:
    - `npm ci`
-   - Copy `app/.dev.vars.example` to `app/.dev.vars`. Set `TURNSTILE_SITE_KEY=""` (an empty key means no bot check, so asking for a login code works locally). Leave `RESEND_API_KEY=""` empty: with a key, a click on "Küldés" would try to send to the fake addresses for real. Also set `EMAIL_DAILY_LIMIT="1000"`: a full run sends about 100 emails (login codes included), and the default daily limit of 100 would leave the last group emails unsent (nothing sends the rest locally).
+   - Copy `app/.dev.vars.example` to `app/.dev.vars`. Set `TURNSTILE_SITE_KEY=""` (an empty key means no bot check, so asking for a login code works locally). Leave `RESEND_API_KEY=""`, `SMTP_USER=""` and `SMTP_PASSWORD=""` empty: with a Resend key or a relay login, a click on "Küldés" would try to send to the fake addresses for real. The daily limit (2,000) is far above the roughly 100 emails a full run sends.
 2. Migrate and seed the local database:
    - `npm run db:migrate:local -w app`
    - `npm run db:seed:local -w app`

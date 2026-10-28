@@ -1,18 +1,19 @@
 // The outbox's pair emails on a real SQLite (~/test/sqlite): what gets queued
-// and for whom. Resend is stubbed; nothing leaves the process.
+// and for whom. The sender is stubbed; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InterestSignup } from "~/lib/interest";
 
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
-vi.mock("cloudflare:workers", () => ({ env: {} }));
+// The quota tests count against a limit of 100 a day.
+vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async (emails: any[]) => {
+  sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
-    return { ok: true, ids: emails.map((_, i) => `id-${i}`) };
+    return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
 }));
 vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor", name: "Győr" }] }));

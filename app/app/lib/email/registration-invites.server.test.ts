@@ -1,15 +1,15 @@
 // The registration invite (#20, D26) on a real SQLite (~/test/sqlite): who it
 // is queued for, and that each address is claimed once. Only queued, never
-// sent: Resend is stubbed and fails the test if called.
+// sent: The sender is stubbed and fails the test if called.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
+  sendEmails: async () => {
     throw new Error("nothing may be sent");
   },
 }));

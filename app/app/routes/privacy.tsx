@@ -223,7 +223,7 @@ export default function Privacy() {
               Ha Google-lel lépsz be, a Google átadja nekünk a neved, az
               e-mail-címed, a fiókod azonosítóját és a profilképed címét. A
               profilképet csak a fiókodban mutatjuk, és a Google szerveréről
-              töltődik be. Ezen kívül a Google semmit nem tud meg rólad tőlünk.
+              töltődik be. A leveleinket is a Google küldi ki (lásd lent).
             </p>
           </Section>
 
@@ -248,8 +248,8 @@ export default function Privacy() {
             </p>
             <ul className={list}>
               <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a jelentkezési űrlap robotszűrője (Turnstile),</li>
-              <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók,</li>
-              <li>Resend – a liga e-mailjeinek kiküldése.</li>
+              <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók és a liga e-mailjeinek kiküldése,</li>
+              <li>Resend – a liga e-mailjeinek kiküldése, ha a Google épp nem tudja.</li>
             </ul>
           </Section>
 

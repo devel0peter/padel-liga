@@ -1,5 +1,8 @@
-# Copy to .dev.vars. Without RESEND_API_KEY, local dev logs emails to the console.
+# Copy to .dev.vars. Without SMTP_USER/SMTP_PASSWORD and RESEND_API_KEY, local dev
+# logs emails to the console. Setting either sends real email.
 EMAIL_SECRET="any-long-random-string"
+SMTP_USER=""
+SMTP_PASSWORD=""
 RESEND_API_KEY=""
 # Google login: an OAuth client with redirect URI http://localhost:5173/auth/google/callback.
 # Set GOOGLE_CLIENT_ID in wrangler.jsonc vars (or override it here). Empty: no Google button.

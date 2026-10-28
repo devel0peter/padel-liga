@@ -304,7 +304,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 title={chosen?.league ? "Nevezz a ligába" : "Jelentkezz, és szólunk"}
                 lede={
                   chosen?.league
-                    ? "Itt már fut a liga. Így látod, hol tart, és mikor tudtok becsatlakozni."
+                    ? "Itt már van liga. Így látod, hol tart, és mikor tudtok becsatlakozni."
                     : "Nálatok még nincs liga. Írd fel magad, és e-mailben szólunk, ha indul. A jelentkezés nem kötelez semmire."
                 }
               />

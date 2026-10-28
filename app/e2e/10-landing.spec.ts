@@ -18,6 +18,9 @@ test("a league city shows the league and leads to registration, not the interest
   await expect(league).toContainText("Nevezz most, és az 1. körtől játszotok");
   // No interest form for this city, and no pair threshold anywhere.
   await expect(page.locator("#name1")).toHaveCount(0);
+  // The FAQ answer is only in the page while its item is open.
+  await page.getByRole("button", { name: "Mikor csatlakozhatok?" }).click();
+  await expect(page.getByText("Ahol már fut a liga, nevezhetsz rögtön")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/12 pár|elég pár/);
 
   await page.getByRole("link", { name: "Tovább a nevezéshez" }).click();

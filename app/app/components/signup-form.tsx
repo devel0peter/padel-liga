@@ -208,7 +208,7 @@ export function SignupForm({
       <div className="grid gap-5 rounded-2xl border-2 border-foreground bg-background p-6">
         {cityField}
         <div className="grid gap-3">
-          <h3 className="font-display text-xl font-bold">Itt már fut a liga</h3>
+          <h3 className="font-display text-xl font-bold">Itt már van liga</h3>
           <p>
             Nem kell külön jelentkezni: lépj be, vagy hozz létre egy fiókot, és a Kezdőlapon tudtok nevezni a
             párotokkal.

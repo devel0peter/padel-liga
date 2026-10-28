@@ -104,10 +104,10 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
     `Szint: ${levelLabel(s.level)}`,
   ];
   const next = otherCity
-    ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, és elég pár összegyűlik, szólunk.`
+    ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
     : s.mode === "solo"
-      ? "Segítünk párt találni. Amint elég pár összegyűlik, írunk az indulásról."
-      : "Amint elég pár összegyűlik, írunk az indulásról és a következő lépésekről.";
+      ? "Segítünk párt találni, és írunk az indulásról."
+      : "Írunk az indulásról és a következő lépésekről.";
   const share = otherCity
     ? `Minél többen jelentkeztek, annál hamarabb indulhat nálatok is. Küldd el a helyi padeleseknek: ${shareUrl(SHARE_REFS.email)}`
     : s.mode === "solo"

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  canCreateAccount,
   checkCode,
   codeSendDecision,
   CODE_TTL_MS,
@@ -12,12 +11,12 @@ import {
   loginEmailParam,
   MAX_CODE_ATTEMPTS,
   MAX_CODES_PER_WINDOW,
+  newAddressCodeCap,
+  newAddressCodeDecision,
   nextExpiry,
   normalizeCode,
   normalizeEmail,
   parseCookies,
-  REGISTRATION_OPENS_AT,
-  registrationOpen,
   resolveGoogleLogin,
   safeReturnTo,
   serializeCookie,
@@ -148,22 +147,36 @@ describe("checking codes", () => {
   });
 });
 
-describe("registration", () => {
-  it("opens on 2 Nov 2026 at midnight Budapest time", () => {
-    expect(REGISTRATION_OPENS_AT.toISOString()).toBe("2026-11-01T23:00:00.000Z");
-    expect(registrationOpen(new Date("2026-11-01T22:59:59Z"))).toBe(false);
-    expect(registrationOpen(new Date("2026-11-01T23:00:00Z"))).toBe(true);
+describe("codes to new addresses (#113)", () => {
+  const base = { hasAccount: false, invited: false, suppression: null, sentToNewLast24h: 0, dailyLimit: 100 } as const;
+
+  it("caps them at a quarter of the daily limit", () => {
+    expect(newAddressCodeCap(100)).toBe(25);
+    expect(newAddressCodeCap(2000)).toBe(500);
+    expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 24 })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 25 })).toBe("capped");
   });
 
-  it("lets only invited emails create an account before that", () => {
-    expect(canCreateAccount({ invited: false, now })).toBe(false);
-    expect(canCreateAccount({ invited: true, now })).toBe(true);
-    expect(canCreateAccount({ invited: false, now: REGISTRATION_OPENS_AT })).toBe(true);
+  it("never caps an account or an invited address", () => {
+    expect(newAddressCodeDecision({ ...base, hasAccount: true, sentToNewLast24h: 99 })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, invited: true, sentToNewLast24h: 99 })).toBe("send");
+  });
+
+  it("skips a new address that bounced or complained, invited or not", () => {
+    for (const suppression of ["bounced", "complained"] as const) {
+      expect(newAddressCodeDecision({ ...base, suppression })).toBe("suppressed");
+      expect(newAddressCodeDecision({ ...base, suppression, invited: true })).toBe("suppressed");
+    }
+  });
+
+  it("sends to an unsubscribed new address and to an account whose address bounced", () => {
+    expect(newAddressCodeDecision({ ...base, suppression: "unsubscribed" })).toBe("send");
+    expect(newAddressCodeDecision({ ...base, hasAccount: true, suppression: "bounced" })).toBe("send");
   });
 });
 
 describe("Google login", () => {
-  const base = { linkedUserId: null, emailUserId: null, emailVerified: true, invited: false, now };
+  const base = { linkedUserId: null, emailUserId: null, emailVerified: true };
 
   it("logs in the account already linked to this Google account", () => {
     expect(resolveGoogleLogin({ ...base, linkedUserId: "u1", emailUserId: "u2" })).toEqual({
@@ -183,10 +196,12 @@ describe("Google login", () => {
     });
   });
 
-  it("creates an account only when invited or registration is open", () => {
-    expect(resolveGoogleLogin(base)).toEqual({ kind: "refused", reason: "closed" });
-    expect(resolveGoogleLogin({ ...base, invited: true })).toEqual({ kind: "create" });
-    expect(resolveGoogleLogin({ ...base, now: REGISTRATION_OPENS_AT })).toEqual({ kind: "create" });
+  it("creates an account for any new verified email, no invite needed (#113)", () => {
+    expect(resolveGoogleLogin(base)).toEqual({ kind: "create" });
+  });
+
+  it("never creates an account for an unverified Google email", () => {
+    expect(resolveGoogleLogin({ ...base, emailVerified: false })).toEqual({ kind: "refused", reason: "unverified" });
   });
 });
 

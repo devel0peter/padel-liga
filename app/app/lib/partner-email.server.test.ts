@@ -1,6 +1,6 @@
 // "Partner has no email" (#96, D35) on a real SQLite (~/test/sqlite): the
 // box, saving the address, the one held invite, and the pair forming once the
-// partner registers. Resend is stubbed and fails the test if called: nothing
+// partner registers. The sender is stubbed and fails the test if called: nothing
 // is sent, the invite waits on Kimenő levelek.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,9 +12,9 @@ vi.mock("~/lib/cities.server", () => ({
   listedCities: async () => [{ slug: "gyor" }],
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
 }));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
+  sendEmails: async () => {
     throw new Error("nothing may be sent");
   },
 }));

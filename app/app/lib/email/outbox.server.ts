@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -9,7 +9,7 @@ import type { InterestSignup } from "~/lib/interest";
 import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
 import { BULK_KINDS, parseDailyLimit, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses, queuedStatus } from "./hold";
-import { MAX_BATCH, sendBatch } from "./resend.server";
+import { MAX_BATCH, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { listCities } from "~/lib/cities.server";
@@ -338,7 +338,8 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
 export async function sendTestBroadcast(draft: { subject: string; body: string }, to: Recipient) {
   const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(to.email, emailSecret()));
   const email = broadcastEmail(draft, to, url);
-  return sendBatch([{ to: to.email, ...email, subject: `[TESZT] ${email.subject}` }]);
+  const [result] = await sendEmails([{ to: to.email, ...email, subject: `[TESZT] ${email.subject}` }]);
+  return result;
 }
 
 type Claimed = typeof emailMessages.$inferSelect;
@@ -354,7 +355,9 @@ const GROUP_BUDGET_KIND: Record<Group, MessageKind> = {
   broadcast: "broadcast",
 };
 
-async function claim(limit: number, group: Group, ids?: number[]): Promise<Claimed[]> {
+// runStart: an email that failed earlier in this run (claimed since then)
+// waits for the next run instead of being tried again right away.
+async function claim(limit: number, group: Group, runStart: Date, ids?: number[]): Promise<Claimed[]> {
   if (limit <= 0) return [];
   const pending = db
     .select({ id: emailMessages.id })
@@ -362,6 +365,7 @@ async function claim(limit: number, group: Group, ids?: number[]): Promise<Claim
     .where(
       and(
         eq(emailMessages.status, "pending"),
+        or(isNull(emailMessages.claimedAt), lt(emailMessages.claimedAt, runStart)),
         group === "transactional"
           ? notInArray(emailMessages.kind, [...BULK_KINDS, "login_code"])
           : group === "broadcast"
@@ -380,8 +384,11 @@ async function claim(limit: number, group: Group, ids?: number[]): Promise<Claim
     .returning();
 }
 
-async function sendClaimed(rows: Claimed[]): Promise<"ok" | "stop"> {
-  const result = await sendBatch(
+// Marks each email by its own result (#111): sent, back in the queue
+// (retryLater: no attempt counted), or one more failed attempt. Stops the
+// run when a provider asks to wait or when nothing in the batch went out.
+async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boolean }> {
+  const results: SendResult[] = await sendEmails(
     rows.map((r) => ({
       to: r.toEmail,
       subject: r.subject,
@@ -390,40 +397,39 @@ async function sendClaimed(rows: Claimed[]): Promise<"ok" | "stop"> {
       headers: r.headers ? (JSON.parse(r.headers) as Record<string, string>) : undefined,
     })),
   );
-  const ids = rows.map((r) => r.id);
 
-  if (result.ok) {
-    const now = new Date();
-    const [first, ...rest] = rows.map((r, i) =>
-      db
+  const now = new Date();
+  const [first, ...rest] = rows.map((r, i) => {
+    const result = results[i] ?? { ok: false, error: "no result", retryLater: false };
+    const row = eq(emailMessages.id, r.id);
+    if (result.ok)
+      return db
         .update(emailMessages)
-        .set({ status: "sent", sentAt: now, providerId: result.ids[i] ?? null, html: null, text: null, lastError: null })
-        .where(eq(emailMessages.id, r.id)),
-    );
-    await db.batch([first, ...rest]);
-    return "ok";
-  }
+        .set({ status: "sent", sentAt: now, providerId: result.id || null, html: null, text: null, lastError: null })
+        .where(row);
+    if (result.retryLater) return db.update(emailMessages).set({ status: "pending", lastError: result.error }).where(row);
+    return db
+      .update(emailMessages)
+      .set({
+        attempts: sql`${emailMessages.attempts} + 1`,
+        status: sql`case when ${emailMessages.attempts} + 1 >= ${MAX_ATTEMPTS} then 'failed' else 'pending' end`,
+        lastError: result.error,
+      })
+      .where(row);
+  });
+  await db.batch([first, ...rest]);
 
-  console.error("email batch failed", result.error);
-  if (result.retryLater) {
-    await db.update(emailMessages).set({ status: "pending", lastError: result.error }).where(inArray(emailMessages.id, ids));
-    return "stop";
-  }
-  await db
-    .update(emailMessages)
-    .set({
-      attempts: sql`${emailMessages.attempts} + 1`,
-      status: sql`case when ${emailMessages.attempts} + 1 >= ${MAX_ATTEMPTS} then 'failed' else 'pending' end`,
-      lastError: result.error,
-    })
-    .where(inArray(emailMessages.id, ids));
-  return "stop";
+  const failed = results.filter((r): r is Extract<SendResult, { ok: false }> => !r.ok);
+  if (failed.length) console.error(`${failed.length} of ${rows.length} emails failed`, failed[0].error);
+  const sent = rows.length - failed.length;
+  return { sent, stop: sent === 0 || failed.some((r) => r.retryLater) };
 }
 
 // Sends pending emails within the daily budget: login codes first, then
 // signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
 export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   const now = Date.now();
+  const runStart = new Date(now);
   await db
     .update(emailMessages)
     .set({ status: "pending" })
@@ -439,10 +445,11 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   for (const group of GROUPS) {
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
       const budget = sendBudget(limit, sentLast24h + sent, GROUP_BUDGET_KIND[group]);
-      const rows = await claim(budget, group, ids);
+      const rows = await claim(budget, group, runStart, ids);
       if (rows.length === 0) break;
-      if ((await sendClaimed(rows)) === "stop") return { sent };
-      sent += rows.length;
+      const result = await sendClaimed(rows);
+      sent += result.sent;
+      if (result.stop) return { sent };
     }
   }
   return { sent };

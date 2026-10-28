@@ -173,6 +173,8 @@ Group size, phase length in weeks, phases per season (4), catch-up week on or of
 ## 13. Notifications (in Hungarian; README decision log, 2026-10-05)
 Channels: email, and web push for players who opt in (PWA). No player gets more than one non-urgent email a day.
 
+Emails are sent from `hello@padelparbaj.hu` through Google Workspace's SMTP relay; what the relay refuses or can't take goes through Resend. Each email is marked sent or failed on its own. The league's own limit is 2,000 emails a day, sent in this order: login codes, personal emails, bulk mail (README decision log, 2026-10-28, #111).
+
 Every email except login codes and signup confirmations is held until an Admin sends or discards it on "Kimenő levelek" (`/admin/outbox`), per kind (README decision log, 2026-10-24, #88). The "instant" emails below leave only then.
 
 **Instant** (email and push), only when someone has to act soon or the groups change:
@@ -229,7 +231,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Public: names, results, standings and ratings.
   - Never public: email and phone number.
   - Phone number: only the current round's opponents see it (section 3).
-- **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database) and Resend (email).
+- **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).
 - **Retention:**
   - Interest list: deleted after the first season starts, unless the person registers.
   - Accounts: kept until deletion, then anonymized (section 3).

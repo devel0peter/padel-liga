@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BULK_KINDS, LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
+import { BULK_KINDS, DEFAULT_DAILY_LIMIT, LOGIN_RESERVE, parseDailyLimit, sendBudget, TRANSACTIONAL_RESERVE } from "./budget";
 
 describe("sendBudget", () => {
   it("gives login codes the whole remaining quota", () => {
@@ -39,8 +39,20 @@ describe("sendBudget", () => {
 });
 
 describe("parseDailyLimit", () => {
-  it("reads a positive integer and falls back to 100", () => {
+  it("reads a positive integer and falls back to 2,000 (#111)", () => {
+    expect(DEFAULT_DAILY_LIMIT).toBe(2000);
     expect(parseDailyLimit("3000")).toBe(3000);
-    for (const v of [undefined, "", "abc", "0", "-5", "1.5"]) expect(parseDailyLimit(v)).toBe(100);
+    for (const v of [undefined, "", "abc", "0", "-5", "1.5"]) expect(parseDailyLimit(v)).toBe(2000);
+  });
+});
+
+describe("the 2,000 a day limit (#111)", () => {
+  it("still keeps the login code reserve and the send order", () => {
+    // Bulk mail stops 15 short, other transactional mail 10 short: those are
+    // left for login codes.
+    expect(sendBudget(2000, 1990, "signup_confirmation")).toBe(0);
+    expect(sendBudget(2000, 1985, "broadcast")).toBe(0);
+    expect(sendBudget(2000, 1990, "login_code")).toBe(LOGIN_RESERVE);
+    expect(sendBudget(2000, 0, "broadcast")).toBe(2000 - TRANSACTIONAL_RESERVE);
   });
 });

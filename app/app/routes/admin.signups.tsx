@@ -52,7 +52,7 @@ import {
   STATUSES,
   type SignupRow,
 } from "~/lib/signups-admin";
-import { deliver, pendingRegistrationInvites, queueRegistrationInvites } from "~/lib/email/outbox.server";
+import { pendingRegistrationInvites, queueRegistrationInvites } from "~/lib/email/outbox.server";
 import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.server";
 
 const MAX_ADMIN_NOTE = 2000;
@@ -95,8 +95,8 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   // The registration invite to the whole interest list (#20), not the filtered view.
   if (form.get("intent") === "invite") {
+    // Queued and sent right away, within the daily limit (#112).
     const queued = await queueRegistrationInvites();
-    await deliver();
     return { ok: true, queued };
   }
   const id = Number(form.get("id"));
@@ -296,9 +296,9 @@ function InviteButton({ pending }: { pending: number }) {
         {queued !== undefined ? (
           <>
             <AlertDialogHeader>
-              <AlertDialogTitle>Meghívók sorban</AlertDialogTitle>
+              <AlertDialogTitle>Meghívók elindultak</AlertDialogTitle>
               <AlertDialogDescription>
-                {queued} levél vár a Kimenő levelek között; onnan küldöd ki (napi kvóta szerint).
+                {queued} levél most megy ki. Ami ma nem fér bele a napi limitbe, magától megy a következő napokon.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

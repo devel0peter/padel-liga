@@ -66,8 +66,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 type ActionData = { error?: string; notice?: string };
 
 const DONE: Record<Decision, string> = {
-  approve: "Jóváhagytad. A két játékos e-mailjét az Admin küldi ki.",
-  reject: "Elutasítottad. A két játékos e-mailjét az Admin küldi ki.",
+  approve: "Jóváhagytad. A két játékos most kap róla e-mailt.",
+  reject: "Elutasítottad. A két játékos most kap róla e-mailt.",
 };
 
 export async function action({ request, params }: Route.ActionArgs): Promise<ActionData> {
@@ -107,7 +107,7 @@ function DecisionDialog({ row, decision }: { row: Row; decision: Decision }) {
               {approve ? "Jóváhagyod" : "Elutasítod"}: {pairName(row)}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Mindkét játékosnak e-mail készül, benne az üzeneteddel, ha írsz; az Admin küldi ki.
+              Mindkét játékos most kap róla e-mailt, benne az üzeneteddel, ha írsz.
               {approve &&
                 " Ha a szezon már elindult, a következő körtől játszanak; ha már az utolsó kör fut, a következő szezontól."}
             </AlertDialogDescription>

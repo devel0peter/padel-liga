@@ -1,18 +1,19 @@
 // Marking a paired solo signup withdrawn (#114) on a real SQLite
 // (~/test/sqlite): the partner goes back to the waiting list, a withdrawn
 // signup forms no pair and gets no invite, and undoing it re-pairs nobody.
-// Only queued, never sent: Resend is stubbed and fails the test if called.
+// Mail is sent right away since #112; here the sender is stubbed as "no
+// provider available now", so every email stays queued (pending) and
+// nothing leaves the process.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
-    throw new Error("nothing may be sent");
-  },
+  relayConfigured: () => false,
+  sendEmails: async (emails: any[]) => emails.map(() => ({ ok: false, error: "no provider now", retryLater: true })),
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -150,14 +151,14 @@ describe("withdrawing a paired solo signup (#114)", () => {
   it("deletes the unsent invite and pair intros: nothing goes to her, nothing about her to the partner", async () => {
     const { c } = await pairedAndInvited();
     await S.updateSignup(c, { status: "withdrawn" });
-    expect(mail()).toEqual([{ kind: "registration_invite", to_email: "d@x.hu", status: "held" }]);
+    expect(mail()).toEqual([{ kind: "registration_invite", to_email: "d@x.hu", status: "pending" }]);
   });
 
-  it("does the same once mail is released and waiting to be sent (pending)", async () => {
+  it("leaves mail being sent right now alone", async () => {
     const { c } = await pairedAndInvited();
-    h.raw.exec("update email_messages set status = 'pending'");
+    h.raw.exec("update email_messages set status = 'sending'");
     await S.updateSignup(c, { status: "withdrawn" });
-    expect(mail()).toEqual([{ kind: "registration_invite", to_email: "d@x.hu", status: "pending" }]);
+    expect(mail()).toHaveLength(4);
   });
 
   it("keeps mail already sent", async () => {
@@ -173,7 +174,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     expect(h.raw.prepare("select invited_at from interest_signups where id = ?").get(c)).toEqual({ invited_at: null });
     await S.updateSignup(c, { status: "new" });
     expect(await O.queueRegistrationInvites()).toBe(1);
-    expect(mail("to_email = 'c@x.hu'")).toEqual([{ kind: "registration_invite", to_email: "c@x.hu", status: "held" }]);
+    expect(mail("to_email = 'c@x.hu'")).toEqual([{ kind: "registration_invite", to_email: "c@x.hu", status: "pending" }]);
     expect(row(c)).toEqual({ status: "new", paired_with: null });
   });
 

@@ -2,7 +2,7 @@
 // forms once both have registered.
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, ORGANIZER, WAITING_SOLOS, as, content, registerAll, visit } from "./support";
+import { ADMIN, ORGANIZER, WAITING_SOLOS, as, content, logOffset, registerAll, visit, waitForEmails } from "./support";
 
 test("13. the Szervező pairs the waiting solos on Párkeresők", async ({ browser }) => {
   const [boglarka, akos] = WAITING_SOLOS;
@@ -13,14 +13,19 @@ test("13. the Szervező pairs the waiting solos on Párkeresők", async ({ brows
 
   await page.getByRole("checkbox", { name: `${boglarka.name} kijelölése` }).check();
   await page.getByRole("checkbox", { name: `${akos.name} kijelölése` }).check();
+  const offset = logOffset();
   await page.getByRole("button", { name: "Párba teszem (2/2)" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Párba teszem" }).click();
   await expect(content(page)).toContainText("0 egyedül jelentkező keres párt, 2 párt hoztál össze");
   await context.close();
 
+  // Both get the introduction at once (#112), and the log counts it.
+  const intros = await waitForEmails(offset, 2);
+  expect(intros.map((m) => m.to).sort()).toEqual([akos.email, boglarka.email].sort());
   const admin = await as(browser, ADMIN.email);
   await visit(admin.page, "/admin/outbox");
-  await expect(admin.page.locator("[data-slot=card]", { hasText: "Párkeresők bemutatása" })).toContainText("2 levél");
+  const row = admin.page.getByRole("row").filter({ hasText: "Párkeresők bemutatása" });
+  await expect(row.getByRole("cell").nth(2)).toHaveText("2");
   await admin.context.close();
 
   // They were invited in step 3; once both register, the pair forms.

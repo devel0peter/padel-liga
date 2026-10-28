@@ -169,8 +169,8 @@ export async function missingPartnerEmails(user: Pick<User, "id" | "email">): Pr
 const GONE = "Ezt a jelentkezést már nem tudod módosítani.";
 
 // "Mentés" in the box (#96, D35): fills email2 on that signup, as if it had
-// been on the form, and queues the partner's registration invite, held for
-// the Admin like every invite (same rules: not to an account, an unsubscribed
+// been on the form, and sends the partner's registration invite right away
+// (#112; same rules as every invite: not to an account, an unsubscribed
 // address or one invited already). No token and no confirmation. The update
 // only runs while email2 is still empty, so a second submit queues nothing.
 // If the partner has registered already, the pair forms now (#89).

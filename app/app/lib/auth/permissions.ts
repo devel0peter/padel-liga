@@ -20,7 +20,7 @@ export type Permission =
   // See the admin area at all.
   | { kind: "admin.enter" }
   // Admin (superadmin) only: the interest list (and its CSV), broadcasts, the
-  // held outbox, traffic, leagues and Szervező appointments, the user list.
+  // outbox log, traffic, leagues and Szervező appointments, the user list.
   | { kind: "signups.manage" }
   | { kind: "broadcasts.send" }
   | { kind: "outbox.manage" }

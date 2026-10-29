@@ -1,10 +1,14 @@
+import { TriangleAlert } from "lucide-react";
+
 import type { Route } from "./+types/admin.outbox";
 import { AppPage } from "~/components/app-page";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { kindLabel } from "~/lib/email/outbox-view";
+import { kindLabel, relayWarning } from "~/lib/email/outbox-view";
 import { dailyLimit, outboxLog, sentLast24h } from "~/lib/email/outbox.server";
+import { relayConfigured } from "~/lib/email/send.server";
 import { formatDateTime } from "~/lib/format";
 import { SITE_NAME } from "~/lib/site";
 
@@ -19,16 +23,28 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "outbox.manage" });
   const [log, sent] = await Promise.all([outboxLog(), sentLast24h()]);
-  return { log, sent, limit: dailyLimit() };
+  return {
+    log,
+    sent,
+    limit: dailyLimit(),
+    relayWarning: relayWarning(relayConfigured(), import.meta.env.DEV),
+  };
 }
 
 export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
-  const { log, sent, limit } = loaderData;
+  const { log, sent, limit, relayWarning: notice } = loaderData;
   return (
     <AppPage
       title="Kimenő levelek"
       description={`Minden levél magától megy ki, naponta legfeljebb ${limit}; ami ma nem fér bele, a következő napokon. Az elmúlt 24 órában ${sent} ment ki.`}
     >
+      {notice && (
+        <Alert variant="destructive" className="mb-4">
+          <TriangleAlert />
+          <AlertTitle>Nincs levelezőrelé</AlertTitle>
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
       {log.length === 0 ? (
         <p className="py-10 text-center text-muted-foreground">Még nem ment ki levél.</p>
       ) : (

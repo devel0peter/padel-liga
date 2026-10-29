@@ -152,7 +152,7 @@ describe("codes to new addresses (#113)", () => {
 
   it("caps them at a quarter of the daily limit", () => {
     expect(newAddressCodeCap(100)).toBe(25);
-    expect(newAddressCodeCap(2000)).toBe(500);
+    expect(newAddressCodeCap(5000)).toBe(1250);
     expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 24 })).toBe("send");
     expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 25 })).toBe("capped");
   });

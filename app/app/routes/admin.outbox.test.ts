@@ -4,13 +4,13 @@
 // the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
+const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], relay: false }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  relayConfigured: () => false,
+  relayConfigured: () => h.relay,
   sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
@@ -52,6 +52,25 @@ describe("/admin/outbox", () => {
     st.run("pair_intro", "anna@x.hu", "sent", Math.floor(Date.now() / 1000), null);
     st.run("pair_intro", "bela@x.hu", "pending", null, null);
     st.run("broadcast", "cili@x.hu", "failed", null, "relay: RCPT TO: 550 <cili@x.hu> unknown");
+  });
+
+  it("shows the relay warning in production only while the relay isn't configured (#127)", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    vi.stubEnv("DEV", false);
+    try {
+      h.relay = false;
+      expect((await R.loader(args(get(cookie)))).relayWarning).toMatch(/Resend/);
+      h.relay = true;
+      const withRelay = await R.loader(args(get(cookie)));
+      expect(withRelay.relayWarning).toBeNull();
+      expect(withRelay.limit).toBe(5000);
+      h.relay = false;
+      vi.stubEnv("DEV", true);
+      expect((await R.loader(args(get(cookie)))).relayWarning).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+      h.relay = false;
+    }
   });
 
   it("refuses a Játékos and a Szervező with 403", async () => {

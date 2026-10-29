@@ -62,7 +62,7 @@ type NewMessage = Email & {
   headers?: Record<string, string>;
 };
 
-// 2,000 with the SMTP relay, else Resend's 100 (EMAIL_DAILY_LIMIT), so login
+// 5,000 with the SMTP relay, else Resend's 100 (EMAIL_DAILY_LIMIT), so login
 // codes keep their reserve until the relay is set up (#111, budget.ts).
 export function dailyLimit(): number {
   return effectiveDailyLimit(relayConfigured(), env.EMAIL_DAILY_LIMIT);

@@ -95,7 +95,18 @@ export default function Privacy() {
               </li>
               <li>
                 a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
-                döntése az üzenetével együtt.
+                döntése az üzenetével együtt,
+              </li>
+              <li>
+                az értesítéseid listája, és hogy e-mailben, push értesítésben
+                vagy mindkettőben kéred-e őket (alapból mindkettő be van
+                kapcsolva, a profilodban bármikor átállíthatod),
+              </li>
+              <li>
+                ha egy eszközön bekapcsolod a push értesítést, a böngésződ
+                értesítési címe az adott eszközre. Az értesítést titkosítva a
+                böngésződ gyártójának értesítő szolgáltatása (pl. Google, Apple,
+                Mozilla) juttatja el hozzád.
               </li>
             </ul>
             <p>
@@ -107,9 +118,15 @@ export default function Privacy() {
           <Section title="Mire használjuk?">
             <p>
               Csak a liga szervezésére: csoportok összeállítására, párkeresésre,
-              és arra, hogy e-mailben értesítsünk az indulásról és a liga
-              ügyeiről. Nem küldünk reklámot, és senkinek nem adjuk el vagy adjuk
-              át az adataidat marketingcélra.
+              és arra, hogy értesítsünk az indulásról és a liga ügyeiről. Nem
+              küldünk reklámot, és senkinek nem adjuk el vagy adjuk át az
+              adataidat marketingcélra.
+            </p>
+            <p>
+              Az értesítéseidet a fiókodban mindig látod. A profilodban
+              választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
+              is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
+              mindig e-mailben küldjük.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
@@ -153,8 +170,9 @@ export default function Privacy() {
               <li>
                 A csoportok összeállításakor a szervező a pár két tagjának nevét
                 és az értékszámotokat látja. A csoportbeosztásról mindenki
-                e-mailt kap, benne az ellenfelei nevével; az e-mail-címeteket és
-                a telefonszámotokat nem.
+                értesítést kap (e-mailben is, ha nem kapcsolta ki), benne az
+                ellenfelei nevével; az e-mail-címeteket és a telefonszámotokat
+                nem.
               </li>
             </ul>
           </Section>

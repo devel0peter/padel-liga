@@ -13,8 +13,8 @@ import { getActor } from "~/lib/auth/admin.server";
 import { roleLabel } from "~/lib/auth/permissions";
 import { initials, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
-import { isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
-import { disabledKindsFor, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import { channelEnabled, CHANNELS, isChannel, isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
+import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
 import { SITE_NAME } from "~/lib/site";
 
@@ -29,6 +29,7 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
+  const disabled = await disabledKindsFor(user.id);
   return {
     name: user.name,
     email: user.email,
@@ -40,15 +41,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     role: roleLabel(actor),
     leagues: actor.leagues.map((l) => l.name),
     vapidPublicKey: vapidPublicKey(),
-    kinds: await (async () => {
-      const disabled = await disabledKindsFor(user.id);
-      return kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) }));
-    })(),
+    emailOn: channelEnabled(disabled, "email"),
+    pushOn: channelEnabled(disabled, "push"),
+    kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
   };
 }
 
-// Saves the profile form, or switches one notification kind on or off
-// (Értesítések section).
+// Saves the profile form, or switches email or push (#115) or one
+// notification kind on or off (Értesítések section).
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
@@ -64,30 +64,48 @@ export async function action({ request }: Route.ActionArgs) {
     await updateProfile(user.id, result.value);
     return { saved: true, errors: {} as ProfileErrors };
   }
+  const enabled = form.get("enabled") === "1";
+  if (form.get("intent") === "channel") {
+    const channel = form.get("channel");
+    if (!isChannel(channel)) return data({ ok: false }, { status: 400 });
+    await setChannelEnabled(user.id, channel, enabled);
+    return { ok: true };
+  }
   const kind = form.get("kind");
   if (!isNotificationKind(kind) || !kindsFor(actor).includes(kind)) return data({ ok: false }, { status: 400 });
-  await setKindEnabled(user.id, kind, form.get("enabled") === "1");
+  await setKindEnabled(user.id, kind, enabled);
   return { ok: true };
 }
 
-type Kind = Route.ComponentProps["loaderData"]["kinds"][number];
-
-function KindSwitch({ k }: { k: Kind }) {
+// One switch of the Értesítések section; `fields` say what it saves.
+function SettingSwitch({
+  id,
+  label,
+  description,
+  enabled,
+  fields,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  fields: Record<string, string>;
+}) {
   const fetcher = useFetcher();
   // Optimistic: show the new value while it saves.
   const pending = fetcher.formData?.get("enabled");
-  const checked = pending != null ? pending === "1" : k.enabled;
+  const checked = pending != null ? pending === "1" : enabled;
   return (
     <div className="flex items-start gap-3">
       <Switch
-        id={`kind-${k.kind}`}
+        id={id}
         checked={checked}
-        onCheckedChange={(on) => fetcher.submit({ kind: k.kind, enabled: on ? "1" : "0" }, { method: "post" })}
+        onCheckedChange={(on) => fetcher.submit({ ...fields, enabled: on ? "1" : "0" }, { method: "post" })}
         className="mt-0.5"
       />
       <div className="grid gap-0.5">
-        <Label htmlFor={`kind-${k.kind}`}>{k.label}</Label>
-        <p className="text-sm text-muted-foreground">{k.description}</p>
+        <Label htmlFor={id}>{label}</Label>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
   );
@@ -152,14 +170,30 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
         <div className="grid gap-1">
           <h2 className="font-display text-lg font-extrabold">Értesítések</h2>
           <p className="text-sm text-muted-foreground">
-            Az <Link to="/notifications">Értesítések</Link> oldalon mindet látod. Itt azt állítod, mit kapj meg, és hogy a telefonod is szóljon-e.
+            Az <Link to="/notifications">Értesítések</Link> oldalon mindet látod, akármit állítasz itt. Itt azt választod, hogy
+            e-mailben, push értesítésben vagy mindkettőben is szóljunk.
           </p>
         </div>
-        <PushSettings vapidPublicKey={d.vapidPublicKey} />
+        <SettingSwitch
+          id="channel-email"
+          label={CHANNELS.email.label}
+          description={CHANNELS.email.description}
+          enabled={d.emailOn}
+          fields={{ intent: "channel", channel: "email" }}
+        />
+        <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
         {d.kinds.length > 0 && (
-          <div className="grid gap-4">
+          <div className="grid gap-4 border-t pt-4">
+            <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>
             {d.kinds.map((k) => (
-              <KindSwitch key={k.kind} k={k} />
+              <SettingSwitch
+                key={k.kind}
+                id={`kind-${k.kind}`}
+                label={k.label}
+                description={k.description}
+                enabled={k.enabled}
+                fields={{ kind: k.kind }}
+              />
             ))}
           </div>
         )}

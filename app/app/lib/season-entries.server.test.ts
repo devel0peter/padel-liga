@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 
+// No VAPID keys: notifications are stored, not pushed.
+vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
@@ -77,6 +79,11 @@ describe("season entries on real SQLite", () => {
     expect(h.mails).toEqual([
       expect.objectContaining({ kind: "decision", toEmail: "a@x.hu", to: "Anna", partnerName: "Béla", approved: true, note: "Jó játékot!" }),
       expect.objectContaining({ kind: "decision", toEmail: "b@x.hu", to: "Béla", partnerName: "Anna", approved: true }),
+    ]);
+    // And both see it on Értesítések (#115).
+    expect(all("select user_id, kind, url from notifications order by user_id")).toEqual([
+      { user_id: "a", kind: "season_entry_decision", url: "/pair" },
+      { user_id: "b", kind: "season_entry_decision", url: "/pair" },
     ]);
     expect(h.mails[0]).toMatchObject({ league: "Padelpárbaj Győr", season: "2026/27 tél", joins: { phase: 1, startsAt: at(PHASES[0]) } });
     expect((await E.entryViews(user("b"), [season], DURING_REGISTRATION)).get(1)).toMatchObject({ kind: "status", status: "approved" });

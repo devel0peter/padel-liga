@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 
+// No VAPID keys: notifications are stored, not pushed.
+vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
@@ -199,6 +201,14 @@ describe("first-phase groups on real SQLite", () => {
     expect(h.mails.find((m) => m.toEmail === "p5b@x.hu")!.input.weeks[0].opponents).toBeNull();
     // Names only: no other player's email in what the template gets.
     for (const m of h.mails) expect(JSON.stringify(m.input)).not.toContain("@");
+
+    // And one in-app notification per player (#115), with their group.
+    const inbox = all("select n.kind, n.title, n.url, u.email from notifications n join users u on u.id = n.user_id");
+    expect(inbox).toHaveLength(20);
+    expect(new Set(inbox.map((n: any) => n.email)).size).toBe(20);
+    expect(inbox.every((n: any) => n.kind === "groups_published" && n.url === "/home")).toBe(true);
+    expect(inbox.find((n: any) => n.email === "p1a@x.hu")!.title).toBe("Itt a csoportod: 1. csoport");
+    expect(inbox.find((n: any) => n.email === "p5b@x.hu")!.title).toBe("Itt a csoportod: 2. csoport");
   });
 
   it("a group of 2 or 5 can't be published", async () => {

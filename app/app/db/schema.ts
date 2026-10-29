@@ -350,7 +350,7 @@ export const notifications = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["new_signup", "test"] }).notNull(),
+    kind: text("kind", { enum: ["new_signup", "season_entry_decision", "groups_published", "pair_intro", "test"] }).notNull(),
     title: text("title").notNull(),
     body: text("body").notNull(),
     // A path on this site, opened through /notifications/<id>.
@@ -381,7 +381,9 @@ export const pushSubscriptions = sqliteTable(
   (t) => [index("push_subscriptions_user_idx").on(t.userId)],
 );
 
-// Notification kinds a user switched off on the profile page. No row: on.
+// Notification kinds a user switched off on the profile page, and the
+// channels (#115: "channel:email", "channel:push"; lib/notifications.ts). No
+// row: on.
 export const notificationOptOuts = sqliteTable(
   "notification_opt_outs",
   {

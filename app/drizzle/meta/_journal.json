@@ -176,6 +176,13 @@
       "when": 1793222100233,
       "tag": "0024_release_held_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1793287758589,
+      "tag": "0025_user_sex",
+      "breakpoints": true
     }
   ]
 }

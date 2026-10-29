@@ -29,6 +29,10 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await page.getByRole("option", { name: /^Középhaladó/ }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 765 4321");
   await page.getByLabel(/hozzájárulok/).check();
+  // Férfi or Nő is required (#133): without it the page stays.
+  await page.getByRole("button", { name: "Kész" }).click();
+  await expect(page.getByText("Válaszd ki: férfi vagy nő.")).toBeVisible();
+  await page.getByLabel("Férfi", { exact: true }).click();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
   await save(context, NEW_PLAYER.email);

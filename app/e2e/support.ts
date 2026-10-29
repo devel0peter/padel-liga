@@ -139,6 +139,9 @@ export async function completeWelcome(page: Page, player: Player): Promise<void>
   await expect(page.getByText("A jelentkezésedből már megvan a neved és a szinted")).toBeVisible();
   await expect(page.getByLabel("Neved")).toHaveValue(player.name);
   await expect(page.getByLabel("Szinted")).toContainText(levelLabel(player));
+  // Never prefilled (#133): the player picks.
+  await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+  await page.getByLabel("Nő", { exact: true }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 123 4567");
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();

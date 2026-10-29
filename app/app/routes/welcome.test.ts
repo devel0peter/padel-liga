@@ -24,6 +24,8 @@ vi.mock("~/lib/email/send.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const { createSession } = await import("~/lib/auth/session.server");
 const R = await import("~/routes/welcome");
+const P = await import("~/routes/profile");
+const { requireUser } = await import("~/lib/auth/session.server");
 
 const URL_ = "http://localhost/welcome";
 const args = (request: Request) => ({ request, params: {}, context: {} }) as any;
@@ -49,7 +51,7 @@ function signup(v: { mode?: "pair" | "solo"; name1: string; email1: string; name
     .get(v.mode ?? "pair", v.name1, v.email1, v.name2 ?? null, v.email2 ?? null, v.level ?? "kezdo", ++clock).id as number;
 }
 
-const done = { phone: "+36 30 123 4567", consent: "on", returnTo: "/home" };
+const done = { phone: "+36 30 123 4567", consent: "on", sex: "female", returnTo: "/home" };
 
 async function redirectOf(p: Promise<unknown>): Promise<string | null> {
   try {
@@ -137,9 +139,58 @@ describe("first-login page pre-filled from the signup (#130)", () => {
   it("saves no partner address while the profile itself is invalid", async () => {
     const id = signup({ name1: "Nagy Anna", email1: "anna@x.hu", name2: "Kovács Béla", level: "halado" });
     const cookie = await firstLogin("anna@x.hu");
-    const result: any = await R.action(args(post(cookie, { name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", [`partnerEmail-${id}`]: "bela@x.hu" })));
+    const result: any = await R.action(
+      args(post(cookie, { name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", sex: "female", [`partnerEmail-${id}`]: "bela@x.hu" })),
+    );
     expect(result.errors.consent).toBeTruthy();
     expect(all("select email2 from interest_signups where id = ?", id)).toEqual([{ email2: null }]);
     expect(all("select * from email_messages")).toEqual([]);
+  });
+});
+
+describe("Férfi or Nő (#133)", () => {
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+  });
+  const profile = { name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", consent: "on", returnTo: "/home" };
+  const row = (id: string) => h.raw.prepare("select sex, consent_at is not null as done from users where id = ?").get(id);
+
+  it("can't finish the first login without choosing, and takes no other value", async () => {
+    const cookie = await firstLogin("anna@x.hu");
+    for (const sex of [undefined, "", "other", "Nő"]) {
+      const fields: Record<string, string> = sex === undefined ? profile : { ...profile, sex };
+      expect(await R.action(args(post(cookie, fields))), String(sex)).toEqual({ errors: { sex: "Válaszd ki: férfi vagy nő." } });
+    }
+    expect(row("anna")).toEqual({ sex: null, done: 0 });
+    expect(await redirectOf(R.action(args(post(cookie, { ...profile, sex: "female" }))))).toBe("/home");
+    expect(row("anna")).toEqual({ sex: "female", done: 1 });
+  });
+
+  it("asks an existing account once, then sends it on where it was going", async () => {
+    h.raw.prepare("insert into users (id, email, name, level, phone, consent_at) values ('old', 'old@x.hu', 'Régi Ödön', 'halado', '+36301234567', 1)").run();
+    const cookie = (await createSession("old")).split(";")[0]!;
+    const pair = new Request("http://localhost/pair", { headers: { Cookie: cookie } });
+    expect(await redirectOf(requireUser(pair))).toBe("/welcome?returnTo=%2Fpair");
+    const page = await R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fpair", { headers: { Cookie: cookie } })));
+    expect(page).toEqual({ onlySex: true, returnTo: "/pair" });
+    expect(await R.action(args(post(cookie, { sex: "x", returnTo: "/pair" })))).toEqual({ errors: { sex: "Válaszd ki: férfi vagy nő." } });
+    expect(await redirectOf(R.action(args(post(cookie, { sex: "male", returnTo: "/pair" }))))).toBe("/pair");
+    expect(row("old")).toEqual({ sex: "male", done: 1 });
+    // Asked once: from now on it goes straight through.
+    expect((await requireUser(new Request("http://localhost/pair", { headers: { Cookie: cookie } }))).sex).toBe("male");
+    expect(await redirectOf(R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fpair", { headers: { Cookie: cookie } }))))).toBe("/pair");
+  });
+
+  it("Profil saves a change, and only Férfi or Nő", async () => {
+    h.raw.prepare("insert into users (id, email, name, level, phone, sex, consent_at) values ('anna', 'anna@x.hu', 'Nagy Anna', 'halado', '+36301234567', 'female', 1)").run();
+    const cookie = (await createSession("anna")).split(";")[0]!;
+    const save = (sex: string) =>
+      P.action(args(new Request("http://localhost/profile", { method: "POST", headers: { Cookie: cookie }, body: new URLSearchParams({ intent: "profile", name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", sex }) })));
+    const refused: any = await save("other");
+    expect(refused.data.errors).toEqual({ sex: "Válaszd ki: férfi vagy nő." });
+    expect(row("anna").sex).toBe("female");
+    expect(await save("male")).toMatchObject({ saved: true });
+    expect(row("anna").sex).toBe("male");
   });
 });

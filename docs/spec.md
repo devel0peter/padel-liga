@@ -33,6 +33,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
   - Required: name, email.
   - Required: self-assessed level (kezdő / középhaladó / haladó / versenyző; asked at first login, prefilled from the interest signup with the same email; accounts that predate it are prompted on the home page, and the level is required to apply for a season).
   - Required: phone number (Hungarian numbers only, stored as +36…, shown as `+36 30 123 4567`; visible only to opponents in the current round, never public; asked at first login, not on the interest form; it can be changed but not removed on the profile page; README decision log, 2026-10-28). Name, level and phone are editable on the profile page.
+  - Required: sex, "Férfi" or "Nő" only (#133; README decision log, 2026-10-29, D54): what the player picks, never inferred from a name or prefilled; asked at first login next to the phone number and editable (not removable) on the profile page. An account from before it was asked is sent once, on its next app page, to a one-question page ("Még egy kérdés") and then on to where it was going. Never public and never shown to other players; it lets the organizer email a group of players (e.g. a women-only event; filtering broadcasts by it comes later).
 - GDPR:
   - Privacy notice (section 17) and consent at registration.
   - Account deletion with anonymization: match history stays, the name becomes "Törölt játékos".

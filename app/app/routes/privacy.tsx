@@ -88,6 +88,12 @@ export default function Privacy() {
                 telefonon egyeztetitek; a profilodban bármikor módosíthatod),
               </li>
               <li>
+                hogy férfi vagy nő vagy (kötelező, te választod, sosem a nevedből
+                találjuk ki; azért kérdezzük, hogy egy-egy levelet csak egy
+                csoportnak küldhessünk, pl. női eseményről; nem nyilvános, más
+                játékos nem látja, a profilodban módosíthatod),
+              </li>
+              <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>

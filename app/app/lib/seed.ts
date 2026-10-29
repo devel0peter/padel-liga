@@ -152,12 +152,12 @@ export function insertStatements(now: Date): string[] {
     );
   out.push(`insert into leagues (city, slug, name) values (${q(CITY.slug)}, ${q(LEAGUE.slug)}, ${q(LEAGUE.name)})`);
 
-  // Admin and Szervező: finished accounts (name, level and consent set), so
+  // Admin and Szervező: finished accounts (name, level, sex and consent set), so
   // they log in with an email code and land on the app, not on /welcome.
   out.push(
-    `insert into users (id, email, name, platform_role, level, consent_at) values ` +
-      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', ${secs(now)}), ` +
-      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', ${secs(now)})`,
+    `insert into users (id, email, name, platform_role, level, sex, consent_at) values ` +
+      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', 'male', ${secs(now)}), ` +
+      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', 'female', ${secs(now)})`,
   );
   out.push(
     `insert into league_admins (league_id, user_id, granted_by) select id, ${q(ORGANIZER.id)}, ${q(ADMIN.id)} ` +

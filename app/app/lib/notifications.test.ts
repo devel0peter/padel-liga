@@ -71,6 +71,12 @@ describe("newSignupMessage", () => {
     });
   });
 
+  it("says when the signer would organize a league", () => {
+    expect(newSignupMessage({ ...pair, organize: true }, admin).body).toBe(
+      "Új pár jelentkezett, haladó szint. Szívesen szervezne ligát. Eddig 9 pár és 4 egyéni jelentkező.",
+    );
+  });
+
   it("sends a Szervező to the solo list for a solo signup", () => {
     const m = newSignupMessage({ ...pair, mode: "solo", level: "kezdo" }, organizer);
     expect(m.body).toBe("Új egyéni jelentkező (párt keres), kezdő szint. Eddig 9 pár és 4 egyéni jelentkező.");

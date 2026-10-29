@@ -96,12 +96,25 @@ export function leagueLanding(seasons: readonly LandingSeason[], now: Date): Lea
 }
 
 // The league city's block on the page: plain strings, so the loader can hand
-// it to the page as is.
-export type LandingBlock = { title: string; facts: [label: string, value: string][]; joining: string };
+// it to the page as is. `chip` is the short state on the city chip under the
+// hero; `cta` the register button, `ctaNote` the line under it.
+export type LandingBlock = {
+  title: string;
+  facts: [label: string, value: string][];
+  joining: string;
+  chip: string;
+  cta: string;
+  ctaNote: string | null;
+};
+
+// The article before a round number: "az 1.", "a 2.", "az 5.".
+function article(n: number): string {
+  return n === 1 || n === 5 ? "az" : "a";
+}
 
 // "az 1. körtől", "a 2. körtől"
 function fromRound(n: number): string {
-  return `${n === 1 || n === 5 ? "az" : "a"} ${n}. körtől`;
+  return `${article(n)} ${n}. körtől`;
 }
 
 export function joiningSentence(joining: Joining): string {
@@ -115,7 +128,19 @@ export function joiningSentence(joining: Joining): string {
   }
 }
 
+// "Nevezek a 2. körre" when a round is open for new pairs; otherwise an
+// account is still worth making (anyone can sign up, #113).
+function cta(joining: Joining): Pick<LandingBlock, "cta" | "ctaNote"> {
+  return joining.kind === "round"
+    ? { cta: `Nevezek ${article(joining.number)} ${joining.number}. körre`, ctaNote: null }
+    : { cta: "Regisztrálok", ctaNote: "Hozz létre fiókot, és nevezz, amint nyílik." };
+}
+
 export function landingBlock(state: LeagueLanding): LandingBlock {
+  return { ...stateBlock(state), ...cta(state.joining) };
+}
+
+function stateBlock(state: LeagueLanding): Omit<LandingBlock, "cta" | "ctaNote"> {
   const joining = joiningSentence(state.joining);
   switch (state.kind) {
     case "registration":
@@ -126,9 +151,15 @@ export function landingBlock(state: LeagueLanding): LandingBlock {
           ["1. kör indul", formatDay(state.firstRound)],
         ],
         joining,
+        chip: "nevezés nyitva",
       };
     case "starting":
-      return { title: "Hamarosan indul", facts: [["1. kör indul", formatDay(state.firstRound)]], joining };
+      return {
+        title: "Hamarosan indul",
+        facts: [["1. kör indul", formatDay(state.firstRound)]],
+        joining,
+        chip: "hamarosan indul",
+      };
     case "running":
       return {
         title: "Zajlik a szezon",
@@ -137,12 +168,14 @@ export function landingBlock(state: LeagueLanding): LandingBlock {
           ["Határidő", formatDeadline(state.deadline)],
         ],
         joining,
+        chip: `zajlik ${article(state.round)} ${state.round}. kör`,
       };
     case "break":
       return {
         title: "Szünet a körök között",
         facts: [["Következő kör", `${state.next.number}. kör, ${formatDay(state.next.start)}`]],
         joining,
+        chip: "szünet a körök között",
       };
     case "between":
       return {
@@ -154,6 +187,7 @@ export function landingBlock(state: LeagueLanding): LandingBlock {
             ]
           : [["Nevezés", "hamarosan"]],
         joining,
+        chip: "készül a következő szezon",
       };
   }
 }

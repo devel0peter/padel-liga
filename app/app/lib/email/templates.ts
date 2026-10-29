@@ -2,12 +2,14 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatDeadline, formatShortDate } from "../format";
+import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "../format";
 import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { SHARE_REFS, shareUrl } from "../share";
 import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
+
+import type { InviteStart } from "./audience";
 
 export type Email = { subject: string; html: string; text: string };
 
@@ -98,13 +100,16 @@ type Cities = readonly Pick<City, "slug" | "name">[];
 
 export function signupConfirmation(s: InterestSignup, cities: Cities = []): Email {
   const otherCity = s.cityOther != null;
+  // The other-city form asks for no partner (contact only).
   const lines = [
     `Város: ${cityLabel(s, cities)}`,
-    s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel",
+    ...(otherCity ? [] : [s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel"]),
     `Szint: ${levelLabel(s.level)}`,
   ];
   const next = otherCity
-    ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
+    ? s.wantsToOrganize
+      ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Azt írtad, szívesen szerveznél: hamarosan írunk.`
+      : `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
     : s.mode === "solo"
       ? "Segítünk párt találni, és írunk az indulásról."
       : "Írunk az indulásról és a következő lépésekről.";
@@ -138,8 +143,9 @@ export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
     [
       `Szia ${s.name2}!`,
       `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,
-      `A ${SITE_NAME} pároknak szól: szint szerinti 4-es csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
-      `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Ezen kívül nem írunk neked, amíg magad nem regisztrálsz.`,
+      `A ${SITE_NAME} pároknak szól: szint szerinti, 3-4 páros csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
+      // As on the privacy page: the registration invite is the only other email.
+      `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Amikor indul a regisztráció, kapsz egy meghívót is. Ezen kívül semmit nem küldünk, amíg magad nem regisztrálsz.`,
       SIGNATURE,
     ].join("\n\n"),
     footer(`Ezt az egy levelet azért kaptad, mert ${s.name1} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`),
@@ -157,7 +163,7 @@ export function pairIntro(to: PairIntroPerson, partner: PairIntroPerson, city: s
     [
       `Szia ${to.name}!`,
       `Egyedül jelentkeztél a ${SITE_NAME}ra (${city}), és találtunk neked párt: ${partner.name}, aki szintén párt keres. A szintje: ${levelLabel(partner.level)}.`,
-      `Az e-mail-címe: ${partner.email}\nŐ is megkapta a te nevedet és címedet. Írjatok egymásnak, játsszatok egyet, és ha összejön, az induláskor együtt neveztek.`,
+      `Az e-mail-címe: ${partner.email}\nŐ is megkapta a te nevedet és címedet. Írjatok egymásnak, és játsszatok egyet. Ha összejön, a ligában párként neveztek.`,
       `Ha nem jön össze, vagy mégsem szeretnél vele játszani, válaszolj erre a levélre, és keresünk mást.`,
       SIGNATURE,
     ].join("\n\n"),
@@ -188,25 +194,33 @@ export function registrationLink(email: string): string {
 }
 
 // Sent once to everyone on the interest list (spec section 3). It goes to the
-// whole list, so it has an unsubscribe link like a broadcast.
+// whole list, so it has an unsubscribe link like a broadcast. It is the only
+// email that thanks for signing up early (#131).
 // `variant` (audience.ts, #96): a solo still waiting for a partner gets its
 // own line; the signer of a pair signup without the partner's email is asked
-// to add it after logging in.
+// to add it on the first-login page (#130).
+// `start` (audience.ts inviteStarts): when and where the league starts; null
+// leaves that sentence out.
 export function registrationInvite(
   to: { name: string; email: string; variant?: "solo" | "no_partner_email" },
   unsubscribeUrl: string,
+  start: InviteStart | null = null,
 ): Email {
+  const until = start?.registrationCloses ? `, a nevezés ${formatUntilDate(start.registrationCloses)} tart` : "";
+  const when = start ? ` A liga ${formatOnDate(start.firstRound)} indul (${start.city})${until}.` : "";
+  const together = "a ligában magától pár lesztek, és együtt nevezhettek a szezonra.";
   return build(
     `Regisztrálj a ${SITE_NAME}ra`,
     [
       `Szia ${to.name}!`,
-      `Jelentkeztél a ${SITE_NAME}ra, és most már regisztrálhatsz. Az e-mail-címedet kitöltöttük, csak lépj be:`,
+      `Köszi, hogy előzetesen jelentkeztél a ${SITE_NAME}ra!${when} Regisztrálni és nevezni itt tudsz:`,
       registrationLink(to.email),
-      `Jelszó nem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
+      `A neved és a szinted már megvan, csak a telefonszámod kell, úgyhogy egy perc az egész. Jelszó sem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
       to.variant === "solo"
         ? `Még keresünk neked párt, addig regisztrálj.`
-        : `Ha a párod is regisztrált, együtt nevezhettek a szezonra. Ha még nincs párod, válaszolj erre a levélre, és segítünk.`,
-      ...(to.variant === "no_partner_email" ? [`A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.`] : []),
+        : to.variant === "no_partner_email"
+          ? `A párod e-mail-címét nem adtad meg: belépéskor add meg, és ő is kap meghívót. Amint ő is regisztrál, ${together}`
+          : `Amint a párod is regisztrál, ${together}`,
       SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
@@ -224,6 +238,7 @@ export function loginCode(code: string, validMinutes: number): Email {
       `A belépőkódod: ${spaced}`,
       `${validMinutes} percig érvényes, és csak egyszer használható.`,
       `Ha nem te kérted, nem kell tenned semmit: a kód nélkül senki nem tud belépni.`,
+      SIGNATURE,
     ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert valaki ezzel a címmel kért belépőkódot a ${SITE_URL.replace("https://", "")} oldalon.`),
   );

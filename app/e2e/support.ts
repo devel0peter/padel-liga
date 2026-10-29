@@ -132,12 +132,16 @@ export async function save(context: BrowserContext, email: string): Promise<void
   await context.storageState({ path: authFile(email) });
 }
 
-// "Üdv!": the name, the level from the signup (already set), a phone number,
-// consent, Kész.
+// "Üdv!": the name and the level from the signup (already set, #130), a phone
+// number, consent, Kész.
 export async function completeWelcome(page: Page, player: Player): Promise<void> {
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
+  await expect(page.getByText("A jelentkezésedből már megvan a neved és a szinted")).toBeVisible();
+  await expect(page.getByLabel("Neved")).toHaveValue(player.name);
   await expect(page.getByLabel("Szinted")).toContainText(levelLabel(player));
-  await page.getByLabel("Neved").fill(player.name);
+  // Never prefilled (#133): the player picks.
+  await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+  await page.getByLabel("Nő", { exact: true }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 123 4567");
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
@@ -169,6 +173,17 @@ export function d1(select: string): Record<string, unknown>[] {
     stdio: ["ignore", "pipe", "ignore"],
   }).toString();
   return (JSON.parse(out) as { results: Record<string, unknown>[] }[])[0].results;
+}
+
+// One fixture insert into the suite's local D1, for a row no page can make
+// any more (an interest signup in a league city, #83).
+export function d1Insert(sql: string): void {
+  if (!/^\s*insert\b/i.test(sql)) throw new Error("d1Insert() only inserts.");
+  execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--command", sql])], {
+    cwd: APP_DIR,
+    env: { ...process.env, FORCE_COLOR: "0" },
+    stdio: ["ignore", "ignore", "inherit"],
+  });
 }
 
 // The seeded season's id, from the Szezonok page's links.

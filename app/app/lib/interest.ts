@@ -29,6 +29,8 @@ export type InterestSignup = {
   ref: string | null;
   // Club slug where they play most, OTHER_CLUB, or null (optional field).
   homeClub: string | null;
+  // "Szívesen szerveznék ligát" (other-city contact form).
+  wantsToOrganize: boolean;
 };
 
 export type InterestField =
@@ -50,6 +52,8 @@ const MAX_NAME = 100;
 const MAX_EMAIL = 254;
 const MAX_NOTE = 1000;
 
+export const LEAGUE_CITY_ERROR = "Itt már fut a liga: regisztrálj, és nevezz a ligába.";
+
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function str(form: FormData, key: string): string {
@@ -64,10 +68,13 @@ export function isLevel(value: string): value is Level {
 // `clubs`: slugs of the city's clubs; an unknown home club is dropped, not an
 // error, since the field is optional and the list can change under the form.
 // `cities`: the listed cities (cities.server.ts listedCities).
+// `leagueCities`: slugs of the cities with a league. Those take no interest
+// signup: people register and enter the league instead (#83).
 export function parseInterest(
   form: FormData,
   clubs: readonly string[],
   cities: readonly Pick<City, "slug" | "name">[],
+  leagueCities: readonly string[] = [],
 ): InterestResult {
   let city = str(form, "city");
   let cityOther = city === OTHER_CITY ? str(form, "cityOther") : "";
@@ -92,6 +99,8 @@ export function parseInterest(
     if (!cityOther) errors.cityOther = "Írd be, melyik városban játszanál.";
     else if (cityOther.length > MAX_NAME) errors.cityOther = "Ez a városnév túl hosszú.";
   } else if (!isCity(city, cities)) errors.city = "Válaszd ki a várost.";
+  else if (leagueCities.includes(city))
+    errors[typed ? "cityOther" : "city"] = LEAGUE_CITY_ERROR;
 
   if (!name1) errors.name1 = "Add meg a neved.";
   else if (name1.length > MAX_NAME) errors.name1 = "Ez a név túl hosszú.";
@@ -135,6 +144,7 @@ export function parseInterest(
       note: note || null,
       ref: normalizeRef(str(form, "ref")),
       homeClub: parseHomeClub(str(form, "homeClub"), city, clubs),
+      wantsToOrganize: form.get("organize") != null,
     },
   };
 }

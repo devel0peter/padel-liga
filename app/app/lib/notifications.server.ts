@@ -192,6 +192,7 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
     cityName: signup.city === OTHER_CITY ? (signup.cityOther ?? "Más város") : cityName(signup.city, cities),
     pairs: counts.find((c) => c.mode === "pair")?.n ?? 0,
     solos: counts.find((c) => c.mode === "solo")?.n ?? 0,
+    organize: signup.wantsToOrganize,
   };
   await notify("new_signup", recipients.map((r) => ({ userId: r.userId, message: newSignupMessage(summary, r) })));
 }

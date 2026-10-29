@@ -1,8 +1,10 @@
-import { Field, inputClass, invalid } from "~/components/auth";
+import { Field, FieldError, inputClass, invalid } from "~/components/auth";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { LEVELS } from "~/lib/interest";
-import type { ProfileErrors } from "~/lib/auth/rules";
+import { SEXES, type ProfileErrors } from "~/lib/auth/rules";
 
 // The name, level and phone fields shared by the first-login page (welcome)
 // and the profile page, so both ask the same way.
@@ -67,18 +69,49 @@ export function PhoneField({ error, defaultValue }: { error?: string; defaultVal
   );
 }
 
+// Férfi or Nő (#133), required; never prefilled from a name.
+export function SexField({ error, defaultValue }: { error?: string; defaultValue?: string | null }) {
+  return (
+    <div className="grid content-start gap-1.5">
+      <p id="sex-label" className="text-sm font-semibold">
+        Férfi vagy nő?
+      </p>
+      <RadioGroup
+        name="sex"
+        aria-required
+        aria-labelledby="sex-label"
+        defaultValue={defaultValue ?? undefined}
+        className="flex gap-6"
+        {...invalid("sex", error)}
+      >
+        {Object.entries(SEXES).map(([value, label]) => (
+          <div key={value} className="flex items-center gap-2">
+            <RadioGroupItem id={`sex-${value}`} value={value} className="size-5" />
+            <Label htmlFor={`sex-${value}`} className="text-base font-normal">
+              {label}
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
+      <p className="text-sm text-muted-foreground">Nem nyilvános. Csak azért kérdezzük, hogy célzottan írhassunk, pl. női eseményről.</p>
+      <FieldError id="sex-error" message={error} />
+    </div>
+  );
+}
+
 export function ProfileFields({
   errors,
   values,
 }: {
   errors: ProfileErrors;
-  values: { name: string; level: string | null; phone: string };
+  values: { name: string; level: string | null; phone: string; sex: string | null };
 }) {
   return (
     <>
       <NameField error={errors.name} defaultValue={values.name} />
       <LevelField error={errors.level} defaultValue={values.level} />
       <PhoneField error={errors.phone} defaultValue={values.phone} />
+      <SexField error={errors.sex} defaultValue={values.sex} />
     </>
   );
 }

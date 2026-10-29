@@ -35,6 +35,9 @@ export const interestSignups = sqliteTable("interest_signups", {
   // The same for email2, the partner of a pair signup (D26): invited_at
   // stays about email1, so each address is still invited once.
   invited2At: integer("invited2_at", { mode: "timestamp" }),
+  // "Szívesen szerveznék ligát" on the other-city contact form: someone who
+  // might organize a league where there is none yet.
+  wantsToOrganize: integer("wants_to_organize", { mode: "boolean" }).notNull().default(false),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -154,6 +157,11 @@ export const users = sqliteTable("users", {
   // form since 2026-10-28 (older accounts may lack it). Personal data:
   // never on a public page; only the current phase's opponents will see it.
   phone: text("phone"),
+  // "male" or "female" (Férfi / Nő), as the player says on the first-login
+  // or profile page (#133); never inferred. Null on older accounts until they
+  // answer the one-time prompt. Personal data: never public or shown to other
+  // players; for emails to a group of players (e.g. a women-only event).
+  sex: text("sex", { enum: ["male", "female"] }),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })

@@ -19,7 +19,7 @@ const R = await import("~/routes/admin.league-pairs");
 
 async function cookieFor(id: string, role: "player" | "superadmin", organizes?: number) {
   h.raw
-    .prepare("insert into users (id, email, name, consent_at, platform_role) values (?, ?, ?, 1, ?)")
+    .prepare("insert into users (id, email, name, sex, consent_at, platform_role) values (?, ?, ?, 'female', 1, ?)")
     .run(id, `${id}@x.hu`, id, role);
   if (organizes) h.raw.prepare("insert into league_admins (league_id, user_id) values (?, ?)").run(organizes, id);
   return (await createSession(id)).split(";")[0];

@@ -131,9 +131,9 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
       }
       below={
         <>
-          Még nem jelentkeztél?{" "}
-          <Link to="/#jelentkezes" className="underline">
-            Jelentkezz a ligába
+          Nálatok még nincs liga?{" "}
+          <Link to="/#mas-varos" className="underline">
+            Szólj, és értesítünk
           </Link>
         </>
       }

@@ -81,11 +81,33 @@ describe("queueRegistrationInvites", () => {
     expect(text("cili@x.hu")).not.toContain("Még keresünk neked párt");
   });
 
+  it("says when and where the league starts, from the league's season (#131)", async () => {
+    const s = (iso: string) => Date.parse(iso) / 1000;
+    h.raw
+      .prepare(
+        "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Ősz', ?, ?, '2026-11-09')",
+      )
+      .run(s("2026-10-28T23:00:00Z"), s("2026-11-06T22:59:00Z"));
+    h.raw
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?), (1, 2, ?, ?)")
+      .run(s("2026-11-08T23:00:00Z"), s("2026-11-29T22:59:00Z"), s("2026-11-29T23:00:00Z"), s("2026-12-20T22:59:00Z"));
+    signup({ mode: "solo", name1: "Ede", email1: "ede@x.hu" });
+    signup({ mode: "solo", name1: "Pál", email1: "pal@x.hu", city: "pecs" });
+    h.raw.exec(`insert or replace into cities (slug, name, listed) values ('pecs', 'Pécs', 1)`);
+    h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
+    expect(await O.queueRegistrationInvites(new Date("2026-11-02T08:00:00Z"))).toBe(2);
+    const text = (to: string) => h.sent.find((m) => m.to === to).text as string;
+    expect(text("ede@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:");
+    // Pécs has a league but no season yet: no date sentence.
+    expect(text("pal@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! Regisztrálni és nevezni itt tudsz:");
+    expect(text("pal@x.hu")).not.toContain("indul");
+  });
+
   it("asks the signer of a pair signup without the partner's email to add it (#96)", async () => {
     signup({ mode: "pair", name1: "Anna", email1: "anna@x.hu", name2: "Béla" });
     expect(await O.queueRegistrationInvites()).toBe(1);
     const row = h.raw.prepare("select to_email, status from email_messages").get();
     expect(row).toMatchObject({ to_email: "anna@x.hu", status: "sent" });
-    expect(h.sent[0].text).toContain("Belépés után add meg, és ő is kap meghívót.");
+    expect(h.sent[0].text).toContain("belépéskor add meg, és ő is kap meghívót.");
   });
 });

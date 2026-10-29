@@ -50,6 +50,30 @@ export function formatShortDate(date: Date): string {
   return shortDate.format(date);
 }
 
+const monthName = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "long" });
+const dayOfMonth = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "numeric" });
+
+// The ending of "9-én", "1-jén", "3-án": it follows the spoken ordinal
+// ("elsején", "másodikán", "tizenkettedikén", "huszadikán", ...).
+function onDayEnding(day: number): string {
+  if (day === 1) return "jén";
+  if (day === 2) return "án";
+  if (day % 10 === 0) return day === 10 ? "én" : "án";
+  return ["", "én", "én", "án", "én", "én", "án", "én", "án", "én"][day % 10]!;
+}
+
+// On which day, in a sentence: "november 9-én"
+export function formatOnDate(date: Date): string {
+  const day = Number(dayOfMonth.format(date));
+  return `${monthName.format(date)} ${day}-${onDayEnding(day)}`;
+}
+
+// Until which day, in a sentence: "november 6-ig" ("elsejéig": "1-jéig")
+export function formatUntilDate(date: Date): string {
+  const day = Number(dayOfMonth.format(date));
+  return `${monthName.format(date)} ${day}-${day === 1 ? "jéig" : "ig"}`;
+}
+
 const fullDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
 
 // "2026. 10. 01."

@@ -16,13 +16,14 @@ import {
 import type { InterestSignup } from "~/lib/interest";
 import { channelKey, followsEmailSwitch } from "~/lib/notifications";
 
-import { INTEREST_INVITE_NOTE, inviteRecipients, type InviteRecipient, type Recipient } from "./audience";
+import { INTEREST_INVITE_NOTE, inviteRecipients, inviteStarts, type InviteRecipient, type InviteStart, type Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { listCities } from "~/lib/cities.server";
+import { listSeasons } from "~/lib/seasons.server";
 
 import {
   broadcastEmail,
@@ -294,6 +295,16 @@ export async function pendingRegistrationInvites(): Promise<InviteRecipient[]> {
   });
 }
 
+// When and where each league city's league starts, for the invite (#131).
+async function leagueStarts(now: Date): Promise<Map<string, InviteStart>> {
+  const [leagueRows, seasons, cities] = await Promise.all([
+    db.select({ id: leagues.id, city: leagues.city }).from(leagues),
+    listSeasons(),
+    listCities(),
+  ]);
+  return inviteStarts(leagueRows, seasons, cities, now);
+}
+
 // account_invites binds 3 parameters per row, the invited_at update 1 per
 // address plus the timestamp (D1: at most 100 per statement).
 const INVITE_CHUNK = 30;
@@ -347,10 +358,12 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
   let ids: number[];
   try {
     const secret = emailSecret();
+    const starts = await leagueStarts(now);
     const messages = await Promise.all(
       recipients.map(async (r): Promise<NewMessage> => {
         const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
-        return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...registrationInvite(r, url) };
+        const email = registrationInvite(r, url, starts.get(r.city) ?? null);
+        return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...email };
       }),
     );
     const statements: BatchItem<"sqlite">[] = [];

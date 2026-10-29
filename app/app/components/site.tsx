@@ -33,7 +33,7 @@ export function Logo({ className = "" }: { className?: string }) {
 
 const headerLink = "rounded-full border-2 border-foreground px-4 py-2 font-bold no-underline sm:px-5";
 
-// `cta`: the "Jelentkezem" button (landing and rules). "Belépés" is on every
+// `cta`: the "Nevezés" button to the landing's league card (landing and rules). "Belépés" is on every
 // public page; someone logged in gets "Kezdőlap" (the app's home) instead of
 // both. The login page itself has no link to itself.
 export function SiteHeader({ cta = true }: { cta?: boolean }) {
@@ -54,9 +54,9 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
             <>
               {cta && (
                 // Not on a phone: two buttons don't fit beside the logo at 360 px,
-                // and the page has its own "Jelentkezem".
-                <a href="/#jelentkezes" className={`${headerLink} max-sm:hidden`}>
-                  Jelentkezem
+                // and the landing has the league card (the way in) on top.
+                <a href="/" className={`${headerLink} max-sm:hidden`}>
+                  Nevezés
                 </a>
               )}
               {pathname !== "/login" && (

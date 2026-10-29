@@ -173,12 +173,15 @@ const GONE = "Ezt a jelentkezést már nem tudod módosítani.";
 // (#112; same rules as every invite: not to an account, an unsubscribed
 // address or one invited already). No token and no confirmation. The update
 // only runs while email2 is still empty, so a second submit queues nothing.
+// `checkOnly`: the same checks, nothing saved or sent (the first-login page
+// checks every typed address before saving any, #130).
 // If the partner has registered already, the pair forms now (#89).
 export async function savePartnerEmail(
   user: Pick<User, "id" | "email">,
   signupId: number,
   rawEmail: string,
   now = new Date(),
+  checkOnly = false,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const box = (await missingPartnerEmails(user)).find((b) => b.signupId === signupId);
   if (!box) {
@@ -196,6 +199,7 @@ export async function savePartnerEmail(
     : false;
   const check = checkPartnerEmail({ email: rawEmail, userEmail: user.email, paired });
   if (!check.ok) return check;
+  if (checkOnly) return { ok: true };
   const updated = await db
     .update(interestSignups)
     .set({ email2: check.email, updatedAt: now })

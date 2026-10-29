@@ -78,12 +78,19 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.ok) return { errors: result.errors };
   // The partner's address, if they typed one (#96): saved and invited as
   // from the box on the home page. A refused address keeps the page open.
+  // Every typed address is checked before any is saved or invited.
   const partnerErrors: Record<number, string> = {};
-  for (const box of await missingPartnerEmails(user)) {
-    const typed = String(form.get(`partnerEmail-${box.signupId}`) ?? "").trim();
-    if (!typed) continue;
-    const saved = await savePartnerEmail(user, box.signupId, typed);
-    if (!saved.ok) partnerErrors[box.signupId] = saved.error;
+  const typed = (await missingPartnerEmails(user))
+    .map((box) => ({ signupId: box.signupId, email: String(form.get(`partnerEmail-${box.signupId}`) ?? "").trim() }))
+    .filter((t) => t.email);
+  for (const t of typed) {
+    const checked = await savePartnerEmail(user, t.signupId, t.email, new Date(), true);
+    if (!checked.ok) partnerErrors[t.signupId] = checked.error;
+  }
+  if (Object.keys(partnerErrors).length > 0) return { errors: {}, partnerErrors };
+  for (const t of typed) {
+    const saved = await savePartnerEmail(user, t.signupId, t.email);
+    if (!saved.ok) partnerErrors[t.signupId] = saved.error;
   }
   if (Object.keys(partnerErrors).length > 0) return { errors: {}, partnerErrors };
   await saveProfile(user.id, result.value);
@@ -98,7 +105,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
   const partnerErrors: Record<number, string> = (actionData && "partnerErrors" in actionData && actionData.partnerErrors) || {};
   if (loaderData.onlySex)
     return (
-      <AuthPage title="Még egy kérdés" intro="Új mezőt vettünk fel a profilba. Egy kattintás, és mehetsz tovább.">
+      <AuthPage title="Még egy kérdés" intro="Új mezőt vettünk fel a profilba. Csak ennyi, és mehetsz tovább.">
         <Form method="post" className="grid gap-5">
           <input type="hidden" name="returnTo" value={loaderData.returnTo} />
           <SexField error={errors.sex} />

@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({
-  listedCities: async () => [{ slug: "gyor" }],
+  listedCities: async () => [{ slug: "gyor" }, { slug: "pecs" }],
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
 }));
 vi.mock("~/lib/email/send.server", () => ({
@@ -43,12 +43,12 @@ async function firstLogin(email: string, name = ""): Promise<string> {
 }
 
 let clock = 0;
-function signup(v: { mode?: "pair" | "solo"; name1: string; email1: string; name2?: string; email2?: string; level?: string }) {
+function signup(v: { mode?: "pair" | "solo"; name1: string; email1: string; name2?: string; email2?: string; level?: string; city?: string }) {
   return h.raw
     .prepare(
-      "insert into interest_signups (mode, name1, email1, name2, email2, city, level, consent_at, created_at) values (?, ?, ?, ?, ?, 'gyor', ?, 1, ?) returning id",
+      "insert into interest_signups (mode, name1, email1, name2, email2, city, level, consent_at, created_at) values (?, ?, ?, ?, ?, ?, ?, 1, ?) returning id",
     )
-    .get(v.mode ?? "pair", v.name1, v.email1, v.name2 ?? null, v.email2 ?? null, v.level ?? "kezdo", ++clock).id as number;
+    .get(v.mode ?? "pair", v.name1, v.email1, v.name2 ?? null, v.email2 ?? null, v.city ?? "gyor", v.level ?? "kezdo", ++clock).id as number;
 }
 
 const done = { phone: "+36 30 123 4567", consent: "on", sex: "female", returnTo: "/home" };
@@ -133,6 +133,18 @@ describe("first-login page pre-filled from the signup (#130)", () => {
     expect(result).toEqual({ errors: {}, partnerErrors: { [id]: "A saját címedet nem adhatod meg." } });
     expect(all("select consent_at from users where id = 'anna'")).toEqual([{ consent_at: null }]);
     expect(all("select email2 from interest_signups where id = ?", id)).toEqual([{ email2: null }]);
+    expect(all("select * from email_messages")).toEqual([]);
+  });
+
+  it("checks every partner address before saving or inviting any", async () => {
+    h.raw.exec("insert or replace into cities (slug, name, listed) values ('pecs', 'Pécs', 1)");
+    h.raw.exec("insert or replace into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')");
+    const gyor = signup({ name1: "Nagy Anna", email1: "anna@x.hu", name2: "Kovács Béla", level: "halado" });
+    const pecs = signup({ name1: "Nagy Anna", email1: "anna@x.hu", name2: "Tóth Cili", level: "halado", city: "pecs" });
+    const cookie = await firstLogin("anna@x.hu");
+    const fields = { ...done, name: "Nagy Anna", level: "halado", [`partnerEmail-${gyor}`]: "bela@x.hu", [`partnerEmail-${pecs}`]: "anna@x.hu" };
+    expect(await R.action(args(post(cookie, fields)))).toEqual({ errors: {}, partnerErrors: { [pecs]: "A saját címedet nem adhatod meg." } });
+    expect(all("select email2 from interest_signups order by id")).toEqual([{ email2: null }, { email2: null }]);
     expect(all("select * from email_messages")).toEqual([]);
   });
 

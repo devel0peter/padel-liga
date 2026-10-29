@@ -6,6 +6,7 @@
 // Later audiences (e.g. active league players) get their own function here.
 
 import { cityName, OTHER_CITY, type City } from "../cities";
+import { seasonEnd, type Season } from "../seasons";
 import { soloIsPaired, type SignupLink } from "../signup-partners";
 import { levelLabel, NO_REF, STATUSES, type Filters, type SignupRow } from "../signups-admin";
 
@@ -44,7 +45,8 @@ export type InviteCandidate = SignupLink & { invitedAt: Date | null; invited2At:
 
 export type InviteVariant = "solo" | "no_partner_email";
 
-export type InviteRecipient = Recipient & { variant?: InviteVariant };
+// `city`: the signup's city slug, for the invite's start sentence (#131).
+export type InviteRecipient = Recipient & { city: string; variant?: InviteVariant };
 
 export function inviteRecipients(
   rows: readonly InviteCandidate[],
@@ -74,10 +76,43 @@ export function inviteRecipients(
       if (seen.has(email)) continue;
       seen.add(email);
       if (invited.has(email) || ctx.suppressed.has(email) || ctx.accounts.has(email)) continue;
-      recipients.push({ email, name: p.name, ...(p.variant ? { variant: p.variant } : {}) });
+      recipients.push({ email, name: p.name, city: r.city, ...(p.variant ? { variant: p.variant } : {}) });
     }
   }
   return recipients;
+}
+
+// Where and when the league starts, for the invite's opening line (#131):
+// "A liga november 9-én indul (Győr)." Per city slug: the city's name and
+// round 1's start of its league's current season (the earliest one that
+// hasn't ended, as on the landing page; a city with several leagues takes
+// the first one that has such a season). Only while that round is still
+// ahead: a city without a season, or whose current season has started, has
+// no entry, and the invite leaves the sentence out.
+export type InviteStart = { city: string; firstRound: Date };
+
+export function inviteStarts(
+  leagues: readonly { id: number; city: string }[],
+  seasons: readonly Pick<Season, "leagueId" | "phases">[],
+  cities: readonly Pick<City, "slug" | "name">[],
+  now: Date,
+): Map<string, InviteStart> {
+  const firstRound = (s: Pick<Season, "phases">) => s.phases.find((p) => p.number === 1)?.startsAt ?? null;
+  const current = (leagueId: number) =>
+    seasons
+      .filter((s) => s.leagueId === leagueId && firstRound(s) !== null && (seasonEnd(s) ?? now) >= now)
+      .sort((a, b) => firstRound(a)!.getTime() - firstRound(b)!.getTime())[0];
+  const out = new Map<string, InviteStart>();
+  const decided = new Set<string>();
+  for (const league of [...leagues].sort((a, b) => a.id - b.id)) {
+    if (decided.has(league.city)) continue;
+    const season = current(league.id);
+    if (!season) continue;
+    decided.add(league.city);
+    const start = firstRound(season)!;
+    if (start > now) out.set(league.city, { city: cityName(league.city, cities), firstRound: start });
+  }
+  return out;
 }
 
 export function audienceLabel(f: Filters, cities: readonly Pick<City, "slug" | "name">[] = []): string {

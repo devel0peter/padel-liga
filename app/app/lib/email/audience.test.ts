@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { audienceLabel, inviteRecipients, signupRecipients, type InviteCandidate } from "./audience";
+import { audienceLabel, inviteRecipients, inviteStarts, signupRecipients, type InviteCandidate } from "./audience";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
@@ -83,8 +83,8 @@ describe("inviteRecipients", () => {
 
   it("invites both addresses of a pair signup, each by their own name, once each", () => {
     expect(inviteRecipients([pair()], ctx)).toEqual([
-      { name: "Anna", email: "anna@example.com" },
-      { name: "Béla", email: "bela@example.com" },
+      { name: "Anna", email: "anna@example.com", city: "gyor" },
+      { name: "Béla", email: "bela@example.com", city: "gyor" },
     ]);
     // The same pair signed up twice, the second time the other way round.
     expect(
@@ -94,10 +94,10 @@ describe("inviteRecipients", () => {
 
   it("invites only the signer of a pair signup without a partner email, with the extra sentence (#96)", () => {
     expect(inviteRecipients([pair({ email2: null })], ctx)).toEqual([
-      { name: "Anna", email: "anna@example.com", variant: "no_partner_email" },
+      { name: "Anna", email: "anna@example.com", city: "gyor", variant: "no_partner_email" },
     ]);
     expect(inviteRecipients([pair({ email2: "" })], ctx)).toEqual([
-      { name: "Anna", email: "anna@example.com", variant: "no_partner_email" },
+      { name: "Anna", email: "anna@example.com", city: "gyor", variant: "no_partner_email" },
     ]);
   });
 
@@ -109,14 +109,14 @@ describe("inviteRecipients", () => {
 
   it("invites both solos once a Szervező paired them", () => {
     expect(inviteRecipients(soloDuo(), ctx)).toEqual([
-      { name: "Cili", email: "cili@example.com" },
-      { name: "Dani", email: "dani@example.com" },
+      { name: "Cili", email: "cili@example.com", city: "gyor" },
+      { name: "Dani", email: "dani@example.com", city: "gyor" },
     ]);
   });
 
   it("invites a solo still waiting for a partner too, with the solo text (#96)", () => {
     expect(inviteRecipients([solo({ email1: "solo@example.com" })], ctx)).toEqual([
-      { name: "Anna", email: "solo@example.com", variant: "solo" },
+      { name: "Anna", email: "solo@example.com", city: "gyor", variant: "solo" },
     ]);
     // Only one row pointing at the other is no pairing.
     const [x, y] = soloDuo();
@@ -124,7 +124,7 @@ describe("inviteRecipients", () => {
     expect(inviteRecipients([x, y], ctx).map((r) => r.variant)).toEqual(["solo", "solo"]);
     // A partner who withdrew leaves the other waiting.
     expect(inviteRecipients(soloDuo({}, { status: "withdrawn" }), ctx)).toEqual([
-      { name: "Cili", email: "cili@example.com", variant: "solo" },
+      { name: "Cili", email: "cili@example.com", city: "gyor", variant: "solo" },
     ]);
   });
 
@@ -164,5 +164,46 @@ describe("inviteRecipients", () => {
     expect(emails([pair({ invitedAt, invited2At: invitedAt }), ...soloDuo({ email1: "bela@example.com" })])).toEqual([
       "dani@example.com",
     ]);
+  });
+});
+
+describe("inviteStarts (#131)", () => {
+  // Rounds start Monday 00:00 Budapest and end Sunday 23:59.
+  const round = (number: number, start: string, end: string) => ({
+    number,
+    startsAt: new Date(`${start}T23:00:00Z`),
+    deadline: new Date(`${end}T22:59:00Z`),
+  });
+  const autumn = { leagueId: 1, phases: [round(1, "2026-11-08", "2026-11-29"), round(2, "2026-11-29", "2026-12-20")] };
+  const spring = { leagueId: 1, phases: [round(1, "2027-02-28", "2027-03-21")] };
+  const leagues = [{ id: 1, city: "gyor" }];
+  const cities = [{ slug: "gyor", name: "Győr" }];
+  const on = (iso: string) => new Date(iso);
+
+  it("gives each league city its name and the current season's first round start", () => {
+    const starts = inviteStarts(leagues, [spring, autumn], cities, on("2026-10-30T10:00:00Z"));
+    expect([...starts]).toEqual([["gyor", { city: "Győr", firstRound: new Date("2026-11-08T23:00:00Z") }]]);
+  });
+
+  it("has nothing for a city whose league has no season", () => {
+    expect(inviteStarts(leagues, [], cities, on("2026-10-30T10:00:00Z")).size).toBe(0);
+  });
+
+  it("has nothing once the current season's first round has started", () => {
+    expect(inviteStarts(leagues, [autumn, spring], cities, on("2026-11-09T08:00:00Z")).size).toBe(0);
+  });
+
+  it("takes the next season once the current one has ended", () => {
+    const starts = inviteStarts(leagues, [autumn, spring], cities, on("2027-01-10T10:00:00Z"));
+    expect(starts.get("gyor")?.firstRound).toEqual(new Date("2027-02-28T23:00:00Z"));
+  });
+
+  it("takes the first league of a city that has a season", () => {
+    const two = [
+      { id: 1, city: "gyor" },
+      { id: 2, city: "gyor" },
+    ];
+    const starts = inviteStarts(two, [{ ...autumn, leagueId: 2 }], cities, on("2026-10-30T10:00:00Z"));
+    expect(starts.get("gyor")?.firstRound).toEqual(new Date("2026-11-08T23:00:00Z"));
   });
 });

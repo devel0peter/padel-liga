@@ -171,6 +171,17 @@ export function d1(select: string): Record<string, unknown>[] {
   return (JSON.parse(out) as { results: Record<string, unknown>[] }[])[0].results;
 }
 
+// One fixture insert into the suite's local D1, for a row no page can make
+// any more (an interest signup in a league city, #83).
+export function d1Insert(sql: string): void {
+  if (!/^\s*insert\b/i.test(sql)) throw new Error("d1Insert() only inserts.");
+  execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--command", sql])], {
+    cwd: APP_DIR,
+    env: { ...process.env, FORCE_COLOR: "0" },
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+}
+
 // The seeded season's id, from the Szezonok page's links.
 export async function seasonPath(page: Page): Promise<string> {
   await page.goto("/admin/leagues/minta/seasons");

@@ -13,14 +13,13 @@ import {
 } from "~/components/ui/accordion";
 import { landingPairCounts, listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
-import { activeVenues, toClubOption } from "~/lib/clubs";
+import { activeVenues } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { parseInterest } from "~/lib/interest";
 import { landingByCity } from "~/lib/landing-league";
 import { listLeagues } from "~/lib/leagues.server";
 import { publishedPhases } from "~/lib/groups.server";
 import { listSeasons } from "~/lib/seasons.server";
-import { OTHER_CITY } from "~/lib/cities";
 import { LeagueStatus } from "~/components/league-status";
 import { saveInterest } from "~/lib/interest.server";
 import { organizationJsonLd, pageMeta } from "~/lib/site";
@@ -47,8 +46,6 @@ export function meta({ location }: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  // Clubs only feed the optional "where do you play most" field.
-  const clubs = activeVenues(await listClubs()).map(toClubOption);
   const listed = await listedCities();
   const pairs = await landingPairCounts(listed);
   // A listed city with a league shows where it is and sends visitors to
@@ -67,7 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     league: league.get(slug) ?? null,
   }));
   const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
-  return { ref, clubs, cities, turnstileSiteKey: turnstileSiteKey() };
+  return { ref, cities, turnstileSiteKey: turnstileSiteKey() };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -77,11 +74,13 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   const honeypot = form.get("website");
   if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
 
-  const [clubs, cities] = await Promise.all([listClubs(), listedCities()]);
+  const [clubs, cities, leagues] = await Promise.all([listClubs(), listedCities(), listLeagues()]);
+  // A city with a league takes no interest signup (#83): people register.
   const result = parseInterest(
     form,
     activeVenues(clubs, String(form.get("city"))).map((c) => c.slug),
     cities,
+    leagues.map((l) => l.city),
   );
   if (!result.ok) return result;
 
@@ -118,7 +117,6 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   return { ok: true, cityOther: result.data.cityOther };
 }
 
-const btn = "inline-block rounded-full border-2 px-6 py-3 font-bold no-underline";
 
 
 
@@ -146,8 +144,8 @@ const RULES = [
 
 const FAQ = [
   ["Mennyibe kerül?", "Nevezési díj nincs, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor csatlakozhatok?", "Ahol már fut a liga, nevezhetsz rögtön: a következő kör elejétől játszotok, a dátumot a Jelentkezz résznél látod. Ahol még nincs liga, írd fel magad, és e-mailben szólunk, ha indul."],
-  ["Nincs párom. Jelentkezhetek?", "Igen. Jelentkezz egyedül, és megpróbálunk hasonló szintű párt találni neked a jelentkezők közül."],
+  ["Mikor csatlakozhatok?", "Ahol már fut a liga, nevezhetsz rögtön: a következő kör elejétől játszotok, a dátumot az oldal tetején látod. Ahol még nincs liga, írd fel magad, és e-mailben szólunk, ha indul."],
+  ["Nincs párom. Nevezhetek?", "Igen. Regisztrálj egyedül, és a szervező hasonló szintű párt keres neked."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
   ["Mi van, ha megsérül a párom?", "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."],
@@ -176,14 +174,15 @@ function useLandingCount(source: string | null) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { clubs, cities } = loaderData;
+  const { cities } = loaderData;
   // The source as the page was opened. Loaders run again later (a "#" link,
   // back from the rules) on the cleaned address, which has no source.
   const [ref] = useState(loaderData.ref);
   useLandingCount(ref);
-  // The chosen city is shared by the form and the league block next to it.
-  const [city, setCity] = useState<string>(cities[0]?.slug ?? OTHER_CITY);
-  const chosen = cities.find((c) => c.slug === city);
+  const leagueCities = cities.filter((c) => c.league);
+  // The city typed in the other-city form; a chip of a listed city without a
+  // league fills it in.
+  const [cityText, setCityText] = useState("");
   return (
     <>
       <SiteHeader />
@@ -198,12 +197,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Négyes csoportok, heti egy meccs. Aki nyer, feljebb lép. Aki
                 nem, a következő körben visszavághat.
               </p>
-              <div className="flex flex-wrap gap-3">
-                <a href="#jelentkezes" className={`${btn} border-ball bg-ball text-ball-foreground`}>
-                  Jelentkezem
-                </a>
-                <a href="#hogyan" className={`${btn} border-foreground`}>
+              {leagueCities.map((c) => c.league && <LeagueStatus key={c.slug} city={c.name} block={c.league} />)}
+              <div className="flex flex-wrap gap-x-6 gap-y-2 font-bold">
+                <a href="#hogyan" className="underline">
                   Hogyan működik?
+                </a>
+                <a href="#mas-varos" className="underline">
+                  {leagueCities.length > 0 ? "Más városban játszol?" : "Jelentkezem"}
                 </a>
               </div>
               <div className="grid gap-2">
@@ -214,8 +214,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   {cities.map((c) => (
                     <li key={c.slug}>
                       <a
-                        href="#jelentkezes"
-                        onClick={() => setCity(c.slug)}
+                        href={c.league ? "#" : "#mas-varos"}
+                        onClick={c.league ? (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); } : () => setCityText(c.name)}
                         className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
                       >
                         <span className="relative flex size-2.5">
@@ -224,15 +224,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         </span>
                         {c.name}
                         <span className="text-sm font-medium opacity-80">
-                          · {c.pairs ? `${c.pairs} pár jelentkezett` : "jelentkezés nyitva"}
+                          · {c.league ? c.league.chip : c.pairs ? `${c.pairs} pár jelentkezett` : "jelentkezés nyitva"}
                         </span>
                       </a>
                     </li>
                   ))}
                   <li>
                     <a
-                      href="#jelentkezes"
-                      onClick={() => setCity(OTHER_CITY)}
+                      href="#mas-varos"
+                      onClick={() => setCityText("")}
                       title="Szólunk, ha nálatok is indul"
                       className="inline-flex items-center rounded-full border-[1.5px] border-dashed px-4 py-2 font-bold text-muted-foreground no-underline"
                     >
@@ -269,7 +269,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <Wrap>
             <SectionHead
               title="A szabályok röviden"
-              lede="A részletes szabályzatot az indulás előtt véglegesítjük, a jelentkezők véleményét is figyelembe véve."
+              lede="A részleteket a teljes szabályzatban találod."
             />
             <dl className="grid max-w-[52rem] sm:grid-cols-[minmax(9rem,14rem)_1fr]">
               {RULES.map(([term, desc]) => (
@@ -299,25 +299,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </Wrap>
         </section>
 
-        <section id="jelentkezes" className="scroll-mt-4 bg-muted py-16">
+        <section id="mas-varos" className="scroll-mt-4 bg-muted py-16">
           <Wrap className="grid items-start gap-12 lg:grid-cols-[1fr_1.2fr]">
-            <div className="grid gap-6">
-              <SectionHead
-                title={chosen?.league ? "Nevezz a ligába" : "Jelentkezz, és szólunk"}
-                lede={
-                  chosen?.league
-                    ? "Itt már van liga. Így látod, hol tart, és mikor tudtok becsatlakozni."
-                    : "Nálatok még nincs liga. Írd fel magad, és e-mailben szólunk, ha indul. A jelentkezés nem kötelez semmire."
-                }
-              />
-              {chosen?.league && <LeagueStatus city={chosen.name} block={chosen.league} />}
-            </div>
+            <SectionHead
+              title="Nálatok még nincs liga?"
+              lede="Hagyd itt az elérhetőséged, és szólunk, ha nálatok is indul. Ha szívesen szerveznél egyet, jelöld be, és felvesszük veled a kapcsolatot. Nem kötelez semmire."
+            />
             <SignupForm
               signupRef={ref}
-              clubs={clubs}
               cities={cities}
-              city={city}
-              onCityChange={setCity}
+              cityText={cityText}
+              onCityTextChange={setCityText}
               turnstileSiteKey={loaderData.turnstileSiteKey}
             />
           </Wrap>

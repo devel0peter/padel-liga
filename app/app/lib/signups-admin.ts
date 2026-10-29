@@ -34,6 +34,7 @@ export type SignupRow = {
   status: Status;
   adminNote: string | null;
   pairedWith: number | null;
+  wantsToOrganize: boolean;
   consentAt: Date;
   createdAt: Date;
   updatedAt: Date | null;
@@ -118,7 +119,7 @@ export function toCsv(
 ): string {
   const header = [
     "Azonosító", "Jelentkezett", "Város", "Mód", "Név 1", "E-mail 1", "Név 2", "E-mail 2",
-    "Szint", "Megjegyzés", "Forrás", "Hol játszik", "Állapot", "Admin jegyzet",
+    "Szint", "Megjegyzés", "Forrás", "Hol játszik", "Állapot", "Admin jegyzet", "Szervezne",
   ];
   const cell = (v: string | number | null) => {
     // A leading = + - @ (or tab/CR) would make Excel read user input as a
@@ -142,6 +143,7 @@ export function toCsv(
       label.homeClub(r.homeClub),
       STATUSES[r.status],
       r.adminNote,
+      r.wantsToOrganize ? "igen" : "",
     ]
       .map(cell)
       .join(";"),

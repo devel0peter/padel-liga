@@ -98,13 +98,16 @@ type Cities = readonly Pick<City, "slug" | "name">[];
 
 export function signupConfirmation(s: InterestSignup, cities: Cities = []): Email {
   const otherCity = s.cityOther != null;
+  // The other-city form asks for no partner (contact only).
   const lines = [
     `Város: ${cityLabel(s, cities)}`,
-    s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel",
+    ...(otherCity ? [] : [s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel"]),
     `Szint: ${levelLabel(s.level)}`,
   ];
   const next = otherCity
-    ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
+    ? s.wantsToOrganize
+      ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Azt írtad, szívesen szerveznél: hamarosan írunk.`
+      : `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
     : s.mode === "solo"
       ? "Segítünk párt találni, és írunk az indulásról."
       : "Írunk az indulásról és a következő lépésekről.";

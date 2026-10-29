@@ -29,6 +29,7 @@ const pair: InterestSignup = {
   note: null,
   ref: null,
   homeClub: null,
+  wantsToOrganize: false,
 };
 
 describe("textToHtml", () => {
@@ -87,6 +88,10 @@ describe("signupConfirmation", () => {
     expect(signupConfirmation(pair, GYOR).text).toContain("Írunk az indulásról és a következő lépésekről.");
     expect(signupConfirmation(solo, GYOR).text).toContain("Segítünk párt találni, és írunk az indulásról.");
     expect(signupConfirmation(other, GYOR).text).toContain("Ha lesz szervező, szólunk.");
+    expect(signupConfirmation(other, GYOR).text).not.toContain("párt keresel");
+    expect(signupConfirmation({ ...other, wantsToOrganize: true }, GYOR).text).toContain(
+      "Azt írtad, szívesen szerveznél: hamarosan írunk.",
+    );
   });
 });
 

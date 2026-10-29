@@ -48,6 +48,9 @@ describe("leagueLanding", () => {
         ["1. kör indul", "nov. 9., hétfő"],
       ],
       joining: "Nevezz most, és az 1. körtől játszotok (nov. 9.).",
+      chip: "nevezés nyitva",
+      cta: "Nevezek az 1. körre",
+      ctaNote: null,
     });
   });
 
@@ -94,6 +97,9 @@ describe("leagueLanding", () => {
         ["Határidő", "nov. 29., vasárnap 23:59"],
       ],
       joining: "Nevezz most, és a 2. körtől játszotok (nov. 30.).",
+      chip: "zajlik az 1. kör",
+      cta: "Nevezek a 2. körre",
+      ctaNote: null,
     });
   });
 
@@ -207,5 +213,25 @@ describe("landingByCity", () => {
       now,
     );
     expect(m.get("gyor")!.title).toBe("Nyitva a nevezés");
+  });
+});
+
+describe("landing chip and register button", () => {
+  it("no round left to join: the button still offers an account", () => {
+    const b = landingBlock(leagueLanding([{ ...FIRST, publishedPhases: [2, 3, 4] }], at("2026-11-12")));
+    expect(b).toMatchObject({ chip: "zajlik az 1. kör", cta: "Regisztrálok", ctaNote: "Hozz létre fiókot, és nevezz, amint nyílik." });
+  });
+
+  it("no season at all: the next season is being prepared, register anyway", () => {
+    expect(landingBlock(leagueLanding([], at("2026-10-29")))).toMatchObject({
+      chip: "készül a következő szezon",
+      cta: "Regisztrálok",
+    });
+  });
+
+  it("each state has its own chip", () => {
+    expect(landingBlock(leagueLanding([FIRST], at("2026-11-06"))).chip).toBe("hamarosan indul");
+    expect(landingBlock(leagueLanding([FIRST], at("2026-12-01"))).chip).toBe("zajlik a 2. kör");
+    expect(landingBlock(leagueLanding([FIRST], at("2026-12-24"))).chip).toBe("szünet a körök között");
   });
 });

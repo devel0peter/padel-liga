@@ -1,0 +1,1 @@
+ALTER TABLE `interest_signups` ADD `wants_to_organize` integer DEFAULT false NOT NULL;

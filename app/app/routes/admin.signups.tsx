@@ -200,9 +200,10 @@ function SignupTableRow({
             <Player name={row.name2} email={row.email2} />
           ) : row.pairedName ? (
             <Badge variant="secondary">Párja: {row.pairedName}</Badge>
-          ) : (
+          ) : row.cityOther == null ? (
             <Badge variant="secondary">Egyéni, párt keres</Badge>
-          )}
+          ) : null}
+          {row.wantsToOrganize && <Badge>Szervezne ligát</Badge>}
         </div>
       </TableCell>
       <TableCell>{levelLabel(row.level)}</TableCell>

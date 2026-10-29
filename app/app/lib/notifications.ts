@@ -102,6 +102,8 @@ export type SignupSummary = {
   // The city's signups so far, this one included (withdrawn ones not counted).
   pairs: number;
   solos: number;
+  // Ticked "Szívesen szerveznék ligát".
+  organize?: boolean;
 };
 
 // "Kezdő – most ismerkedünk…" -> "kezdő"
@@ -118,7 +120,7 @@ export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message
       : `/admin/leagues/${to.leagueSlug}`;
   return {
     title: `Új jelentkező · ${s.cityName}`,
-    body: `${who} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
+    body: `${who}${s.organize ? " Szívesen szervezne ligát." : ""} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
     url,
   };
 }

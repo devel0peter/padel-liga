@@ -27,6 +27,7 @@ function row(over: Partial<SignupRow>): SignupRow {
     note: null,
     ref: null,
     homeClub: null,
+    wantsToOrganize: false,
     status: "new",
     adminNote: null,
     pairedWith: null,
@@ -102,6 +103,14 @@ describe("toCsv", () => {
     expect(line).toContain("Győr;Pár;Nagy Anna;anna@example.com;Kovács Béla;;Kezdő;");
     expect(line).toContain('"hétfő; ""este"""');
     expect(line).toContain(";Új;");
+  });
+
+  it("marks who would organize a league in the last column", () => {
+    const csv = toCsv([row({ wantsToOrganize: true }), row({})]);
+    const [header, yes, no] = csv.split("\r\n");
+    expect(header.endsWith(";Szervezne")).toBe(true);
+    expect(yes.endsWith(";igen")).toBe(true);
+    expect(no.endsWith(";")).toBe(true);
   });
 
   it("writes the source and home club through the given labels", () => {

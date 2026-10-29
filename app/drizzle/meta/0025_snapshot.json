@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1bc10468-33aa-4961-9c47-98cb66ce2922",
+  "id": "d88ac838-e1c6-45e3-9fe6-7ff7d6364148",
   "prevId": "1742d941-9642-453c-b3bf-055f46f07443",
   "tables": {
     "account_invites": {
@@ -755,6 +755,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "wants_to_organize": {
+          "name": "wants_to_organize",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "updated_at": {
           "name": "updated_at",
@@ -2224,13 +2232,6 @@
         },
         "phone": {
           "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sex": {
-          "name": "sex",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

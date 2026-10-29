@@ -2,29 +2,18 @@
 // address. The seed has none, so this one comes in through the public form.
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, as, content, logOffset, visit, waitForEmails, type Player } from "./support";
+import { ADMIN, as, content, d1Insert, logOffset, visit, waitForEmails, type Player } from "./support";
 
 const elek: Player = { name: "Teszt Elek", email: "teszt.elek@example.test", level: "halado" };
 const PARTNER = "Cím Nélküli";
 
 test("a pair signup without the partner's address asks for it on Párom", async ({ browser }) => {
-  // A signup from before the city had a league. The landing page no longer
-  // offers the form for a league city (#83, see 10-landing), so the post goes
-  // to the page's action directly, the way an old open tab would send it.
-  const anon = await browser.newPage();
-  const sent = await anon.request.post("/?index", {
-    form: {
-      city: "minta",
-      mode: "pair",
-      name1: elek.name,
-      email1: elek.email,
-      name2: PARTNER,
-      level: elek.level,
-      consent: "on",
-    },
-  });
-  expect(sent.ok()).toBe(true);
-  await anon.close();
+  // A signup from before the city had a league. A league city takes no
+  // signup any more (#83, see 10-landing), so it goes into the database.
+  d1Insert(
+    `INSERT INTO interest_signups (city, mode, name1, email1, name2, level, consent_at) ` +
+      `VALUES ('minta', 'pair', '${elek.name}', '${elek.email}', '${PARTNER}', '${elek.level}', unixepoch())`,
+  );
 
   // The Admin invites the new signup like the seeded ones.
   const admin = await as(browser, ADMIN.email);

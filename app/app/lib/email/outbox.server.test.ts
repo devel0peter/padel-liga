@@ -128,6 +128,7 @@ describe("automatic outbox", () => {
     note: null,
     ref: null,
     homeClub: null,
+    wantsToOrganize: false,
   };
   const byKind = () =>
     Object.fromEntries(

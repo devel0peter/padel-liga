@@ -61,6 +61,7 @@ export default function Privacy() {
               <li>a város, ahol játszanál,</li>
               <li>ha párral jelentkezel, a párod neve és (ha megadod) az e-mail-címe,</li>
               <li>a szint, amit megadsz, és a megjegyzésed,</li>
+              <li>ha bejelölöd, hogy szívesen szerveznél ligát (ezért keresünk meg),</li>
               <li>ha megadod, melyik klubban játszol a legtöbbet,</li>
               <li>
                 ha egy klub plakátjáról (QR-kóddal) érkeztél, a klub neve, hogy

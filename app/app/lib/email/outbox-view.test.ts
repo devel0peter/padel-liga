@@ -65,17 +65,17 @@ describe("hideAddresses", () => {
 
 describe("relayWarning (#127)", () => {
   it("warns in production when the relay is missing, in Hungarian and with no secret or address", () => {
-    const text = relayWarning(false, false);
+    const text = relayWarning(false, false, 250);
     expect(text).toMatch(/Resend/);
-    expect(text).toMatch(/100/);
+    expect(text).toMatch(/naponta legfeljebb 250/);
     expect(text).not.toMatch(/@/);
   });
 
   it("is silent when the relay is configured", () => {
-    expect(relayWarning(true, false)).toBeNull();
+    expect(relayWarning(true, false, 100)).toBeNull();
   });
 
   it("is silent in local dev, where the console shows the emails", () => {
-    expect(relayWarning(false, true)).toBeNull();
+    expect(relayWarning(false, true, 100)).toBeNull();
   });
 });

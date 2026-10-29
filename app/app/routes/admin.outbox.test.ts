@@ -59,7 +59,7 @@ describe("/admin/outbox", () => {
     vi.stubEnv("DEV", false);
     try {
       h.relay = false;
-      expect((await R.loader(args(get(cookie)))).relayWarning).toMatch(/Resend/);
+      expect((await R.loader(args(get(cookie)))).relayWarning).toMatch(/Resenden mennek ki, naponta legfeljebb 100/);
       h.relay = true;
       const withRelay = await R.loader(args(get(cookie)));
       expect(withRelay.relayWarning).toBeNull();

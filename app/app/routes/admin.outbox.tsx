@@ -23,12 +23,8 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "outbox.manage" });
   const [log, sent] = await Promise.all([outboxLog(), sentLast24h()]);
-  return {
-    log,
-    sent,
-    limit: dailyLimit(),
-    relayWarning: relayWarning(relayConfigured(), import.meta.env.DEV),
-  };
+  const limit = dailyLimit();
+  return { log, sent, limit, relayWarning: relayWarning(relayConfigured(), import.meta.env.DEV, limit) };
 }
 
 export default function AdminOutbox({ loaderData }: Route.ComponentProps) {

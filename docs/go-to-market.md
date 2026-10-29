@@ -76,13 +76,13 @@ Ha eddig halogattad: most iratkozz fel, és jelöld meg a párodat! 👇
 ```
 
 ### Post 4: registration open (ready 2026-10-29)
-Dates from the live season "2026/27 tél": entry 29 Oct – 6 Nov (Fri), round 1 starts 9 Nov, round 2 on 30 Nov. Social proof from production on 2026-10-29: 31 pair and 4 solo interest signups in Győr, 0 entries yet.
+Dates from the live season "2026/27 tél": entry 29 Oct – 6 Nov (Fri), round 1 starts 9 Nov, round 2 on 30 Nov. No signup count in the post (Peter, 2026-10-29): interest signups aren't entries, so the post thanks people for the interest instead.
 
 4a. Facebook page (`facebook.com/padelparbaj`), posted by hand (the app has no `pages_manage_posts`):
 ```
 Nyitva a nevezés! 🎾
 
-November 9-én indul Győrben a Padelpárbaj, a heti padelliga pároknak. Már több mint 30 pár felírta magát.
+Nagyon örülünk, hogy ennyien érdeklődtetek, ezért elindul a Padelpárbaj, a heti padelliga pároknak! Az első kör november 9-én kezdődik Győrben.
 
 • Szint szerinti csoportok, kezdőtől versenyzőig
 • Hetente 1 meccs, az időpontot ti egyeztetitek

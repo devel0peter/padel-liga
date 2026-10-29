@@ -83,17 +83,18 @@ export function inviteRecipients(
 }
 
 // Where and when the league starts, for the invite's opening line (#131):
-// "A liga november 9-én indul (Győr)." Per city slug: the city's name and
-// round 1's start of its league's current season (the earliest one that
-// hasn't ended, as on the landing page; a city with several leagues takes
-// the first one that has such a season). Only while that round is still
-// ahead: a city without a season, or whose current season has started, has
-// no entry, and the invite leaves the sentence out.
-export type InviteStart = { city: string; firstRound: Date };
+// "A liga november 9-én indul (Győr), a nevezés november 6-ig tart." Per
+// city slug: the city's name and round 1's start of its league's current
+// season (the earliest one that hasn't ended, as on the landing page; a city
+// with several leagues takes the first one that has such a season), and the
+// season's last registration day while registration hasn't closed. Only while
+// round 1 is still ahead: a city without a season, or whose current season
+// has started, has no entry, and the invite leaves the sentence out.
+export type InviteStart = { city: string; firstRound: Date; registrationCloses: Date | null };
 
 export function inviteStarts(
   leagues: readonly { id: number; city: string }[],
-  seasons: readonly Pick<Season, "leagueId" | "phases">[],
+  seasons: readonly Pick<Season, "leagueId" | "phases" | "registrationClosesAt">[],
   cities: readonly Pick<City, "slug" | "name">[],
   now: Date,
 ): Map<string, InviteStart> {
@@ -110,7 +111,12 @@ export function inviteStarts(
     if (!season) continue;
     decided.add(league.city);
     const start = firstRound(season)!;
-    if (start > now) out.set(league.city, { city: cityName(league.city, cities), firstRound: start });
+    if (start > now)
+      out.set(league.city, {
+        city: cityName(league.city, cities),
+        firstRound: start,
+        registrationCloses: season.registrationClosesAt > now ? season.registrationClosesAt : null,
+      });
   }
   return out;
 }

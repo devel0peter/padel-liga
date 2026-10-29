@@ -174,15 +174,28 @@ describe("inviteStarts (#131)", () => {
     startsAt: new Date(`${start}T23:00:00Z`),
     deadline: new Date(`${end}T22:59:00Z`),
   });
-  const autumn = { leagueId: 1, phases: [round(1, "2026-11-08", "2026-11-29"), round(2, "2026-11-29", "2026-12-20")] };
-  const spring = { leagueId: 1, phases: [round(1, "2027-02-28", "2027-03-21")] };
+  // Registration 29 Oct – 6 Nov 23:59, round 1 from Mon 9 Nov (the real first season).
+  const closes = new Date("2026-11-06T22:59:00Z");
+  const autumn = {
+    leagueId: 1,
+    registrationClosesAt: closes,
+    phases: [round(1, "2026-11-08", "2026-11-29"), round(2, "2026-11-29", "2026-12-20")],
+  };
+  const spring = { leagueId: 1, registrationClosesAt: new Date("2027-02-26T22:59:00Z"), phases: [round(1, "2027-02-28", "2027-03-21")] };
   const leagues = [{ id: 1, city: "gyor" }];
   const cities = [{ slug: "gyor", name: "Győr" }];
   const on = (iso: string) => new Date(iso);
 
-  it("gives each league city its name and the current season's first round start", () => {
+  it("gives each league city its name, the current season's first round start and last registration day", () => {
     const starts = inviteStarts(leagues, [spring, autumn], cities, on("2026-10-30T10:00:00Z"));
-    expect([...starts]).toEqual([["gyor", { city: "Győr", firstRound: new Date("2026-11-08T23:00:00Z") }]]);
+    expect([...starts]).toEqual([
+      ["gyor", { city: "Győr", firstRound: new Date("2026-11-08T23:00:00Z"), registrationCloses: closes }],
+    ]);
+  });
+
+  it("drops the registration day once registration has closed, before round 1", () => {
+    const starts = inviteStarts(leagues, [autumn], cities, on("2026-11-07T10:00:00Z"));
+    expect(starts.get("gyor")).toEqual({ city: "Győr", firstRound: new Date("2026-11-08T23:00:00Z"), registrationCloses: null });
   });
 
   it("has nothing for a city whose league has no season", () => {

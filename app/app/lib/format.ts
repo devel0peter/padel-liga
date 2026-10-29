@@ -68,6 +68,12 @@ export function formatOnDate(date: Date): string {
   return `${monthName.format(date)} ${day}-${onDayEnding(day)}`;
 }
 
+// Until which day, in a sentence: "november 6-ig" ("elsejéig": "1-jéig")
+export function formatUntilDate(date: Date): string {
+  const day = Number(dayOfMonth.format(date));
+  return `${monthName.format(date)} ${day}-${day === 1 ? "jéig" : "ig"}`;
+}
+
 const fullDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
 
 // "2026. 10. 01."

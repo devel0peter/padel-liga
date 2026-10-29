@@ -87,7 +87,7 @@ describe("queueRegistrationInvites", () => {
       .prepare(
         "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Ősz', ?, ?, '2026-11-09')",
       )
-      .run(s("2026-11-01T23:00:00Z"), s("2026-11-08T22:59:00Z"));
+      .run(s("2026-10-28T23:00:00Z"), s("2026-11-06T22:59:00Z"));
     h.raw
       .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?), (1, 2, ?, ?)")
       .run(s("2026-11-08T23:00:00Z"), s("2026-11-29T22:59:00Z"), s("2026-11-29T23:00:00Z"), s("2026-12-20T22:59:00Z"));
@@ -97,7 +97,7 @@ describe("queueRegistrationInvites", () => {
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
     expect(await O.queueRegistrationInvites(new Date("2026-11-02T08:00:00Z"))).toBe(2);
     const text = (to: string) => h.sent.find((m) => m.to === to).text as string;
-    expect(text("ede@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr).");
+    expect(text("ede@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:");
     // Pécs has a league but no season yet: no date sentence.
     expect(text("pal@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! Regisztrálni és nevezni itt tudsz:");
     expect(text("pal@x.hu")).not.toContain("indul");

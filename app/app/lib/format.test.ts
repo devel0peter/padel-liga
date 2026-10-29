@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatDeadline, formatOnDate, formatShortDate } from "./format";
+import { formatDate, formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "./format";
 
 describe("Hungarian dates in Budapest time", () => {
   // Sunday 14 Feb 2027, 23:59 Budapest (CET).
@@ -34,5 +34,14 @@ describe("formatOnDate (#131)", () => {
     };
     for (let day = 1; day <= 31; day++)
       expect(formatOnDate(new Date(Date.UTC(2027, 0, day, 12)))).toBe(`január ${day}-${endings[day]}`);
+  });
+});
+
+describe("formatUntilDate (#131)", () => {
+  it("says until which day, in Budapest time: november 6-ig", () => {
+    // Friday 6 Nov 2026 23:59 Budapest.
+    expect(formatUntilDate(new Date("2026-11-06T22:59:00Z"))).toBe("november 6-ig");
+    expect(formatUntilDate(new Date("2026-12-01T10:00:00Z"))).toBe("december 1-jéig");
+    expect(formatUntilDate(new Date("2026-12-21T10:00:00Z"))).toBe("december 21-ig");
   });
 });

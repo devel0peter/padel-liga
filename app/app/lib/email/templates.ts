@@ -2,7 +2,7 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatDeadline, formatOnDate, formatShortDate } from "../format";
+import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "../format";
 import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
@@ -203,7 +203,8 @@ export function registrationInvite(
   unsubscribeUrl: string,
   start: InviteStart | null = null,
 ): Email {
-  const when = start ? ` A liga ${formatOnDate(start.firstRound)} indul (${start.city}).` : "";
+  const until = start?.registrationCloses ? `, a nevezés ${formatUntilDate(start.registrationCloses)} tart` : "";
+  const when = start ? ` A liga ${formatOnDate(start.firstRound)} indul (${start.city})${until}.` : "";
   const together = "a ligában magától pár lesztek, és együtt nevezhettek a szezonra.";
   return build(
     `Regisztrálj a ${SITE_NAME}ra`,

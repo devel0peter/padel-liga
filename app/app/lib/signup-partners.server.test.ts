@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any }));
 
+// No VAPID keys: notifications are stored, not pushed.
+vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({

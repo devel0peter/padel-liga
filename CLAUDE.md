@@ -46,7 +46,7 @@
 - `npm run db:seed:local -w app`: fake data in the local D1 for the milestone 1 walkthrough (`docs/walkthrough.md`). Local only: it takes no options and refuses remote. Running it again resets its own rows.
 - Deploys are automatic: every push to `main` (so, only a release) runs GitHub Actions (`.github/workflows/ci.yml`): typecheck, tests, build, then remote D1 migrations, then deploy. PR checks (`check`, `e2e`, `commitlint`) run for every base branch. Migrations must be additive and safe on live data.
 - `npm run deploy`: manual fallback only (CI down). Ask first.
-- Accounts: `npm run auth:invite -w app -- <email> [--remote]` (sign-up before 2 Nov), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Admin).
+- Accounts: `npm run auth:invite -w app -- <email> [--remote]` (optional since #113: anyone can sign up), `npm run auth:superadmin -w app -- <email> [--remote] [--revoke]` (the only way to grant Admin).
 
 ## Commits
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`, `refactor:`, `test:`), lowercase subject, e.g. `fix: accept the Access cookie on admin data requests`. CI runs commitlint on every PR's commits; check locally with `echo "<msg>" | npx commitlint`.

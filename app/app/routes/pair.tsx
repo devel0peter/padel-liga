@@ -5,6 +5,7 @@ import { PartnerEmailBox } from "~/components/partner-email";
 import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { requireUser } from "~/lib/auth/session.server";
+import { NO_PAIR_TEXT, NO_PAIR_TITLE } from "~/lib/pairs";
 import { pairLeagues, pairOverview } from "~/lib/pairs.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { waitingMessage } from "~/lib/signup-partners";
@@ -16,9 +17,11 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // "Párom": the pair (from the interest signup, #89, or made by a Szervező,
 // #97), or the partner who hasn't registered yet, or the box to add the
 // partner's address when the signup had none (#96), and the league's open
-// seasons to enter together (#23). Players can't change their pair here: a
-// Szervező does that on the Párok page (#97). One block per league; the
-// league is only named when there are several.
+// seasons to enter together (#23). Without any of these (a new account
+// without a signup, #113, or a solo): the organizer pairs them. Players
+// can't change their pair here: a Szervező does that on the Párok page
+// (#97). One block per league; the league is only named when there are
+// several.
 
 // After the partner's address is saved (#96) the box stays to say so: no
 // reload, which would remove it before the notice shows.
@@ -109,6 +112,22 @@ function ActivePair({ pair }: { pair: NonNullable<Overview["pair"]> }) {
   );
 }
 
+function NoPair() {
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">{NO_PAIR_TITLE}</CardTitle>
+        <CardDescription>
+          {NO_PAIR_TEXT}{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+            {CONTACT_EMAIL}
+          </a>
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
+
 function Waiting({ name }: { name: string }) {
   return (
     <Card className="max-w-2xl">
@@ -137,7 +156,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
       {d.overview.length === 0 ? (
         <p className="max-w-2xl text-muted-foreground">Még nincs liga, ahol párod lehetne.</p>
       ) : (
-        shown.length === 0 && <p className="max-w-2xl text-muted-foreground">Még nincs párod.</p>
+        shown.length === 0 && <NoPair />
       )}
       {shown.map((o) => (
         <section key={o.league.id} className="grid gap-4">

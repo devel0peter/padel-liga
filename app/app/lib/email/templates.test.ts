@@ -75,6 +75,19 @@ describe("signupConfirmation", () => {
   it("escapes names in the HTML", () => {
     expect(signupConfirmation({ ...pair, name1: "<script>" }).html).not.toContain("<script>");
   });
+
+  it("never says the start waits for enough pairs (#83)", () => {
+    const solo = { ...pair, mode: "solo", name2: null, email2: null } as const;
+    const other = { ...pair, city: "other", cityOther: "Pécs" };
+    for (const s of [pair, solo, other]) {
+      const e = signupConfirmation(s, GYOR);
+      expect(e.text).not.toMatch(/elég pár|összegyűl/);
+      expect(e.html).not.toMatch(/elég pár|összegyűl/);
+    }
+    expect(signupConfirmation(pair, GYOR).text).toContain("Írunk az indulásról és a következő lépésekről.");
+    expect(signupConfirmation(solo, GYOR).text).toContain("Segítünk párt találni, és írunk az indulásról.");
+    expect(signupConfirmation(other, GYOR).text).toContain("Ha lesz szervező, szólunk.");
+  });
 });
 
 describe("partnerNotice", () => {

@@ -17,6 +17,7 @@ test("5. the first partner registers and waits for the other", async ({ browser 
 
   // Without the consent the form stays, with an error.
   await page.getByLabel("Neved").fill(anna.name);
+  await page.getByLabel("Telefonszám").fill("+36 30 123 4567");
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/welcome/);
   await expect(page.locator("#consent-error")).not.toBeEmpty();

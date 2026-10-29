@@ -3,6 +3,8 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { interestSignups } from "~/db/schema";
 import { deliver, queuePairIntros } from "~/lib/email/outbox.server";
+import { pairIntroMessage } from "~/lib/notifications";
+import { notifyAccounts } from "~/lib/notifications.server";
 
 import { pairError } from "./solo-pairing";
 
@@ -45,6 +47,10 @@ export async function pairSolos(aId: number, bId: number, city: string, cityName
   } catch (e) {
     console.error("pair intro email failed", e);
   }
+  // In the app too, for whoever has an account (#115): the email skips an
+  // account that switched email off.
+  const message = pairIntroMessage(cityName);
+  await notifyAccounts("pair_intro", [a.email1, b.email1].map((email) => ({ email, message })));
   return null;
 }
 

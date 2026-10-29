@@ -2,19 +2,21 @@
 // (~/test/sqlite): what it writes, that running it twice leaves the same
 // state, that it clears what a walkthrough made, and that the real app code
 // can carry the seeded data from the registration invite to published groups.
-// Email is stubbed and fails the test if anything is actually sent.
+// Email is stubbed and records what it gets; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { phaseCalendar } from "@padel-liga/rules";
 
-const h = vi.hoisted(() => ({ raw: null as any }));
+const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async () => {
-    throw new Error("nothing may be sent");
+  relayConfigured: () => false,
+  sendEmails: async (emails: any[]) => {
+    h.sent.push(...emails);
+    return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
 }));
 
@@ -43,6 +45,7 @@ const sizes = () => Object.fromEntries(TABLES.map((t) => [t, count(t)]));
 
 beforeEach(() => {
   h.raw = migratedDatabase();
+  h.sent = [];
 });
 
 describe("the seeded state", () => {
@@ -141,7 +144,7 @@ describe("running it twice", () => {
         ('real', 'real@example.com', 'Valódi', 'kezdo', 1), ('real2', 'real2@example.com', 'Valódi2', 'kezdo', 1);
       insert into leagues (id, city, slug, name) values (900, 'gyor', 'gyor', 'Padelpárbaj Győr');
       insert into interest_signups (mode, name1, email1, level, consent_at) values ('solo', 'Valódi', 'real@example.com', 'kezdo', 1);
-      insert into email_messages (kind, to_email, subject, status) values ('pair_invite', 'real@example.com', 's', 'held');
+      insert into email_messages (kind, to_email, subject, status) values ('pair_invite', 'real@example.com', 's', 'sent');
       insert into account_invites (email, note) values ('real@example.com', 'x');
     `);
     const baseline = sizes();
@@ -149,7 +152,7 @@ describe("running it twice", () => {
     const seeded = sizes();
 
     // A walkthrough: players register, pair up, enter, get approved, groups
-    // are drafted and published, mail is held, they log in, ...
+    // are drafted and published, mail goes out, they log in, ...
     h.raw.exec(`
       insert into users (id, email, name, level, consent_at) values
         ('w1', 'kovacs.anna@example.test', 'Kovács Anna', 'halado', 1), ('w2', 'nagy.bence@example.test', 'Nagy Bence', 'halado', 1);
@@ -163,7 +166,7 @@ describe("running it twice", () => {
       insert into groups (season_id, phase, number) select id, 1, 1 from seasons;
       insert into group_pairs (group_id, pair_id, seed) select (select id from groups), (select id from pairs), 1;
       insert into email_messages (kind, to_email, subject, status) values
-        ('registration_invite', 'kovacs.anna@example.test', 's', 'held'), ('login_code', 'admin@example.test', 's', 'sent');
+        ('registration_invite', 'kovacs.anna@example.test', 's', 'pending'), ('login_code', 'admin@example.test', 's', 'sent');
       insert into broadcasts (subject, body, audience, recipients, created_by) values ('s', 'b', 'a', 1, 'admin@example.test');
       insert into audit_log (actor_id, action, target) values ('seed-admin', 'x', 'league:minta'), ('seed-organizer', 'y', 'kovacs.anna@example.test');
       insert into email_suppressions (email, reason) values ('nagy.bence@example.test', 'bounced');
@@ -211,18 +214,20 @@ describe("the seed carries the walkthrough", () => {
 
   const userRow = async (email: string) => (await db.select().from(users)).find((u) => u.email === email)!;
 
-  it("queues the registration invite held, for the 20 pair players and all 4 solos (#96)", async () => {
+  it("sends the registration invite to the 20 pair players and all 4 solos (#96, #112)", async () => {
     expect(await O.queueRegistrationInvites()).toBe(24);
-    const held = rows("select to_email, status, text from email_messages where kind = 'registration_invite'");
-    expect(held).toHaveLength(24);
-    expect(new Set(held.map((m) => m.status))).toEqual(new Set(["held"]));
+    const invites = rows("select to_email, status from email_messages where kind = 'registration_invite'");
+    expect(invites).toHaveLength(24);
+    expect(new Set(invites.map((m) => m.status))).toEqual(new Set(["sent"]));
+    expect(h.sent).toHaveLength(24);
     // The two solos still waiting for a partner get the solo text.
     const waiting = ["pal.boglarka@example.test", "sandor.akos@example.test"];
-    for (const m of held) expect(m.text.includes("Még keresünk neked párt"), m.to_email).toBe(waiting.includes(m.to_email));
-    // They can register before 2 Nov because of the account invites.
+    for (const m of h.sent) expect(m.text.includes("Még keresünk neked párt"), m.to).toBe(waiting.includes(m.to));
+    // Each invited address also gets an account_invites row (it exempts the address from the new-address code cap, #113).
     expect(count("account_invites")).toBe(24);
-    // Nothing goes out until an Admin releases it, and a second run adds nothing.
+    // A second run adds nothing.
     expect(await O.queueRegistrationInvites()).toBe(0);
+    expect(h.sent).toHaveLength(24);
   });
 
   it("forms the pairs from the signups, lets them enter, and publishes the groups", async () => {
@@ -256,6 +261,10 @@ describe("the seed carries the walkthrough", () => {
     for (const e of rows("select id from season_entries order by id"))
       expect(await E.decideEntry(organizer, season.id, e.id, "approve", null, NOW)).toEqual({ ok: true });
     expect(rows("select distinct joins_phase from season_entries")).toEqual([{ joins_phase: 1 }]);
+    // Both players of every pair got the decision, with nothing else to do (#112).
+    expect(rows("select status, count(*) as n from email_messages where kind = 'season_entry_decision' group by status")).toEqual([
+      { status: "sent", n: 22 },
+    ]);
 
     // Draft and publish: 11 pairs split into groups of 3 or 4.
     expect(await G.generateDraft(season.id, organizer.id)).toEqual({ ok: true });
@@ -264,12 +273,17 @@ describe("the seed carries the walkthrough", () => {
     expect(sizes.reduce((a, b) => a + b, 0)).toBe(11);
     expect(await G.publishGroups(season.id, organizer.id, NOW)).toEqual({ ok: true });
     expect(count("matches")).toBeGreaterThan(0);
+    // One email per player, sent right away (#112).
+    expect(rows("select status, count(*) as n from email_messages where kind = 'groups_published' group by status")).toEqual([
+      { status: "sent", n: 22 },
+    ]);
 
-    // Every email the walkthrough produced is held for the Admin; none was sent.
+    // Every email the walkthrough produced went out by itself (#112).
     const kinds = rows("select kind, status, count(*) as n from email_messages group by kind, status");
     expect(kinds.length).toBeGreaterThan(0);
-    for (const k of kinds) expect(k.status, k.kind).toBe("held");
+    for (const k of kinds) expect(k.status, k.kind).toBe("sent");
     expect(kinds.map((k) => k.kind)).toEqual(expect.arrayContaining(["season_entry_decision", "groups_published"]));
     for (const m of rows("select to_email from email_messages")) expect(m.to_email.endsWith("@example.test")).toBe(true);
+    for (const m of h.sent) expect(m.to.endsWith("@example.test")).toBe(true);
   });
 });

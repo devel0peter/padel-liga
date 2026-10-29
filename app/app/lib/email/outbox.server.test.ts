@@ -1,18 +1,20 @@
 // The outbox's pair emails on a real SQLite (~/test/sqlite): what gets queued
-// and for whom. Resend is stubbed; nothing leaves the process.
+// and for whom. The sender is stubbed; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InterestSignup } from "~/lib/interest";
 
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
-vi.mock("cloudflare:workers", () => ({ env: {} }));
+// The quota tests count against a limit of 100 a day.
+vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
-vi.mock("~/lib/email/resend.server", () => ({
+vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
-  sendBatch: async (emails: any[]) => {
+  relayConfigured: () => false,
+  sendEmails: async (emails: any[]) => {
     h.sent.push(...emails);
-    return { ok: true, ids: emails.map((_, i) => `id-${i}`) };
+    return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
 }));
 vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor", name: "Győr" }] }));
@@ -38,18 +40,19 @@ describe("queueSeasonEntryDecision", () => {
     h.sent = [];
   });
 
-  it("queues one email, held for the Admin (#88)", async () => {
+  it("sends the email right away, without an Admin (#112)", async () => {
     await O.queueSeasonEntryDecision("bela@x.hu", input);
     expect(messages()).toEqual([
-      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Jóváhagyták a nevezéseteket – Padelpárbaj", status: "held" },
+      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Jóváhagyták a nevezéseteket – Padelpárbaj", status: "sent" },
     ]);
-    expect(h.sent).toEqual([]);
+    expect(h.sent.map((m) => m.to)).toEqual(["bela@x.hu"]);
   });
 
   it("sends nothing to a suppressed address", async () => {
     h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "unsubscribed");
     await O.queueSeasonEntryDecision("bela@x.hu", input);
     expect(messages()).toEqual([]);
+    expect(h.sent).toEqual([]);
   });
 });
 
@@ -70,16 +73,16 @@ describe("queueGroupsPublished", () => {
     h.sent = [];
   });
 
-  it("queues one email per player, held for the Admin (#88)", async () => {
+  it("sends one email per player right away (#112)", async () => {
     await O.queueGroupsPublished([
       { toEmail: "anna@x.hu", input: input("Anna") },
       { toEmail: "bela@x.hu", input: input("Béla") },
     ]);
     expect(messages()).toEqual([
-      { kind: "groups_published", to_email: "anna@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "held" },
-      { kind: "groups_published", to_email: "bela@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "held" },
+      { kind: "groups_published", to_email: "anna@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
+      { kind: "groups_published", to_email: "bela@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
     ]);
-    expect(h.sent).toEqual([]);
+    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu", "bela@x.hu"]);
   });
 
   it("skips a suppressed address", async () => {
@@ -91,15 +94,17 @@ describe("queueGroupsPublished", () => {
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
   });
 
-  it("queues a whole league at once, within D1's parameter limit; once sent, what is over the day's quota waits", async () => {
+  it("queues a whole league at once; sends at most 50 in the request, the cron the rest within the day's limit", async () => {
     const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
     await O.queueGroupsPublished(many);
     expect(messages()).toHaveLength(120);
-    expect(h.sent).toEqual([]);
-    expect(await O.releaseHeld("groups_published", 1000)).toEqual({ released: 120, skipped: 0 });
+    expect(O.SEND_NOW_MAX).toBe(50);
+    expect(h.sent).toHaveLength(50);
+    expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(70);
+    // The cron: daily limit 100, minus the 10 kept for login codes.
     await O.deliver();
-    // Daily limit 100, minus the 10 kept for login codes.
     expect(h.sent).toHaveLength(90);
+    expect(new Set(h.sent.map((m) => m.to)).size).toBe(90);
     expect(messages().filter((m: any) => m.status === "pending")).toHaveLength(30);
   });
 
@@ -109,9 +114,8 @@ describe("queueGroupsPublished", () => {
   });
 });
 
-// The held outbox (#88, D23-D25): only login codes and signup confirmations
-// go out by themselves; the rest waits for the Admin.
-describe("held outbox", () => {
+// Every email goes out by itself (#112, replaces the held outbox of #88).
+describe("automatic outbox", () => {
   const signup: InterestSignup = {
     city: "gyor",
     cityOther: null,
@@ -132,15 +136,17 @@ describe("held outbox", () => {
         .all()
         .map((r: any) => [r.kind, r.s]),
     );
-  const insert = (kind: string, n: number, status = "held", to = "x@x.hu") => {
-    const st = h.raw.prepare("insert into email_messages (kind, to_email, subject, text, status) values (?, ?, ?, ?, ?)");
-    for (let i = 0; i < n; i++) st.run(kind, to, `${kind} ${i}`, `Szia! ${kind} ${i}`, status);
-  };
-  const sentToday = (n: number) => {
+  const insert = (kind: string, n: number, status = "pending", to = "x@x.hu", lastError: string | null = null) => {
     const st = h.raw.prepare(
-      "insert into email_messages (kind, to_email, subject, status, sent_at) values ('login_code', 'x@x.hu', 's', 'sent', unixepoch())",
+      "insert into email_messages (kind, to_email, subject, text, status, last_error, claimed_at) values (?, ?, ?, ?, ?, ?, ?)",
     );
-    for (let i = 0; i < n; i++) st.run();
+    for (let i = 0; i < n; i++) st.run(kind, to, `${kind} ${i}`, `Szia! ${kind} ${i}`, status, lastError, lastError ? 1_800_000_000 + i : null);
+  };
+  const sentToday = (n: number, kind = "login_code") => {
+    const st = h.raw.prepare(
+      "insert into email_messages (kind, to_email, subject, status, sent_at) values (?, 'x@x.hu', 's', 'sent', unixepoch())",
+    );
+    for (let i = 0; i < n; i++) st.run(kind);
   };
   const count = (where: string) => h.raw.prepare(`select count(*) as n from email_messages where ${where}`).get().n;
 
@@ -149,7 +155,7 @@ describe("held outbox", () => {
     h.sent = [];
   });
 
-  it("queues every kind but login codes and signup confirmations as held, and sends none of them", async () => {
+  it("sends every kind as soon as it is queued, with no further action", async () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
     h.raw
       .prepare(
@@ -158,10 +164,12 @@ describe("held outbox", () => {
       .run();
     const league = "Padelpárbaj Győr";
     await O.deliver(await O.queueSignupEmails(signup));
-    await O.queuePairIntros(
-      { name: "Cili", email: "cili@x.hu", level: "kezdo" },
-      { name: "Dani", email: "dani@x.hu", level: "kezdo" },
-      "Győr",
+    await O.deliver(
+      await O.queuePairIntros(
+        { name: "Cili", email: "cili@x.hu", level: "kezdo" },
+        { name: "Dani", email: "dani@x.hu", level: "kezdo" },
+        "Győr",
+      ),
     );
     await O.queueSeasonEntryDecision("bela@x.hu", {
       to: "Béla",
@@ -196,168 +204,121 @@ describe("held outbox", () => {
       },
     ]);
     await O.queueLoginCode("anna@x.hu", "123456");
-    await O.deliver();
 
     expect(byKind()).toEqual({
       signup_confirmation: "sent",
+      partner_notice: "sent",
+      pair_intro: "sent",
+      season_entry_decision: "sent",
+      broadcast: "sent",
+      registration_invite: "sent",
+      groups_published: "sent",
       login_code: "sent",
-      partner_notice: "held",
-      pair_intro: "held",
-      season_entry_decision: "held",
-      broadcast: "held",
-      registration_invite: "held",
-      groups_published: "held",
     });
-    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu", "anna@x.hu"]);
-    expect(h.sent[1].subject).toMatch(/^123 456 a belépőkódod/);
+    expect(h.sent).toHaveLength(10);
+    expect(h.sent.at(-1).subject).toMatch(/^123 456 a belépőkódod/);
   });
 
-  it("never sends held mail, also when the cron runs with nothing else queued", async () => {
-    insert("pair_answer", 3);
-    insert("broadcast", 2);
+  it("a broadcast to many sends at most 50 in the request", async () => {
+    const recipients = Array.from({ length: 70 }, (_, i) => ({ email: `p${i}@x.hu`, name: `P${i}` }));
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu" });
+    expect(h.sent).toHaveLength(50);
+    expect(count("kind = 'broadcast' and status = 'pending'")).toBe(20);
+  });
+
+  it("never sends an email twice: one left in 'sending' by a crashed run is marked failed, not retried", async () => {
+    insert("pair_intro", 1, "sending");
+    insert("pair_intro", 1, "sending", "fresh@x.hu");
+    // The first was claimed 11 minutes ago, the second just now.
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() - 660 where to_email = 'x@x.hu'").run();
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() where to_email = 'fresh@x.hu'").run();
     expect(await O.deliver()).toEqual({ sent: 0 });
-    expect(await O.deliver([1, 2, 3, 4, 5])).toEqual({ sent: 0 });
     expect(h.sent).toEqual([]);
-    expect(count("status = 'held'")).toBe(5);
+    expect(h.raw.prepare("select to_email, status, last_error from email_messages order by id").all()).toEqual([
+      { to_email: "x@x.hu", status: "failed", last_error: O.INTERRUPTED },
+      { to_email: "fresh@x.hu", status: "sending", last_error: null },
+    ]);
+    // A claimed row is never claimed again by another run.
+    expect(await O.deliver()).toEqual({ sent: 0 });
+    expect(h.sent).toEqual([]);
   });
 
-  it("lists held mail per kind with one preview, without any address", async () => {
-    insert("pair_answer", 2, "held", "anna@x.hu");
+  it("registration invites go out right away, only the ones just queued", async () => {
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
     h.raw
       .prepare(
-        "insert into email_messages (kind, to_email, subject, text, status) values ('pair_intro', 'cili@x.hu', 'Párt találtunk', ?, 'held')",
+        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', 'Zsófi', 'zsofi@x.hu', 'Ödön', 'odon@x.hu', 'kezdo', 1, 'gyor')",
       )
-      .run("Szia Cili!\n\nAz e-mail-címe: dani@x.hu\nhttps://padelparbaj.hu/login?email=cili%40x.hu");
-    insert("pair_answer", 1, "sent");
-    insert("login_code", 1, "pending");
-    const held = await O.listHeld();
-    expect(held.map(({ kind, count }) => ({ kind, count }))).toEqual([
-      { kind: "pair_answer", count: 2 },
-      { kind: "pair_intro", count: 1 },
-    ]);
-    expect(held[0]).toEqual({ kind: "pair_answer", count: 2, upTo: 2, subject: "pair_answer 0", text: "Szia! pair_answer 0" });
-    expect(held[1].text).toBe("Szia Cili!\n\nAz e-mail-címe: [elrejtve]\nhttps://padelparbaj.hu/login?email=[elrejtve]");
-    expect(JSON.stringify(held)).not.toMatch(/@|%40/);
+      .run();
+    // Something else waiting (over yesterday's limit) is left to the cron.
+    insert("broadcast", 1);
+    expect(await O.queueRegistrationInvites()).toBe(2);
+    expect(h.sent.map((m) => m.to).sort()).toEqual(["odon@x.hu", "zsofi@x.hu"]);
+    expect(count("kind = 'broadcast' and status = 'pending'")).toBe(1);
   });
 
-  it("Küldés releases only that kind, up to what the Admin saw", async () => {
-    insert("pair_answer", 3);
-    insert("pair_dissolved", 2);
-    insert("pair_answer", 1, "failed");
-    expect(await O.releaseHeld("pair_answer", 2)).toEqual({ released: 2, skipped: 0 });
-    expect(count("kind = 'pair_answer' and status = 'pending'")).toBe(2);
-    expect(count("kind = 'pair_answer' and status = 'held'")).toBe(1);
-    expect(count("kind = 'pair_answer' and status = 'failed'")).toBe(1);
-    expect(count("kind = 'pair_dissolved' and status = 'held'")).toBe(2);
-    await O.deliver();
-    expect(h.sent.map((m) => m.subject)).toEqual(["pair_answer 0", "pair_answer 1"]);
+  it("with the daily limit used up, a new email stays queued and goes out on the next run after the limit frees up", async () => {
+    sentToday(100);
+    await O.queueSeasonEntryDecision("bela@x.hu", {
+      to: "Béla",
+      partnerName: "Anna",
+      league: "Padelpárbaj Győr",
+      season: "2026/27 tél",
+      approved: true,
+      joins: null,
+      note: null,
+    });
+    expect(h.sent).toEqual([]);
+    expect(count("kind = 'season_entry_decision' and status = 'pending'")).toBe(1);
+    // The cron, still within the same 24 hours: nothing.
+    expect(await O.deliver()).toEqual({ sent: 0 });
+    // A day later the limit is free again.
+    h.raw.prepare("update email_messages set sent_at = sent_at - 25 * 3600 where status = 'sent'").run();
+    expect(await O.deliver()).toEqual({ sent: 1 });
+    expect(h.sent.map((m) => m.to)).toEqual(["bela@x.hu"]);
   });
 
-  it("released mail still keeps the daily quota and its reserves", async () => {
-    insert("pair_answer", 20);
+  it("keeps the send order and the reserves: login codes, then personal mail, then bulk mail", async () => {
     insert("broadcast", 20);
+    insert("pair_intro", 20);
     sentToday(80);
-    await O.releaseHeld("pair_answer", 1000);
-    await O.releaseHeld("broadcast", 1000);
-    // 100 a day: transactional mail leaves the last 10 to login codes,
-    // broadcasts the last 15 to all transactional mail.
+    // 100 a day: personal mail leaves the last 10 to login codes, bulk mail
+    // the last 15 to all personal mail.
     expect(await O.deliver()).toEqual({ sent: 10 });
-    expect(h.sent.every((m) => m.subject.startsWith("pair_answer"))).toBe(true);
+    expect(h.sent.every((m) => m.subject.startsWith("pair_intro"))).toBe(true);
     expect(count("status = 'pending'")).toBe(30);
-    expect(count("status = 'held'")).toBe(0);
   });
 
-  it("Küldés drops mail to an address that unsubscribed or bounced while it was held", async () => {
-    insert("broadcast", 1, "held", "anna@x.hu");
-    insert("broadcast", 1, "held", "Bela@x.hu");
-    insert("broadcast", 1, "held", "cili@x.hu");
-    insert("pair_answer", 1, "held", "bela@x.hu");
-    await O.suppress("anna@x.hu", "unsubscribed");
-    await O.suppress("bela@x.hu", "bounced");
-    expect(await O.releaseHeld("broadcast", 1000)).toEqual({ released: 1, skipped: 2 });
-    await O.deliver();
-    expect(h.sent.map((m) => m.to)).toEqual(["cili@x.hu"]);
-    expect(count("kind = 'broadcast'")).toBe(1);
-    expect(count("kind = 'pair_answer' and status = 'held'")).toBe(1);
+  it("logs waiting, sent and failed emails per kind with the newest failure's reason, and no address", async () => {
+    insert("pair_intro", 2, "sent", "cili@x.hu");
+    insert("pair_intro", 1, "pending", "dani@x.hu");
+    insert("pair_intro", 1, "sending", "dani@x.hu");
+    insert("broadcast", 3, "sent");
+    insert("broadcast", 1, "failed", "bad@x.hu", "relay: RCPT TO: 550 5.1.1 <bad@x.hu> does not exist; resend: 422 bad");
+    insert("broadcast", 1, "pending", "late@x.hu", "relay: connection: timed out; resend: 429 rate_limit_exceeded: slow down");
+    const log = await O.outboxLog();
+    expect(log).toEqual([
+      { kind: "pair_intro", waiting: 2, sent: 2, failed: 0, lastError: null },
+      {
+        kind: "broadcast",
+        waiting: 1,
+        sent: 3,
+        failed: 1,
+        // The newest attempt: the pending one, tried after the failed one.
+        lastError: {
+          reason: "relay: connection: timed out; resend: 429 rate_limit_exceeded: slow down",
+          at: new Date(1_800_000_000 * 1000),
+        },
+      },
+    ]);
+    insert("broadcast", 1, "failed", "zed@x.hu", "relay: RCPT TO: 550 5.1.1 <zed@x.hu> does not exist");
+    h.raw.prepare("update email_messages set claimed_at = 1900000000 where to_email = 'zed@x.hu'").run();
+    const [, broadcast] = await O.outboxLog();
+    expect(broadcast.lastError?.reason).toBe("relay: RCPT TO: 550 5.1.1 <[elrejtve]> does not exist");
+    expect(JSON.stringify(await O.outboxLog())).not.toMatch(/@|%40/);
   });
 
-  it("Elvetés deletes only that kind's held mail, up to what the Admin saw", async () => {
-    insert("pair_answer", 3);
-    insert("pair_answer", 1, "pending");
-    insert("pair_answer", 1, "sent");
-    insert("pair_dissolved", 2);
-    expect(await O.discardHeld("pair_answer", 2)).toBe(2);
-    expect(count("kind = 'pair_answer'")).toBe(3);
-    expect(count("kind = 'pair_answer' and status = 'held'")).toBe(1);
-    expect(count("kind = 'pair_dissolved' and status = 'held'")).toBe(2);
-    expect(h.sent).toEqual([]);
-  });
-
-  const pairSignup = (name1: string, email1: string, name2: string, email2: string) =>
-    h.raw
-      .prepare(
-        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', ?, ?, ?, ?, 'kezdo', 1, 'gyor')",
-      )
-      .run(name1, email1, name2, email2);
-  const marks = () =>
-    h.raw.prepare("select invited_at is not null as one, invited2_at is not null as two from interest_signups order by id").all();
-
-  it("Elvetés on registration invites lets the invite button offer those addresses again, partners included", async () => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "Odon@x.hu");
-    pairSignup("Cili", "cili@x.hu", "Dani", "dani@x.hu");
-    expect(await O.queueRegistrationInvites()).toBe(4);
-    expect(marks()).toEqual([
-      { one: 1, two: 1 },
-      { one: 1, two: 1 },
-    ]);
-    expect((await O.pendingRegistrationInvites()).length).toBe(0);
-    const [held] = await O.listHeld();
-
-    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(4);
-    expect(count("kind = 'registration_invite'")).toBe(0);
-    // Both the signer's mark (invited_at) and the partner's (invited2_at) are cleared.
-    expect(marks()).toEqual([
-      { one: 0, two: 0 },
-      { one: 0, two: 0 },
-    ]);
-    // The account invites stay, so the login link still works for them.
-    expect(h.raw.prepare("select email from account_invites order by email").all()).toEqual([
-      { email: "cili@x.hu" },
-      { email: "dani@x.hu" },
-      { email: "odon@x.hu" },
-      { email: "zsofi@x.hu" },
-    ]);
-    expect((await O.pendingRegistrationInvites()).map((r) => r.email).sort()).toEqual([
-      "cili@x.hu",
-      "dani@x.hu",
-      "odon@x.hu",
-      "zsofi@x.hu",
-    ]);
-    expect(await O.queueRegistrationInvites()).toBe(4);
-  });
-
-  it("Elvetés stops at what the Admin saw: an invite held later keeps its mark", async () => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "odon@x.hu");
-    await O.queueRegistrationInvites();
-    const [held] = await O.listHeld();
-    pairSignup("Cili", "cili@x.hu", "Dani", "dani@x.hu");
-    await O.queueRegistrationInvites();
-    expect(await O.discardHeld("registration_invite", held.upTo)).toBe(2);
-    expect(marks()).toEqual([
-      { one: 0, two: 0 },
-      { one: 1, two: 1 },
-    ]);
-  });
-
-  it("Elvetés on another kind leaves the invite marks alone", async () => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    pairSignup("Zsófi", "zsofi@x.hu", "Ödön", "odon@x.hu");
-    await O.queueRegistrationInvites();
-    insert("broadcast", 1, "held", "zsofi@x.hu");
-    await O.discardHeld("broadcast", 1000);
-    expect(marks()).toEqual([{ one: 1, two: 1 }]);
-    expect(count("kind = 'registration_invite' and status = 'held'")).toBe(2);
+  it("logs nothing when no email was ever queued", async () => {
+    expect(await O.outboxLog()).toEqual([]);
   });
 });

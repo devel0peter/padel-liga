@@ -31,6 +31,13 @@ const shortDay = new Intl.DateTimeFormat("hu-HU", {
   weekday: "long",
 });
 
+const dayOnly = new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC", month: "short", day: "numeric" });
+
+// "2026-11-30" -> "nov. 30."
+export function formatShortDay(day: string): string {
+  return dayOnly.format(new Date(`${day}T00:00:00Z`));
+}
+
 // "2026-10-05" -> "okt. 5., hétfő"
 export function formatDay(day: string): string {
   return shortDay.format(new Date(`${day}T00:00:00Z`));

@@ -70,8 +70,8 @@ export function logSince(offset: number): string {
 
 export type Email = { to: string; subject: string; text: string };
 
-// resend.server.ts prints `[email] to=<address> subject=<subject>`, then the
-// text, for every email when there is no Resend key.
+// send.server.ts prints `[email] to=<address> subject=<subject>`, then the
+// text, for every email when neither the relay nor Resend is set.
 export function emailsSince(offset: number): Email[] {
   const blocks = logSince(offset).split(/^(?=\[email\] to=)/m);
   return blocks.flatMap((b) => {
@@ -132,11 +132,13 @@ export async function save(context: BrowserContext, email: string): Promise<void
   await context.storageState({ path: authFile(email) });
 }
 
-// "Üdv!": the name, the level from the signup (already set), consent, Kész.
+// "Üdv!": the name, the level from the signup (already set), a phone number,
+// consent, Kész.
 export async function completeWelcome(page: Page, player: Player): Promise<void> {
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
   await expect(page.getByLabel("Szinted")).toContainText(levelLabel(player));
   await page.getByLabel("Neved").fill(player.name);
+  await page.getByLabel("Telefonszám").fill("+36 30 123 4567");
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
@@ -158,7 +160,7 @@ export async function registerAll(browser: Browser, players: Player[]): Promise<
 
 // One read-only query against the suite's local D1 (never the developer's).
 // It starts a second local runtime on the dev server's state dir: fine for a
-// read, and the only way to see rows no page shows (matches, held mail).
+// read, and the only way to see rows no page shows (matches).
 export function d1(select: string): Record<string, unknown>[] {
   if (!/^\s*select\b/i.test(select)) throw new Error("d1() only reads.");
   const out = execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--json", "--command", select])], {

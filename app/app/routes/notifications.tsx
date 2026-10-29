@@ -88,7 +88,8 @@ export default function Notifications({ loaderData: { items } }: Route.Component
       title="Értesítések"
       description={
         <>
-          Telefonra is kérheted őket a <Link to="/profile#ertesitesek">profilodon</Link>.
+          Itt mind megvan. Hogy e-mailben és push értesítésben is szóljunk-e, a{" "}
+          <Link to="/profile#ertesitesek">profilodon</Link> állítod be.
         </>
       }
       actions={

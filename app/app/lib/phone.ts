@@ -4,6 +4,8 @@
 // Hungary (README decision log, 2026-10-23).
 
 export const PHONE_ERROR = "Magyar telefonszámot adj meg, pl. +36 30 123 4567.";
+// The profile requires a number (README decision log, 2026-10-28).
+export const PHONE_REQUIRED = "Add meg a telefonszámod, a meccsek egyeztetéséhez kell.";
 
 export type PhoneResult = { ok: true; value: string | null } | { ok: false; error: string };
 
@@ -14,7 +16,8 @@ const BUDAPEST = /^1\d{7}$/;
 const LANDLINE = /^(?!(?:20|30|31|50|70))[2-9]\d{7}$/;
 
 // Accepts 06…, +36… and 36…, with spaces, dashes, dots, slashes and brackets
-// between the digits. An empty value is "no phone number" (it is optional).
+// between the digits. An empty value is "no phone number"; the caller decides
+// whether that is allowed.
 // Returns the E.164 form.
 export function parsePhone(input: unknown): PhoneResult {
   const raw = typeof input === "string" ? input.trim() : "";

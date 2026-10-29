@@ -3,7 +3,7 @@
 // database side is in *.server.ts next to this file.
 
 import { EMAIL_RE, isLevel, type Level } from "../interest";
-import { parsePhone } from "../phone";
+import { PHONE_REQUIRED, parsePhone } from "../phone";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -17,10 +17,6 @@ export const CODE_TTL_MS = 10 * MINUTE;
 export const MAX_CODE_ATTEMPTS = 5;
 const CODE_WINDOW_MS = HOUR;
 export const MAX_CODES_PER_WINDOW = 5;
-
-// Registration opens Mon 2 Nov 2026 00:00 Budapest time (spec section 18).
-// Before that only invited emails can create an account.
-export const REGISTRATION_OPENS_AT = new Date("2026-11-01T23:00:00Z");
 
 export const DEFAULT_RETURN_TO = "/home";
 const MAX_NAME = 80;
@@ -89,6 +85,37 @@ export function codeSendDecision(existing: Pick<CodeRecord, "windowStart" | "sen
   return { ok: true, windowStart: existing.windowStart, sentInWindow: existing.sentInWindow + 1 };
 }
 
+// Codes to an address without an account (#113). Anyone may sign up, so a
+// bot past the bot check could otherwise type random addresses and use up the
+// daily email quota that every login shares. An address with an account
+// always gets its code. A new address gets none when it bounced or complained
+// before, and none once codes to new, uninvited addresses reached
+// NEW_ADDRESS_CODE_SHARE of the daily limit in the last 24 hours. An invited
+// address (registration invite, Szervező appointment) is not capped.
+// Skipped codes look like sent ones, so the form doesn't tell which addresses
+// have an account.
+export const NEW_ADDRESS_CODE_SHARE = 0.25;
+
+export function newAddressCodeCap(dailyLimit: number): number {
+  return Math.floor(dailyLimit * NEW_ADDRESS_CODE_SHARE);
+}
+
+export type NewAddressCode = "send" | "suppressed" | "capped";
+
+export function newAddressCodeDecision(input: {
+  hasAccount: boolean;
+  invited: boolean;
+  suppression: "unsubscribed" | "bounced" | "complained" | null;
+  sentToNewLast24h: number;
+  dailyLimit: number;
+}): NewAddressCode {
+  if (input.hasAccount) return "send";
+  // Unsubscribing stops bulk mail, not a code the person asked for.
+  if (input.suppression === "bounced" || input.suppression === "complained") return "suppressed";
+  if (input.invited) return "send";
+  return input.sentToNewLast24h >= newAddressCodeCap(input.dailyLimit) ? "capped" : "send";
+}
+
 export type CodeCheck = "ok" | "wrong" | "expired" | "locked" | "missing";
 
 // `matches`: whether the submitted code's hash equals record.codeHash
@@ -110,35 +137,23 @@ export const CODE_MESSAGES: Record<Exclude<CodeCheck, "ok">, string> = {
 
 // --- Accounts ---------------------------------------------------------------
 
-export function registrationOpen(now: Date): boolean {
-  return now.getTime() >= REGISTRATION_OPENS_AT.getTime();
-}
-
-// A login for an email without an account creates one only if registration
-// is open or the email is invited.
-export function canCreateAccount({ invited, now }: { invited: boolean; now: Date }): boolean {
-  return invited || registrationOpen(now);
-}
-
 export type GoogleLogin =
   | { kind: "existing"; userId: string }
   | { kind: "link"; userId: string }
   | { kind: "create" }
-  | { kind: "refused"; reason: "unverified" | "closed" };
+  | { kind: "refused"; reason: "unverified" };
 
 // Same email = same account: a Google login attaches to the account with
-// that email, but only when Google says the email is verified.
+// that email, but only when Google says the email is verified. Anyone may
+// create an account (#113): no invite needed.
 export function resolveGoogleLogin(input: {
   linkedUserId: string | null;
   emailUserId: string | null;
   emailVerified: boolean;
-  invited: boolean;
-  now: Date;
 }): GoogleLogin {
   if (input.linkedUserId) return { kind: "existing", userId: input.linkedUserId };
   if (!input.emailVerified) return { kind: "refused", reason: "unverified" };
   if (input.emailUserId) return { kind: "link", userId: input.emailUserId };
-  if (!canCreateAccount(input)) return { kind: "refused", reason: "closed" };
   return { kind: "create" };
 }
 
@@ -162,14 +177,11 @@ export function initials(name: string, email: string): string {
   return letters.toUpperCase();
 }
 
-export const REGISTRATION_CLOSED_MESSAGE =
-  "A regisztráció november 2-án nyílik. Ha meghívót kaptál, azzal az e-mail-címmel lépj be.";
-
-export type ProfileInput = { name: string; level: Level; phone: string | null; consent: boolean };
+export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean };
 export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;
 
-// The profile form (first login and the profile page): name and level are
-// required, the phone number is optional and stored as E.164 (phone.ts).
+// The profile form (first login and the profile page): name, level and phone
+// number are all required; the phone is stored as E.164 (phone.ts).
 // `requireConsent`: the first-login page also asks for the privacy consent.
 export function validateProfile(
   input: { name: unknown; level: unknown; phone: unknown; consent?: unknown },
@@ -184,8 +196,9 @@ export function validateProfile(
   if (!level) errors.level = "Válaszd ki a szinted.";
   const phone = parsePhone(input.phone);
   if (!phone.ok) errors.phone = phone.error;
+  else if (!phone.value) errors.phone = PHONE_REQUIRED;
   if (requireConsent && !consent) errors.consent = "A belépéshez fogadd el az adatkezelési tájékoztatót.";
-  if (Object.keys(errors).length || !level || !phone.ok) return { ok: false, errors };
+  if (Object.keys(errors).length || !level || !phone.ok || !phone.value) return { ok: false, errors };
   return { ok: true, value: { name, level, phone: phone.value, consent } };
 }
 

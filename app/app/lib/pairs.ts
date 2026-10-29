@@ -16,6 +16,12 @@ export const SOURCE_LABELS: Record<PairSource, string> = {
 
 export const DISSOLVE_REFUSED = "Kör közben nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
 
+// Párom for a player with no pair, no signup partner waiting and no partner
+// address to add: a new account without a signup (#113), or a solo. A
+// Szervező pairs them on the Párok page; the contact address follows the text.
+export const NO_PAIR_TITLE = "Még nincs párod.";
+export const NO_PAIR_TEXT = "A szervező keres neked párt. Ha már tudod, kivel játszanál, vagy kérdésed van, írj nekünk:";
+
 export type NewPairRefusal = "same" | "unknown" | "paired";
 
 export const NEW_PAIR_REFUSALS: Record<NewPairRefusal, string> = {

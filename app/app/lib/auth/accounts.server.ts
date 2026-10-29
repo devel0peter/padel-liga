@@ -1,25 +1,13 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { accountInvites, auditLog, leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
+import { auditLog, leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
 
-import { canCreateAccount, type ProfileInput } from "./rules";
+import type { ProfileInput } from "./rules";
 
 export async function findUserIdByEmail(email: string): Promise<string | null> {
   const [row] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   return row?.id ?? null;
-}
-
-export async function isInvited(email: string): Promise<boolean> {
-  const [row] = await db.select({ email: accountInvites.email }).from(accountInvites).where(eq(accountInvites.email, email));
-  return !!row;
-}
-
-// Whether a login with this (normalized) email may go ahead: an existing
-// account always can; a new one only when invited or registration is open.
-export async function mayLogIn(email: string): Promise<boolean> {
-  if (await findUserIdByEmail(email)) return true;
-  return canCreateAccount({ invited: await isInvited(email), now: new Date() });
 }
 
 export async function createUser(email: string, name = ""): Promise<string> {

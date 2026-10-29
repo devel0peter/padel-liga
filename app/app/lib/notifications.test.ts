@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  channelEnabled,
+  channelKey,
+  followsEmailSwitch,
+  groupsPublishedMessage,
+  isChannel,
   isEnabled,
+  isNotificationKind,
   kindsFor,
+  pairIntroMessage,
+  seasonEntryDecisionMessage,
   newSignupMessage,
   parseSubscription,
   pushPayload,
@@ -140,5 +148,85 @@ describe("parseSubscription", () => {
   it("refuses malformed keys", () => {
     expect(parseSubscription(form("https://fcm.googleapis.com/x", { p256dh: "short" }))).toBeNull();
     expect(parseSubscription(form("https://fcm.googleapis.com/x", { auth: "c".repeat(21) + "=" }))).toBeNull();
+  });
+});
+
+describe("channels (#115)", () => {
+  it("email and push are on until switched off", () => {
+    expect(channelEnabled(new Set(), "email")).toBe(true);
+    expect(channelEnabled(new Set(), "push")).toBe(true);
+    expect(channelEnabled(new Set(["channel:email"]), "email")).toBe(false);
+    expect(channelEnabled(new Set(["channel:email"]), "push")).toBe(true);
+    // A kind switched off is not a channel switched off.
+    expect(channelEnabled(new Set(["new_signup"]), "push")).toBe(true);
+  });
+
+  it("knows only email and push, and their rows are never a kind", () => {
+    expect(isChannel("email")).toBe(true);
+    expect(isChannel("push")).toBe(true);
+    expect(isChannel("sms")).toBe(false);
+    expect(isChannel("toString")).toBe(false);
+    expect(isNotificationKind(channelKey("email"))).toBe(false);
+    expect(isEnabled(new Set([channelKey("email"), channelKey("push")]), "new_signup")).toBe(true);
+  });
+
+  it("only login codes and signup confirmations ignore the switch (Peter, 2026-10-29)", () => {
+    expect(followsEmailSwitch("login_code")).toBe(false);
+    expect(followsEmailSwitch("signup_confirmation")).toBe(false);
+    for (const kind of [
+      "partner_notice",
+      "pair_intro",
+      "registration_invite",
+      "broadcast",
+      "season_entry_decision",
+      "groups_published",
+    ] as const)
+      expect(followsEmailSwitch(kind)).toBe(true);
+  });
+});
+
+describe("pairIntroMessage", () => {
+  it("says a partner was found, with no names", () => {
+    expect(pairIntroMessage("Győr")).toEqual({
+      title: "Párt találtunk neked",
+      body: "A szervező párba tett egy másik egyéni jelentkezővel (Győr). A Párom oldalon látod, ki az.",
+      url: "/pair",
+    });
+  });
+});
+
+describe("player messages (#115)", () => {
+  const base = { league: "Padelpárbaj Győr", season: "2026/27 tél" };
+
+  it("an approval says where the pair starts; no names", () => {
+    expect(
+      seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } }),
+    ).toEqual({
+      title: "Jóváhagyták a nevezéseteket",
+      body: "2026/27 tél, Padelpárbaj Győr. Az 1. körtől játszotok (kezdés: nov. 9.).",
+      url: "/pair",
+    });
+    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
+      "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
+    );
+    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: null }).body).toBe(
+      "2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.",
+    );
+  });
+
+  it("a rejection", () => {
+    expect(seasonEntryDecisionMessage({ ...base, approved: false, joins: null })).toEqual({
+      title: "Nem fogadták el a nevezéseteket",
+      body: "2026/27 tél, Padelpárbaj Győr.",
+      url: "/pair",
+    });
+  });
+
+  it("the groups: group, phase and deadline in Budapest time", () => {
+    expect(groupsPublishedMessage({ ...base, phase: 1, group: 3, deadline: new Date("2026-11-29T22:59:00Z") })).toEqual({
+      title: "Itt a csoportod: 3. csoport",
+      body: "1. kör, 2026/27 tél, Padelpárbaj Győr. Határidő: nov. 29., vasárnap 23:59.",
+      url: "/home",
+    });
   });
 });

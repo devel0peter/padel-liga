@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 25.";
+const EFFECTIVE_FROM = "2026. 10. 28.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -80,8 +80,8 @@ export default function Privacy() {
                 állítasz be, és amiből az induló értékszámod lesz,
               </li>
               <li>
-                ha megadod, a telefonszámod (magyar szám lehet, nem kötelező, a
-                profilodban bármikor módosíthatod vagy törölheted),
+                a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
+                telefonon egyeztetitek; a profilodban bármikor módosíthatod),
               </li>
               <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
@@ -95,7 +95,18 @@ export default function Privacy() {
               </li>
               <li>
                 a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
-                döntése az üzenetével együtt.
+                döntése az üzenetével együtt,
+              </li>
+              <li>
+                az értesítéseid listája, és hogy e-mailben, push értesítésben
+                vagy mindkettőben kéred-e őket (alapból mindkettő be van
+                kapcsolva, a profilodban bármikor átállíthatod),
+              </li>
+              <li>
+                ha egy eszközön bekapcsolod a push értesítést, a böngésződ
+                értesítési címe az adott eszközre. Az értesítést titkosítva a
+                böngésződ gyártójának értesítő szolgáltatása (pl. Google, Apple,
+                Mozilla) juttatja el hozzád.
               </li>
             </ul>
             <p>
@@ -107,9 +118,15 @@ export default function Privacy() {
           <Section title="Mire használjuk?">
             <p>
               Csak a liga szervezésére: csoportok összeállítására, párkeresésre,
-              és arra, hogy e-mailben értesítsünk az indulásról és a liga
-              ügyeiről. Nem küldünk reklámot, és senkinek nem adjuk el vagy adjuk
-              át az adataidat marketingcélra.
+              és arra, hogy értesítsünk az indulásról és a liga ügyeiről. Nem
+              küldünk reklámot, és senkinek nem adjuk el vagy adjuk át az
+              adataidat marketingcélra.
+            </p>
+            <p>
+              Az értesítéseidet a fiókodban mindig látod. A profilodban
+              választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
+              is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
+              mindig e-mailben küldjük.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
@@ -153,8 +170,9 @@ export default function Privacy() {
               <li>
                 A csoportok összeállításakor a szervező a pár két tagjának nevét
                 és az értékszámotokat látja. A csoportbeosztásról mindenki
-                e-mailt kap, benne az ellenfelei nevével; az e-mail-címeteket és
-                a telefonszámotokat nem.
+                értesítést kap (e-mailben is, ha nem kapcsolta ki), benne az
+                ellenfelei nevével; az e-mail-címeteket és a telefonszámotokat
+                nem.
               </li>
             </ul>
           </Section>
@@ -223,7 +241,7 @@ export default function Privacy() {
               Ha Google-lel lépsz be, a Google átadja nekünk a neved, az
               e-mail-címed, a fiókod azonosítóját és a profilképed címét. A
               profilképet csak a fiókodban mutatjuk, és a Google szerveréről
-              töltődik be. Ezen kívül a Google semmit nem tud meg rólad tőlünk.
+              töltődik be. A leveleinket is a Google küldi ki (lásd lent).
             </p>
           </Section>
 
@@ -248,8 +266,8 @@ export default function Privacy() {
             </p>
             <ul className={list}>
               <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a jelentkezési űrlap robotszűrője (Turnstile),</li>
-              <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók,</li>
-              <li>Resend – a liga e-mailjeinek kiküldése.</li>
+              <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók és a liga e-mailjeinek kiküldése,</li>
+              <li>Resend – a liga e-mailjeinek kiküldése, ha a Google épp nem tudja.</li>
             </ul>
           </Section>
 
@@ -266,11 +284,9 @@ export default function Privacy() {
                 töröljük.
               </li>
               <li>
-                <strong>Levelek:</strong> a belépőkódon és a jelentkezés
-                visszaigazolásán kívül minden levél nálunk vár, amíg el nem
-                küldjük vagy el nem vetjük. A szövegét a kiküldésig őrizzük,
-                utána csak azt, hogy kinek, mikor és milyen tárggyal ment; az
-                elvetett levelet teljesen töröljük.
+                <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
+                őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
+                azt, hogy kinek, mikor és milyen tárggyal ment.
               </li>
             </ul>
           </Section>

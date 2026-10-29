@@ -3,6 +3,9 @@
 // notifications.server.ts, encryption in push/webpush.ts.
 
 import type { Actor } from "./auth/permissions";
+import type { MessageKind } from "./email/budget";
+import { formatDeadline, formatShortDate } from "./format";
+import { withArticle } from "./groups";
 import { LEVELS, type Level, type Mode } from "./interest";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
@@ -15,7 +18,9 @@ export const NOTIFICATION_KINDS = {
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
-export type StoredKind = NotificationKind | "test";
+// Player notifications have no per-kind switch (#115), only the channels.
+export type PlayerKind = "season_entry_decision" | "groups_published" | "pair_intro";
+export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
   return typeof value === "string" && Object.hasOwn(NOTIFICATION_KINDS, value);
@@ -29,6 +34,47 @@ export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): Notifi
 // No row means on: a setting is stored only once someone changes it.
 export function isEnabled(disabled: ReadonlySet<string>, kind: StoredKind): boolean {
   return kind === "test" || !disabled.has(kind);
+}
+
+// --- Channels (#115) --------------------------------------------------------
+// Every user chooses on the profile whether notifications also come by email,
+// by push, or both. Both are on by default: like a kind, a channel is stored
+// (a notification_opt_outs row) only once it is switched off. The in-app list
+// (/notifications) always gets every notification.
+
+export const CHANNELS = {
+  email: {
+    label: "E-mail",
+    description: "Levélben is megkapod az értesítéseket. A belépési kódot és a jelentkezésed visszaigazolását mindig elküldjük.",
+  },
+  push: {
+    label: "Push értesítés",
+    description: "A telefonod vagy a géped is szól, akkor is, ha nincs nyitva az oldal.",
+  },
+} as const;
+
+export type Channel = keyof typeof CHANNELS;
+
+// The opt-out row of a channel; no notification kind has a colon.
+export const channelKey = (channel: Channel) => `channel:${channel}` as const;
+
+export function isChannel(value: unknown): value is Channel {
+  return typeof value === "string" && Object.hasOwn(CHANNELS, value);
+}
+
+export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel): boolean {
+  return !disabled.has(channelKey(channel));
+}
+
+// Emails that go out whatever the email switch says: only login codes and
+// signup confirmations (#115; Peter, 2026-10-29). Every other kind, a new one
+// too, broadcasts and the signup-list emails included, is skipped for an
+// address whose account switched email off. Addresses without an account
+// can't switch, so they get everything as before.
+export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code", "signup_confirmation"];
+
+export function followsEmailSwitch(kind: MessageKind): boolean {
+  return !EMAIL_ALWAYS.includes(kind);
 }
 
 export type Message = { title: string; body: string; url: string };
@@ -74,6 +120,55 @@ export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message
     title: `Új jelentkező · ${s.cityName}`,
     body: `${who} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
     url,
+  };
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// A Szervező decided on the pair's season entry (#23). No names (a lock
+// screen is not a private place); the note is on the Párom page.
+export function seasonEntryDecisionMessage(input: {
+  league: string;
+  season: string;
+  approved: boolean;
+  // Where an approved pair starts; null: the next season.
+  joins: { phase: number; startsAt: Date } | null;
+}): Message {
+  const start = !input.approved
+    ? null
+    : input.joins === null
+      ? "A következő szezontól játszotok."
+      : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
+  return {
+    title: input.approved ? "Jóváhagyták a nevezéseteket" : "Nem fogadták el a nevezéseteket",
+    body: [`${input.season}, ${input.league}.`, start].filter(Boolean).join(" "),
+    url: "/pair",
+  };
+}
+
+// The groups are published (#24): the group and the deadline. The opponents
+// are on the home page and in the email.
+export function groupsPublishedMessage(input: {
+  league: string;
+  season: string;
+  phase: number;
+  group: number;
+  deadline: Date;
+}): Message {
+  return {
+    title: `Itt a csoportod: ${input.group}. csoport`,
+    body: `${input.phase}. kör, ${input.season}, ${input.league}. Határidő: ${formatDeadline(input.deadline)}.`,
+    url: "/home",
+  };
+}
+
+// A Szervező paired two solo signups (#115): for the one who has an account,
+// so it reaches them with email off too. No names; Párom shows the partner.
+export function pairIntroMessage(cityName: string): Message {
+  return {
+    title: "Párt találtunk neked",
+    body: `A szervező párba tett egy másik egyéni jelentkezővel (${cityName}). A Párom oldalon látod, ki az.`,
+    url: "/pair",
   };
 }
 

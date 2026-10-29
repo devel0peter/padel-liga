@@ -35,6 +35,9 @@ export const interestSignups = sqliteTable("interest_signups", {
   // The same for email2, the partner of a pair signup (D26): invited_at
   // stays about email1, so each address is still invited once.
   invited2At: integer("invited2_at", { mode: "timestamp" }),
+  // "Szívesen szerveznék ligát" on the other-city contact form: someone who
+  // might organize a league where there is none yet.
+  wantsToOrganize: integer("wants_to_organize", { mode: "boolean" }).notNull().default(false),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()

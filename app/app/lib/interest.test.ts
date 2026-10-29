@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseInterest } from "./interest";
+import { LEAGUE_CITY_ERROR, parseInterest } from "./interest";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
@@ -39,6 +39,7 @@ describe("parseInterest", () => {
         note: null,
         ref: null,
         homeClub: null,
+        wantsToOrganize: false,
       },
     });
   });
@@ -110,6 +111,19 @@ describe("parseInterest", () => {
   it("files a typed supported city under that city", () => {
     const r = parseInterest(form({ ...pair, city: "other", cityOther: "gyor" }), [], GYOR);
     expect(r.ok && r.data).toMatchObject({ city: "gyor", cityOther: null });
+  });
+
+  it("refuses a city with a league, picked or typed: those register instead", () => {
+    const picked = parseInterest(form(pair), [], GYOR, ["gyor"]);
+    expect(!picked.ok && picked.errors.city).toBe(LEAGUE_CITY_ERROR);
+    const typed = parseInterest(form({ ...pair, city: "other", cityOther: " győr " }), [], GYOR, ["gyor"]);
+    expect(!typed.ok && typed.errors.cityOther).toBe(LEAGUE_CITY_ERROR);
+  });
+
+  it("keeps the organizer checkbox", () => {
+    const other = { ...pair, city: "other", cityOther: "Szeged" };
+    expect(parseInterest(form({ ...other, organize: "on" }), [], GYOR)).toMatchObject({ ok: true, data: { wantsToOrganize: true } });
+    expect(parseInterest(form(other), [], GYOR)).toMatchObject({ ok: true, data: { wantsToOrganize: false } });
   });
 
   it("ignores cityOther when a supported city is picked", () => {

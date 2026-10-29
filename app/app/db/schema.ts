@@ -350,7 +350,7 @@ export const notifications = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["new_signup", "season_entry_decision", "groups_published", "test"] }).notNull(),
+    kind: text("kind", { enum: ["new_signup", "season_entry_decision", "groups_published", "pair_intro", "test"] }).notNull(),
     title: text("title").notNull(),
     body: text("body").notNull(),
     // A path on this site, opened through /notifications/<id>.

@@ -24,6 +24,7 @@ import { SEND_NOW_MAX, TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
 import {
   createBroadcast,
   dailyLimit,
+  emailSwitchedOff,
   sendTestBroadcast,
   suppressedSet,
 } from "~/lib/email/outbox.server";
@@ -37,8 +38,10 @@ const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
   const filters = parseFilters(params);
-  const [rows, suppressed, cities] = await Promise.all([listSignups(), suppressedSet(), listCities()]);
-  return { label: audienceLabel(filters, cities), ...signupRecipients(filterSignups(rows, filters), suppressed) };
+  const [rows, suppressed, off, cities] = await Promise.all([listSignups(), suppressedSet(), emailSwitchedOff(), listCities()]);
+  // Accounts that switched email off get no broadcast either (#115, Peter 2026-10-29).
+  const skipped = new Set([...suppressed, ...off]);
+  return { label: audienceLabel(filters, cities), ...signupRecipients(filterSignups(rows, filters), skipped) };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -91,7 +94,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <strong>Címzettek:</strong> {label} · {recipients.length} cím
-            {suppressed > 0 && ` (${suppressed} leiratkozott vagy nem kézbesíthető címet kihagyunk)`}
+            {suppressed > 0 && ` (${suppressed} címet kihagyunk: leiratkozott, nem kézbesíthető, vagy kikapcsolta az e-mailt)`}
           </div>
           <Button variant="outline" size="sm" asChild>
             <Link to={`/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>

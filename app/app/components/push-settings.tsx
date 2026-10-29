@@ -127,7 +127,7 @@ export function PushSettings({ vapidPublicKey, enabled }: { vapidPublicKey: stri
   return (
     <div className="grid gap-3">
       <div className="flex items-start gap-3">
-        <Switch id="channel-push" checked={on} disabled={busy} onCheckedChange={toggle} className="mt-0.5" />
+        <Switch id="channel-push" checked={on} disabled={busy || state === "checking"} onCheckedChange={toggle} className="mt-0.5" />
         <div className="grid gap-0.5">
           <Label htmlFor="channel-push">{CHANNELS.push.label}</Label>
           <p className="text-sm text-muted-foreground">{CHANNELS.push.description}</p>

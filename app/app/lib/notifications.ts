@@ -19,7 +19,7 @@ export const NOTIFICATION_KINDS = {
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
 // Player notifications have no per-kind switch (#115), only the channels.
-export type PlayerKind = "season_entry_decision" | "groups_published";
+export type PlayerKind = "season_entry_decision" | "groups_published" | "pair_intro";
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -66,20 +66,12 @@ export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel):
   return !disabled.has(channelKey(channel));
 }
 
-// Emails that go out whatever the email switch says: login codes and signup
-// confirmations (#115), and the emails that are not notifications of an
-// account. The partner notice (sent once, so the partner can ask for
-// deletion), the pair intro and the registration invite go to the signup
-// list, and broadcasts have their own unsubscribe link. Every other kind,
-// a new one too, follows the switch.
-export const EMAIL_ALWAYS: readonly MessageKind[] = [
-  "login_code",
-  "signup_confirmation",
-  "partner_notice",
-  "pair_intro",
-  "registration_invite",
-  "broadcast",
-];
+// Emails that go out whatever the email switch says: only login codes and
+// signup confirmations (#115; Peter, 2026-10-29). Every other kind, a new one
+// too, broadcasts and the signup-list emails included, is skipped for an
+// address whose account switched email off. Addresses without an account
+// can't switch, so they get everything as before.
+export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code", "signup_confirmation"];
 
 export function followsEmailSwitch(kind: MessageKind): boolean {
   return !EMAIL_ALWAYS.includes(kind);
@@ -167,6 +159,16 @@ export function groupsPublishedMessage(input: {
     title: `Itt a csoportod: ${input.group}. csoport`,
     body: `${input.phase}. kör, ${input.season}, ${input.league}. Határidő: ${formatDeadline(input.deadline)}.`,
     url: "/home",
+  };
+}
+
+// A Szervező paired two solo signups (#115): for the one who has an account,
+// so it reaches them with email off too. No names; Párom shows the partner.
+export function pairIntroMessage(cityName: string): Message {
+  return {
+    title: "Párt találtunk neked",
+    body: `A szervező párba tett egy másik egyéni jelentkezővel (${cityName}). A Párom oldalon látod, ki az.`,
+    url: "/pair",
   };
 }
 

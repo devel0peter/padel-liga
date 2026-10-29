@@ -332,7 +332,8 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // before registration opens). If that fails, the claim is released. Then
 // they are sent, within the daily limit (#112). Returns how many were queued.
 // `only`: just these (lowercase) addresses, e.g. the partner's address a
-// player just added (#96); the same rules apply.
+// player just added (#96); the same rules apply. Never to an address with an
+// account (inviteRecipients), so the email switch (#115) has nothing to skip.
 export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
   const pending = (await pendingRegistrationInvites()).filter((r) => !only || only.includes(r.email));
   if (pending.length === 0) return 0;

@@ -41,6 +41,7 @@ const E = await import("~/lib/season-entries.server");
 const N = await import("~/lib/notifications.server");
 const O = await import("~/lib/email/outbox.server");
 const L = await import("~/lib/auth/login-code.server");
+const SOLO = await import("~/lib/solo-pairing.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const DURING_REGISTRATION = new Date("2026-11-03T12:00:00Z");
@@ -158,17 +159,88 @@ describe("notification switches (#115)", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
   });
 
-  it("the emails that aren't account notifications ignore the switch", async () => {
+  // Peter, 2026-10-29: only login codes and signup confirmations ignore the
+  // switch; addresses without an account are unaffected.
+  it("a pair intro skips the email of an account with email off, but is on its Értesítések", async () => {
     await N.setChannelEnabled("a", "email", false);
-    await O.queuePairIntros(
-      { name: "Anna", email: "a@x.hu", level: "halado" },
-      { name: "Béla", email: "b@x.hu", level: "halado" },
-      "Győr",
+    const solo = (email: string) =>
+      h.raw
+        .prepare("insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'X', ?, 'gyor', 'kezdo', 1) returning id")
+        .get(email).id as number;
+    // Anna has an account (email off); z@x.hu has none.
+    expect(await SOLO.pairSolos(solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
+    expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "pair_intro", to_email: "z@x.hu" }]);
+    expect(inbox("a")).toEqual([{ kind: "pair_intro", title: "Párt találtunk neked", url: "/pair" }]);
+    expect(all("select count(*) n from notifications")[0].n).toBe(1);
+    expect(h.pushed).toEqual([endpoint("a")]);
+  });
+
+  it("broadcasts and partner notices skip an account with email off; signup confirmations don't", async () => {
+    await N.setChannelEnabled("a", "email", false);
+    await O.createBroadcast({
+      subject: "Hír",
+      body: "Szia {név}!",
+      audience: "Mind",
+      recipients: [
+        { email: "a@x.hu", name: "Anna" },
+        { email: "z@x.hu", name: "Zoli" },
+      ],
+      createdBy: "o@x.hu",
+    });
+    expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);
+    expect(await O.emailSwitchedOff()).toEqual(new Set(["a@x.hu"]));
+
+    h.sent = [];
+    // Anna signs up and names Béla as partner: her confirmation goes out.
+    await O.deliver(
+      await O.queueSignupEmails({ mode: "pair", name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "gyor", level: "halado" } as any),
     );
-    expect(all("select kind, to_email from email_messages order by id")).toEqual([
-      { kind: "pair_intro", to_email: "a@x.hu" },
-      { kind: "pair_intro", to_email: "b@x.hu" },
-    ]);
+    // Béla's partner notice goes out too (email on); with email off it wouldn't.
+    expect(h.sent.map((m) => m.to).sort()).toEqual(["a@x.hu", "b@x.hu"]);
+    await N.setChannelEnabled("b", "email", false);
+    h.raw.exec("delete from email_messages");
+    h.sent = [];
+    await O.deliver(
+      await O.queueSignupEmails({ mode: "pair", name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "gyor", level: "halado" } as any),
+    );
+    expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "signup_confirmation", to_email: "a@x.hu" }]);
+  });
+
+  it("a fan-out to many players takes a few D1 queries, not a few per player", async () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `p${i}`);
+    for (const id of ids) {
+      h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, id);
+      h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'k')").run(endpoint(id), id);
+    }
+    await N.setChannelEnabled("p0", "push", false);
+    const raw = h.raw;
+    const queries: string[] = [];
+    h.raw = new Proxy(raw, {
+      get(target, prop) {
+        if (prop !== "prepare") {
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (q: string) => {
+          queries.push(q);
+          return target.prepare(q);
+        };
+      },
+    });
+    const message = { title: "Itt a csoportod: 1. csoport", body: "…", url: "/home" };
+    await N.notifyPlayers("groups_published", ids.map((userId) => ({ userId, message })));
+    h.raw = raw;
+
+    // One opt-out lookup, 3 inserts of at most 15 rows, one subscription lookup.
+    expect(queries.filter((q) => /^select .* from "notification_opt_outs"/.test(q))).toHaveLength(1);
+    expect(queries.filter((q) => /^insert into "notifications"/.test(q))).toHaveLength(3);
+    expect(queries.filter((q) => /from "push_subscriptions"/.test(q))).toHaveLength(1);
+    expect(queries).toHaveLength(5);
+    expect(all("select count(*) n from notifications")[0].n).toBe(40);
+    // Each push carries its own notification's id.
+    expect(h.pushed).toHaveLength(39);
+    expect(new Set(h.pushed).size).toBe(39);
+    expect(h.pushed).not.toContain(endpoint("p0"));
   });
 
   it("a Szervező's per-kind switch keeps working next to the push switch", async () => {

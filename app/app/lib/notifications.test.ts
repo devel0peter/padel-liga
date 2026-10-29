@@ -9,6 +9,7 @@ import {
   isEnabled,
   isNotificationKind,
   kindsFor,
+  pairIntroMessage,
   seasonEntryDecisionMessage,
   newSignupMessage,
   parseSubscription,
@@ -169,13 +170,28 @@ describe("channels (#115)", () => {
     expect(isEnabled(new Set([channelKey("email"), channelKey("push")]), "new_signup")).toBe(true);
   });
 
-  it("login codes and signup confirmations always go out; account notifications follow the switch", () => {
+  it("only login codes and signup confirmations ignore the switch (Peter, 2026-10-29)", () => {
     expect(followsEmailSwitch("login_code")).toBe(false);
     expect(followsEmailSwitch("signup_confirmation")).toBe(false);
-    for (const kind of ["partner_notice", "pair_intro", "registration_invite", "broadcast"] as const)
-      expect(followsEmailSwitch(kind)).toBe(false);
-    expect(followsEmailSwitch("season_entry_decision")).toBe(true);
-    expect(followsEmailSwitch("groups_published")).toBe(true);
+    for (const kind of [
+      "partner_notice",
+      "pair_intro",
+      "registration_invite",
+      "broadcast",
+      "season_entry_decision",
+      "groups_published",
+    ] as const)
+      expect(followsEmailSwitch(kind)).toBe(true);
+  });
+});
+
+describe("pairIntroMessage", () => {
+  it("says a partner was found, with no names", () => {
+    expect(pairIntroMessage("Győr")).toEqual({
+      title: "Párt találtunk neked",
+      body: "A szervező párba tett egy másik egyéni jelentkezővel (Győr). A Párom oldalon látod, ki az.",
+      url: "/pair",
+    });
   });
 });
 

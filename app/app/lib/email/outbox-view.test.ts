@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { emailMessages } from "~/db/schema";
 import { CONTACT_EMAIL, SITE_URL } from "~/lib/site";
 
-import { HIDDEN, hideAddresses, kindLabel } from "./outbox-view";
+import { HIDDEN, hideAddresses, kindLabel, relayWarning } from "./outbox-view";
 import { pairIntro, registrationInvite } from "./templates";
 import { unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
@@ -60,5 +60,22 @@ describe("hideAddresses", () => {
 
   it("hides a percent-encoded address outside a link parameter", () => {
     expect(hideAddresses("cím: anna%40example.com vége")).toBe(`cím: ${HIDDEN} vége`);
+  });
+});
+
+describe("relayWarning (#127)", () => {
+  it("warns in production when the relay is missing, in Hungarian and with no secret or address", () => {
+    const text = relayWarning(false, false, 250);
+    expect(text).toMatch(/Resend/);
+    expect(text).toMatch(/naponta legfeljebb 250/);
+    expect(text).not.toMatch(/@/);
+  });
+
+  it("is silent when the relay is configured", () => {
+    expect(relayWarning(true, false, 100)).toBeNull();
+  });
+
+  it("is silent in local dev, where the console shows the emails", () => {
+    expect(relayWarning(false, true, 100)).toBeNull();
   });
 });

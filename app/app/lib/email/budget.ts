@@ -1,7 +1,7 @@
 // How many emails we may send right now within the league's own daily limit.
-// Pure (no I/O). The limit follows the transport (#111): 2,000 with Google's
-// SMTP relay (it allows 10,000 per user a day, but Google can lower an
-// account's limit); without the relay everything goes through Resend, whose
+// Pure (no I/O). The limit follows the transport (#111, #127): 5,000 with Google's
+// SMTP relay (half of the 10,000 per user a day it allows, as Google can lower
+// an account's limit); without the relay everything goes through Resend, whose
 // free plan sends 100 a day, so EMAIL_DAILY_LIMIT (default 100) applies.
 
 // Kept free for signup confirmations, so a large broadcast can't block them.
@@ -42,7 +42,7 @@ export const RESEND_DAILY_LIMIT = 100;
 // that queued them (outbox.server.ts deliverNow); the hourly cron sends the
 // rest. Here (pure) so the admin pages can say it.
 export const SEND_NOW_MAX = 50;
-export const RELAY_DAILY_LIMIT = 2000;
+export const RELAY_DAILY_LIMIT = 5000;
 
 export function parseDailyLimit(value: string | undefined): number {
   const n = Number(value);

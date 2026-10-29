@@ -24,6 +24,15 @@ export function kindLabel(kind: string): string {
   return KIND_LABELS[kind as MessageKind] ?? kind;
 }
 
+// The notice on "Kimenő levelek" while the SMTP relay isn't set up (#127), or
+// null. Only in production: local dev has no relay by design and prints the
+// emails to the console. Names no secret or address.
+// limit: the daily limit without the relay (dailyLimit()).
+export function relayWarning(relay: boolean, dev: boolean, limit: number): string | null {
+  if (relay || dev) return null;
+  return `Nincs beállítva a Google levelezőrelé, ezért a levelek a Resenden mennek ki, naponta legfeljebb ${limit}. Ha a Resend sincs beállítva, a levelek sorban várnak.`;
+}
+
 export const HIDDEN = "[elrejtve]";
 
 // A link parameter that carries an address: the login link's ?email= and

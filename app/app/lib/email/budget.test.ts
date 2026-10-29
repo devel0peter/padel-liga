@@ -55,11 +55,11 @@ describe("parseDailyLimit", () => {
   });
 });
 
-describe("effectiveDailyLimit (#111)", () => {
-  it("is 2,000 with the SMTP relay", () => {
-    expect(RELAY_DAILY_LIMIT).toBe(2000);
-    expect(effectiveDailyLimit(true, "100")).toBe(2000);
-    expect(effectiveDailyLimit(true, undefined)).toBe(2000);
+describe("effectiveDailyLimit (#111, #127)", () => {
+  it("is 5,000 with the SMTP relay", () => {
+    expect(RELAY_DAILY_LIMIT).toBe(5000);
+    expect(effectiveDailyLimit(true, "100")).toBe(5000);
+    expect(effectiveDailyLimit(true, undefined)).toBe(5000);
   });
 
   it("stays Resend-safe without the relay: EMAIL_DAILY_LIMIT, else 100", () => {
@@ -76,13 +76,13 @@ describe("effectiveDailyLimit (#111)", () => {
   });
 });
 
-describe("the 2,000 a day limit (#111)", () => {
+describe("the 5,000 a day limit (#111, #127)", () => {
   it("still keeps the login code reserve and the send order", () => {
     // Bulk mail stops 15 short, other transactional mail 10 short: those are
     // left for login codes.
-    expect(sendBudget(2000, 1990, "signup_confirmation")).toBe(0);
-    expect(sendBudget(2000, 1985, "broadcast")).toBe(0);
-    expect(sendBudget(2000, 1990, "login_code")).toBe(LOGIN_RESERVE);
-    expect(sendBudget(2000, 0, "broadcast")).toBe(2000 - TRANSACTIONAL_RESERVE);
+    expect(sendBudget(5000, 4990, "signup_confirmation")).toBe(0);
+    expect(sendBudget(5000, 4985, "broadcast")).toBe(0);
+    expect(sendBudget(5000, 4990, "login_code")).toBe(LOGIN_RESERVE);
+    expect(sendBudget(5000, 0, "broadcast")).toBe(5000 - TRANSACTIONAL_RESERVE);
   });
 });

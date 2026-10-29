@@ -267,8 +267,8 @@ describe("delivery through the SMTP relay (#111)", () => {
     expect(h.resend.batches).toHaveLength(1);
   });
 
-  it("the daily limit is 2,000 with the relay, Resend's 100 (EMAIL_DAILY_LIMIT) without it", () => {
-    expect(O.dailyLimit()).toBe(2000);
+  it("the daily limit is 5,000 with the relay, Resend's 100 (EMAIL_DAILY_LIMIT) without it", () => {
+    expect(O.dailyLimit()).toBe(5000);
     delete h.env.SMTP_PASSWORD;
     expect(O.dailyLimit()).toBe(100);
     h.env.EMAIL_DAILY_LIMIT = "100";

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { effectiveDailyLimit } from "~/lib/email/budget";
+
 import {
   checkCode,
   codeSendDecision,
@@ -152,9 +154,17 @@ describe("codes to new addresses (#113)", () => {
 
   it("caps them at a quarter of the daily limit", () => {
     expect(newAddressCodeCap(100)).toBe(25);
-    expect(newAddressCodeCap(2000)).toBe(500);
+    expect(newAddressCodeCap(5000)).toBe(1250);
     expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 24 })).toBe("send");
     expect(newAddressCodeDecision({ ...base, sentToNewLast24h: 25 })).toBe("capped");
+  });
+
+  it("is 1,250 with the relay and 25 without it (#127)", () => {
+    expect(newAddressCodeCap(effectiveDailyLimit(true, undefined))).toBe(1250);
+    expect(newAddressCodeCap(effectiveDailyLimit(false, undefined))).toBe(25);
+    const relay = { ...base, dailyLimit: effectiveDailyLimit(true, undefined) };
+    expect(newAddressCodeDecision({ ...relay, sentToNewLast24h: 1249 })).toBe("send");
+    expect(newAddressCodeDecision({ ...relay, sentToNewLast24h: 1250 })).toBe("capped");
   });
 
   it("never caps an account or an invited address", () => {

@@ -71,7 +71,7 @@ describe("first-login page pre-filled from the signup (#130)", () => {
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
   });
 
-  it("fills in the signup's name and level on a code login, and says only the phone is missing", async () => {
+  it("fills in the signup's name and level on a code login, and says what is still missing", async () => {
     signup({ mode: "solo", name1: "Nagy Anna", email1: "anna@x.hu", level: "halado" });
     const d = await R.loader(args(get(await firstLogin("anna@x.hu"))));
     expect(d).toMatchObject({ name: "Nagy Anna", level: "halado", fromSignup: true, partnerEmails: [] });

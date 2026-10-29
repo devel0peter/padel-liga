@@ -23,7 +23,7 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // address may add it here (#96). Férfi or Nő is asked too (#133); an account
 // from before that question gets only it, once (requireUser sends it here).
 
-export const FROM_SIGNUP = "A jelentkezésedből már megvan a neved és a szinted, csak a telefonszámod kell.";
+export const FROM_SIGNUP = "A jelentkezésedből már megvan a neved és a szinted. Csak a telefonszámod kell, és hogy férfi vagy nő vagy.";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Üdv a ${SITE_NAME}on` }, { name: "robots", content: "noindex" }];

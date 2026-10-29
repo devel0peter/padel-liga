@@ -153,7 +153,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
 - Accounts: the players from the tables above. Minimum: both players of 3 pair signups (6 logins, enough for one group of 3 pairs). For the full run use the 22 players who start with a partner: 11 pairs split into groups of 4, 4 and 3.
 - Per player:
   1. Open the link from the terminal with the host changed to `http://localhost:5173`. The address is already filled in; press "Kódot kérek" and log in with the code from the terminal.
-  2. On "Üdv!": check the line "A jelentkezésedből már megvan a neved és a szinted, csak a telefonszámod kell.", that "Neved" already holds the name from the table and "Szinted" the signup's level (#130), leave the phone empty (or try a Hungarian number), pick "Férfi" or "Nő" (nothing is preselected, #133), tick the privacy consent and press "Kész".
+  2. On "Üdv!": check the line "A jelentkezésedből már megvan a neved és a szinted. Csak a telefonszámod kell, és hogy férfi vagy nő vagy.", that "Neved" already holds the name from the table and "Szinted" the signup's level (#130), leave the phone empty (or try a Hungarian number), pick "Férfi" or "Nő" (nothing is preselected, #133), tick the privacy consent and press "Kész".
 - Expect:
   - Without the consent, the name or Férfi/Nő, the form shows an error and stays.
   - After "Kész" you land on Kezdőlap.

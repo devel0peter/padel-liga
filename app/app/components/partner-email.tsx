@@ -1,18 +1,32 @@
 import { useFetcher } from "react-router";
 
+import { Field, inputClass, invalid } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 
-// "Partner has no email" (#96, D35), on the home page and Párom: the player's
-// pair signup names a partner without an address. The form posts intent
-// "partner_email" to the page's own action. Shows the partner's name only.
+// "Partner has no email" (#96, D35): the player's pair signup names a partner
+// without an address. On the home page and Párom a box whose form posts
+// intent "partner_email" to the page's own action; on the first-login page
+// (#130) a field of that page's form. Shows the partner's name only.
 
 export const PARTNER_EMAIL_SAVED = "Elmentettük. Ha még nincs fiókja, most megkapja a meghívót.";
 
 export function partnerEmailPrompt(name: string): string {
   return `A párodnak (${name}) nincs e-mail-címe nálunk. Add meg, és ő is kap meghívót.`;
+}
+
+// The same question on the first-login page (#130): an optional field of
+// that page's own form, saved with "Kész".
+export function PartnerEmailField({ signupId, name, error }: { signupId: number; name: string; error?: string }) {
+  const field = `partnerEmail-${signupId}`;
+  return (
+    <Field name={field} label="A párod e-mail-címe (nem kötelező)" error={error}>
+      <p className="text-sm text-muted-foreground">{partnerEmailPrompt(name)}</p>
+      <Input id={field} name={field} type="email" autoComplete="off" maxLength={254} className={inputClass} {...invalid(field, error)} />
+    </Field>
+  );
 }
 
 export function PartnerEmailBox({ signupId, name }: { signupId: number; name: string }) {

@@ -19,8 +19,10 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await logIn(page, NEW_PLAYER.email);
   await expect(page).toHaveURL(/\/welcome/);
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
-  // No signup: no partner named, no level prefilled.
+  // No signup: no partner named, nothing prefilled (#130).
   await expect(content(page)).not.toContainText("A párod:");
+  await expect(content(page)).not.toContainText("A jelentkezésedből");
+  await expect(page.getByLabel("Neved")).toHaveValue("");
   await page.getByLabel("Neved").fill(NEW_PLAYER.name);
   await expect(page.getByLabel("Szinted")).toContainText("Válassz…");
   await page.getByLabel("Szinted").click();

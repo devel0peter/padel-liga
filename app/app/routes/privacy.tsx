@@ -74,10 +74,14 @@ export default function Privacy() {
             </ul>
             <p>Ha fiókot hozol létre:</p>
             <ul className={list}>
-              <li>a neved és az e-mail-címed,</li>
+              <li>
+                a neved és az e-mail-címed (ha jelentkeztél, az első belépéskor
+                a jelentkezésedből kitöltjük a neved; átírhatod),
+              </li>
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
-                állítasz be, és amiből az induló értékszámod lesz,
+                állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
+                alap), és amiből az induló értékszámod lesz,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket

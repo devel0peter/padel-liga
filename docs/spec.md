@@ -247,9 +247,9 @@ Dates are Europe/Budapest.
 
 | Milestone | Date | Must work |
 |---|---|---|
-| Registration opens | Mon 2 Nov 2026 | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
+| Registration opens | Thu 29 Oct 2026 (was Mon 2 Nov; README decision log, 2026-10-29) | Accounts (Google and email code), roles, invites to the interest list, pairs, season with registration window, season entry and approval, venues, first-phase seeding |
 | Round 1 starts | Mon 9 Nov 2026 | Publishing groups, my matches, scheduling (including recording an agreed time), results and confirmation, disputes, public standings, emails and reminders, daily backup |
 | First round switch | Mon 30 Nov 2026 | Unplayed-match resolution, no-show reports, withdrawal, round switch draft and publish, promotion and relegation, Elo, public profiles, substitutes, strikes, web push and the daily digest, account deletion |
 | Season end | Thu 31 Dec 2026 | 4-phase seasons, re-entry ("Nevezünk újra", organizer re-entry by hand), carrying approvals into the next season, season switch draft (carry-over, compaction, re-formed pairs as late joiners), season archive page, season recap email and re-entry reminder |
 
-First season: registration 2–5 Nov (closes Thu 5 Nov 23:59), phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec (deadline may move to 23 Dec if matches are still open), break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.
+First season: registration 29 Oct – 6 Nov (closes Fri 6 Nov 23:59; Peter, 2026-10-29), phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec (deadline may move to 23 Dec if matches are still open), break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.

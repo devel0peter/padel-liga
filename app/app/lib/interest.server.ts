@@ -9,13 +9,14 @@ export async function saveInterest(signup: InterestSignup): Promise<void> {
   await db.insert(interestSignups).values({ ...signup, consentAt: new Date() });
 }
 
-// The level of the newest interest signup naming this (lowercase) email, to
-// prefill the first-login page (the form stores emails lowercase): as the
-// signer, a paired solo included, or as the partner of a pair signup (#89),
-// who gets the level the signer gave for the pair.
-export async function interestLevelFor(email: string): Promise<Level | null> {
+// What the newest interest signup naming this (lowercase) email says, to
+// prefill the first-login page (#130; the form stores emails lowercase): as
+// the signer, a paired solo included, their own name; as the partner of a
+// pair signup (#89), the name the signer gave them. Either way the level
+// given for the signup. Null without a signup.
+export async function interestProfileFor(email: string): Promise<{ name: string; level: Level | null } | null> {
   const [row] = await db
-    .select({ level: interestSignups.level })
+    .select({ email1: interestSignups.email1, name1: interestSignups.name1, name2: interestSignups.name2, level: interestSignups.level })
     .from(interestSignups)
     .where(
       or(
@@ -26,5 +27,9 @@ export async function interestLevelFor(email: string): Promise<Level | null> {
     )
     .orderBy(desc(interestSignups.createdAt), desc(interestSignups.id))
     .limit(1);
-  return row && isLevel(row.level) ? row.level : null;
+  if (!row) return null;
+  return {
+    name: ((row.email1 === email ? row.name1 : row.name2) ?? "").trim(),
+    level: isLevel(row.level) ? row.level : null,
+  };
 }

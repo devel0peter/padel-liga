@@ -18,7 +18,7 @@ import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } f
 import { formatPhone } from "~/lib/phone";
 import { SITE_NAME } from "~/lib/site";
 
-// The profile, inside the app shell (app.tsx): name, level and phone number
+// The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
 // (the phone is never shown to anyone else on this page or any public page),
 // notification settings, logout everywhere.
 
@@ -36,6 +36,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     imageUrl: user.imageUrl,
     level: user.level,
     phone: formatPhone(user.phone),
+    sex: user.sex,
     initials: initials(user.name, user.email),
     google: await hasGoogleLogin(user.id),
     role: roleLabel(actor),
@@ -57,7 +58,7 @@ export async function action({ request }: Route.ActionArgs) {
     // A missing phone field must not clear the saved number.
     if (!form.has("phone")) return data({ saved: false, errors: {} as ProfileErrors }, { status: 400 });
     const result = validateProfile(
-      { name: form.get("name"), level: form.get("level"), phone: form.get("phone") },
+      { name: form.get("name"), level: form.get("level"), phone: form.get("phone"), sex: form.get("sex") },
       { requireConsent: false },
     );
     if (!result.ok) return data({ saved: false, errors: result.errors }, { status: 400 });
@@ -146,7 +147,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
         )}
         <Form method="post" className="grid gap-5">
           <input type="hidden" name="intent" value="profile" />
-          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone }} />
+          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} />
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={busy}>
               Mentés

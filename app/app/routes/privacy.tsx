@@ -75,14 +75,24 @@ export default function Privacy() {
             </ul>
             <p>Ha fiókot hozol létre:</p>
             <ul className={list}>
-              <li>a neved és az e-mail-címed,</li>
+              <li>
+                a neved és az e-mail-címed (ha jelentkeztél, az első belépéskor
+                a jelentkezésedből kitöltjük a neved; átírhatod),
+              </li>
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
-                állítasz be, és amiből az induló értékszámod lesz,
+                állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
+                alap), és amiből az induló értékszámod lesz,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
                 telefonon egyeztetitek; a profilodban bármikor módosíthatod),
+              </li>
+              <li>
+                hogy férfi vagy nő vagy (kötelező, te választod, sosem a nevedből
+                találjuk ki; azért kérdezzük, hogy egy-egy levelet csak egy
+                csoportnak küldhessünk, pl. női eseményről; nem nyilvános, más
+                játékos nem látja, a profilodban módosíthatod),
               </li>
               <li>
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből

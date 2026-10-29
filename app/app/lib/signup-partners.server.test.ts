@@ -184,16 +184,16 @@ describe("signup pairs on real SQLite", () => {
     expect([...(await SP.waitingPartners("x@x.hu"))]).toEqual([]);
   });
 
-  it("prefills the signup's level for the partner too", async () => {
+  it("prefills the signup's name and level for the partner too (#130)", async () => {
     signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", level: "halado" });
     signup({ mode: "solo", name1: "Cili", email1: "c@x.hu", level: "versenyzo" });
-    expect(await I.interestLevelFor("a@x.hu")).toBe("halado");
-    expect(await I.interestLevelFor("b@x.hu")).toBe("halado");
-    expect(await I.interestLevelFor("c@x.hu")).toBe("versenyzo");
-    expect(await I.interestLevelFor("x@x.hu")).toBeNull();
-    // A withdrawn signup doesn't prefill the partner's level.
+    expect(await I.interestProfileFor("a@x.hu")).toEqual({ name: "Anna", level: "halado" });
+    expect(await I.interestProfileFor("b@x.hu")).toEqual({ name: "Béla", level: "halado" });
+    expect(await I.interestProfileFor("c@x.hu")).toEqual({ name: "Cili", level: "versenyzo" });
+    expect(await I.interestProfileFor("x@x.hu")).toBeNull();
+    // A withdrawn signup doesn't prefill the partner.
     const id = signup({ name1: "Ede", email1: "e@x.hu", name2: "Feri", email2: "f@x.hu", level: "halado" });
     h.raw.prepare("update interest_signups set status = 'withdrawn' where id = ?").run(id);
-    expect(await I.interestLevelFor("f@x.hu")).toBeNull();
+    expect(await I.interestProfileFor("f@x.hu")).toBeNull();
   });
 });

@@ -19,14 +19,20 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await logIn(page, NEW_PLAYER.email);
   await expect(page).toHaveURL(/\/welcome/);
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
-  // No signup: no partner named, no level prefilled.
+  // No signup: no partner named, nothing prefilled (#130).
   await expect(content(page)).not.toContainText("A párod:");
+  await expect(content(page)).not.toContainText("A jelentkezésedből");
+  await expect(page.getByLabel("Neved")).toHaveValue("");
   await page.getByLabel("Neved").fill(NEW_PLAYER.name);
   await expect(page.getByLabel("Szinted")).toContainText("Válassz…");
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: /^Középhaladó/ }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 765 4321");
   await page.getByLabel(/hozzájárulok/).check();
+  // Férfi or Nő is required (#133): without it the page stays.
+  await page.getByRole("button", { name: "Kész" }).click();
+  await expect(page.getByText("Válaszd ki: férfi vagy nő.")).toBeVisible();
+  await page.getByLabel("Férfi", { exact: true }).click();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
   await save(context, NEW_PLAYER.email);

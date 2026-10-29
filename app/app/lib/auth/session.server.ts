@@ -95,10 +95,12 @@ export async function requireAccount(request: Request): Promise<User> {
   return user;
 }
 
-// Logged in with name and privacy consent: every other account page.
+// Logged in with name and privacy consent: every other account page. An
+// account from before the sex was asked (#133) answers it once on /welcome,
+// then goes on where it was going.
 export async function requireUser(request: Request): Promise<User> {
   const user = await requireAccount(request);
-  if (!user.consentAt) loginRedirect(request, "/welcome");
+  if (!user.consentAt || !user.sex) loginRedirect(request, "/welcome");
   return user;
 }
 

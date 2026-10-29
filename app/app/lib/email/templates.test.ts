@@ -101,7 +101,10 @@ describe("partnerNotice", () => {
     expect(e.subject).toBe("Nagy Anna jelentkeztetett titeket a Padelpárbajra");
     expect(e.text).toContain("Szia Kovács Béla!");
     expect(e.text).toContain("töröljük az adataidat");
-    expect(e.text).toContain("nem írunk neked, amíg magad nem regisztrálsz");
+    // What else they get, as the privacy page says: the registration invite only.
+    expect(e.text).toContain("Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat.");
+    expect(e.text).toContain("Amikor indul a regisztráció, kapsz egy meghívót is. Ezen kívül semmit nem küldünk, amíg magad nem regisztrálsz.");
+    expect(e.text).toContain("3-4 páros csoportok");
   });
 
   it("needs a partner", () => {
@@ -168,6 +171,7 @@ describe("pairIntro", () => {
     expect(e.text).toContain("A szintje: Haladó.");
     expect(e.text).toContain("Az e-mail-címe: bela@example.com");
     expect(e.text).not.toContain("anna@example.com");
+    expect(e.text).toContain("Írjatok egymásnak, és játsszatok egyet. Ha összejön, a ligában párként neveztek.");
   });
 
   it("escapes names in the HTML", () => {
@@ -184,7 +188,34 @@ describe("registrationLink", () => {
 
 describe("registrationInvite", () => {
   const unsub = "https://padelparbaj.hu/unsubscribe?t=abc";
-  const email = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub);
+  // Győr's season: registration until Friday 6 Nov 23:59, round 1 on Monday
+  // 9 Nov 2026 (00:00 Budapest).
+  const start = { city: "Győr", firstRound: new Date("2026-11-08T23:00:00Z"), registrationCloses: new Date("2026-11-06T22:59:00Z") };
+  const email = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub, start);
+
+  it("thanks for signing up early, says when and where the league starts and until when to enter, then the link (#131)", () => {
+    expect(email.text).toContain(
+      "Szia Nagy Anna!\n\nKöszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/login?email=anna%40example.com\n\n",
+    );
+    expect(email.text).toContain("A neved és a szinted már megvan, csak a telefonszámod kell, úgyhogy egy perc az egész.");
+    expect(email.text).not.toContain("kitöltöttük");
+    expect(email.html).not.toContain("kitöltöttük");
+  });
+
+  it("says only the start once registration has closed (#131)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub, { ...start, registrationCloses: null });
+    expect(e.text).toContain("A liga november 9-én indul (Győr). Regisztrálni és nevezni itt tudsz:");
+    expect(e.text).not.toContain("a nevezés");
+  });
+
+  it("leaves out the start sentence without a season (#131)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub, null);
+    expect(e.text).toContain(
+      "Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/login?email=anna%40example.com",
+    );
+    expect(e.text).not.toMatch(/indul|november/);
+    expect(registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub).text).toBe(e.text);
+  });
 
   it("greets the signer and links to registration with the email filled in", () => {
     expect(email.subject).toBe("Regisztrálj a Padelpárbajra");
@@ -205,23 +236,83 @@ describe("registrationInvite", () => {
   });
 
   it("tells a player with a partner they enter together, and promises no pair invite (#97)", () => {
-    expect(email.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
+    expect(email.text).toContain("Amint a párod is regisztrál, a ligában magától pár lesztek, és együtt nevezhettek a szezonra.");
     expect(email.text).not.toContain("hívhatod meg");
     expect(email.text).not.toContain("Még keresünk neked párt");
     expect(email.text).not.toContain("add meg");
   });
 
   it("has its own text for a solo still waiting for a partner (#96)", () => {
-    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "solo" }, unsub);
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "solo" }, unsub, start);
     expect(e.text).toContain("Még keresünk neked párt, addig regisztrálj.");
-    expect(e.text).not.toContain("Ha a párod is regisztrált");
+    expect(e.text).not.toContain("a párod is regisztrál");
+    expect(e.text).toContain("A liga november 9-én indul (Győr), a nevezés november 6-ig tart.");
     expect(e.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
   });
 
-  it("asks for the partner's address when the pair signup had none (#96)", () => {
-    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "no_partner_email" }, unsub);
-    expect(e.text).toContain("A párod e-mail-címét nem adtad meg. Belépés után add meg, és ő is kap meghívót.");
-    expect(e.text).toContain("Ha a párod is regisztrált, együtt nevezhettek a szezonra.");
+  it("asks for the partner's address when the pair signup had none (#96, #130)", () => {
+    const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com", variant: "no_partner_email" }, unsub, start);
+    expect(e.text).toContain("A párod e-mail-címét nem adtad meg: belépéskor add meg, és ő is kap meghívót.");
+    expect(e.text).toContain("Amint ő is regisztrál, a ligában magától pár lesztek, és együtt nevezhettek a szezonra.");
+    expect(e.text).toContain("A liga november 9-én indul (Győr), a nevezés november 6-ig tart.");
+  });
+});
+
+describe("the early-signup thanks (#131)", () => {
+  const THANKS = "előzetesen jelentkeztél";
+  const solo = { ...pair, mode: "solo", name2: null, email2: null } as const;
+  const decision = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    approved: true,
+    joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") },
+    note: null,
+  };
+  const groups = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: null }],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  };
+  const anna = { name: "Nagy Anna", email: "anna@example.com", level: "kezdo" };
+  const bela = { name: "Kovács Béla", email: "bela@example.com", level: "kezdo" };
+
+  it("is only in the registration invite: not in login codes, entry decisions, groups, confirmations or the rest", () => {
+    const others = {
+      loginCode: loginCode("123456", 10),
+      approved: seasonEntryDecision(decision),
+      rejected: seasonEntryDecision({ ...decision, approved: false, joins: null }),
+      groups: groupsPublished(groups),
+      confirmationPair: signupConfirmation(pair, GYOR),
+      confirmationSolo: signupConfirmation(solo, GYOR),
+      confirmationOther: signupConfirmation({ ...pair, city: "other", cityOther: "Pécs" }),
+      partnerNotice: partnerNotice(pair, GYOR),
+      pairIntro: pairIntro(anna, bela, "Győr"),
+    };
+    for (const [name, e] of Object.entries(others)) {
+      expect(e.text, name).not.toContain(THANKS);
+      expect(e.html, name).not.toContain(THANKS);
+    }
+    expect(registrationInvite({ name: "Anna", email: "anna@example.com" }, "#").text).toContain(THANKS);
+  });
+
+  it("every email we write ends with the same sign-off", () => {
+    const all = [
+      loginCode("123456", 10),
+      seasonEntryDecision(decision),
+      groupsPublished(groups),
+      signupConfirmation(pair, GYOR),
+      partnerNotice(pair, GYOR),
+      pairIntro(anna, bela, "Győr"),
+      registrationInvite({ name: "Anna", email: "anna@example.com" }, "#"),
+    ];
+    for (const e of all) expect(e.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");
   });
 });
 

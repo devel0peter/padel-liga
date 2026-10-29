@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { auditLog, leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
 
-import type { ProfileInput } from "./rules";
+import type { ProfileInput, Sex } from "./rules";
 
 export async function findUserIdByEmail(email: string): Promise<string | null> {
   const [row] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
@@ -37,13 +37,21 @@ async function acceptOrganizerInvites(userId: string, email: string): Promise<vo
 export async function saveProfile(userId: string, profile: ProfileInput): Promise<void> {
   await db
     .update(users)
-    .set({ name: profile.name, level: profile.level, phone: profile.phone, consentAt: new Date() })
+    .set({ name: profile.name, level: profile.level, phone: profile.phone, sex: profile.sex, consentAt: new Date() })
     .where(eq(users.id, userId));
 }
 
 // The profile page: the same fields, the consent stays as it was given.
 export async function updateProfile(userId: string, profile: Omit<ProfileInput, "consent">): Promise<void> {
-  await db.update(users).set({ name: profile.name, level: profile.level, phone: profile.phone }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ name: profile.name, level: profile.level, phone: profile.phone, sex: profile.sex })
+    .where(eq(users.id, userId));
+}
+
+// The one-time question to accounts from before it was asked (#133).
+export async function saveSex(userId: string, sex: Sex): Promise<void> {
+  await db.update(users).set({ sex }).where(eq(users.id, userId));
 }
 
 export async function hasGoogleLogin(userId: string): Promise<boolean> {

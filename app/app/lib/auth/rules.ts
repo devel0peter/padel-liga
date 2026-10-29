@@ -177,14 +177,24 @@ export function initials(name: string, email: string): string {
   return letters.toUpperCase();
 }
 
-export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean };
+// Férfi or Nő (#133): the only two answers, what the player says; never
+// inferred from a name.
+export const SEXES = { male: "Férfi", female: "Nő" } as const;
+export type Sex = keyof typeof SEXES;
+export const SEX_REQUIRED = "Válaszd ki: férfi vagy nő.";
+
+export function parseSex(value: unknown): Sex | null {
+  return value === "male" || value === "female" ? value : null;
+}
+
+export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean; sex: Sex };
 export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;
 
-// The profile form (first login and the profile page): name, level and phone
-// number are all required; the phone is stored as E.164 (phone.ts).
+// The profile form (first login and the profile page): name, level, phone
+// number and sex are all required; the phone is stored as E.164 (phone.ts).
 // `requireConsent`: the first-login page also asks for the privacy consent.
 export function validateProfile(
-  input: { name: unknown; level: unknown; phone: unknown; consent?: unknown },
+  input: { name: unknown; level: unknown; phone: unknown; consent?: unknown; sex?: unknown },
   { requireConsent }: { requireConsent: boolean },
 ): { ok: true; value: ProfileInput } | { ok: false; errors: ProfileErrors } {
   const name = typeof input.name === "string" ? input.name.trim().replace(/\s+/g, " ") : "";
@@ -197,9 +207,11 @@ export function validateProfile(
   const phone = parsePhone(input.phone);
   if (!phone.ok) errors.phone = phone.error;
   else if (!phone.value) errors.phone = PHONE_REQUIRED;
+  const sex = parseSex(input.sex);
+  if (!sex) errors.sex = SEX_REQUIRED;
   if (requireConsent && !consent) errors.consent = "A belépéshez fogadd el az adatkezelési tájékoztatót.";
-  if (Object.keys(errors).length || !level || !phone.ok || !phone.value) return { ok: false, errors };
-  return { ok: true, value: { name, level, phone: phone.value, consent } };
+  if (Object.keys(errors).length || !level || !phone.ok || !phone.value || !sex) return { ok: false, errors };
+  return { ok: true, value: { name, level, phone: phone.value, consent, sex } };
 }
 
 // --- Redirects and cookies --------------------------------------------------

@@ -12,7 +12,7 @@ test("warm up the dev server", async ({ browser }) => {
   test.setTimeout(300_000);
   // The public pages first: they load the UI's client dependencies before the login.
   const visitor = await browser.newContext();
-  for (const path of ["/login", "/rules", "/privacy"]) await visit(await visitor.newPage(), path);
+  for (const path of ["/login", "/register", "/rules", "/privacy"]) await visit(await visitor.newPage(), path);
   await visitor.close();
 
   const { context, page } = await as(browser, ADMIN.email);

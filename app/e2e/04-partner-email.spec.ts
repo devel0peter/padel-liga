@@ -37,5 +37,5 @@ test("a pair signup without the partner's address asks for it on Párom", async 
 
   // The partner's invite goes out at once (#112), like every invite.
   const [invite] = await waitForEmails(saved, 1, (e) => e.to === "cim.nelkuli@example.test");
-  expect(invite.text).toContain("https://padelparbaj.hu/login?email=cim.nelkuli%40example.test");
+  expect(invite.text).toContain("https://padelparbaj.hu/register?email=cim.nelkuli%40example.test");
 });

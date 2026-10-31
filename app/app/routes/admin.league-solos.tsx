@@ -3,6 +3,7 @@ import { data, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-solos";
 import { AppPage } from "~/components/app-page";
+import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,8 @@ import { homeClubLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { formatDateTime } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
+import { statusChips } from "~/lib/player-status";
+import { playerStatuses, type PlayerStatuses } from "~/lib/player-status.server";
 import { levelLabel, type SignupRow } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 import { soloPairs, waitingSolos } from "~/lib/solo-pairing";
@@ -47,26 +50,30 @@ async function scope(request: Request, slug: string) {
   return { league, cityName: cityName(league.city, await listCities()) };
 }
 
-// Only what pairing needs: no email, no admin note, no source.
-function publicRow(r: SignupRow, clubs: Awaited<ReturnType<typeof listClubs>>) {
+// Only what pairing needs: no email, no admin note, no source. `status`:
+// whether they registered, and their pair and entry in this league (someone
+// waiting here may already have a pair from the Párok page).
+function publicRow(r: SignupRow, clubs: Awaited<ReturnType<typeof listClubs>>, statuses: PlayerStatuses, leagueId: number) {
   return {
     id: r.id,
     name: r.name1,
     level: levelLabel(r.level),
     plays: homeClubLabel(r.homeClub, clubs),
     note: r.note,
+    status: statusChips(statuses.byEmail.get(r.email1.toLowerCase()), [leagueId]),
     createdAt: r.createdAt,
   };
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, cityName } = await scope(request, params.league);
-  const [signups, clubs] = await Promise.all([listSignups(), listClubs()]);
+  const [signups, clubs, statuses] = await Promise.all([listSignups(), listClubs(), playerStatuses()]);
+  const row = (r: SignupRow) => publicRow(r, clubs, statuses, league.id);
   return {
     name: league.name,
     cityName,
-    waiting: waitingSolos(signups, league.city).map((r) => publicRow(r, clubs)),
-    pairs: soloPairs(signups, league.city).map(([a, b]) => [publicRow(a, clubs), publicRow(b, clubs)] as const),
+    waiting: waitingSolos(signups, league.city).map(row),
+    pairs: soloPairs(signups, league.city).map(([a, b]) => [row(a), row(b)] as const),
   };
 }
 
@@ -98,6 +105,9 @@ function Who({ row }: { row: Row }) {
       <div className="text-xs text-muted-foreground">
         {row.level}
         {row.plays && ` · ${row.plays}`}
+      </div>
+      <div className="mt-1">
+        <StatusChips chips={row.status} />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.signups";
 import { AppPage } from "~/components/app-page";
+import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,9 @@ import { formatDateTime } from "~/lib/format";
 import { homeClubLabel, OTHER_CLUB, refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { LEVELS } from "~/lib/interest";
+import { listLeagues } from "~/lib/leagues.server";
+import { statusChips, type StatusChip } from "~/lib/player-status";
+import { playerStatuses } from "~/lib/player-status.server";
 import {
   cityLabel,
   countSignups,
@@ -61,19 +65,29 @@ const MAX_ADMIN_NOTE = 2000;
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
   const filters = parseFilters(new URL(request.url).searchParams);
-  const [all, clubs, cities, invites] = await Promise.all([
+  const [all, clubs, cities, invites, statuses, leagues] = await Promise.all([
     listSignups(),
     listClubs(),
     listCities(),
     pendingRegistrationInvites(),
+    playerStatuses(),
+    listLeagues(),
   ]);
   const names = new Map(all.map((r) => [r.id, r.name1]));
+  // Each person's account, pair and entry in the leagues of the signup's city.
+  const chips = (email: string | null, city: string): StatusChip[] => {
+    if (!email) return [];
+    const ids = leagues.filter((l) => l.city === city).map((l) => l.id);
+    return statusChips(statuses.byEmail.get(email.toLowerCase()), ids, ids.length > 1);
+  };
   const rows = filterSignups(all, filters).map((r) => ({
     ...r,
     pairedName: r.pairedWith != null ? (names.get(r.pairedWith) ?? null) : null,
     cityText: cityLabel(r, cities),
     source: refLabel(r.ref, clubs),
     plays: homeClubLabel(r.homeClub, clubs),
+    status1: chips(r.email1, r.city),
+    status2: r.mode === "pair" ? chips(r.email2, r.city) : [],
   }));
   // Filter options: every club, plus any other ref that came in.
   const refs = new Map<string, string>(clubs.map((c) => [c.slug, c.name]));
@@ -161,15 +175,18 @@ function FilterSelect({
   );
 }
 
-function Player({ name, email }: { name: string; email: string | null }) {
+function Player({ name, email, status }: { name: string; email: string | null; status: StatusChip[] }) {
   return (
-    <div>
-      <div className="font-medium">{name}</div>
-      {email && (
-        <a href={`mailto:${email}`} className="text-xs text-muted-foreground underline">
-          {email}
-        </a>
-      )}
+    <div className="grid gap-1">
+      <div>
+        <div className="font-medium">{name}</div>
+        {email && (
+          <a href={`mailto:${email}`} className="text-xs text-muted-foreground underline">
+            {email}
+          </a>
+        )}
+      </div>
+      <StatusChips chips={status} />
     </div>
   );
 }
@@ -177,7 +194,14 @@ function Player({ name, email }: { name: string; email: string | null }) {
 function SignupTableRow({
   row,
 }: {
-  row: SignupRow & { source: string; plays: string; cityText: string; pairedName: string | null };
+  row: SignupRow & {
+    source: string;
+    plays: string;
+    cityText: string;
+    pairedName: string | null;
+    status1: StatusChip[];
+    status2: StatusChip[];
+  };
 }) {
   const fetcher = useFetcher();
   const [note, setNote] = useState(row.adminNote ?? "");
@@ -195,9 +219,9 @@ function SignupTableRow({
       <TableCell>{row.cityText}</TableCell>
       <TableCell className="min-w-56">
         <div className="grid gap-2">
-          <Player name={row.name1} email={row.email1} />
+          <Player name={row.name1} email={row.email1} status={row.status1} />
           {row.mode === "pair" && row.name2 ? (
-            <Player name={row.name2} email={row.email2} />
+            <Player name={row.name2} email={row.email2} status={row.status2} />
           ) : row.pairedName ? (
             <Badge variant="secondary">Párja: {row.pairedName}</Badge>
           ) : row.cityOther == null ? (

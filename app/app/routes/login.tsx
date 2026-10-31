@@ -13,6 +13,30 @@ import { formSignupPairs } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
+// Login and registration (/register) are the same flow: the first login of
+// a new address creates the account (#113). /register is its own page with
+// its own words, so someone looking for registration doesn't land on
+// "Belépés" (2026-10-31). Both come back to `returnTo`.
+
+export type AuthMode = "login" | "register";
+
+const WORDS = {
+  login: {
+    title: "Belépés",
+    intro: "Nincs jelszó: lépj be Google-lel, vagy kérj egy belépőkódot",
+    google: "Belépés Google-lel",
+    verify: "Belépek",
+    other: { text: "Még nincs fiókod?", link: "Regisztráció", to: "/register" },
+  },
+  register: {
+    title: "Regisztráció",
+    intro: "Nincs jelszó: regisztrálj Google-lel, vagy kérj egy kódot",
+    google: "Regisztráció Google-lel",
+    verify: "Tovább",
+    other: { text: "Már van fiókod?", link: "Belépés", to: "/login" },
+  },
+} as const;
+
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Belépés – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
 }
@@ -62,7 +86,13 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   return { step: "code", email: result.email, resent: form.get("intent") === "resend" };
 }
 
-export default function Login({ loaderData, actionData }: Route.ComponentProps) {
+export default function Login(props: Route.ComponentProps) {
+  return <AuthForm {...props} mode="login" />;
+}
+
+export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentProps, "loaderData" | "actionData"> & { mode: AuthMode }) {
+  const words = WORDS[mode];
+  const self = mode === "login" ? "/login" : "/register";
   const navigation = useNavigation();
   const busy = navigation.state !== "idle";
   const { google, returnTo, error, turnstileSiteKey } = loaderData;
@@ -101,7 +131,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
           {turnstile}
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" name="intent" value="verify" disabled={busy} className="h-11 px-6 text-base">
-              Belépek
+              {words.verify}
             </Button>
             <Button type="submit" name="intent" value="resend" variant="ghost" disabled={busy} formNoValidate>
               Új kódot kérek
@@ -110,7 +140,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
         </Form>
         <p className="text-sm text-muted-foreground">
           Nem jött meg? Nézd meg a spam mappát is, vagy{" "}
-          <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
+          <Link to={`${self}?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
             adj meg másik címet
           </Link>
           .
@@ -122,15 +152,19 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
   const emailError = actionData?.step === "email" ? actionData.error : undefined;
   return (
     <AuthPage
-      title="Belépés"
+      title={words.title}
       intro={
         <>
-          Nincs jelszó: lépj be Google-lel, vagy kérj egy belépőkódot{" "}
-          <span className="whitespace-nowrap">e-mailben</span>.
+          {words.intro} <span className="whitespace-nowrap">e-mailben</span>.
         </>
       }
       below={
         <>
+          {words.other.text}{" "}
+          <Link to={`${words.other.to}?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
+            {words.other.link}
+          </Link>
+          <br />
           Nálatok még nincs liga?{" "}
           <Link to="/#mas-varos" className="underline">
             Szólj, és értesítünk
@@ -148,7 +182,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
           <Button asChild variant="outline" className="h-11 gap-3 text-base">
             <a href={`/auth/google?returnTo=${encodeURIComponent(returnTo)}`}>
               <GoogleMark />
-              Belépés Google-lel
+              {words.google}
             </a>
           </Button>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">

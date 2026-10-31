@@ -257,14 +257,28 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 
 Anyone can create an account, no invite needed (#113).
 
-- Page: `/login`, then `/welcome` and `/pair` ("Párom")
+- Page: `/register` (or `/login`), then `/welcome`, `/home` and `/pair` ("Párom")
 - Account: a new address that is not in the seed, for example `uj.jatekos@example.test`
 - Do: ask for a login code, enter the code from the terminal, then fill in the first-login page (name, level, phone, consent) and press "Kész".
 - Expect:
   - The code arrives like for anyone else; nothing about 2 November.
   - The first-login page names no partner and prefills no level.
-  - Párom: "Még nincs párod." with "A szervező keres neked párt." and the contact address `hello@padelparbaj.hu`.
+  - Kezdőlap and Párom: "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`.
   - The Szervező can now pick this player on "Párok" (step 14).
+
+### 16. The new player invites a partner with the pair link (side path)
+
+A player without a pair sends their own link; the partner registers and accepts (README decision log, 2026-10-31).
+
+- Page: `/home` as the player of step 15, then the link in a private window, `/register`, `/welcome`, the link again, `/pair`
+- Account: another new address, for example `link.partner@example.test`
+- Do: copy the link from "Hívd meg a párodat", open it in a private window, press "Regisztrálok", ask for a code, enter it, fill in the first-login page, then press "Elfogadom".
+- Expect:
+  - Logged out, the link shows "Új Játékos meghívott, hogy legyél a párja." and the league, never an email.
+  - `/register` says "Regisztráció" and "Regisztráció Google-lel", the code step "Tovább"; it is the login flow.
+  - After "Kész" the partner is back on the link; "Elfogadom" opens Párom with "Mostantól párban vagytok." and the partner's name.
+  - Both players' link boxes are gone; on "Párok" the pair's source is "linkkel". No email was queued.
+  - The player's own link, opened by themselves, says "Ez a saját linked."
 
 ## Start over
 

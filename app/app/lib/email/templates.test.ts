@@ -181,8 +181,8 @@ describe("pairIntro", () => {
 
 describe("registrationLink", () => {
   it("opens the login page with the email filled in", () => {
-    expect(registrationLink("anna@example.com")).toBe("https://padelparbaj.hu/login?email=anna%40example.com");
-    expect(registrationLink("a+b@example.com")).toBe("https://padelparbaj.hu/login?email=a%2Bb%40example.com");
+    expect(registrationLink("anna@example.com")).toBe("https://padelparbaj.hu/register?email=anna%40example.com");
+    expect(registrationLink("a+b@example.com")).toBe("https://padelparbaj.hu/register?email=a%2Bb%40example.com");
   });
 });
 
@@ -195,7 +195,7 @@ describe("registrationInvite", () => {
 
   it("thanks for signing up early, says when and where the league starts and until when to enter, then the link (#131)", () => {
     expect(email.text).toContain(
-      "Szia Nagy Anna!\n\nKöszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/login?email=anna%40example.com\n\n",
+      "Szia Nagy Anna!\n\nKöszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/register?email=anna%40example.com\n\n",
     );
     expect(email.text).toContain("A neved és a szinted már megvan, csak a telefonszámod kell, úgyhogy egy perc az egész.");
     expect(email.text).not.toContain("kitöltöttük");
@@ -211,7 +211,7 @@ describe("registrationInvite", () => {
   it("leaves out the start sentence without a season (#131)", () => {
     const e = registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub, null);
     expect(e.text).toContain(
-      "Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/login?email=anna%40example.com",
+      "Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! Regisztrálni és nevezni itt tudsz:\n\nhttps://padelparbaj.hu/register?email=anna%40example.com",
     );
     expect(e.text).not.toMatch(/indul|november/);
     expect(registrationInvite({ name: "Nagy Anna", email: "anna@example.com" }, unsub).text).toBe(e.text);
@@ -220,8 +220,8 @@ describe("registrationInvite", () => {
   it("greets the signer and links to registration with the email filled in", () => {
     expect(email.subject).toBe("Regisztrálj a Padelpárbajra");
     expect(email.text).toContain("Szia Nagy Anna!");
-    expect(email.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
-    expect(email.html).toContain('href="https://padelparbaj.hu/login?email=anna%40example.com"');
+    expect(email.text).toContain("https://padelparbaj.hu/register?email=anna%40example.com");
+    expect(email.html).toContain('href="https://padelparbaj.hu/register?email=anna%40example.com"');
   });
 
   it("has an unsubscribe link: it goes to the whole list", () => {
@@ -247,7 +247,7 @@ describe("registrationInvite", () => {
     expect(e.text).toContain("Még keresünk neked párt, addig regisztrálj.");
     expect(e.text).not.toContain("a párod is regisztrál");
     expect(e.text).toContain("A liga november 9-én indul (Győr), a nevezés november 6-ig tart.");
-    expect(e.text).toContain("https://padelparbaj.hu/login?email=anna%40example.com");
+    expect(e.text).toContain("https://padelparbaj.hu/register?email=anna%40example.com");
   });
 
   it("asks for the partner's address when the pair signup had none (#96, #130)", () => {

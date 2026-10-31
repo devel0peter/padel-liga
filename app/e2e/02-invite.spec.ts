@@ -23,7 +23,7 @@ test("3. the registration invite goes out at once", async ({ browser }) => {
   await expect(page.getByRole("button", { name: /Regisztrációs meghívó/ })).toBeDisabled();
   const sent = await waitForEmails(offset, 24);
   expect(sent).toHaveLength(24);
-  for (const mail of sent) expect(mail.text).toContain(`https://padelparbaj.hu/login?email=${encodeURIComponent(mail.to)}`);
+  for (const mail of sent) expect(mail.text).toContain(`https://padelparbaj.hu/register?email=${encodeURIComponent(mail.to)}`);
   // The two solos without a partner get their own text (#96).
   const waiting = sent.find((m) => m.to === "pal.boglarka@example.test");
   expect(waiting?.text).toContain("Még keresünk neked párt, addig regisztrálj.");

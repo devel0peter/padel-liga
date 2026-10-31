@@ -9,11 +9,13 @@ export default [
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
   route("login", "routes/login.tsx"),
+  route("register", "routes/register.tsx"),
   route("welcome", "routes/welcome.tsx"),
   route("logout", "routes/logout.ts"),
   route("auth/google", "routes/auth.google.ts"),
   route("auth/google/callback", "routes/auth.google.callback.ts"),
   route("api/push", "routes/api.push.ts"),
+  route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).

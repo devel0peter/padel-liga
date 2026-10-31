@@ -242,7 +242,7 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
       )}
 
       {pairs.length > 0 && (
-        <section className="grid gap-3">
+        <section className="grid gap-3 [&>*]:min-w-0">
           <h2 className="font-semibold">Összehozott párok</h2>
           <div className="rounded-lg border">
             <Table>

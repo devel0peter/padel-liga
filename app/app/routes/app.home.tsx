@@ -3,6 +3,7 @@ import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
 import { PhaseList } from "~/components/season-calendar";
+import { PairLinkBox } from "~/components/pair-link";
 import { PartnerEmailBox } from "~/components/partner-email";
 import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -12,6 +13,7 @@ import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate } from "~/lib/format";
 import { listedCities } from "~/lib/cities.server";
 import { listLeagues } from "~/lib/leagues.server";
+import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { homeSeasons } from "~/lib/seasons";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
@@ -59,6 +61,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     needsLevel: !user.level,
     // The signup named a partner without an email (#96): the box to add it.
     missingEmails: (await missingPartnerEmails(user)).map(({ signupId, name }) => ({ signupId, name })),
+    // No pair in a league: the player's own link to invite one (2026-10-31),
+    // first thing after the first-login page.
+    pairLinks: (await pairLinkBoxes(user)).map((l) => ({ league: l.league.name, url: new URL(request.url).origin + pairLinkPath(l.token) })),
+    multiLeague: leagueName.size > 1,
     seasons,
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
@@ -91,6 +97,9 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </p>
         </section>
       )}
+      {d.pairLinks.map((l) => (
+        <PairLinkBox key={l.url} url={l.url} league={d.multiLeague ? l.league : undefined} />
+      ))}
       {d.missingEmails.map((m) => (
         <PartnerEmailBox key={m.signupId} signupId={m.signupId} name={m.name} />
       ))}

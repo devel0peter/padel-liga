@@ -38,7 +38,7 @@ const count = (table: string) => rows(`select count(*) as n from ${table}`)[0].n
 
 const TABLES = [
   "cities", "clubs", "leagues", "users", "league_admins", "seasons", "season_phases", "interest_signups",
-  "account_invites", "email_messages", "pairs", "pair_invites", "season_entries", "groups", "group_pairs",
+  "account_invites", "email_messages", "pairs", "pair_invites", "pair_links", "season_entries", "groups", "group_pairs",
   "matches", "sessions", "login_codes", "notifications", "audit_log", "broadcasts", "email_suppressions",
 ];
 const sizes = () => Object.fromEntries(TABLES.map((t) => [t, count(t)]));

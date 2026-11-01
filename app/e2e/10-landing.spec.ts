@@ -24,7 +24,8 @@ test("the hero shows a league city's league and leads to registration", async ({
   await expect(page.locator("body")).not.toContainText(/12 pár|elég pár/);
 
   await league.getByRole("link", { name: "Nevezek a 2. körre" }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/register$/);
+  await expect(page.getByRole("heading", { name: "Regisztráció" })).toBeVisible();
   await page.close();
 });
 
@@ -34,7 +35,7 @@ test("a league city typed in the other-city form leads to registration, not a si
   await page.locator("#cityOther").fill("mintavaros");
   await expect(page.getByRole("status")).toContainText("Mintaváros: itt már fut a liga");
   await expect(page.locator("#name1")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Regisztrálok és nevezek" })).toHaveAttribute("href", "/login");
+  await expect(page.getByRole("link", { name: "Regisztrálok és nevezek" })).toHaveAttribute("href", "/register");
   await page.close();
 });
 

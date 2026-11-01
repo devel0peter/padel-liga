@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b68a6587-d6d3-4ffc-af8f-687258607b96",
+  "id": "c76a49d5-c08e-48b5-be10-1f4e7393e001",
   "prevId": "c8614791-18a2-446a-9139-2b9706314122",
   "tables": {
     "account_invites": {
@@ -1584,6 +1584,95 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "pair_links": {
+      "name": "pair_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "league_id": {
+          "name": "league_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "pair_links_token_unique": {
+          "name": "pair_links_token_unique",
+          "columns": [
+            "token"
+          ],
+          "isUnique": true
+        },
+        "pair_links_owner_idx": {
+          "name": "pair_links_owner_idx",
+          "columns": [
+            "league_id",
+            "owner_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "pair_links_league_id_leagues_id_fk": {
+          "name": "pair_links_league_id_leagues_id_fk",
+          "tableFrom": "pair_links",
+          "tableTo": "leagues",
+          "columnsFrom": [
+            "league_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "pair_links_owner_id_users_id_fk": {
+          "name": "pair_links_owner_id_users_id_fk",
+          "tableFrom": "pair_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "pairs": {
       "name": "pairs",
       "columns": {
@@ -2246,13 +2335,6 @@
         },
         "consent_at": {
           "name": "consent_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "last_login_at": {
-          "name": "last_login_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

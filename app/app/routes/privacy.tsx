@@ -209,9 +209,19 @@ export default function Privacy() {
             </p>
           </Section>
 
+          <Section title="Ha linkkel hívod meg a párodat">
+            <p>
+              Amíg nincs párod, a Kezdőlapon és a Párom oldalon kapsz egy saját
+              linket, amit te küldesz el annak, akivel játszanál. Aki megnyitja,
+              a neved és a liga nevét látja, az e-mail-címedet és a
+              telefonszámodat nem. Ha regisztrál és elfogadja, pár lesztek. A
+              linket mi nem küldjük el senkinek, és erről nem megy e-mail.
+            </p>
+          </Section>
+
           <Section title="Ha változik a párod">
             <p>
-              Párt létrehozni, felbontani vagy cserélni a szervező tud: írj
+              Felbontani vagy cserélni a párt a szervező tud: írj
               nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
               szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.

@@ -1,6 +1,6 @@
 // Walkthrough step 15: anyone can create an account (#113). An address with
 // no invite and no signup logs in, finishes the first-login page and sees on
-// Párom that the organizer pairs them. Runs last: the new player has no pair,
+// Párom their own pair link, and that the organizer pairs those with nobody. Runs last: the new player has no pair,
 // so the earlier steps' lists stay as they were.
 import { expect, test } from "@playwright/test";
 
@@ -37,9 +37,11 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(page).toHaveURL(/\/home$/);
   await save(context, NEW_PLAYER.email);
 
+  // Straight after the first-login page: the own pair link (2026-10-31).
+  await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await visit(page, "/pair");
-  await expect(content(page)).toContainText("Még nincs párod.");
-  await expect(content(page)).toContainText("A szervező keres neked párt.");
+  await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
+  await expect(content(page)).toContainText("a szervező keres neked párt.");
   await expect(content(page).getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
   await context.close();
 });

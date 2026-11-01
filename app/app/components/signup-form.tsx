@@ -200,7 +200,7 @@ export function SignupForm({
               asChild
               className="h-auto rounded-full bg-ball px-6 py-3 text-base font-bold text-ball-foreground hover:bg-ball/85"
             >
-              <Link to="/login">Regisztrálok és nevezek</Link>
+              <Link to="/register">Regisztrálok és nevezek</Link>
             </Button>
           </div>
         </div>

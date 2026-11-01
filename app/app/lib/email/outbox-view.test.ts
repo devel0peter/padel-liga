@@ -54,7 +54,7 @@ describe("hideAddresses", () => {
     expect(leak(text, email).length).toBeGreaterThan(0);
     const hidden = hideAddresses(text);
     expect(leak(hidden, email)).toEqual([]);
-    expect(hidden).toContain(`${SITE_URL}/login?email=${HIDDEN}`);
+    expect(hidden).toContain(`${SITE_URL}/register?email=${HIDDEN}`);
     expect(hidden).toContain(`?t=${HIDDEN}`);
   });
 

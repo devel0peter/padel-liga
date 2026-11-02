@@ -263,6 +263,7 @@ Anyone can create an account, no invite needed (#113).
 - Do: ask for a login code, enter the code from the terminal, then fill in the first-login page (name, level, phone, consent) and press "Kész".
 - Expect:
   - The code arrives like for anyone else; nothing about 2 November.
+  - Under the code field: "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, vagy írj nekünk: hello@padelparbaj.hu." (with "lépj be Google-lel" / "regisztrálj Google-lel" before the last part when Google login is set up). The same line for every address, also one that gets no code (#123).
   - The first-login page names no partner and prefills no level.
   - Kezdőlap and Párom: "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`.
   - The Szervező can now pick this player on "Párok" (step 14).

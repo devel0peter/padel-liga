@@ -17,6 +17,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 11, a pair entering after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
 | 13 | [`08-solos.spec.ts`](../app/e2e/08-solos.spec.ts) |
 | 14 | [`09-pairs.spec.ts`](../app/e2e/09-pairs.spec.ts) |
+| 14, search, filter and Levél nekik (#148) | [`15-pairs-filter.spec.ts`](../app/e2e/15-pairs-filter.spec.ts) |
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
 
 ## Set up
@@ -246,6 +247,8 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
   4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
   5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again.
+  6. Type a name in "Keresés" without accents (for example "kovacs"): only the matching rows stay, and the address has `?q=`. "Szűrők törlése" brings every row back.
+  7. Press "Nincs a ligában (N)": exactly N rows, the players without a pair ("Nincs párja", "Párt keres" where the switch is on) and the pairs without an entry. A reload keeps it. As `admin@example.test`, "Levél nekik" opens "Új körlevél" with those players as recipients ("Lista"); don't send.
 - Expect:
   - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change or an entry change.
   - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).

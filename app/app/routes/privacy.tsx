@@ -237,7 +237,11 @@ export default function Privacy() {
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
               Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
               ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
-              e-mailben nem. Hogy ki és mikor tette, eltároljuk.
+              e-mailben nem. Hogy ki és mikor tette, eltároljuk. A Párok oldalon
+              a regisztrált, még pár nélküli játékosok is szerepelnek: a nevük, a
+              szintjük és az, hogy párt keresnek-e. Az Admin innen körlevelet
+              írhat a listán látott játékosoknak (például akik még nem neveztek);
+              aki leiratkozott vagy kikapcsolta az e-mailt, nem kapja meg.
             </p>
             <p>
               A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a

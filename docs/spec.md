@@ -96,7 +96,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - One pair records the result, and the other confirms or disputes it.
 - Not confirmed within 48 hours: the result is accepted automatically.
 - A disputed result goes to the organizer, who decides.
-- The page, corrections, the dispute's own version and the auto-accept run: README decision log, 2026-11-02 (D77).
+- The page, corrections, the dispute's own version and the auto-accept run: README decision log, 2026-11-02 (D77). The organizer's "Viták" page, decisions and overrides with a required reason: D78.
 
 ## 8. Unplayed matches (resolved automatically at the deadline)
 The deadline is the end of the phase (section 5), so a match missed in its scheduled week can still be played later in the phase.

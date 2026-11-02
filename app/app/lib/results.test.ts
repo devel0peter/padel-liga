@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoAcceptLine,
   decisionText,
+  neutralDecisionText,
   neutralOutcomeText,
   outcomeText,
   parseOutcome,
@@ -140,6 +141,18 @@ describe("status, Teendő and log lines (#28)", () => {
     );
     expect(decisionText({ kind: "organizer", outcome: { kind: "unplayed" }, reason: "Eső" }, "a")).toBe(
       "A szervező döntött: Elmaradt: nem számít a tabellába. Indoklás: Eső",
+    );
+  });
+});
+
+describe("neutralDecisionText (#29)", () => {
+  it("names the pairs; the auto-accept has no reason", () => {
+    const names = { a: "Anna – Béla", b: "Cili – Dani" };
+    expect(neutralDecisionText({ kind: "organizer", outcome: { kind: "walkover", winner: "a" }, reason: "Nem jöttek el." }, names)).toBe(
+      "Döntés: Játék nélküli győzelem: Anna – Béla (4:0, 4:0). Indoklás: Nem jöttek el.",
+    );
+    expect(neutralDecisionText({ kind: "auto_accepted", outcome: { kind: "played", score: SPLIT }, reason: null }, names)).toBe(
+      "48 óra után magától elfogadtuk az eredményt",
     );
   });
 });

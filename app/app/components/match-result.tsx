@@ -1,4 +1,4 @@
-import type { ResultState } from "@padel-liga/rules";
+import type { MatchScore, ResultState } from "@padel-liga/rules";
 import { Form, useNavigation } from "react-router";
 
 import { Button } from "~/components/ui/button";
@@ -32,8 +32,23 @@ const ROWS = [
 /**
  * Games per set in two columns (field names set1-us, set1-them, ...; see
  * results.ts parseScore). `columns`: the two headings, e.g. "Ti" and "Ők".
+ * `values`: a prefill, the first column first; `required`: the two sets.
  */
-export function ScoreFields({ id, columns }: { id: string; columns: [string, string] }) {
+export function ScoreFields({
+  id,
+  columns,
+  values,
+  required = true,
+}: {
+  id: string;
+  columns: [string, string];
+  values?: MatchScore | null;
+  required?: boolean;
+}) {
+  const prefill = (row: (typeof ROWS)[number]["name"], i: 0 | 1) => {
+    const pair = row === "stb" ? values?.superTieBreak : values?.sets[row === "set1" ? 0 : 1];
+    return pair ? String(pair[i]) : undefined;
+  };
   return (
     <fieldset className="grid gap-2">
       <legend className="sr-only">Eredmény</legend>
@@ -56,7 +71,8 @@ export function ScoreFields({ id, columns }: { id: string; columns: [string, str
               maxLength={2}
               autoComplete="off"
               className="text-center"
-              required={r.name !== "stb"}
+              defaultValue={prefill(r.name, i as 0 | 1)}
+              required={required && r.name !== "stb"}
             />
           ))}
         </div>

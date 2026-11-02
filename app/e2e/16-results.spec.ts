@@ -1,9 +1,11 @@
-// Walkthrough step 20 (#28): after the match of step 18, one pair records the
-// result (an invalid one first), the other gets the email and confirms it,
-// and it shows as played for both pairs.
+// Walkthrough steps 20 and 21 (#28, #29): after the match of step 18, one
+// pair records the result (an invalid one first), the other gets the email
+// and confirms it, and it shows as played for both pairs; on the match of
+// step 19 the other pair disputes the result and the Szervező decides it on
+// Viták, with a reason in the log.
 import { expect, test, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
+import { ORGANIZER, PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
 
 const anna = PAIRS.p1[0];
 
@@ -84,5 +86,70 @@ test("20. record → confirm: an invalid score refused, the email, played for bo
   await visit(partner.page, "/home");
   await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText("Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
   await partner.context.close();
+  await player.context.close();
+});
+
+test("21. dispute → the Szervező decides on Viták; a player can't open it", async ({ browser }) => {
+  const [, second] = annasMatches();
+  const [opponent] = second!.opponents;
+  // Anna records a 2:0 win on her other match (scheduled in step 19).
+  const player = await as(browser, anna);
+  await visit(player.page, `/matches/${second!.id}`);
+  await fillScore(player.page, [
+    ["4", "2"],
+    ["5", "3"],
+  ]);
+  await player.page.getByRole("button", { name: "Rögzítem az eredményt" }).click();
+  await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük." })).toBeVisible();
+
+  // The other pair disputes it with its own version and a note.
+  const other = await as(browser, opponent!);
+  await visit(other.page, `/matches/${second!.id}`);
+  await expect(result(other.page).getByText("Nem így volt?")).toBeVisible();
+  const dispute = result(other.page).locator("form").filter({ has: other.page.getByRole("button", { name: "Vitatom az eredményt" }) });
+  await dispute.getByLabel("1. szett, Ti").fill("4");
+  await dispute.getByLabel("1. szett, Ők").fill("2");
+  await dispute.getByLabel("2. szett, Ti").fill("3");
+  await dispute.getByLabel("2. szett, Ők").fill("5");
+  await dispute.getByLabel("Szuper tie-break (csak 1:1-nél), Ti").fill("10");
+  await dispute.getByLabel("Szuper tie-break (csak 1:1-nél), Ők").fill("7");
+  await dispute.getByLabel("Megjegyzés a szervezőnek (nem kötelező)").fill("A szuper tie-breaket mi nyertük.");
+  await other.page.getByRole("button", { name: "Vitatom az eredményt" }).click();
+  await expect(content(other.page).getByRole("status").filter({ hasText: "Jeleztük a szervezőnek, ő dönt." })).toBeVisible();
+  await expect(status(other.page)).toContainText("Vitatott eredmény, a szervező dönt");
+
+  // A player gets 403 on the organizer pages.
+  const refused = await other.page.goto("/admin/leagues/minta/disputes");
+  expect(refused?.status()).toBe(403);
+  const refusedDecide = await other.page.goto(`/admin/leagues/minta/matches/${second!.id}/decide`);
+  expect(refusedDecide?.status()).toBe(403);
+  await other.context.close();
+
+  // The Szervező: Viták lists it with both versions, then decides.
+  const org = await as(browser, ORGANIZER.email);
+  await visit(org.page, "/admin/leagues/minta/disputes");
+  const main = content(org.page);
+  await expect(main.getByRole("heading", { name: "Vitatott eredmények (1)" })).toBeVisible();
+  await expect(main).not.toContainText("@example.test");
+  await main.getByRole("link", { name: "Döntök" }).click();
+  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
+  await org.page.waitForLoadState("networkidle");
+  await expect(content(org.page)).toContainText("Megjegyzés: A szuper tie-breaket mi nyertük.");
+  await expect(content(org.page).getByRole("region", { name: "Napló" })).toContainText("Vitatta az eredményt");
+  await content(org.page).getByRole("radio", { name: /^Mindkét pár vereséget kap/ }).click();
+  await org.page.getByLabel("Indoklás").fill("Nem tudtak megegyezni, és egyik változat sem igazolható.");
+  await org.page.getByRole("button", { name: "Döntés mentése" }).click();
+  await expect(content(org.page).getByRole("status").filter({ hasText: "Elmentettük a döntést." })).toBeVisible();
+  await expect(content(org.page).getByRole("region", { name: "Napló" })).toContainText(
+    "Döntés: Mindkét pár vereséget kap (0:4, 0:4). Indoklás: Nem tudtak megegyezni",
+  );
+  await visit(org.page, "/admin/leagues/minta/disputes");
+  await expect(content(org.page).getByRole("heading", { name: "Vitatott eredmények (0)" })).toBeVisible();
+  await org.context.close();
+
+  // Both pairs see the final outcome and the decision in the log.
+  await visit(player.page, `/matches/${second!.id}`);
+  await expect(status(player.page)).toContainText("Lejátszva: Mindkét pár vereséget kap (0:4, 0:4)");
+  await expect(content(player.page).getByRole("region", { name: "Napló" })).toContainText("A szervező döntött");
   await player.context.close();
 });

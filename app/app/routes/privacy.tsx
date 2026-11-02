@@ -173,7 +173,10 @@ export default function Privacy() {
                 ki rögzítette, erősítette meg vagy vitatta az eredményt, a
                 vitához írt megjegyzéssel együtt) a meccs két párja látja a meccs
                 oldalán. Megőrizzük, mert a határidőig le nem játszott meccsekről
-                és a vitás eredményekről ez alapján döntünk.
+                és a vitás eredményekről ez alapján döntünk. A ligád szervezője
+                is látja (a nevekkel, telefonszám és e-mail-cím nélkül), és ha
+                dönt egy meccsről, a döntése a nevével, idejével és indoklásával
+                bekerül a naplóba, amit mindkét pár lát.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem

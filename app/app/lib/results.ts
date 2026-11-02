@@ -86,15 +86,7 @@ export function neutralOutcomeText(outcome: MatchOutcome, names: { a: string; b:
 }
 
 // The outcome choices of the organizer's form (#29 requirement 2).
-export const OUTCOME_CHOICES = [
-  { value: "played", label: "Eredmény" },
-  { value: "walkover-a", label: "Játék nélküli győzelem: 1. pár" },
-  { value: "walkover-b", label: "Játék nélküli győzelem: 2. pár" },
-  { value: "both-inactive", label: "Mindkét pár vereséget kap (0:4, 0:4)" },
-  { value: "unplayed", label: "Elmaradt (nem számít)" },
-] as const;
-
-export type OutcomeChoice = (typeof OUTCOME_CHOICES)[number]["value"];
+export type OutcomeChoice = "played" | "walkover-a" | "walkover-b" | "both-inactive" | "unplayed";
 
 /**
  * The organizer's form as an outcome: the score fields are in the match's
@@ -164,6 +156,15 @@ export function resultEventText(e: { kind: ResultEventKind; score?: MatchScore |
 export function decisionText(d: { kind: "auto_accepted" | "organizer"; outcome: MatchOutcome; reason: string | null }, viewer: Side): string {
   if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
   return `A szervező döntött: ${outcomeText(d.outcome, viewer)}. Indoklás: ${d.reason ?? ""}`;
+}
+
+// A ruling for the organizer, naming the pairs (#29).
+export function neutralDecisionText(
+  d: { kind: "auto_accepted" | "organizer"; outcome: MatchOutcome; reason: string | null },
+  names: { a: string; b: string },
+): string {
+  if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
+  return `Döntés: ${neutralOutcomeText(d.outcome, names)}. Indoklás: ${d.reason ?? ""}`;
 }
 
 /** The note a disputing pair may add for the organizer. */

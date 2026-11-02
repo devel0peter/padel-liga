@@ -144,6 +144,29 @@ describe("runningPhases (#158)", () => {
     expect(phase!.matches.map((m) => m.week)).toEqual([...phase!.matches.map((m) => m.week)].sort());
   });
 
+  it("a proposal that lapsed unanswered stays stuck after its slots started", async () => {
+    await play();
+    // Sunday: every slot of the 1–3 proposal has started.
+    const sunday = at("2026-11-15", 12);
+    const [phase] = await O.runningPhases(1, sunday);
+    expect(phase!.matches.find((m) => m.id === matchOf(1, 3))).toMatchObject({ status: "to_schedule", label: "Egyeztetésre vár", stuck: "unanswered" });
+    expect((await O.organizerMatch(1, matchOf(1, 3), sunday))!.stuck).toBe("unanswered");
+  });
+
+  it("over 100 matches: no statement binds more than D1's 100 parameters", async () => {
+    await play();
+    // A big phase: 120 more published groups with a match each (over 100
+    // groups and over 100 matches), one with a step.
+    const group = h.raw.prepare("insert into groups (season_id, phase, number, published_at) values (1, 1, ?, ?)");
+    const match = h.raw.prepare("insert into matches (group_id, pair_a, pair_b, week, deadline) values (?, 2, 3, 1, ?)");
+    for (let n = 3; n < 123; n++) match.run(group.run(n, sec("2026-11-08T08:00:00Z")).lastInsertRowid, sec(DEADLINE.toISOString()));
+    const extra = all("select max(id) as id from matches")[0].id;
+    h.raw.prepare("insert into match_events (match_id, pair_id, user_id, kind, slots, at) values (?, 2, 'p2a', 'proposal', ?, ?)").run(extra, JSON.stringify(SLOTS.map((s) => sec(s.toISOString()))), sec(MONDAY.toISOString()));
+    const [phase] = await O.runningPhases(1, NOW);
+    expect(phase!.matches).toHaveLength(9 + 120);
+    expect(phase!.matches.find((m) => m.id === extra)).toMatchObject({ status: "proposed", stuck: "unanswered", lastActivity: MONDAY });
+  });
+
   it("names only: no phone number or email address on the list", async () => {
     await play();
     const json = JSON.stringify(await O.runningPhases(1, NOW));

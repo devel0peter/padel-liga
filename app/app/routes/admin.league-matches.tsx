@@ -142,7 +142,9 @@ export default function LeagueMatches({ loaderData }: Route.ComponentProps) {
           {shown.length === 0 && <p className="text-muted-foreground">Nincs ilyen meccs.</p>}
           {phases.map((p) =>
             p.groups.map((g) => {
-              const weeks = [1, 2, 3]
+              // The weeks the matches have (1–3 today), so none is dropped.
+              const weeks = [...new Set(p.matches.map((m) => m.week))]
+                .sort((x, y) => x - y)
                 .map((week) => ({ week, matches: p.matches.filter((m) => m.groupNumber === g && m.week === week && visible.has(m.id)) }))
                 .filter((w) => w.matches.length > 0);
               if (weeks.length === 0) return null;

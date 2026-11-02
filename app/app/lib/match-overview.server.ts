@@ -41,6 +41,16 @@ export type OverviewPhase = {
   matches: OverviewMatch[];
 };
 
+const ID_CHUNK = 90;
+
+async function inChunks<T>(ids: readonly number[], read: (chunk: number[]) => Promise<T>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) out.push(await read(ids.slice(i, i + ID_CHUNK)));
+  return out;
+}
+
+const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.flatMap((m) => [...m]));
+
 /**
  * Every match of the league's running phases (groups published, deadline not
  * passed), by group and week. Normally one phase; a league running two
@@ -64,14 +74,16 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     .orderBy(asc(seasonPhases.startsAt), asc(groups.seasonId), asc(groups.number));
   if (groupRows.length === 0) return [];
 
+  // D1 binds at most 100 parameters per statement: a big phase has more
+  // groups or matches than that, so every id list goes in chunks.
   const groupIds = groupRows.map((g) => g.id);
-  const members = await groupMembers(groupIds);
-  const matchRows = await db
-    .select()
-    .from(matches)
-    .where(inArray(matches.groupId, groupIds))
-    .orderBy(asc(matches.week), asc(matches.id));
-  const events = await eventsOf(matchRows.map((m) => m.id));
+  const members = mergeMaps(await inChunks(groupIds, groupMembers));
+  const matchRows = (
+    await inChunks(groupIds, (ids) => db.select().from(matches).where(inArray(matches.groupId, ids)))
+  )
+    .flat()
+    .sort((x, y) => x.week - y.week || x.id - y.id);
+  const events = mergeMaps(await inChunks(matchRows.map((m) => m.id), eventsOf));
   const states = new Map(
     matchRows.map((m) => [m.id, schedulingState((events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)), now)]),
   );
@@ -121,7 +133,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       lastActivity: log.at(-1)?.at ?? null,
       active,
       activity: activityLine(active, names),
-      stuck: stuckReason({ state, kinds: log.map((e) => e.kind), phaseStartsAt: g.startsAt, week: m.week, now }),
+      stuck: stuckReason({ state, events: log, phaseStartsAt: g.startsAt, week: m.week, now }),
     });
   }
   return [...phases.values()];
@@ -187,7 +199,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
     label: status.label,
     tone: status.tone,
     stuck: running
-      ? stuckReason({ state, kinds: ctx.events.map((e) => e.kind), phaseStartsAt: ctx.phaseStartsAt, week: ctx.match.week, now })
+      ? stuckReason({ state, events: ctx.events, phaseStartsAt: ctx.phaseStartsAt, week: ctx.match.week, now })
       : null,
     activity: activityLine(active, names),
     pairs: (["a", "b"] as const).map((side) => ({

@@ -164,16 +164,17 @@ export default function Privacy() {
               <li>
                 <strong>A telefonszámodat</strong> csak azok látják, akikkel az
                 aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
-                ligád szervezője, hogy fel tudjon hívni, ha elakad egy meccs. Más
-                játékos nem látja. A csoportok kihirdetése után az ellenfeleid a
-                Kezdőlapjukon és a meccs oldalán, a szervező a meccsek szervezői
-                oldalán látja, a kör határidejéig; utána már nem.
+                ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
+                elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése
+                után az ellenfeleid a Kezdőlapjukon és a meccs oldalán, a
+                szervező és az admin a meccsek szervezői oldalán látja, a kör
+                határidejéig; utána már nem.
               </li>
               <li>
                 <strong>Az időpont-egyeztetést</strong> (ki, mikor, milyen
                 időpontot ajánlott, fogadott el vagy erősített meg) a meccs két
-                párja látja a meccs oldalán, és a liga szervezője is, hogy lássa,
-                melyik meccs akadt el. Megőrizzük, mert a határidőig le nem
+                párja látja a meccs oldalán, és a liga szervezője meg az oldal
+                adminja is, hogy lássák, melyik meccs akadt el. Megőrizzük, mert a határidőig le nem
                 játszott meccsekről ez alapján dönt a rendszer.
               </li>
               <li>

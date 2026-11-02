@@ -1,4 +1,4 @@
-import { budapestTime, type SchedulingState } from "@padel-liga/rules";
+import { budapestTime, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -61,46 +61,65 @@ describe("quietUntil", () => {
 describe("stuckReason (#158 stuck match)", () => {
   const base = { phaseStartsAt: PHASE, week: 1 };
   const wednesday = budapestTime("2026-11-11", 0, 0);
+  const monday = budapestTime("2026-11-09", 10, 0);
+  const toSchedule: SchedulingState = { status: "to_schedule" };
+  const ev = (kind: SchedulingEventKind, at: Date) => ({ kind, at });
 
   it("no valid activity: stuck from the 3rd day of the scheduled week, not before", () => {
-    const s = { ...base, state: { status: "to_schedule" } as SchedulingState, kinds: [] };
+    const s = { ...base, state: toSchedule, events: [] };
     expect(stuckReason({ ...s, now: new Date(wednesday.getTime() - 1) })).toBeNull();
     expect(stuckReason({ ...s, now: wednesday })).toBe("no_activity");
     // A week 3 match isn't stuck in week 1.
     expect(stuckReason({ ...s, week: 3, now: wednesday })).toBeNull();
   });
 
-  it("a match whose pairs were active and is back to scheduling isn't stuck", () => {
-    for (const kind of ["proposal", "counter_proposal", "agreed_time", "agreed_confirmed"] as const)
-      expect(stuckReason({ ...base, state: { status: "to_schedule" }, kinds: [kind], now: hours(wednesday, 100) })).toBeNull();
-  });
-
   it("accepting or declining alone isn't valid activity (spec 8)", () => {
-    expect(stuckReason({ ...base, state: { status: "to_schedule" }, kinds: ["agreed_declined"], now: wednesday })).toBe("no_activity");
+    expect(stuckReason({ ...base, state: toSchedule, events: [ev("agreed_declined", monday)], now: wednesday })).toBe("no_activity");
   });
 
   it("a proposal unanswered for 48 hours", () => {
-    const at = budapestTime("2026-11-09", 10, 0);
-    const state: SchedulingState = { status: "proposed", by: "a", slots: [hours(at, 100)], clubId: null, at };
-    expect(stuckReason({ ...base, state, kinds: ["proposal"], now: hours(at, 47.99) })).toBeNull();
-    expect(stuckReason({ ...base, state, kinds: ["proposal"], now: hours(at, 48) })).toBe("unanswered");
+    const state: SchedulingState = { status: "proposed", by: "a", slots: [hours(monday, 100)], clubId: null, at: monday };
+    const events = [ev("proposal", monday)];
+    expect(stuckReason({ ...base, state, events, now: hours(monday, 47.99) })).toBeNull();
+    expect(stuckReason({ ...base, state, events, now: hours(monday, 48) })).toBe("unanswered");
   });
 
   it("an agreed time unconfirmed for 48 hours", () => {
-    const at = budapestTime("2026-11-09", 10, 0);
-    const state: SchedulingState = { status: "agreed_time", by: "b", slot: hours(at, 72), clubId: null, at };
-    expect(stuckReason({ ...base, state, kinds: ["agreed_time"], now: hours(at, 47) })).toBeNull();
-    expect(stuckReason({ ...base, state, kinds: ["agreed_time"], now: hours(at, 49) })).toBe("unanswered");
+    const state: SchedulingState = { status: "agreed_time", by: "b", slot: hours(monday, 72), clubId: null, at: monday };
+    const events = [ev("agreed_time", monday)];
+    expect(stuckReason({ ...base, state, events, now: hours(monday, 47) })).toBeNull();
+    expect(stuckReason({ ...base, state, events, now: hours(monday, 49) })).toBe("unanswered");
+  });
+
+  it("a proposal that lapsed unanswered stays stuck: back to scheduling, but nobody answered", () => {
+    // Every slot has started: the state is back to scheduling.
+    for (const kind of ["proposal", "counter_proposal"] as const)
+      expect(stuckReason({ ...base, state: toSchedule, events: [ev("proposal", monday), ev(kind, hours(monday, 1))], now: hours(monday, 100) })).toBe(
+        "unanswered",
+      );
+  });
+
+  it("an agreed time that lapsed unconfirmed is stuck once 48 hours passed since it was recorded", () => {
+    // Recorded for 3 hours later: it lapses long before the 48 hours.
+    const events = [ev("agreed_time", monday)];
+    expect(stuckReason({ ...base, state: toSchedule, events, now: hours(monday, 5) })).toBeNull();
+    expect(stuckReason({ ...base, state: toSchedule, events, now: hours(monday, 48) })).toBe("unanswered");
+  });
+
+  it("an answered offer back to scheduling isn't stuck: declined, or its pairs were active", () => {
+    const declined = [ev("agreed_time", monday), ev("agreed_declined", hours(monday, 1))];
+    expect(stuckReason({ ...base, state: toSchedule, events: declined, now: hours(monday, 100) })).toBeNull();
   });
 
   it("a fresh proposal isn't stuck, even late in the week", () => {
     const at = hours(wednesday, 30);
     const state: SchedulingState = { status: "proposed", by: "a", slots: [hours(at, 60)], clubId: null, at };
-    expect(stuckReason({ ...base, state, kinds: ["proposal"], now: hours(at, 1) })).toBeNull();
+    expect(stuckReason({ ...base, state, events: [ev("proposal", at)], now: hours(at, 1) })).toBeNull();
   });
 
   it("a scheduled match isn't stuck", () => {
-    expect(stuckReason({ ...base, state: { status: "scheduled", slot, clubId: null }, kinds: ["proposal", "accepted"], now: hours(wednesday, 200) })).toBeNull();
+    const events = [ev("proposal", monday), ev("accepted", hours(monday, 1))];
+    expect(stuckReason({ ...base, state: { status: "scheduled", slot, clubId: null }, events, now: hours(wednesday, 200) })).toBeNull();
   });
 
   it("has a Hungarian text per reason", () => {

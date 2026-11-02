@@ -56,6 +56,9 @@ export function quietUntil(phaseStartsAt: Date, week: number): Date {
 
 export type StuckReason = "no_activity" | "unanswered";
 
+// The steps that wait for the other pair's answer.
+const OFFER_KINDS: readonly SchedulingEventKind[] = ["proposal", "counter_proposal", "agreed_time"];
+
 export const STUCK_TEXT: Record<StuckReason, string> = {
   no_activity: "Elakadt: még egyik pár sem lépett",
   unanswered: `Elakadt: ${ANSWER_HOURS} órája nincs válasz`,
@@ -64,22 +67,29 @@ export const STUCK_TEXT: Record<StuckReason, string> = {
 /**
  * Why the match is stuck at `now`, or null (#158): no valid activity (spec 8)
  * by either pair after the first 2 days of its scheduled week, or a proposal
- * or agreed time unanswered for 48 hours. A match whose proposal lapsed
- * unanswered is back to scheduling and isn't stuck by this rule: its pairs
- * were active. An unconfirmed or disputed result joins with #28.
+ * or agreed time unanswered for 48 hours. That includes one that lapsed
+ * unanswered (all its slots started, or the agreed time passed): the match
+ * is back to scheduling, but the other pair still never answered, so it
+ * stays stuck until someone steps again. An unconfirmed or disputed result
+ * joins with #28.
  */
 export function stuckReason(input: {
   state: SchedulingState;
-  kinds: readonly SchedulingEventKind[];
+  // The match's log in order: what happened and when.
+  events: readonly { kind: SchedulingEventKind; at: Date }[];
   phaseStartsAt: Date;
   week: number;
   now: Date;
 }): StuckReason | null {
   const { state, now } = input;
-  if (state.status === "proposed" || state.status === "agreed_time")
-    return now.getTime() - state.at.getTime() >= ANSWER_HOURS * 3600 * 1000 ? "unanswered" : null;
+  const waited = (since: Date) => now.getTime() - since.getTime() >= ANSWER_HOURS * 3600 * 1000;
+  if (state.status === "proposed" || state.status === "agreed_time") return waited(state.at) ? "unanswered" : null;
   if (state.status === "scheduled") return null;
-  if (input.kinds.some(isValidActivity)) return null;
+  // Back to scheduling with an offer as the newest step: it lapsed, nobody
+  // accepted, confirmed, declined or answered it with their own.
+  const last = input.events.at(-1);
+  if (last && OFFER_KINDS.includes(last.kind)) return waited(last.at) ? "unanswered" : null;
+  if (input.events.some((e) => isValidActivity(e.kind))) return null;
   return now.getTime() >= quietUntil(input.phaseStartsAt, input.week).getTime() ? "no_activity" : null;
 }
 

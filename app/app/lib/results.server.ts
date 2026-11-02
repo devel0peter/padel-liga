@@ -21,7 +21,7 @@ import { matchResultConfirmedMessage, matchResultMessage, type Message } from "~
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import { CHANGED, loadMatch, NOT_FOUND, sideOf, type MatchContext } from "./matches.server";
-import { resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
+import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { NOTE_MAX, scoreText } from "./results";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
@@ -56,10 +56,10 @@ export function mirror(state: ResultState): { status: "result_pending" | "disput
 // The insert's match_id, only while the match is still at `revision`:
 // otherwise it comes out null, NOT NULL fails and the batch writes nothing
 // (the same guard as the scheduling steps in matches.server.ts).
-const guardedMatchId = (matchId: number, revision: number) =>
+export const guardedMatchId = (matchId: number, revision: number) =>
   sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${revision})`;
 
-const lostRace = (e: unknown) => /NOT NULL constraint failed: match_(events|decisions)\.match_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`);
+export const lostRace = (e: unknown) => /NOT NULL constraint failed: match_(events|decisions)\.match_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`);
 
 /**
  * One result step by a player of either pair (#28): checked against the
@@ -201,7 +201,7 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
     .where(eq(matches.status, "result_pending"))
     .orderBy(asc(matches.id));
   if (pending.length === 0) return 0;
-  const results = await resultsOf(pending);
+  const results = await resultsOf(pending, db.select({ id: matches.id }).from(matches).where(eq(matches.status, "result_pending")));
   const due = pending
     .map((m) => ({ ...m, results: results.get(m.id)! }))
     .filter((m) => m.results && autoAcceptDue(m.results.state, now))
@@ -230,15 +230,12 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
 
 async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number; results: MatchResults }[]): Promise<void> {
   try {
-    const rows = await db
-      .select({ id: pairs.id, playerA: pairs.playerA, playerB: pairs.playerB })
-      .from(pairs)
-      .where(
-        inArray(
-          pairs.id,
-          list.flatMap((m) => [m.pairA, m.pairB]),
-        ),
-      );
+    const parts = await Promise.all(
+      chunks(list.flatMap((m) => [m.pairA, m.pairB])).map((ids) =>
+        db.select({ id: pairs.id, playerA: pairs.playerA, playerB: pairs.playerB }).from(pairs).where(inArray(pairs.id, ids)),
+      ),
+    );
+    const rows = parts.flat();
     const players = new Map(rows.map((r) => [r.id, [r.playerA, r.playerB]]));
     const messages: { userId: string; message: Message }[] = [];
     for (const m of list) {

@@ -1,5 +1,5 @@
 import { RESULT_EVENT_KINDS, resultState, type MatchOutcome, type MatchScore, type ResultEvent, type ResultEventKind, type ResultState, type Ruling, type Side } from "@padel-liga/rules";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -35,11 +35,56 @@ const EMPTY: MatchResults = { state: { status: "none" }, events: [], decisions: 
 
 const decider = alias(users, "decider");
 
-/** The result of each match, by id; a match without steps has status "none". */
-export async function resultsOf(list: readonly { id: number; pairA: number }[]): Promise<Map<number, MatchResults>> {
+// D1 allows 100 bound parameters per statement: id lists go in chunks of
+// this many (the events query binds 3 kinds besides).
+export const ID_CHUNK = 90;
+
+export function chunks<T>(list: readonly T[], size = ID_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+/**
+ * The result of each match, by id; a match without steps has status "none".
+ * For a long list, `scope` is a subquery of match ids that covers it (e.g.
+ * the league's matches): two queries whatever the length. Without it the
+ * ids go in chunks.
+ */
+export async function resultsOf(list: readonly { id: number; pairA: number }[], scope?: SQLWrapper): Promise<Map<number, MatchResults>> {
   const out = new Map<number, MatchResults>();
   const ids = list.map((m) => m.id);
   if (ids.length === 0) return out;
+  const parts = await Promise.all(scope ? [logOf(scope)] : chunks([...new Set(ids)]).map((part) => logOf(part)));
+  const events = parts.flatMap((p) => p.events).sort((x, y) => x.id - y.id);
+  const decisions = parts.flatMap((p) => p.decisions).sort((x, y) => x.id - y.id);
+  const eventsOf = groupBy(events, (e) => e.matchId);
+  const decisionsOf = groupBy(decisions, (d) => d.matchId);
+  for (const m of list) {
+    const own = (eventsOf.get(m.id) ?? [])
+      .map(({ matchId: _, kind, ...e }) => ({ ...e, kind: kind as ResultEventKind }));
+    const rulings = (decisionsOf.get(m.id) ?? []).map(({ matchId: _, ...d }) => d);
+    out.set(m.id, {
+      state: resultState(
+        own.map((e) => toResultEvent(e, m.pairA)),
+        rulings.map(toRuling),
+      ),
+      events: own,
+      decisions: rulings,
+    });
+  }
+  return out;
+}
+
+function groupBy<T>(list: readonly T[], key: (item: T) => number): Map<number, T[]> {
+  const out = new Map<number, T[]>();
+  for (const item of list) (out.get(key(item)) ?? out.set(key(item), []).get(key(item))!).push(item);
+  return out;
+}
+
+// The result steps and rulings of at most ID_CHUNK matches, or of the
+// matches a subquery selects.
+async function logOf(ids: number[] | SQLWrapper) {
   const [events, decisions] = await Promise.all([
     db
       .select({
@@ -71,21 +116,7 @@ export async function resultsOf(list: readonly { id: number; pairA: number }[]):
       .where(inArray(matchDecisions.matchId, ids))
       .orderBy(asc(matchDecisions.id)),
   ]);
-  for (const m of list) {
-    const own = events
-      .filter((e) => e.matchId === m.id)
-      .map(({ matchId: _, kind, ...e }) => ({ ...e, kind: kind as ResultEventKind }));
-    const rulings = decisions.filter((d) => d.matchId === m.id).map(({ matchId: _, ...d }) => d);
-    out.set(m.id, {
-      state: resultState(
-        own.map((e) => toResultEvent(e, m.pairA)),
-        rulings.map(toRuling),
-      ),
-      events: own,
-      decisions: rulings,
-    });
-  }
-  return out;
+  return { events, decisions };
 }
 
 export async function resultOf(match: { id: number; pairA: number }): Promise<MatchResults> {

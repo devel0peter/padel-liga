@@ -17,6 +17,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { MANY, addManyMatches, recordOn } = await import("~/test/many-matches");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 
@@ -313,6 +314,14 @@ describe("auto-accept after 48 hours (#28)", () => {
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 49 * HOUR))).toBe(2);
     expect(decisions(first.id)).toEqual([]);
     expect([matchRow(second).status, matchRow(third).status]).toEqual(["final", "final"]);
+  });
+
+  it("more waiting results than one D1 statement can bind: the due ones are accepted", async () => {
+    const ids = addManyMatches(h.raw, DEADLINE);
+    for (const id of ids) recordOn(h.raw, id, score(WIN), PLAYED);
+    const late = new Date(PLAYED.getTime() + 50 * HOUR);
+    expect(await R.autoAcceptResults(late, MANY)).toBe(MANY);
+    expect(all("select count(*) as n from matches where status = 'final'")[0].n).toBe(MANY);
   });
 
   it("at most the batch size per run; the rest on the next", async () => {

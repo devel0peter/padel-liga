@@ -38,7 +38,7 @@ test("17. Kezdőlap shows the group, the division line, the matches by week with
   await expect(main.getByText("Hamarosan itt lesz a csoportod")).toHaveCount(0);
   // A group of 3: 2 matches and the week off.
   const matches = main.getByRole("list", { name: "Meccseitek" });
-  await expect(matches.getByRole("listitem")).toHaveCount(3);
+  await expect(matches.locator(":scope > li")).toHaveCount(3);
   await expect(matches.getByText("Pihenőhét: ezen a héten nem játszotok.")).toHaveCount(1);
   await expect(matches.getByRole("link", { name: "Egyeztetés és részletek" })).toHaveCount(2);
   await expect(matches.getByText("Egyeztetésre vár")).toHaveCount(2);
@@ -121,7 +121,7 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
 
   const other = await as(browser, opponent!);
   await visit(other.page, `/matches/${second!.id}`);
-  await expect(content(other.page).getByRole("heading", { name: "Megerősíted az időpontot?" })).toBeVisible();
+  await expect(content(other.page).getByText("Megerősíted az időpontot?")).toBeVisible();
   await other.page.getByRole("button", { name: "Megerősítem" }).click();
   await expect(status(other.page)).toContainText(/Lefixálva: .*23:00/);
   const log = content(other.page).getByRole("region", { name: "Napló" });

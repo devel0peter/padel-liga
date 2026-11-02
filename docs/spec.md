@@ -87,6 +87,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 ## 7. Recording results
 - Format (league default, one format per league, no per-match variants; see section 12):
   - Best of 2 sets. Short sets: a set goes to 4 games (win by 2); at 4-4 a regular tie-break to 7 (win by 2).
+  - Valid set scores: 4-0, 4-1, 4-2, 5-3 (4-3 plays on) and, after the tie-break, 5-4. Anything else, a third set, or a super tie-break at 2-0 is rejected with a Hungarian message (`packages/rules` `validateScore`).
   - At 1-1 in sets, a super tie-break to 10 (win by 2) replaces the third set.
   - Golden point: no advantage at deuce, one point decides; the receiving pair chooses which player receives.
   - For set and game difference the super tie-break counts as one set and as a 1-0 game (ITF convention).
@@ -135,6 +136,9 @@ Set and game difference are counted over all of the pair's matches in the group 
 
 When 3 or more pairs are tied, apply steps 3–5 in order. As soon as a step separates one or more pairs and only 2 are still tied with each other, go back to step 2 (head-to-head) for those 2.
 Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set difference and is 1st. B and C are still tied, and B beat C, so B is 2nd.
+
+Pairs still equal after every step (head-to-head undecided or unplayed, same set and game difference, same Elo) keep their seed order in the group (strongest first), so the order is always strict (README decision log, 2026-11-02, D61).
+A withdrawn pair (section 4) is left out of the table with all of its matches; unplayed matches (section 8) give no points and count in neither difference.
 
 
 ## 10. Promotion and relegation
@@ -223,7 +227,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 ## 16. Non-functional requirements
 - Mobile-first; most usage will be from a phone link.
 - Hungarian characters everywhere (ő, ű), including email subject lines.
-- Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger (README decision log, 2026-11-02, D60): one SQL file of the whole database per day in a private EU bucket, the newest 35 kept, restore steps in the README ("Backups").
+- Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger (README decision log, 2026-11-02, D69): one SQL file of the whole database per day in a private EU bucket, the newest 35 kept, restore steps in the README ("Backups").
 - Logs: an audit log for every match status change.
 
 ## 17. Privacy page (Adatkezelési tájékoztató)

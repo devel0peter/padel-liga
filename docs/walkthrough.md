@@ -99,13 +99,16 @@ flowchart TD
   H --> I["10. Szervező drafts the groups"]
   I --> J["11. Szervező publishes"]
   J --> K["12. Admin checks the group emails went out"]
+  K --> N["17. Players see their group"]
+  N --> O["18. Propose and accept a slot"]
+  O --> P["19. Record and confirm an agreed time"]
   L["13. Szervező pairs the waiting solos"] --> B
   M["14. Szervező changes pairs"] -.-> F
 ```
 
 ## Steps
 
-Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any time after step 5.
+Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you can do any time after step 5.
 
 ### 1. Admin logs in
 
@@ -262,6 +265,7 @@ Anyone can create an account, no invite needed (#113).
 - Do: ask for a login code, enter the code from the terminal, then fill in the first-login page (name, level, phone, consent) and press "Kész".
 - Expect:
   - The code arrives like for anyone else; nothing about 2 November.
+  - Under the code field: "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, vagy írj nekünk: hello@padelparbaj.hu." (with "lépj be Google-lel" / "regisztrálj Google-lel" before the last part when Google login is set up). The same line for every address, also one that gets no code (#123).
   - The first-login page names no partner and prefills no level.
   - Kezdőlap and Párom: "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`.
   - The Szervező can now pick this player on "Párok" (step 14).
@@ -280,7 +284,38 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Both players' link boxes are gone; on "Párok" the pair's source is "linkkel". No email was queued.
   - The player's own link, opened by themselves, says "Ez a saját linked."
 
-### 17. Admin filters the Felhasználók list (side path)
+### 17. Players see their group (after step 11)
+
+- Page: `/home` ("Kezdőlap")
+- Account: any player in a published group, for example the first pair's first player
+- Expect:
+  - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match.
+  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours, then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
+  - Each match: the opponents, "Egyeztetésre vár", their two phone numbers (tap to call) and "Egyeztetés és részletek". No email address anywhere.
+  - "Hamarosan itt lesz a csoportod" is gone.
+
+### 18. A pair proposes slots, the other accepts one
+
+- Page: `/matches/<id>` (from "Egyeztetés és részletek"), then the same as an opponent
+- Accounts: the player of step 17, then one of the opponents
+- Do: fill two times on the same day and press "Elküldöm az időpontokat"; then three times on two days, at least 48 hours ahead, and send again.
+- Expect:
+  - The page shows "Hogyan egyeztessetek?" with the 3-sentence guide.
+  - The first try is refused: "Legalább 3 különböző időpontot ajánlj." and "Az időpontok legalább 2 különböző napra essenek." (a time before 7:00 or after 22:00, or under 48 hours ahead, gets its own message under its row).
+  - The second goes through: "Elküldtük az időpontokat a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár". The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the link.
+  - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, pick a time and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
+  - Instead of accepting, the opponent can send their own times ("Új időpontok ajánlása"): it replaces the first proposal.
+
+### 19. A pair records an agreed time, the other confirms
+
+- Page: the player's other match, then the same as an opponent
+- Do: under "Már megbeszéltétek?" fill tomorrow 23:00 and press "Rögzítem az időpontot"; as an opponent, press "Megerősítem" (or "Nem így beszéltük").
+- Expect:
+  - Any future time before the deadline is fine, late evening too. "Rögzítettük. A másik pár megerősíti."; the terminal prints "Erősítsd meg a meccs időpontját" to both opponents.
+  - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
+  - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
+
+### 20. Admin filters the Felhasználók list (side path)
 
 - Page: `/admin/users` as the Admin
 - Do: pick "Pár és nevezés" → "Nincs párja", then type a name in the search box, then press "Szűrők törlése".
@@ -289,7 +324,7 @@ A player without a pair sends their own link; the partner registers and accepts 
   - The description says "N fiók (összesen M)" while anything is set; the address holds `?pair=none` (and `q=`), so a reload or a shared link shows the same list.
   - "Szűrők törlése" shows every account again. At 390 px the email and role sit under the name and no column is cut off.
 
-### 18. A player's level locks after the first season (side path)
+### 21. A player's level locks after the first season (side path)
 
 - Page: `/profile` as a player of a published group (step 11, for example the first pair's first player), then as a player without a group (step 15)
 - Do: open Profil; open the "i" next to "Értékszámod"; as the second player change "Szinted" and press "Mentés".
@@ -297,7 +332,6 @@ A player without a pair sends their own link; the partner registers and accepts 
   - The player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
   - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
-
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.
@@ -306,4 +340,4 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
-- Milestone 2 and later: scheduling matches, results, standings.
+- Milestone 2 and later: venue and cancelling (#27), results, standings, reminders.

@@ -507,6 +507,28 @@ export const pairLinks = sqliteTable(
   (t) => [uniqueIndex("pair_links_owner_idx").on(t.leagueId, t.ownerId)],
 );
 
+// "Párt keresek" (D59): a registered player without a pair says, per league,
+// whether the organizer should find them a partner; Párkeresők lists them.
+// No row: the default, which is on for someone whose solo signup is still
+// waiting and off for everyone else (partner-search.ts). A row stays when they
+// get a pair; it only counts while they have none.
+export const partnerSearches = sqliteTable(
+  "partner_searches",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seeking: integer("seeking", { mode: "boolean" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.userId] })],
+);
+
 // A pair's entry to a season ("Nevezünk", #23, spec section 4). Either player
 // applies while the season is open (registration opens → the last phase
 // starts); a Szervező approves or rejects, and can change the decision later.

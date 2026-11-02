@@ -27,10 +27,12 @@ import { listSeasons } from "~/lib/seasons.server";
 
 import {
   broadcastEmail,
+  dailyDigest,
   groupsPublished,
   loginCode,
   matchAgreedTime,
   matchProposal,
+  matchTomorrow,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -237,6 +239,30 @@ export async function queueMatchEmails(
         kind: m.kind,
         toEmail: m.toEmail,
         ...(m.kind === "match_proposal" ? matchProposal(m.input) : matchAgreedTime(m.input)),
+      }),
+    );
+  await deliverNow(await enqueue(queued));
+}
+
+// The cron's match emails (#31): the daily digest and "holnap meccs", as
+// personal (transactional) mail within the daily limit. Unsubscribed or
+// bounced addresses, and players who switched email off (#115), get nothing;
+// the in-app list and push still have the items.
+export async function queueReminderEmails(
+  messages: (
+    | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
+    | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] }
+  )[],
+): Promise<void> {
+  if (messages.length === 0) return;
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map(
+      (m): NewMessage => ({
+        kind: m.kind,
+        toEmail: m.toEmail,
+        ...(m.kind === "match_digest" ? dailyDigest(m.input) : matchTomorrow(m.input)),
       }),
     );
   await deliverNow(await enqueue(queued));

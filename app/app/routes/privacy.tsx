@@ -138,7 +138,10 @@ export default function Privacy() {
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
               is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük.
+              mindig e-mailben küldjük. A meccseid kevésbé sürgős híreit és az
+              emlékeztetőket naponta legfeljebb egy levélben, reggel kapod meg,
+              csak azt, amit az oldalon még nem nyitottál meg; a holnapi
+              meccsedről előző este szólunk.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
@@ -173,9 +176,10 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>Az időpont-egyeztetést</strong> (ki, mikor, milyen
-                időpontot ajánlott, fogadott el vagy erősített meg) a meccs két
-                párja látja a meccs oldalán, és a liga szervezője meg az oldal
-                adminja is, hogy lássák, melyik meccs akadt el. Megőrizzük, mert a határidőig le nem
+                időpontot ajánlott, fogadott el, erősített meg vagy mondott le,
+                és hol lesz a meccs) a meccs két párja látja a meccs oldalán, és a
+                liga szervezője meg az oldal adminja is, hogy lássák, melyik meccs
+                akadt el. Megőrizzük, mert a határidőig le nem
                 játszott meccsekről ez alapján dönt a rendszer.
               </li>
               <li>

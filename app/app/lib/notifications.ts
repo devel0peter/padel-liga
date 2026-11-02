@@ -29,10 +29,24 @@ export type PlayerKind =
   // Daily-digest items (#31 builds the digest email from these): in the app
   // and by push only for now.
   | "match_scheduled"
-  | "match_declined";
+  | "match_declined"
+  | "match_cancelled"
+  // Reminders (#31): digest items, except "holnap meccs", which is instant.
+  | "match_no_proposal"
+  | "match_week_end"
+  | "match_deadline_soon"
+  | "match_tomorrow";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
-export const DIGEST_KINDS: readonly PlayerKind[] = ["match_scheduled", "match_declined"];
+// The digest is built from this list alone, so a kind added here is in it.
+export const DIGEST_KINDS: readonly PlayerKind[] = [
+  "match_scheduled",
+  "match_declined",
+  "match_cancelled",
+  "match_no_proposal",
+  "match_week_end",
+  "match_deadline_soon",
+];
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -241,6 +255,18 @@ export function matchDeclinedMessage(input: { matchId: number; slot: Date }): Me
   return {
     title: "Nem erősítették meg az időpontot",
     body: `Az ellenfeletek szerint nem ${formatDeadline(input.slot)} a meccs. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the other pair: the scheduled slot was cancelled (#27, digest item). A
+// late cancellation says the cancelling pair proposes next (spec 6.6).
+export function matchCancelledMessage(input: { matchId: number; slot: Date; late: boolean }): Message {
+  return {
+    title: "Lemondták a meccset",
+    body: input.late
+      ? `Az ellenfeletek 24 órán belül lemondta a ${formatDeadline(input.slot)} időpontot. Nekik kell új időpontokat ajánlaniuk.`
+      : `Az ellenfeletek lemondta a ${formatDeadline(input.slot)} időpontot. Egyeztessetek újra.`,
     url: matchUrl(input.matchId),
   };
 }

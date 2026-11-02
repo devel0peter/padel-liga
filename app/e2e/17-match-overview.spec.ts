@@ -43,12 +43,14 @@ test("23. Meccsek: every match with its status, the stuck filter, one match's lo
   await expect(main.getByRole("heading", { name: /divízió, 2\. csoport$/ })).toBeVisible();
   const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Napló és telefonszámok" }) });
   await expect(rows).toHaveCount(matchCount);
-  // Steps 18 and 19 scheduled anna's two matches; the backdated one waits.
-  await expect(main.getByText(/^Lefixálva: /)).toHaveCount(2);
+  // Step 19 scheduled anna's second match; her first (step 18) was cancelled
+  // late in step 24 (15-matches). The backdated one waits.
+  await expect(main.getByText(/^Lefixálva: /)).toHaveCount(1);
+  await expect(main.getByText(/^Későn lemondták, .* ajánl új időpontot$/)).toHaveCount(1);
   await expect(main.getByText(/^Időpontokat ajánlottak, .* válaszára vár$/)).toHaveCount(1);
-  // Step 19's agreed time was recorded and confirmed: both pairs stepped.
-  // Step 18's was proposed and accepted: accepting isn't valid activity.
-  await expect(main.getByText(/Mindkét pár lépett$/)).toHaveCount(1);
+  // Step 19's agreed time was recorded and confirmed: both pairs stepped. On
+  // step 18's match the opponents recorded an agreed time in step 24 too.
+  await expect(main.getByText(/Mindkét pár lépett$/)).toHaveCount(2);
   await expect(main).not.toContainText("@example.test");
   await expect(main.locator('a[href^="tel:"]')).toHaveCount(0);
 
@@ -65,7 +67,7 @@ test("23. Meccsek: every match with its status, the stuck filter, one match's lo
   await main.getByRole("combobox", { name: "Állapot" }).click();
   await page.getByRole("option", { name: "Lefixálva" }).click();
   await expect(page).toHaveURL(/status=scheduled/);
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(1);
   await expect(main.getByRole("button", { name: "Elakadtak (0)" })).toBeVisible();
 
   // Step 19's match: both pairs active, four phones, the log.

@@ -334,7 +334,21 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
 
-### 22. A pair records the result, the other confirms
+### 22. A visitor looks at the league page (public)
+
+The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
+
+- Page: `/`, then `/league/minta`
+- Account: none (logged out)
+- Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
+- Expect:
+  - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
+  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
+  - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
+  - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
+  - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
+
+### 23. A pair records the result, the other confirms
 
 - Page: the match of step 18 (`/matches/<id>`), then the same as an opponent
 - Accounts: the player of step 17, then one of the opponents
@@ -344,10 +358,10 @@ A player without a pair sends their own link; the partner registers and accepts 
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
   - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések".
-  - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 23).
+  - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 24).
   - A result nobody answers is accepted by the hourly cron 48 hours after it was recorded; locally the cron doesn't run.
 
-### 23. The other pair disputes a result, the Szervező decides
+### 24. The other pair disputes a result, the Szervező decides
 
 - Page: the match of step 19, then `/admin/leagues/minta/disputes` ("Viták" in the sidebar) and its "Döntök" link
 - Accounts: the player of step 17, one of the opponents, then `szervezo@example.test`

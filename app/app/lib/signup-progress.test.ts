@@ -12,6 +12,7 @@ import {
   personStage,
   signupEmails,
   signupStages,
+  stageRecipients,
   stageCounts,
   STAGES,
   type ProgressContext,
@@ -140,5 +141,37 @@ describe("the Hol tart filter", () => {
     expect(parseStage(new URLSearchParams("stage=no_pair"))).toBe("no_pair");
     expect(parseStage(new URLSearchParams("stage=hack"))).toBeNull();
     expect(parseStage(new URLSearchParams(""))).toBeNull();
+  });
+});
+
+describe("a broadcast to one stage", () => {
+  const base = { city: "gyor", status: "new" as const, invitedAt: null, invited2At: null };
+  const rows = [
+    { ...base, id: 1, mode: "pair" as const, name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", invitedAt: new Date(), invited2At: new Date() },
+    { ...base, id: 2, mode: "pair" as const, name1: "Cecil", email1: "c@x.hu", name2: "Dóra", email2: "d@x.hu" },
+    // Anna again: mailed once.
+    { ...base, id: 3, mode: "solo" as const, name1: "Anna", email1: "A@x.hu", name2: null, email2: null },
+    { ...base, id: 4, mode: "solo" as const, name1: "Ede", email1: "e@x.hu", name2: null, email2: null, status: "withdrawn" as const },
+  ];
+  const status = new Map<string, PlayerStatus>([
+    ["c@x.hu", registered()],
+    ["d@x.hu", registered()],
+  ]);
+  const ctx = progressContext(rows, status, [{ id: 1, city: "gyor" }]);
+
+  it("goes to the people at the stage only, each address once", () => {
+    expect(stageRecipients(rows, "no_pair", ctx)).toEqual([
+      { email: "c@x.hu", name: "Cecil" },
+      { email: "d@x.hu", name: "Dóra" },
+    ]);
+  });
+
+  it("never to a signup's partner who hasn't registered", () => {
+    // Béla got the invite but has no account: only Anna, the signer.
+    expect(stageRecipients(rows, "no_account", ctx)).toEqual([{ email: "a@x.hu", name: "Anna" }]);
+  });
+
+  it("never to the withdrawn", () => {
+    expect(stageRecipients(rows, "withdrawn", ctx)).toEqual([]);
   });
 });

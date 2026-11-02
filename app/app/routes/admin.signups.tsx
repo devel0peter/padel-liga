@@ -62,6 +62,7 @@ import {
   filterByStage,
   FUNNEL,
   inviteChip,
+  NO_MAIL_STAGES,
   parseStage,
   progressContext,
   signupStages,
@@ -318,8 +319,6 @@ function SignupTableRow({
   );
 }
 
-const STAGE_NO_MAIL = "A „Hol tart” szűrővel nem küldhetsz levelet és nem tölthetsz le CSV-t.";
-
 // "Hol tartanak": people per stage (signup-progress.ts), each a link that
 // filters the list to the signups with someone at that stage.
 function StageSummary({ counts }: { counts: Record<Stage, number> }) {
@@ -415,9 +414,9 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
   const { rows, counts, stages, total, refs, clubOptions, cityOptions, invitesPending } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
-  // Mail and CSV go by the signup filters only (filterSignups), so not with
-  // "Hol tart": a pair signup's two people can be at different stages.
-  const byStage = params.has("stage");
+  // With "Hol tart", the mail goes to the people at that stage (D58); never
+  // to the withdrawn.
+  const noMail = NO_MAIL_STAGES.some((s) => params.get("stage") === s);
 
   return (
     <AppPage
@@ -431,29 +430,22 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
       actions={
         <>
           <InviteButton pending={invitesPending} />
-          {byStage ? (
-            <>
-              <Button variant="outline" disabled title={STAGE_NO_MAIL}>
-                <Mail /> Levél nekik
-              </Button>
-              <Button variant="outline" disabled title={STAGE_NO_MAIL}>
-                <Download /> CSV letöltése
-              </Button>
-            </>
+          {noMail ? (
+            <Button variant="outline" disabled title="Aki visszalépett, nem kap levelet.">
+              <Mail /> Levél nekik
+            </Button>
           ) : (
-            <>
-              <Button variant="outline" asChild>
-                <Link to={`/admin/broadcasts/new?${params.toString()}`}>
-                  <Mail /> Levél nekik
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href={`/admin/export.csv?${params.toString()}`} download>
-                  <Download /> CSV letöltése
-                </a>
-              </Button>
-            </>
+            <Button variant="outline" asChild>
+              <Link to={`/admin/broadcasts/new?${params.toString()}`}>
+                <Mail /> Levél nekik
+              </Link>
+            </Button>
           )}
+          <Button variant="outline" asChild>
+            <a href={`/admin/export.csv?${params.toString()}`} download>
+              <Download /> CSV letöltése
+            </a>
+          </Button>
         </>
       }
     >

@@ -232,13 +232,6 @@
       "when": 1793651511385,
       "tag": "0035_match_venue_reminders",
       "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "6",
-      "when": 1793658971212,
-      "tag": "0037_match_results",
-      "breakpoints": true
     }
   ]
 }

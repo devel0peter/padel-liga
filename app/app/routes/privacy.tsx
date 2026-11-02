@@ -105,8 +105,9 @@ export default function Privacy() {
                 is (kinek az e-mail-címére, mikor, és elfogadták-e),
               </li>
               <li>
-                a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
-                döntése az üzenetével együtt,
+                a párotok nevezései a szezonokra (mikor neveztetek, melyik körtől
+                játszotok), és ha korábban a szervező döntött róluk, a döntése az
+                üzenetével együtt,
               </li>
               <li>
                 az értesítéseid listája, és hogy e-mailben, push értesítésben

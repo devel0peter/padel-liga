@@ -3,6 +3,7 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { runAfterResponse } from "~/lib/background.server";
 import {
   accountInvites,
   broadcasts,
@@ -224,9 +225,16 @@ export async function queueGroupsPublished(
 export { SEND_NOW_MAX };
 
 // Sends the first SEND_NOW_MAX of the emails just queued, within the daily
-// limit; the cron sends the rest.
+// limit; the cron sends the rest. Personal emails: the request waits for it.
 async function deliverNow(ids: number[]): Promise<void> {
   if (ids.length > 0) await deliver(ids.slice(0, SEND_NOW_MAX));
+}
+
+// Bulk mail (BULK_KINDS: broadcasts, registration invites, #140): the same
+// send, but after the response, so the Admin's click answers at once. The
+// claim in deliver() keeps an overlapping cron run from sending any twice.
+function deliverAfterResponse(ids: number[]): void {
+  if (ids.length > 0) runAfterResponse("bulk send", () => deliverNow(ids));
 }
 
 export async function createBroadcast(input: {
@@ -260,7 +268,7 @@ export async function createBroadcast(input: {
       };
     }),
   );
-  await deliverNow(await enqueue(messages));
+  deliverAfterResponse(await enqueue(messages));
   return id;
 }
 
@@ -341,7 +349,8 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // none of them and nobody is invited twice. Then, in one D1 batch (a
 // transaction): the emails and the account_invites rows (so the link works
 // before registration opens). If that fails, the claim is released. Then
-// they are sent, within the daily limit (#112). Returns how many were queued.
+// they are sent after the response, within the daily limit (#112, #140).
+// Returns how many were queued.
 // `only`: just these (lowercase) addresses, e.g. the partner's address a
 // player just added (#96); the same rules apply. Never to an address with an
 // account (inviteRecipients), so the email switch (#115) has nothing to skip.
@@ -389,7 +398,7 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
     await markInvited(emails, null);
     throw e;
   }
-  await deliverNow(ids);
+  deliverAfterResponse(ids);
   return recipients.length;
 }
 

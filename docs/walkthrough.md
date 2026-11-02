@@ -135,7 +135,7 @@ Steps 1 to 12 are the main line. Steps 13 and 14 are side paths you can do any t
   - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
-  - The dialog says "Meghívók elindultak": "24 levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap." (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
+  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
   - The button is now disabled (everyone is invited once).
   - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
 

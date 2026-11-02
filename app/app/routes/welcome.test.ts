@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/cities.server", () => ({
   listedCities: async () => [{ slug: "gyor" }, { slug: "pecs" }],
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
@@ -22,6 +23,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const { createSession } = await import("~/lib/auth/session.server");
 const R = await import("~/routes/welcome");
 const P = await import("~/routes/profile");
@@ -110,6 +112,7 @@ describe("first-login page pre-filled from the signup (#130)", () => {
       R.action(args(post(cookie, { ...done, name: "Nagy Anna", level: "halado", [`partnerEmail-${id}`]: " Bela@X.hu " }))),
     );
     expect(to).toBe("/home");
+    await settleBackground();
     expect(all("select email2 from interest_signups where id = ?", id)).toEqual([{ email2: "bela@x.hu" }]);
     expect(all("select consent_at is not null as done from users where id = 'anna'")).toEqual([{ done: 1 }]);
     expect(all("select to_email from email_messages where kind = 'registration_invite'")).toEqual([{ to_email: "bela@x.hu" }]);

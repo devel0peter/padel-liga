@@ -2,6 +2,7 @@
 // The list lives in the database (cities table, /admin/cities); these helpers
 // take it as an argument. Pure (no I/O): cities.server.ts loads the list.
 
+import { fold } from "./search";
 import { isSlug, slugify } from "./slug";
 
 export type City = { slug: string; name: string; listed: boolean };
@@ -10,10 +11,6 @@ export type City = { slug: string; name: string; listed: boolean };
 // typed city name, so we can see where demand is.
 export const OTHER_CITY = "other";
 
-function fold(s: string): string {
-  return s.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
-}
-
 // Whether `value` is one of `cities` (by slug).
 export function isCity(value: string, cities: readonly Pick<City, "slug">[]): boolean {
   return cities.some((c) => c.slug === value);
@@ -21,8 +18,8 @@ export function isCity(value: string, cities: readonly Pick<City, "slug">[]): bo
 
 // Maps a typed city name to one of `cities`, e.g. "gyor" -> Győr.
 export function findCity(name: string, cities: readonly Pick<City, "slug" | "name">[]): string | null {
-  const key = fold(name);
-  return cities.find((c) => fold(c.name) === key || c.slug === key)?.slug ?? null;
+  const key = fold(name.trim());
+  return cities.find((c) => fold(c.name.trim()) === key || c.slug === key)?.slug ?? null;
 }
 
 export function cityName(slug: string, cities: readonly Pick<City, "slug" | "name">[]): string {

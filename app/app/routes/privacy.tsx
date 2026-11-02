@@ -333,10 +333,11 @@ export default function Privacy() {
             <p>
               Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
               neked szóló leveleket, és a neved meg a címed mások
-              jelentkezéséből is. Ha épp egy kör közben kéred, amikor a párod
-              kihirdetett csoportban játszik, a kör végén törlünk. Ha leiratkoztál a levelekről, azt megtartjuk,
-              hogy erre a címre soha többé ne írjunk. A törlésről nem küldünk
-              levelet.
+              jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
+              közben kéred, amikor a párod kihirdetett csoportban játszik, a
+              kör végén törlünk. Ha leiratkoztál a levelekről, azt
+              megtartjuk, hogy erre a címre soha többé ne írjunk. A törlésről
+              nem küldünk levelet.
             </p>
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti

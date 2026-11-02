@@ -134,12 +134,16 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
   );
 }
 
+// The subject names the signer, and subjects stay in the outbox log: an
+// account deletion (#152) finds the rows by it.
+export const partnerNoticeSubject = (name1: string) => `${name1} jelentkeztetett titeket a ${SITE_NAME}ra`;
+
 // Spec section 17: the partner gets exactly one email, so they know about the
 // signup and can ask for deletion.
 export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
   if (!s.name2) throw new Error("partnerNotice needs a partner");
   return build(
-    `${s.name1} jelentkeztetett titeket a ${SITE_NAME}ra`,
+    partnerNoticeSubject(s.name1),
     [
       `Szia ${s.name2}!`,
       `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,

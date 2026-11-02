@@ -1,5 +1,6 @@
-import { and, eq, inArray, isNull, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import {
@@ -22,6 +23,7 @@ import {
   sessions,
   users,
 } from "~/db/schema";
+import { partnerNoticeSubject } from "~/lib/email/templates";
 import { audit } from "~/lib/leagues.server";
 import { dissolveStatements } from "~/lib/pairs.server";
 
@@ -30,6 +32,7 @@ import {
   DELETED_NAME,
   DELETION_REFUSALS,
   deletionPlan,
+  PARTNER_NOTICE_SUBJECT_REMOVED,
   type DeletionMode,
   type DeletionPlan,
 } from "./account-deletion";
@@ -63,11 +66,11 @@ export async function deletionFacts(now = new Date()): Promise<DeletionFacts> {
   return { history: new Set(rows.map((r) => r.id)), playing: new Set(rows.filter((r) => !!r.playing).map((r) => r.id)) };
 }
 
-type Target = { id: string; email: string; platformRole: "player" | "superadmin" };
+type Target = { id: string; email: string; name: string; platformRole: "player" | "superadmin" };
 
 async function target(userId: string): Promise<Target | undefined> {
   const [row] = await db
-    .select({ id: users.id, email: users.email, platformRole: users.platformRole })
+    .select({ id: users.id, email: users.email, name: users.name, platformRole: users.platformRole })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)));
   return row;
@@ -80,14 +83,75 @@ export async function planDeletion(actorId: string, userId: string, now = new Da
 
 const lower = (column: SQLWrapper) => sql`lower(${column})`;
 
+// What finds the stored mail to other people that names the deleted person
+// (review of #152): the partner notices their own pair signups sent (the
+// subject has their name) and their pair partners' addresses.
+type MailContext = { name: string; notices: { to: string; subject: string }[]; partnerEmails: string[] };
+
+async function mailContext(userId: string, email: string, name: string): Promise<MailContext> {
+  const partner = alias(users, "deleted_partner");
+  const [signups, partners] = await Promise.all([
+    db
+      .select({ name1: interestSignups.name1, email2: interestSignups.email2 })
+      .from(interestSignups)
+      .where(and(eq(lower(interestSignups.email1), email), eq(interestSignups.mode, "pair"), isNotNull(interestSignups.email2))),
+    db
+      .selectDistinct({ email: partner.email })
+      .from(pairs)
+      .innerJoin(partner, sql`${partner.id} = case when ${pairs.playerA} = ${userId} then ${pairs.playerB} else ${pairs.playerA} end`)
+      .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))),
+  ]);
+  return {
+    name: name.trim(),
+    notices: signups.map((s) => ({ to: s.email2!.toLowerCase(), subject: partnerNoticeSubject(s.name1) })),
+    partnerEmails: partners.map((p) => p.email.toLowerCase()),
+  };
+}
+
+// Stored mail to other people that names the deleted person. A sent mail
+// keeps only its subject (the body is cleared on sending), so only the
+// partner notice's subject is rewritten; an unsent one is deleted, as the
+// signup or partner it is about is gone: the partner notices, any mail whose
+// text has their address (a solo pair introduction), and an entry decision
+// or group mail to a pair partner that has their name.
+function otherPeoplesMail(email: string, mail: MailContext, mine: (c: SQL | undefined) => SQL | undefined) {
+  const unsent = ne(emailMessages.status, "sent");
+  const notice = (n: MailContext["notices"][number]) =>
+    and(eq(emailMessages.kind, "partner_notice"), eq(lower(emailMessages.toEmail), n.to), eq(emailMessages.subject, n.subject));
+  return [
+    ...mail.notices.flatMap((n) => [
+      db.delete(emailMessages).where(mine(and(notice(n), unsent))),
+      db.update(emailMessages).set({ subject: PARTNER_NOTICE_SUBJECT_REMOVED }).where(mine(notice(n))),
+    ]),
+    db.delete(emailMessages).where(mine(and(unsent, sql`instr(lower(coalesce(${emailMessages.text}, '')), ${email}) > 0`))),
+    ...(mail.name && mail.partnerEmails.length > 0
+      ? [
+          db
+            .delete(emailMessages)
+            .where(
+              mine(
+                and(
+                  unsent,
+                  inArray(emailMessages.kind, ["season_entry_decision", "groups_published"]),
+                  inArray(emailMessages.toEmail, mail.partnerEmails),
+                  sql`instr(coalesce(${emailMessages.text}, ''), ${mail.name}) > 0`,
+                ),
+              ),
+            ),
+        ]
+      : []),
+  ];
+}
+
 // Everything personal tied to the account or its address, other than the
 // users row and the pairs. `guard`: a condition every statement waits for
 // (on anonymize: that the users row was anonymized in the same batch).
 // The unsubscribe (email_suppressions) stays, so the address is never
 // mailed again.
-function personalDataStatements(userId: string, email: string, guard: SQL) {
-  const mine = <T extends SQL | undefined>(c: T) => and(c, guard);
+function personalDataStatements(userId: string, email: string, mail: MailContext, guard: SQL) {
+  const mine = (c: SQL | undefined) => and(c, guard);
   return [
+    ...otherPeoplesMail(email, mail, mine),
     db.delete(sessions).where(mine(eq(sessions.userId, userId))),
     db.delete(oauthAccounts).where(mine(eq(oauthAccounts.userId, userId))),
     db.delete(pushSubscriptions).where(mine(eq(pushSubscriptions.userId, userId))),
@@ -138,13 +202,17 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
   const [row, plan] = await Promise.all([target(userId), planDeletion(actorId, userId, now)]);
   if (!plan.ok || !row) return { ok: false, error: DELETION_REFUSALS[plan.ok ? "gone" : plan.refusal] };
   const email = row.email.toLowerCase();
-  const done = plan.mode === "remove" ? await remove(userId, email) : await anonymize(actorId, userId, email, now);
+  const mail = await mailContext(userId, email, row.name);
+  const done = plan.mode === "remove" ? await remove(userId, email, mail) : await anonymize(actorId, userId, email, mail, now);
   if (!done) {
     // Something changed since the check: say why from the state now.
     const again = await planDeletion(actorId, userId, now);
     return { ok: false, error: again.ok ? CHANGED : DELETION_REFUSALS[again.refusal] };
   }
-  // Who and when only: no name or email of the deleted person.
+  // Who and when only: no name or email of the deleted person. The pairs
+  // an anonymize dissolved are logged as any dissolve.
+  if (done !== true)
+    for (const p of done) await audit(actorId, "pair.dissolve", `pair:${p.id}`, `league:${p.leagueId}; account deleted`);
   await audit(actorId, plan.mode === "remove" ? "account.delete" : "account.anonymize", `user:${userId}`);
   return { ok: true, mode: plan.mode };
 }
@@ -155,7 +223,7 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
 // notifications, pair links, partner search). If a pair of theirs got into a
 // published group in the meantime it stays, and the account's delete fails
 // on its foreign key, so the whole batch rolls back.
-async function remove(userId: string, email: string): Promise<boolean> {
+async function remove(userId: string, email: string, mail: MailContext): Promise<boolean> {
   const theirPairs = db
     .select({ id: pairs.id })
     .from(pairs)
@@ -177,7 +245,7 @@ async function remove(userId: string, email: string): Promise<boolean> {
           ),
         ),
       db.delete(users).where(eq(users.id, userId)),
-      ...personalDataStatements(userId, email, sql`1`),
+      ...personalDataStatements(userId, email, mail, sql`1`),
     ] as unknown as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   } catch (e) {
     if (/FOREIGN KEY/i.test(String(e))) return false;
@@ -189,10 +257,17 @@ async function remove(userId: string, email: string): Promise<boolean> {
 // History: the account stays as "Törölt játékos" without contact data or a
 // way to log in, and its active pairs are dissolved (their unplayed entries
 // withdrawn, D19). The first statement only runs while no pair of theirs
-// plays in a running phase; everything after it waits for it.
-async function anonymize(actorId: string, userId: string, email: string, now: Date): Promise<boolean> {
+// plays in a running phase; everything after it waits for it. Returns the
+// pairs it dissolved, or false when nothing changed.
+async function anonymize(
+  actorId: string,
+  userId: string,
+  email: string,
+  mail: MailContext,
+  now: Date,
+): Promise<{ id: number; leagueId: number }[] | false> {
   const active = await db
-    .select({ id: pairs.id })
+    .select({ id: pairs.id, leagueId: pairs.leagueId })
     .from(pairs)
     .where(and(eq(pairs.status, "active"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))));
   const gone = sql`exists (select 1 from users where users.id = ${userId} and users.deleted_at is not null)`;
@@ -212,7 +287,7 @@ async function anonymize(actorId: string, userId: string, email: string, now: Da
       .where(and(eq(users.id, userId), isNull(users.deletedAt), eq(users.platformRole, "player"), sql`not ${inPublishedGroup(userId, now)}`))
       .returning({ id: users.id }),
     ...active.flatMap((p) => dissolveStatements(actorId, p.id, now, gone)),
-    ...personalDataStatements(userId, email, gone),
+    ...personalDataStatements(userId, email, mail, gone),
   ]);
-  return updated.length > 0;
+  return updated.length > 0 ? active : false;
 }

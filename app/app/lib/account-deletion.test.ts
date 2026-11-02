@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { anonymizedEmail, deletionPlan, type DeletionCheck } from "./account-deletion";
+import { anonymizedEmail, deletionPlan, isAnonymizedEmail, type DeletionCheck } from "./account-deletion";
 
 const check = (over: Partial<DeletionCheck> = {}): DeletionCheck => ({
   actorId: "admin",
@@ -37,5 +37,14 @@ describe("anonymizedEmail", () => {
   it("is unique per account and undeliverable", () => {
     expect(anonymizedEmail("abc")).toBe("deleted-abc@deleted.invalid");
     expect(anonymizedEmail("abc")).not.toBe(anonymizedEmail("abd"));
+  });
+});
+
+describe("isAnonymizedEmail", () => {
+  it("knows the placeholder, and nothing else", () => {
+    expect(isAnonymizedEmail(anonymizedEmail("abc"))).toBe(true);
+    expect(isAnonymizedEmail(" Deleted-ABC@Deleted.Invalid ")).toBe(true);
+    expect(isAnonymizedEmail("deleted@example.com")).toBe(false);
+    expect(isAnonymizedEmail("someone@deleted.invalid.hu")).toBe(false);
   });
 });

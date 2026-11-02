@@ -15,7 +15,8 @@ vi.mock("~/lib/email/outbox.server", () => ({
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const D = await import("~/lib/account-deletion.server");
-const { DELETED_NAME, DELETION_REFUSALS } = await import("~/lib/account-deletion");
+const { DELETED_NAME, DELETION_REFUSALS, PARTNER_NOTICE_SUBJECT_REMOVED } = await import("~/lib/account-deletion");
+const { partnerNoticeSubject } = await import("~/lib/email/templates");
 const { pairCandidates } = await import("~/lib/pairs.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
 
@@ -72,6 +73,27 @@ function freshDb() {
   signup.run(12, "solo", "C", "c@x.hu", null, null, 11, null);
   signup.run(13, "pair", "D", "d@x.hu", "A", "a@x.hu", null, 1);
   h.raw.exec(`update interest_signups set status = 'paired' where id in (11, 12)`);
+  // Mail stored for other people that names a (review of #152): the partner
+  // notice a's pair signup sent b (sent: subject only), one from someone
+  // else, a's solo introduction to c (unsent, has a's address), an entry
+  // decision to the partner b (unsent, has a's name) and one to c, who
+  // isn't a's partner.
+  h.raw.exec(`update users set name = 'Anna Teszt' where id = 'a'`);
+  const mail = h.raw.prepare("insert into email_messages (id, kind, to_email, subject, text, status) values (?, ?, ?, ?, ?, ?)");
+  mail.run(100, "partner_notice", "b@x.hu", partnerNoticeSubject("A"), null, "sent");
+  mail.run(101, "partner_notice", "b@x.hu", partnerNoticeSubject("Zoli"), null, "sent");
+  mail.run(102, "pair_intro", "c@x.hu", "Találtunk neked párt", "Az e-mail-címe: a@x.hu", "pending");
+  mail.run(103, "season_entry_decision", "b@x.hu", "Jóváhagyták", "Szia B! Anna Teszt és te nevezhettek.", "pending");
+  mail.run(104, "season_entry_decision", "c@x.hu", "Jóváhagyták", "Szia C! Anna Teszt is nevezett.", "pending");
+}
+
+// What is left of other people's mail (ids 100 to 104 above).
+function otherPeoplesMailAfter() {
+  expect(all("select id, subject from email_messages where id >= 100 order by id")).toEqual([
+    { id: 100, subject: PARTNER_NOTICE_SUBJECT_REMOVED },
+    { id: 101, subject: partnerNoticeSubject("Zoli") },
+    { id: 104, subject: "Jóváhagyták" },
+  ]);
 }
 
 // Pair 1 (a + b) placed in phase 1's published group 1, with a match.
@@ -128,7 +150,11 @@ function interestListAfter() {
     email2: null,
     invited2_at: null,
   });
-  expect(n("select count(*) from email_messages where to_email = 'b@x.hu'")).toBe(1);
+  expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and kind = 'login_code'")).toBe(1);
+  otherPeoplesMailAfter();
+  // Nothing anywhere has a's address or name, but the kept unsubscribe.
+  expect(n("select count(*) from email_messages where instr(lower(coalesce(text, '') || subject || to_email), 'a@x.hu') > 0")).toBe(0);
+  expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and instr(coalesce(text, '') || subject, 'Anna Teszt') > 0")).toBe(0);
   // The unsubscribe stays, so the address is never mailed again.
   expect(n("select count(*) from email_suppressions where email = 'a@x.hu'")).toBe(1);
 }
@@ -189,7 +215,8 @@ describe("deleting an account (#152)", () => {
     interestListAfter();
     expect((await pairCandidates(1)).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
-    expect(all("select action, target, detail from audit_log where action like 'account.%'")).toEqual([
+    expect(all("select action, target, detail from audit_log where action like 'account.%' or action like 'pair.%' order by id")).toEqual([
+      { action: "pair.dissolve", target: "pair:1", detail: "league:1; account deleted" },
       { action: "account.anonymize", target: "user:a", detail: null },
     ]);
     // Twice: already gone.
@@ -199,10 +226,12 @@ describe("deleting an account (#152)", () => {
   it("refuses while their pair plays in a published group whose phase hasn't ended", async () => {
     publishPairOne();
     expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.playing });
-    expect(one("select name, email from users where id = 'a'")).toEqual({ name: "A", email: "a@x.hu" });
+    expect(one("select name, email from users where id = 'a'")).toEqual({ name: "Anna Teszt", email: "a@x.hu" });
     expect(n("select count(*) from sessions where user_id = 'a'")).toBe(1);
     expect(one("select status from pairs where id = 1").status).toBe("active");
     expect(n("select count(*) from interest_signups")).toBe(4);
+    expect(all("select subject from email_messages where id = 100")).toEqual([{ subject: partnerNoticeSubject("A") }]);
+    expect(n("select count(*) from email_messages where id >= 100")).toBe(5);
   });
 
   it("refuses the Admin's own account and another Admin's", async () => {

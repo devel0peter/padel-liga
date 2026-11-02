@@ -20,6 +20,15 @@ export function anonymizedEmail(userId: string): string {
   return `deleted-${userId}@deleted.invalid`;
 }
 
+// Such an address never gets a login code (it can't receive one anyway).
+export function isAnonymizedEmail(email: string): boolean {
+  return /@deleted\.invalid$/i.test(email.trim());
+}
+
+// The logged subject of a partner notice the deleted person's signup sent,
+// in place of the one that names them.
+export const PARTNER_NOTICE_SUBJECT_REMOVED = "Párként jelentkeztettek (a jelentkező törölte az adatait)";
+
 export type DeletionRefusal = "self" | "admin" | "playing" | "gone";
 
 export const DELETION_REFUSALS: Record<DeletionRefusal, string> = {

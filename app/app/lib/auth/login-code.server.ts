@@ -2,6 +2,7 @@ import { and, count, eq, gt, lt, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, emailMessages, emailSuppressions, loginCodes, users } from "~/db/schema";
+import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { dailyLimit, queueLoginCode } from "~/lib/email/outbox.server";
 
 import { createUser, findUserIdByEmail } from "./accounts.server";
@@ -66,8 +67,9 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
   // (#113). The bot check (login route) and the code limits stay. No code and
   // no error when the address may not get one (mayEmailCode): an error would
   // tell anyone which addresses have an account.
+  // A deleted account's placeholder address (#152) never gets one either.
   const now = new Date();
-  if (!(await mayEmailCode(email, now))) return { ok: true, email };
+  if (isAnonymizedEmail(email) || !(await mayEmailCode(email, now))) return { ok: true, email };
 
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
   const decision = codeSendDecision(existing ?? null, now);

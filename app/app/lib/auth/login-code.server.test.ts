@@ -39,6 +39,13 @@ describe("open sign-up (#113)", () => {
     expect(h.codes.map((c) => c.to)).toEqual(["uj.jatekos@example.com"]);
   });
 
+  it("sends none to a deleted account's placeholder address, but looks the same (#152)", async () => {
+    run("insert into users (id, email, name, deleted_at) values ('x', 'deleted-x@deleted.invalid', 'Törölt játékos', 1)");
+    expect(await L.sendLoginCode("deleted-x@deleted.invalid")).toEqual({ ok: true, email: "deleted-x@deleted.invalid" });
+    expect(h.codes).toEqual([]);
+    expect(all("select email from login_codes")).toEqual([]);
+  });
+
   it("creates the account when the code is right", async () => {
     await L.sendLoginCode("uj.jatekos@example.com");
     const result = await L.verifyLoginCode("uj.jatekos@example.com", h.codes[0]!.code);

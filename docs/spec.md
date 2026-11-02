@@ -64,6 +64,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.
 
+- **"Párt keresek"** (README decision log, 2026-11-02, D59): while a registered player has no pair in a league, Párom and Kezdőlap show a switch to ask the organizer for a partner. It is on by default for someone whose solo signup is still waiting, or whose solo partner registered while the two have no pair, and off for everyone else. Párkeresők lists the registered players with it on and no pair ("Regisztráltak"). Two of them become an active pair at once, with an in-app message and no email. Solo signups whose person hasn't registered yet are paired as before ("Még nem regisztráltak").
 ## 5. Fixtures
 - Groups of 4 give 3 rounds per phase, 2 matches per round, and each pair plays once a week.
 - Round order is generated automatically: week 1 is 1–4 and 2–3, week 2 is 1–3 and 2–4, week 3 is 1–2 and 3–4, based on seeding.

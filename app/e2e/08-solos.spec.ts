@@ -8,7 +8,7 @@ test("13. the Szervező pairs the waiting solos on Párkeresők", async ({ brows
   const [boglarka, akos] = WAITING_SOLOS;
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta/solos");
-  await expect(content(page)).toContainText("2 egyedül jelentkező keres párt, 1 párt hoztál össze");
+  await expect(content(page)).toContainText("0 regisztrált és 2 még nem regisztrált játékos keres párt, 1 párt hoztál össze");
   await expect(content(page)).not.toContainText("@example.test");
 
   await page.getByRole("checkbox", { name: `${boglarka.name} kijelölése` }).check();
@@ -16,7 +16,7 @@ test("13. the Szervező pairs the waiting solos on Párkeresők", async ({ brows
   const offset = logOffset();
   await page.getByRole("button", { name: "Párba teszem (2/2)" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Párba teszem" }).click();
-  await expect(content(page)).toContainText("0 egyedül jelentkező keres párt, 2 párt hoztál össze");
+  await expect(content(page)).toContainText("0 regisztrált és 0 még nem regisztrált játékos keres párt, 2 párt hoztál össze");
   await context.close();
 
   // Both get the introduction at once (#112), and the log counts it.

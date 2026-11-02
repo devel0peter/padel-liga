@@ -4,6 +4,7 @@ import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
 import { PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
+import { PartnerSearchBox } from "~/components/partner-search";
 import { PartnerEmailBox } from "~/components/partner-email";
 import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -14,6 +15,7 @@ import { formatDeadline, formatShortDate } from "~/lib/format";
 import { listedCities } from "~/lib/cities.server";
 import { listLeagues } from "~/lib/leagues.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
+import { partnerSearchState } from "~/lib/partner-search.server";
 import { homeSeasons } from "~/lib/seasons";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
@@ -56,14 +58,21 @@ export async function loader({ request }: Route.LoaderArgs) {
     phases: s.phases,
     entry: views.get(s.id) ?? null,
   }));
+  // No pair in a league: the player's own link to invite one (2026-10-31),
+  // first thing after the first-login page, and "Párt keresek" (D59).
+  const links = await pairLinkBoxes(user);
+  const searching = await partnerSearchState(user, links.map((l) => l.league));
   return {
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
     // The signup named a partner without an email (#96): the box to add it.
     missingEmails: (await missingPartnerEmails(user)).map(({ signupId, name }) => ({ signupId, name })),
-    // No pair in a league: the player's own link to invite one (2026-10-31),
-    // first thing after the first-login page.
-    pairLinks: (await pairLinkBoxes(user)).map((l) => ({ league: l.league.name, url: new URL(request.url).origin + pairLinkPath(l.token) })),
+    pairLinks: links.map((l) => ({
+      leagueId: l.league.id,
+      league: l.league.name,
+      url: new URL(request.url).origin + pairLinkPath(l.token),
+      seeking: searching.get(l.league.id) ?? false,
+    })),
     multiLeague: leagueName.size > 1,
     seasons,
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
@@ -98,7 +107,10 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
         </section>
       )}
       {d.pairLinks.map((l) => (
-        <PairLinkBox key={l.url} url={l.url} league={d.multiLeague ? l.league : undefined} />
+        <div key={l.url} className="grid gap-4">
+          <PairLinkBox url={l.url} league={d.multiLeague ? l.league : undefined} />
+          <PartnerSearchBox leagueId={l.leagueId} seeking={l.seeking} />
+        </div>
       ))}
       {d.missingEmails.map((m) => (
         <PartnerEmailBox key={m.signupId} signupId={m.signupId} name={m.name} />

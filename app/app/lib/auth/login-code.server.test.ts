@@ -63,7 +63,12 @@ describe("codes to new addresses (#113)", () => {
     expect(await L.sendLoginCode("bounced@example.com")).toEqual({ ok: true, email: "bounced@example.com" });
     expect(await L.sendLoginCode("spam@example.com")).toEqual({ ok: true, email: "spam@example.com" });
     expect(h.codes).toEqual([]);
-    expect(all("select email from login_codes")).toEqual([]);
+    // A code row nobody knows, under the same limits as a sent one (#123).
+    expect(all("select email, attempts, sent_in_window from login_codes order by email")).toEqual([
+      { email: "bounced@example.com", attempts: 0, sent_in_window: 1 },
+      { email: "spam@example.com", attempts: 0, sent_in_window: 1 },
+    ]);
+    expect(await L.verifyLoginCode("bounced@example.com", "123456")).toEqual({ ok: false, error: "Ez nem jó kód. Nézd meg újra a levelet." });
   });
 
   it("still sends to a new address that only unsubscribed from bulk mail", async () => {
@@ -83,7 +88,9 @@ describe("codes to new addresses (#113)", () => {
     h.limit = 20; // cap 5
     for (let i = 1; i <= 7; i++) await L.sendLoginCode(`bot${i}@example.com`);
     expect(h.codes.map((c) => c.to)).toEqual([1, 2, 3, 4, 5].map((i) => `bot${i}@example.com`));
-    expect(all("select count(*) as n from login_codes")).toEqual([{ n: 5 }]);
+    // The two past the cap get a code row nobody knows, and no email (#123).
+    expect(all("select count(*) as n from login_codes")).toEqual([{ n: 7 }]);
+    expect(all("select count(*) as n from email_messages")).toEqual([{ n: 5 }]);
   });
 
   it("past the cap still sends to accounts and invited addresses", async () => {

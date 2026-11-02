@@ -70,7 +70,8 @@ test("the page fits a 390 px phone", async ({ browser }) => {
   const page = await context.newPage();
   await visit(page, "/league/minta");
   await expect(content(page).getByRole("region", { name: "Bronz divízió" })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  // A string, since the suite's tsconfig has no DOM types.
+  const overflow = await page.evaluate<number>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
   expect(overflow).toBeLessThanOrEqual(0);
   await context.close();
 });

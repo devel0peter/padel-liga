@@ -80,6 +80,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       b: matches.pairB,
       week: matches.week,
       scheduledAt: matches.scheduledAt,
+      status: matches.status,
+      outcome: matches.outcome,
     })
     .from(matches)
     .where(inArray(matches.groupId, phaseGroups))
@@ -95,11 +97,19 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         // Until Elo is kept the rating is the average starting Elo (D20).
         elo: averageStartingElo(m.levelA, m.levelB) ?? 0,
       })),
-    // The agreed time is stored (#26); results are not yet (#27), so the
-    // tables start at zero until they are.
+    // Only a final outcome counts (#186): confirmed, auto-accepted or decided
+    // by the organizer. A waiting or disputed result has no outcome on the
+    // match yet, and the status check keeps it that way whatever is stored.
     matches: played
       .filter((m) => m.groupId === g.id)
-      .map((m) => ({ id: m.id, a: m.a, b: m.b, week: m.week, scheduledAt: m.scheduledAt, outcome: null })),
+      .map((m) => ({
+        id: m.id,
+        a: m.a,
+        b: m.b,
+        week: m.week,
+        scheduledAt: m.scheduledAt,
+        outcome: m.status === "final" ? m.outcome : null,
+      })),
   }));
 }
 

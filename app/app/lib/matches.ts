@@ -26,6 +26,9 @@ export type Tone = "todo" | "waiting" | "done";
 
 export type StatusView = { label: string; tone: Tone };
 
+// The longest court name a player can type (#27).
+export const COURT_MAX = 40;
+
 // "Padel Arena, 2-es pálya": the venue and the court, if any (#27).
 export function venueLine(venue: string | null | undefined, court?: string | null): string | null {
   return venue ? [venue, court].filter(Boolean).join(", ") : null;

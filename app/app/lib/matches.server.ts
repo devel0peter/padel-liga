@@ -30,6 +30,7 @@ import {
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import { pairName } from "./groups";
+import { COURT_MAX } from "./matches";
 import { formatPhone } from "./phone";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
@@ -421,7 +422,6 @@ const SLOT_GONE = "Ez az időpont már nem választható. Frissítsd az oldalt."
 const NOT_SCHEDULED = "A meccsnek most nincs lefixált időpontja. Frissítsd az oldalt.";
 const STARTED = "A meccs időpontja már elkezdődött, nem lehet lemondani.";
 const NO_CLUB = "Válassz helyszínt a listából.";
-export const COURT_MAX = 40;
 const LONG_COURT = `A pálya legfeljebb ${COURT_MAX} karakter lehet.`;
 
 const secs = (d: Date) => Math.floor(d.getTime() / 1000);

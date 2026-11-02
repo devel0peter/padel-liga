@@ -25,8 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
-import { SCHEDULING_GUIDE, eventText, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
-import { COURT_MAX, matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { COURT_MAX, SCHEDULING_GUIDE, eventText, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
+import { matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
 import { SITE_NAME } from "~/lib/site";
 
 // A match (#25, #26): status, the opponents' phones, scheduling (propose,

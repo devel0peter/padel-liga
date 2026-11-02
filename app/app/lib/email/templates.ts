@@ -2,7 +2,7 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "../format";
+import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate, formatWeekdayDate } from "../format";
 import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
@@ -319,5 +319,115 @@ export function groupsPublished(input: {
     ],
     [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+export type StuckReminderInput = {
+  // reminders.ts: A no account yet, B first login not finished, C no pair,
+  // D no entry.
+  situation: "A" | "B" | "C" | "D";
+  to: string;
+  // The recipient's own address, for A's registration link.
+  email: string;
+  // A: the partner who already registered; C: the one who hasn't; D: the
+  // other player. Names only.
+  partner: string | null;
+  league: string;
+  season: string;
+  deadline: Date;
+  // The next phase that hasn't started.
+  nextRound: { number: number; startsAt: Date } | null;
+  // C: the player's own pair link, in full.
+  pairLink: string | null;
+  now: Date;
+};
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// The dates every reminder gives (#155): the registration deadline and the
+// next round's start; after the deadline (late entry) only the round.
+function reminderDates(input: StuckReminderInput, plural: boolean): string {
+  const round = input.nextRound
+    ? `${withArticle(input.nextRound.number)} kör ${formatWeekdayDate(input.nextRound.startsAt)} indul`
+    : null;
+  if (input.deadline > input.now)
+    return `Nevezési határidő: ${formatDeadline(input.deadline)}.${round ? ` ${capitalize(round)}.` : ""}`;
+  return `A határidő lejárt, de még ${plural ? "beszállhattok" : "beszállhatsz"}${round ? `: ${round}` : ""}.`;
+}
+
+// One automatic reminder per situation for someone stuck before entering a
+// season (#155). Names stay plain text; another person's email or phone is
+// never in it. Like every mail to many, it has an unsubscribe link.
+export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string): Email {
+  const hi = input.to.trim() ? `Szia ${input.to.trim()}!` : "Szia!";
+  const pairPage = `${SITE_URL}/pair`;
+  const registered = `Azért kaptad ezt a levelet, mert regisztráltál a ${SITE_URL.replace("https://", "")} oldalon.`;
+  const parts = (() => {
+    switch (input.situation) {
+      case "A": {
+        const link = registrationLink(input.email);
+        return {
+          subject: `Még nem regisztráltál – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Kaptál tőlem meghívót a ${SITE_NAME}ra, de még nem regisztráltál. Egy perc az egész, jelszó sem kell:`,
+            link,
+            input.partner ? `${input.partner} már regisztrált, csak rád vár.` : null,
+            reminderDates(input, false),
+          ],
+          links: [link],
+          reason: `Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`,
+        };
+      }
+      case "B": {
+        const login = `${SITE_URL}/login`;
+        return {
+          subject: `Fejezd be a regisztrációt – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Elkezdted a regisztrációt a ${SITE_NAME}on, de még nem fejezted be. Lépj be, és add meg a neved, a szinted és a telefonszámod:`,
+            login,
+            reminderDates(input, false),
+          ],
+          links: [login],
+          reason: registered,
+        };
+      }
+      case "C": {
+        const link = input.pairLink ?? pairPage;
+        return {
+          subject: `Küldd el a párlinkedet – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Még nincs párod (${input.league}). Küldd el a párlinkedet a párodnak: ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
+            link,
+            input.partner ? `${input.partner} még nem regisztrált: neki is küldd el.` : null,
+            `Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,
+            pairPage,
+            reminderDates(input, false),
+          ],
+          links: [link, pairPage],
+          reason: registered,
+        };
+      }
+      case "D":
+        return {
+          subject: `Nevezzetek a szezonra – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `${input.partner ?? "A"} pároddal még nem neveztetek (${input.season}, ${input.league}). Egyikőtök nyomja meg a „Nevezünk” gombot a Párom oldalon:`,
+            pairPage,
+            reminderDates(input, true),
+          ],
+          links: [pairPage],
+          reason: registered,
+        };
+    }
+  })();
+  return buildPlain(
+    parts.subject,
+    [...parts.paragraphs.filter((p): p is string => p !== null), SIGNATURE],
+    parts.links,
+    footer(parts.reason, unsubscribeUrl),
   );
 }

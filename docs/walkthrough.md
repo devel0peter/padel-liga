@@ -280,6 +280,18 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Both players' link boxes are gone; on "Párok" the pair's source is "linkkel". No email was queued.
   - The player's own link, opened by themselves, says "Ez a saját linked."
 
+### 17. Szervező checks the automatic reminders (side path)
+
+People stuck before entering get one reminder per situation, once the league's switch is on (#155).
+
+- Page: `/admin/leagues/minta/reminders` ("Emlékeztetők")
+- Account: Szervező
+- Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
+- Expect:
+  - Off by default. The table lists the four situations with "Most kapná", "Kiment" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
+  - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
+  - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

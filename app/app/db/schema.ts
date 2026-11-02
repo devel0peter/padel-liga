@@ -64,6 +64,7 @@ export const emailMessages = sqliteTable(
         "pair_dissolved",
         "season_entry_decision",
         "groups_published",
+        "stuck_reminder",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -246,6 +247,9 @@ export const leagues = sqliteTable("leagues", {
   city: text("city").notNull(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  // When the league's Szervező or the Admin switched on the automatic
+  // reminders for people stuck before entering (#155); null: off.
+  remindersOnAt: integer("reminders_on_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -565,6 +569,29 @@ export const seasonEntries = sqliteTable(
     uniqueIndex("season_entries_season_pair_idx").on(t.seasonId, t.pairId),
     index("season_entries_pair_idx").on(t.pairId),
   ],
+);
+
+// The automatic reminders already sent (#155, reminders.ts): one row per
+// reminder, so none goes out twice. `key` is "A:<email>", "B:<user id>",
+// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key holds
+// the address; deleting a signup deletes it (outbox.server.ts deleteMessagesTo).
+export const stuckReminders = sqliteTable(
+  "stuck_reminders",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    key: text("key").notNull().unique(),
+    situation: text("situation", { enum: ["A", "B", "C", "D"] }).notNull(),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    seasonId: integer("season_id").references(() => seasons.id, { onDelete: "set null" }),
+    // How many emails it queued (D: up to both players).
+    recipients: integer("recipients").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("stuck_reminders_league_idx").on(t.leagueId, t.situation)],
 );
 
 // A phase's groups (#24, D21), 1. csoport the strongest. Until published_at

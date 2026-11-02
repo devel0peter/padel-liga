@@ -12,6 +12,7 @@ import {
   interestSignups,
   leagues,
   notificationOptOuts,
+  stuckReminders,
   users,
 } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
@@ -35,8 +36,10 @@ import {
   registrationInvite,
   seasonEntryDecision,
   signupConfirmation,
+  stuckReminder,
   type Email,
   type PairIntroPerson,
+  type StuckReminderInput,
 } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
@@ -270,6 +273,21 @@ export async function createBroadcast(input: {
   );
   deliverAfterResponse(await enqueue(messages));
   return id;
+}
+
+// The automatic reminders for people stuck before entering (#155,
+// reminders.server.ts decides who): queued as bulk mail, after login codes
+// and personal emails, with an unsubscribe link. The cron that queued them
+// sends them in the same run. Returns the message ids.
+export async function queueStuckReminders(messages: { toEmail: string; input: StuckReminderInput }[]): Promise<number[]> {
+  const secret = emailSecret();
+  const queued = await Promise.all(
+    messages.map(async (m): Promise<NewMessage> => {
+      const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(m.toEmail, secret));
+      return { kind: "stuck_reminder", toEmail: m.toEmail, headers: unsubscribeHeaders(url), ...stuckReminder(m.input, url) };
+    }),
+  );
+  return enqueue(queued);
 }
 
 // Who would get the registration invite now (#20, audience.ts inviteRecipients).
@@ -658,8 +676,13 @@ export async function cancelUnsentSignupMail(emails: string[]): Promise<number> 
   return rows.length;
 }
 
-// Deletion request: remove the stored emails sent to these addresses.
+// Deletion request: remove the stored emails sent to these addresses, and
+// the record of an A reminder (#155), whose key holds the address.
 export async function deleteMessagesTo(emails: string[]) {
   if (emails.length === 0) return;
-  await db.delete(emailMessages).where(inArray(emailMessages.toEmail, emails.map((e) => e.toLowerCase())));
+  const lowered = emails.map((e) => e.toLowerCase());
+  await db.batch([
+    db.delete(emailMessages).where(inArray(emailMessages.toEmail, lowered)),
+    db.delete(stuckReminders).where(inArray(stuckReminders.key, lowered.map((e) => `A:${e}`))),
+  ]);
 }

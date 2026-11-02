@@ -6,7 +6,7 @@ import { leagueAdmins, leagues, oauthAccounts, users } from "~/db/schema";
 import { roleLabel, type RoleLabel } from "./auth/permissions";
 import { statusChips, type StatusChip } from "./player-status";
 import { playerStatuses } from "./player-status.server";
-import { matchesSearch } from "./search";
+import { userFacts, type UserFacts } from "./users-filter";
 
 // The Admin's user list (/admin/users). Never shown to anyone else: it has
 // email addresses (CLAUDE.md: no contact details on public pages).
@@ -20,13 +20,15 @@ export type UserRow = {
   consent: boolean;
   // Registered, what's missing, pair and entry per league (player-status.ts).
   status: StatusChip[];
+  // What the filters look at (users-filter.ts).
+  facts: UserFacts;
   // Null when not asked for (only the Admin sees it) or never recorded.
   lastLoginAt: Date | null;
   createdAt: Date;
 };
 
 // `withLastLogin`: only for the Admin (the route checks the role).
-export async function listUsers(q: string, { withLastLogin = false } = {}): Promise<UserRow[]> {
+export async function listUsers({ withLastLogin = false } = {}): Promise<UserRow[]> {
   const [rows, organized, google, statuses, leagueIds] = await Promise.all([
     db.select().from(users).orderBy(asc(users.name), asc(users.email)),
     db
@@ -40,19 +42,22 @@ export async function listUsers(q: string, { withLastLogin = false } = {}): Prom
   const withGoogle = new Set(google.map((g) => g.userId));
   // The league name on the pair chip only when there is more than one league.
   const withLeague = leagueIds.length > 1;
-  // Filtered here, not with LIKE (search.ts); hundreds of accounts at most.
-  return rows.filter((u) => matchesSearch(q, [u.name, u.email])).map((u) => {
+  // Searched and filtered in JavaScript (search.ts, users-filter.ts), not in
+  // SQL; hundreds of accounts at most.
+  return rows.map((u) => {
     const mine = organized.filter((o) => o.userId === u.id);
     const status = statuses.byId.get(u.id);
+    const role = roleLabel({ platformRole: u.platformRole, leagues: mine });
     return {
       id: u.id,
       name: u.name,
       email: u.email,
-      role: roleLabel({ platformRole: u.platformRole, leagues: mine }),
+      role,
       leagues: mine.map((l) => l.name),
       google: withGoogle.has(u.id),
       consent: !!u.consentAt,
       status: statusChips(status, undefined, withLeague),
+      facts: userFacts({ role, name: u.name, email: u.email }, status),
       lastLoginAt: withLastLogin ? u.lastLoginAt : null,
       createdAt: u.createdAt,
     };

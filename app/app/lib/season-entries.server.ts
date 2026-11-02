@@ -3,23 +3,22 @@ import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { leagues, pairs, seasonEntries, users } from "~/db/schema";
-import { queueSeasonEntryDecision } from "~/lib/email/outbox.server";
-import { seasonEntryDecisionMessage } from "~/lib/notifications";
+import { queueSeasonEntered } from "~/lib/email/outbox.server";
+import { seasonEntryMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
 import { audit } from "./leagues.server";
 import {
   averageStartingElo,
-  canDecide,
   checkEntry,
-  DECIDABLE_FROM,
   ENTRY_REFUSALS,
   entryOpen,
   entryView,
+  IN_RUNNING_PHASE,
   joinsPhase,
-  type Decision,
-  type EntryFilter,
+  noLevelRefusal,
+  ORGANIZER_ENTRY_REFUSALS,
   type EntryStatus,
   type EntryView,
 } from "./season-entries";
@@ -148,31 +147,204 @@ async function entryRefusal(user: User, season: Season, now: Date) {
   return { pair, refusal };
 }
 
+type Joins = { phase: number; startsAt: Date } | null;
+
+// Enters the pair at `now` (#153, D62): the entry counts at once, from the
+// joining phase. One statement re-checks that the pair is still active, both
+// players have a level and the same two players have no other entry here,
+// and that phase 1's groups weren't published meanwhile; the unique index
+// settles a double submit. A withdrawn entry of the same pair is entered
+// again (#154). Returns where the pair starts, or null when nothing changed.
+async function enter(
+  season: Season,
+  pair: { id: number; players: [string, string] },
+  decidedBy: string | null,
+  now: Date,
+): Promise<{ id: number; joins: Joins } | null> {
+  const [a, b] = pair.players;
+  // A pair entered once phase 1's groups are out starts at phase 2 (#24).
+  const published = (await groupsPublished(season.id)) ? [FIRST_PHASE] : [];
+  const phase = joinsPhase(season.phases, now, published);
+  const seconds = Math.floor(now.getTime() / 1000);
+  const inserted = await db.all(sql`insert into ${seasonEntries} (season_id, pair_id, status, joins_phase, decided_by, decided_at, updated_at)
+    select ${season.id}, ${pair.id}, 'approved', ${phase}, ${decidedBy}, ${seconds}, ${seconds}
+    where exists (select 1 from ${pairs} where ${pairs.id} = ${pair.id} and ${pairs.status} = 'active')
+      and (select count(*) from ${users} where ${users.id} in (${a}, ${b}) and ${users.level} is not null) = 2
+      and not exists (
+        select 1 from season_entries se join pairs p on p.id = se.pair_id
+        where se.season_id = ${season.id} and se.status <> 'withdrawn'
+          and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
+      )
+      and (${phase} is not ${FIRST_PHASE} or not exists (
+        select 1 from groups g where g.season_id = ${season.id} and g.phase = ${FIRST_PHASE} and g.published_at is not null
+      ))
+    on conflict (season_id, pair_id) do update set
+      status = 'approved', joins_phase = excluded.joins_phase, decided_by = excluded.decided_by,
+      decided_at = excluded.decided_at, updated_at = excluded.updated_at, note = null
+    where season_entries.status = 'withdrawn'
+    returning id`);
+  if (inserted.length === 0) return null;
+  // The row's id by the unique (season, pair): raw rows come back in another
+  // shape on D1 than in the tests.
+  const [row] = await db
+    .select({ id: seasonEntries.id })
+    .from(seasonEntries)
+    .where(and(eq(seasonEntries.seasonId, season.id), eq(seasonEntries.pairId, pair.id)));
+  return { id: row!.id, joins: phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt } };
+}
+
+// Both players of the pair, with what the notices need.
+async function pairPlayers(pairId: number) {
+  const [row] = await db
+    .select({
+      league: leagues.name,
+      a: { id: playerA.id, email: playerA.email, name: playerA.name },
+      b: { id: playerB.id, email: playerB.email, name: playerB.name },
+    })
+    .from(pairs)
+    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
+    .innerJoin(playerA, eq(playerA.id, pairs.playerA))
+    .innerJoin(playerB, eq(playerB.id, pairs.playerB))
+    .where(eq(pairs.id, pairId));
+  return row;
+}
+
 // "Nevezünk" (D18): either player of an active pair in the season's league.
-export async function applyToSeason(user: User, seasonId: number, now = new Date()): Promise<Result> {
+// The entry counts at once; both players get the notice in the app (and by
+// push, whatever their email switch says, #115) and the email.
+export async function applyToSeason(
+  user: User,
+  seasonId: number,
+  now = new Date(),
+): Promise<{ ok: true; joins: Joins } | { ok: false; error: string }> {
   const season = await getSeason(seasonId);
   if (!season) return { ok: false, error: "Nincs ilyen szezon." };
   const { pair, refusal } = await entryRefusal(user, season, now);
   if (refusal) return { ok: false, error: ENTRY_REFUSALS[refusal] };
-  const [a, b] = pair!.players;
-  // One statement re-checks that the pair is still active, both players have
-  // a level and the same two players have no other entry here; the unique
-  // index settles a double submit.
-  const inserted = await db.all(sql`insert into ${seasonEntries} (season_id, pair_id)
-    select ${seasonId}, ${pair!.id}
-    where exists (select 1 from ${pairs} where ${pairs.id} = ${pair!.id} and ${pairs.status} = 'active')
-      and (select count(*) from ${users} where ${users.id} in (${a}, ${b}) and ${users.level} is not null) = 2
-      and not exists (
-        select 1 from season_entries se join pairs p on p.id = se.pair_id
-        where se.season_id = ${seasonId} and se.status <> 'withdrawn'
-          and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
-      )
-    on conflict do nothing
-    returning id`);
-  if (inserted.length > 0) return { ok: true };
-  // Something changed in the meantime: say what, from the state now.
-  const again = await entryRefusal(user, season, now);
-  return { ok: false, error: again.refusal ? ENTRY_REFUSALS[again.refusal] : "Ez a pár már nem létezik." };
+  const entered = await enter(season, pair!, null, now);
+  if (!entered) {
+    // Something changed in the meantime: say what, from the state now.
+    const again = await entryRefusal(user, season, now);
+    return { ok: false, error: again.refusal ? ENTRY_REFUSALS[again.refusal] : "Ez a pár már nem létezik." };
+  }
+  const players = await pairPlayers(pair!.id);
+  if (players) {
+    const message = seasonEntryMessage({ league: players.league, season: season.name, joins: entered.joins });
+    await notifyPlayers("season_entry_decision", [players.a, players.b].map((p) => ({ userId: p.id, message })));
+    for (const [to, partner] of [
+      [players.a, players.b],
+      [players.b, players.a],
+    ])
+      await queueSeasonEntered(to.email, { to: to.name, partnerName: partner.name, league: players.league, season: season.name, joins: entered.joins });
+  }
+  return { ok: true, joins: entered.joins };
+}
+
+// --- The organizer on Párok (#154) -------------------------------------------
+
+// The active pair of the league, with both players' levels and names.
+async function leaguePair(leagueId: number, pairId: number) {
+  const [row] = await db
+    .select({
+      id: pairs.id,
+      status: pairs.status,
+      a: { id: playerA.id, name: playerA.name, level: playerA.level },
+      b: { id: playerB.id, name: playerB.name, level: playerB.level },
+    })
+    .from(pairs)
+    .innerJoin(playerA, eq(playerA.id, pairs.playerA))
+    .innerJoin(playerB, eq(playerB.id, pairs.playerB))
+    .where(and(eq(pairs.id, pairId), eq(pairs.leagueId, leagueId)));
+  return row;
+}
+
+// The entry that counts for these two players in this season (as entryFor):
+// the pair's own row, or a not withdrawn one of an earlier pair of the same
+// two players.
+async function countingEntry(seasonId: number, pairId: number, a: string, b: string) {
+  const rows = await db
+    .select({ id: seasonEntries.id, pairId: seasonEntries.pairId, status: seasonEntries.status })
+    .from(seasonEntries)
+    .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
+    .where(
+      and(
+        eq(seasonEntries.seasonId, seasonId),
+        or(and(eq(pairs.playerA, a), eq(pairs.playerB, b)), and(eq(pairs.playerA, b), eq(pairs.playerB, a))),
+      ),
+    );
+  return rows.find((r) => r.pairId === pairId && r.status !== "withdrawn") ?? rows.find((r) => r.status !== "withdrawn");
+}
+
+async function notifyPair(pairId: number, season: Season, event: "entered_by_organizer" | "removed", joins: Joins) {
+  const players = await pairPlayers(pairId);
+  if (!players) return;
+  const message = seasonEntryMessage({ league: players.league, season: season.name, joins }, event);
+  // In the app (and by push) only: no email, the organizer tells the players.
+  await notifyPlayers("season_entry_decision", [players.a, players.b].map((p) => ({ userId: p.id, message })));
+}
+
+// "Benevezés" (#154): the organizer enters an active pair of their league,
+// exactly as if one of the players had clicked "Nevezünk" (same checks, same
+// joining phase), also a pair taken out before. Both players are told in the
+// app only; no email.
+export async function enterPairByOrganizer(
+  actor: { id: string },
+  leagueId: number,
+  pairId: number,
+  seasonId: number,
+  now = new Date(),
+): Promise<{ ok: true; joins: Joins } | { ok: false; error: string }> {
+  const season = await getSeason(seasonId);
+  if (!season || season.leagueId !== leagueId) return { ok: false, error: "Nincs ilyen szezon." };
+  const pair = await leaguePair(leagueId, pairId);
+  if (!pair || pair.status !== "active") return { ok: false, error: ORGANIZER_ENTRY_REFUSALS.no_pair };
+  if (await countingEntry(seasonId, pairId, pair.a.id, pair.b.id)) return { ok: false, error: ORGANIZER_ENTRY_REFUSALS.entered };
+  if (!entryOpen(season, now)) return { ok: false, error: ORGANIZER_ENTRY_REFUSALS.closed };
+  const missing = [pair.a, pair.b].filter((p) => !p.level).map((p) => p.name || "Névtelen");
+  if (missing.length) return { ok: false, error: noLevelRefusal(missing) };
+  const entered = await enter(season, { id: pair.id, players: [pair.a.id, pair.b.id] }, actor.id, now);
+  if (!entered) return { ok: false, error: "A pár közben változott. Frissítsd az oldalt." };
+  await audit(actor.id, "season_entry.enter", `season_entry:${entered.id}`, `pair:${pairId}`);
+  await notifyPair(pairId, season, "entered_by_organizer", entered.joins);
+  return { ok: true, joins: entered.joins };
+}
+
+// "Kivétel a szezonból" (#154): the organizer withdraws an entered pair's
+// entry, so it is left out of every group draft made from then on; the pair
+// stays a pair. Refused while the pair plays in a running phase (mid-phase
+// withdrawal is #34), checked inside the write. Both players are told in the
+// app only; no email.
+export async function removePairFromSeason(
+  actor: { id: string },
+  leagueId: number,
+  pairId: number,
+  seasonId: number,
+  now = new Date(),
+): Promise<Result> {
+  const season = await getSeason(seasonId);
+  if (!season || season.leagueId !== leagueId) return { ok: false, error: "Nincs ilyen szezon." };
+  const pair = await leaguePair(leagueId, pairId);
+  if (!pair) return { ok: false, error: "Nincs ilyen pár." };
+  if (await pairInRunningGroup(pairId, now)) return { ok: false, error: IN_RUNNING_PHASE };
+  const updated = await db
+    .update(seasonEntries)
+    .set({ status: "withdrawn", decidedBy: actor.id, decidedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(seasonEntries.seasonId, seasonId),
+        eq(seasonEntries.pairId, pairId),
+        inArray(seasonEntries.status, ["approved", "pending"]),
+        notInRunningGroup(pairId, now),
+      ),
+    )
+    .returning({ id: seasonEntries.id });
+  if (updated.length === 0) {
+    if (await pairInRunningGroup(pairId, now)) return { ok: false, error: IN_RUNNING_PHASE };
+    return { ok: false, error: "Ez a pár nem nevezett erre a szezonra. Frissítsd az oldalt." };
+  }
+  await audit(actor.id, "season_entry.remove", `season_entry:${updated[0]!.id}`, `pair:${pairId}`);
+  await notifyPair(pairId, season, "removed", null);
+  return { ok: true };
 }
 
 export type EntryRow = {
@@ -187,9 +359,9 @@ export type EntryRow = {
   averageElo: number | null;
 };
 
-// The organizer's list for one season and status, in the order the pairs
-// applied. Names and levels only: no email or phone.
-export async function listSeasonEntries(seasonId: number, status: EntryFilter): Promise<EntryRow[]> {
+// The organizer's list of a season's entered pairs, in the order they
+// entered. Names and levels only: no email or phone.
+export async function listSeasonEntries(seasonId: number): Promise<EntryRow[]> {
   const rows = await db
     .select({
       id: seasonEntries.id,
@@ -208,7 +380,7 @@ export async function listSeasonEntries(seasonId: number, status: EntryFilter): 
     .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
     .innerJoin(playerB, eq(playerB.id, pairs.playerB))
-    .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.status, status)))
+    .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.status, "approved")))
     .orderBy(asc(seasonEntries.createdAt), asc(seasonEntries.id));
   return rows.map((r) => ({
     id: r.id,
@@ -226,116 +398,21 @@ export async function listSeasonEntries(seasonId: number, status: EntryFilter): 
   }));
 }
 
-export type EntryCounts = Record<"pending" | "approved" | "rejected", number>;
-
-// Entries per status for each of these seasons (withdrawn ones not counted).
-export async function entryCounts(seasonIds: number[]): Promise<Map<number, EntryCounts>> {
-  const out = new Map<number, EntryCounts>(seasonIds.map((id) => [id, { pending: 0, approved: 0, rejected: 0 }]));
+// Entered pairs per season, for each of these seasons.
+export async function entryCounts(seasonIds: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>(seasonIds.map((id) => [id, 0]));
   if (seasonIds.length === 0) return out;
   const rows = await db
-    .select({ seasonId: seasonEntries.seasonId, status: seasonEntries.status, n: count() })
+    .select({ seasonId: seasonEntries.seasonId, n: count() })
     .from(seasonEntries)
-    .where(inArray(seasonEntries.seasonId, seasonIds))
-    .groupBy(seasonEntries.seasonId, seasonEntries.status);
-  for (const r of rows) {
-    const c = out.get(r.seasonId);
-    if (c && r.status !== "withdrawn") c[r.status] = r.n;
-  }
+    .where(and(inArray(seasonEntries.seasonId, seasonIds), eq(seasonEntries.status, "approved")))
+    .groupBy(seasonEntries.seasonId);
+  for (const r of rows) out.set(r.seasonId, r.n);
   return out;
 }
 
-const DECIDED_MEANWHILE = "Erről a nevezésről közben már döntöttek. Frissítsd az oldalt.";
-const PAIR_GONE = "Ez a pár közben megszűnt, ezért nem hagyhatod jóvá.";
-const IN_GROUP = "Ez a pár már a kiírt csoportjában játszik, ezért most nem utasíthatod el.";
-
-// Approve or reject (D17), also flipping an earlier decision. Both players
-// are emailed, with the note. `seasonId` scopes the entry to the season the
-// organizer's page is for.
-export async function decideEntry(
-  actor: { id: string },
-  seasonId: number,
-  entryId: number,
-  decision: Decision,
-  note: string | null,
-  now = new Date(),
-): Promise<Result> {
-  const season = await getSeason(seasonId);
-  const [entry] = await db
-    .select({
-      status: seasonEntries.status,
-      pairId: seasonEntries.pairId,
-      pairStatus: pairs.status,
-      league: leagues.name,
-      a: { id: playerA.id, email: playerA.email, name: playerA.name },
-      b: { id: playerB.id, email: playerB.email, name: playerB.name },
-    })
-    .from(seasonEntries)
-    .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
-    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
-    .innerJoin(playerA, eq(playerA.id, pairs.playerA))
-    .innerJoin(playerB, eq(playerB.id, pairs.playerB))
-    .where(and(eq(seasonEntries.id, entryId), eq(seasonEntries.seasonId, seasonId)));
-  if (!season || !entry) return { ok: false, error: "Nincs ilyen nevezés." };
-  const pairActive = entry.pairStatus === "active";
-  if (!canDecide(entry.status, decision, pairActive))
-    return { ok: false, error: decision === "approve" && !pairActive ? PAIR_GONE : DECIDED_MEANWHILE };
-
-  if (decision === "reject" && (await pairInRunningGroup(entry.pairId, now))) return { ok: false, error: IN_GROUP };
-  // A pair approved once phase 1's groups are out starts at phase 2 (#24).
-  const published = (await groupsPublished(seasonId)) ? [FIRST_PHASE] : [];
-  const phase = decision === "approve" ? joinsPhase(season.phases, now, published) : null;
-  // Only from the status just read, and an approval only while the pair is
-  // still active: a decision or a dissolve in the meantime wins.
-  const updated = await db
-    .update(seasonEntries)
-    .set({
-      status: decision === "approve" ? "approved" : "rejected",
-      note,
-      decidedBy: actor.id,
-      decidedAt: now,
-      joinsPhase: phase,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(seasonEntries.id, entryId),
-        eq(seasonEntries.status, entry.status),
-        inArray(seasonEntries.status, [...DECIDABLE_FROM[decision]]),
-        decision === "approve"
-          ? sql`exists (select 1 from ${pairs} where ${pairs.id} = ${entry.pairId} and ${pairs.status} = 'active')`
-          : notInRunningGroup(entry.pairId, now),
-        // Phase 1's groups published in the meantime: decide again, for phase 2.
-        phase === FIRST_PHASE
-          ? sql`not exists (select 1 from groups g where g.season_id = ${seasonId} and g.phase = ${FIRST_PHASE} and g.published_at is not null)`
-          : undefined,
-      ),
-    )
-    .returning({ id: seasonEntries.id });
-  if (updated.length === 0) return { ok: false, error: DECIDED_MEANWHILE };
-  await audit(actor.id, `season_entry.${decision}`, `season_entry:${entryId}`, note ?? undefined);
-
-  const joins = phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt };
-  // In the app (and by push) for both, whatever their email switch says (#115).
-  const message = seasonEntryDecisionMessage({ league: entry.league, season: season.name, approved: decision === "approve", joins });
-  await notifyPlayers("season_entry_decision", [entry.a, entry.b].map((p) => ({ userId: p.id, message })));
-  for (const [to, partner] of [
-    [entry.a, entry.b],
-    [entry.b, entry.a],
-  ])
-    await queueSeasonEntryDecision(to.email, {
-      to: to.name,
-      partnerName: partner.name,
-      league: entry.league,
-      season: season.name,
-      approved: decision === "approve",
-      joins,
-      note,
-    });
-  return { ok: true };
-}
-
 // D19: dissolving a pair withdraws the entries it hasn't played in: pending
-// ones, and approved ones whose first phase hasn't started (or that wait for
+// ones (left from the approval step), and approved ones whose first phase hasn't started (or that wait for
 // the next season). For the dissolve batch in pairs.server.ts, after the
 // pair's update: it does nothing unless the pair is dissolved by then.
 export function withdrawEntries(pairId: number, now: Date) {

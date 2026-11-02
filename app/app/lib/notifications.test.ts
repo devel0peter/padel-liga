@@ -18,7 +18,7 @@ import {
   isNotificationKind,
   kindsFor,
   pairIntroMessage,
-  seasonEntryDecisionMessage,
+  seasonEntryMessage,
   newSignupMessage,
   parseSubscription,
   pushPayload,
@@ -212,28 +212,16 @@ describe("pairIntroMessage", () => {
 describe("player messages (#115)", () => {
   const base = { league: "Padelpárbaj Győr", season: "2026/27 tél" };
 
-  it("an approval says where the pair starts; no names", () => {
-    expect(
-      seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } }),
-    ).toEqual({
-      title: "Jóváhagyták a nevezéseteket",
+  it("#153: entered says where the pair starts; no names, no approval", () => {
+    expect(seasonEntryMessage({ ...base, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } })).toEqual({
+      title: "Beneveztetek",
       body: "2026/27 tél, Padelpárbaj Győr. Az 1. körtől játszotok (kezdés: nov. 9.).",
       url: "/pair",
     });
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
+    expect(seasonEntryMessage({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
       "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
     );
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: null }).body).toBe(
-      "2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.",
-    );
-  });
-
-  it("a rejection", () => {
-    expect(seasonEntryDecisionMessage({ ...base, approved: false, joins: null })).toEqual({
-      title: "Nem fogadták el a nevezéseteket",
-      body: "2026/27 tél, Padelpárbaj Győr.",
-      url: "/pair",
-    });
+    expect(seasonEntryMessage({ ...base, joins: null }).body).toBe("2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.");
   });
 
   it("the groups: group, phase and deadline in Budapest time", () => {

@@ -44,7 +44,7 @@ A részleteket lent találod.
   - A helyettes értékszáma változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja.
-- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, a szervező jóváhagyja. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban).
+- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban).
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.

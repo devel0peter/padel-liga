@@ -1,4 +1,4 @@
-// Walkthrough steps 20 and 21 (#28, #29): after the match of step 18, one
+// Walkthrough steps 22 and 23 (#28, #29): after the match of step 18, one
 // pair records the result (an invalid one first), the other gets the email
 // and confirms it, and it shows as played for both pairs; on the match of
 // step 19 the other pair disputes the result and the Szervező decides it on
@@ -35,7 +35,7 @@ async function fillScore(page: Page, rows: [string, string][]) {
   }
 }
 
-test("20. record → confirm: an invalid score refused, the email, played for both pairs", async ({ browser }) => {
+test("22. record → confirm: an invalid score refused, the email, played for both pairs", async ({ browser }) => {
   const [first] = annasMatches();
   const [opponent] = first!.opponents;
   const player = await as(browser, anna);
@@ -89,7 +89,7 @@ test("20. record → confirm: an invalid score refused, the email, played for bo
   await player.context.close();
 });
 
-test("21. dispute → the Szervező decides on Viták; a player can't open it", async ({ browser }) => {
+test("23. dispute → the Szervező decides on Viták; a player can't open it", async ({ browser }) => {
   const [, second] = annasMatches();
   const [opponent] = second!.opponents;
   // Anna records a 2:0 win on her other match (scheduled in step 19).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { divisionOf, divisionSizes } from "./divisions";
+import { DIVISIONS, divisionOf, divisionSizes } from "./divisions";
 
 describe("divisionSizes (spec 4)", () => {
   it("splits evenly when divisible by 3: 15 = 5+5+5", () => {
@@ -49,6 +49,19 @@ describe("divisionOf (spec 4)", () => {
 
   it("a single group is Bronz", () => {
     expect(divisionOf(1, 1)).toBe("bronz");
+  });
+
+  it("with 5 groups the bands are Bronz 1, Réz 2, Rookie 2 (#30)", () => {
+    expect([1, 2, 3, 4, 5].map((n) => divisionOf(n, 5))).toEqual(["bronz", "rez", "rez", "rookie", "rookie"]);
+  });
+
+  it("sizes add up to the group count, and the ladder never goes back up (one ladder)", () => {
+    for (let n = 0; n <= 40; n++) {
+      const s = divisionSizes(n);
+      expect(s.bronz + s.rez + s.rookie).toBe(n);
+      const order = Array.from({ length: n }, (_, i) => DIVISIONS.indexOf(divisionOf(i + 1, n)));
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    }
   });
 
   it("refuses a group outside the count", () => {

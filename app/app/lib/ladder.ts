@@ -7,7 +7,8 @@ import {
   type Day,
   type Division,
   DIVISIONS,
-  divisionOfGroup,
+  DIVISION_NAMES,
+  divisionOf,
   groupStandings,
   type GroupMatch,
   type MatchOutcome,
@@ -15,11 +16,7 @@ import {
 
 import { formatSlot } from "./format";
 
-export const DIVISION_LABEL: Record<Division, string> = {
-  bronz: "Bronz divízió",
-  rez: "Réz divízió",
-  rookie: "Rookie divízió",
-};
+const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
 /** A pair as the ladder shows it: the two players' names and the pair's rating for the last tiebreak. */
 export type LadderPair = { id: number; names: [string, string]; elo: number };
@@ -46,11 +43,11 @@ export type LadderRow = {
   gameDiff: number;
 };
 
+// No database id: nothing internal goes into the public page's data.
 export type LadderMatchView = {
-  id: number;
   a: [string, string];
   b: [string, string];
-  /** "kedd 18:30", or null when no time is set yet. */
+  /** "nov. 10., kedd 18:30", or null when no time is set yet. */
   when: string | null;
   /** "4-2 4-1", "kontumác", ... or null when the match is not played. */
   result: string | null;
@@ -102,13 +99,12 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
       decided,
     );
     const view = (m: LadderMatch): LadderMatchView => ({
-      id: m.id,
       a: names(m.a),
       b: names(m.b),
       when: m.scheduledAt ? formatSlot(m.scheduledAt) : null,
       result: m.outcome ? scoreText(m.outcome) : null,
     });
-    bands.get(divisionOfGroup(index, ordered.length))!.push({
+    bands.get(divisionOf(index + 1, ordered.length))!.push({
       number: group.number,
       rows: standings.map((r) => ({
         rank: r.rank,
@@ -125,7 +121,7 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
         .map(view),
     });
   });
-  return DIVISIONS.map((division) => ({ division, label: DIVISION_LABEL[division], groups: bands.get(division)! })).filter(
+  return DIVISIONS.map((division) => ({ division, label: divisionLabel(division), groups: bands.get(division)! })).filter(
     (b) => b.groups.length > 0,
   );
 }

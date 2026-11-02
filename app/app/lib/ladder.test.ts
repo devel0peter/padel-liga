@@ -92,14 +92,14 @@ describe("buildLadder: this week's matches and results", () => {
   it("lists only the matches of the week, with the time when scheduled", () => {
     const week2 = buildLadder([g], 2)[0]!.groups[0]!.weekMatches;
     expect(week2).toEqual([
-      { id: 2, a: ["Játékos 11A", "Játékos 11B"], b: ["Játékos 13A", "Játékos 13B"], when: formatSlot(slot), result: null },
+      { a: ["Játékos 11A", "Játékos 11B"], b: ["Játékos 13A", "Játékos 13B"], when: formatSlot(slot), result: null },
     ]);
-    expect(buildLadder([g], 3)[0]!.groups[0]!.weekMatches.map((m) => [m.id, m.when])).toEqual([[3, null]]);
+    expect(buildLadder([g], 3)[0]!.groups[0]!.weekMatches.map((m) => [m.a[0], m.when])).toEqual([["Játékos 12A", null]]);
   });
 
   it("lists the played results of the whole phase in week order", () => {
     for (const week of [1, 2, 3]) {
-      expect(buildLadder([g], week)[0]!.groups[0]!.results.map((m) => [m.id, m.result])).toEqual([[1, "4-2 4-1"]]);
+      expect(buildLadder([g], week)[0]!.groups[0]!.results.map((m) => [m.a[0], m.result])).toEqual([["Játékos 11A", "4-2 4-1"]]);
     }
   });
 

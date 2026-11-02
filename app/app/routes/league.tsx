@@ -102,8 +102,8 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
         </h4>
         {group.weekMatches.length > 0 ? (
           <ul className="grid gap-2">
-            {group.weekMatches.map((m) => (
-              <MatchLine key={m.id} match={m} />
+            {group.weekMatches.map((m, i) => (
+              <MatchLine key={i} match={m} />
             ))}
           </ul>
         ) : (
@@ -115,8 +115,8 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
         <div className="grid gap-2">
           <h4 className="font-bold">Lejátszott meccsek</h4>
           <ul className="grid gap-2">
-            {group.results.map((m) => (
-              <MatchLine key={m.id} match={m} />
+            {group.results.map((m, i) => (
+              <MatchLine key={i} match={m} />
             ))}
           </ul>
         </div>

@@ -105,6 +105,20 @@ describe("ladderPage", () => {
     expect(await weekOf("2026-11-17T10:00:00Z")).toEqual({ week: 2, started: true, matches: 1, range: ["nov. 16.", "nov. 22."] });
   });
 
+  it("shows a scheduled match's time in Budapest time, and 'no time yet' for the others", async () => {
+    publish(1, 1);
+    // Week 1 is pair 1011 vs 1012: agreed for Tue 10 Nov 2026, 18:30 Budapest (17:30 UTC).
+    h.raw
+      .prepare("update matches set status = 'scheduled', scheduled_at = ? where pair_a = 1011 and pair_b = 1012")
+      .run(sec("2026-11-10T17:30:00Z"));
+    const page = await ladderPage("gyor", at("2026-11-07T10:00:00Z"));
+    if (page?.kind !== "ladder") throw new Error("no ladder");
+    expect(page.bands[0]!.groups[0]!.weekMatches.map((m) => m.when)).toEqual(["nov. 10., kedd 18:30"]);
+    const week2 = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
+    if (week2?.kind !== "ladder") throw new Error("no ladder");
+    expect(week2.bands[0]!.groups[0]!.weekMatches.map((m) => m.when)).toEqual([null]);
+  });
+
   it("shows the table in seed order, with names, before any result", async () => {
     publish(1, 1);
     const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
@@ -129,10 +143,25 @@ describe("ladderPage", () => {
     expect(before.phase).toBe(1);
   });
 
-  it("carries no email, phone or user id", async () => {
+  it("carries no email, phone or internal id (user, pair, group or match)", async () => {
     publish(1, 3);
-    const text = JSON.stringify(await ladderPage("gyor", at("2026-11-10T10:00:00Z")));
+    h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where week = 1").run(sec("2026-11-10T17:30:00Z"));
+    const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
+    const text = JSON.stringify(page);
     expect(text).not.toMatch(/titkos\.example|@|\+36|30123|"u1\d+/);
     expect(text).toContain("Játékos 1011A");
+    // No field is an id, whatever its value: collect every key of the data.
+    const keys = new Set<string>();
+    JSON.parse(text, function (key) {
+      if (key) keys.add(key);
+      return this[key];
+    });
+    expect([...keys].filter((k) => /(^|[a-z])id$/i.test(k))).toEqual([]);
+  });
+
+  it("is null for a league whose city is not listed (drafts and test leagues stay hidden)", async () => {
+    publish(1, 3);
+    h.raw.exec("update cities set listed = 0 where slug = 'gyor'");
+    expect(await ladderPage("gyor", at("2026-11-10T10:00:00Z"))).toBeNull();
   });
 });

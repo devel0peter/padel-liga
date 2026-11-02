@@ -3,7 +3,7 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groupPairs, groups, matches, pairs, users } from "~/db/schema";
+import { cities, groupPairs, groups, matches, pairs, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
@@ -73,7 +73,14 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
     .where(inArray(groupPairs.groupId, phaseGroups))
     .orderBy(asc(groupPairs.groupId), asc(groupPairs.seed));
   const played = await db
-    .select({ id: matches.id, groupId: matches.groupId, a: matches.pairA, b: matches.pairB, week: matches.week })
+    .select({
+      id: matches.id,
+      groupId: matches.groupId,
+      a: matches.pairA,
+      b: matches.pairB,
+      week: matches.week,
+      scheduledAt: matches.scheduledAt,
+    })
     .from(matches)
     .where(inArray(matches.groupId, phaseGroups))
     .orderBy(asc(matches.week), asc(matches.id));
@@ -88,17 +95,20 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         // Until Elo is kept the rating is the average starting Elo (D20).
         elo: averageStartingElo(m.levelA, m.levelB) ?? 0,
       })),
-    // Scheduling and results are not stored yet (milestone 2): the matches
-    // show without a time and the tables start at zero.
+    // The agreed time is stored (#26); results are not yet (#27), so the
+    // tables start at zero until they are.
     matches: played
       .filter((m) => m.groupId === g.id)
-      .map((m) => ({ id: m.id, a: m.a, b: m.b, week: m.week, scheduledAt: null, outcome: null })),
+      .map((m) => ({ id: m.id, a: m.a, b: m.b, week: m.week, scheduledAt: m.scheduledAt, outcome: null })),
   }));
 }
 
 export async function ladderPage(slug: string, now = new Date()): Promise<LadderPage | null> {
   const league = await getLeague(slug);
   if (!league) return null;
+  // Like the landing page, only leagues of listed cities are public.
+  const [city] = await db.select({ listed: cities.listed }).from(cities).where(eq(cities.slug, league.city));
+  if (!city?.listed) return null;
   const season = currentSeason(await listSeasons(league.id), now);
   const head = { league: { name: league.name, city: league.city }, season: season?.name ?? "" };
   if (!season) return { ...head, kind: "waiting", next: null };

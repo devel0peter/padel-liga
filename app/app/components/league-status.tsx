@@ -32,6 +32,11 @@ export function LeagueStatus({ city, block }: { city: string; block: LandingBloc
         </Button>
         {block.ctaNote && <p className="text-sm text-muted-foreground">{block.ctaNote}</p>}
       </div>
+      {block.ladderPath && (
+        <Link to={block.ladderPath} className="justify-self-start font-bold underline">
+          Csoportok és tabella
+        </Link>
+      )}
     </section>
   );
 }

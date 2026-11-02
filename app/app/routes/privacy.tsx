@@ -98,7 +98,7 @@ export default function Privacy() {
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>
-              <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
+              <li>a fiók létrehozásának, a hozzájárulásodnak és az utolsó belépésednek az időpontja,</li>
               <li>
                 a párod a ligában (a jelentkezésből, vagy akivel a szervező
                 párba tett), és ha korábban pármeghívót küldtél vagy kaptál, az

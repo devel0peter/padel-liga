@@ -4,3 +4,4 @@ export * from "./elo";
 export * from "./fixtures";
 export * from "./groups";
 export * from "./seeding";
+export * from "./slots";

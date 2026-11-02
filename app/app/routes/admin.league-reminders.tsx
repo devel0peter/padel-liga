@@ -151,8 +151,8 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
         )}
         <p className="text-sm text-muted-foreground">
           Egy valódi címzett adataival; az e-mail-cím és a párlink rejtve. Nem kap emlékeztetőt, aki leiratkozott, akinek
-          visszapattant a levele, aki kikapcsolta az e-mailt, akinél be van kapcsolva a „Párt keresek”, akinek a nevezése
-          jóváhagyásra vár, és az Admin.
+          visszapattant a levele, aki kikapcsolta az e-mailt, akinél be van kapcsolva a „Párt keresek”, a már nevezett
+          párok és az Admin.
         </p>
       </section>
     </AppPage>

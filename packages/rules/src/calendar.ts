@@ -95,6 +95,12 @@ export function budapestDay(at: Date): Day {
   return toDay(budapestWallMs(at.getTime()));
 }
 
+// The Budapest wall clock at a UTC instant: its day and minutes since 00:00.
+export function budapestClock(at: Date): { day: Day; minutes: number } {
+  const wall = budapestWallMs(at.getTime());
+  return { day: toDay(wall), minutes: Math.floor((wall % DAY_MS) / 60_000) };
+}
+
 /**
  * The season's 4 phases from the first phase's Monday. Phases run back to
  * back; a phase that would touch a break starts on the first Monday after

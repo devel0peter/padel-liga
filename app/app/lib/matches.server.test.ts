@@ -238,10 +238,10 @@ describe("matchStep (#26)", () => {
       const page = (await M.matchPage(id, u, NOW))!;
       expect(page.state).toEqual({ status: "scheduled", slot: counter[1], clubId: null });
       expect(page.actions.propose).toBe(false);
-      expect(page.log.map((l) => [l.kind, l.who])).toEqual([
-        ["proposal", "Játékos 1A"],
-        ["counter_proposal", "Játékos 3B"],
-        ["accepted", "Játékos 1B"],
+      expect(page.log.map((l) => [l.text.split(":")[0], l.who])).toEqual([
+        ["Időpontokat ajánlott", "Játékos 1A"],
+        ["Új időpontokat ajánlott", "Játékos 3B"],
+        ["Elfogadta", "Játékos 1B"],
       ]);
     }
     const closed = await M.matchStep("p3a", id, { kind: "propose", slots: counter, clubId: null }, NOW);

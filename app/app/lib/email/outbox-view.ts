@@ -20,6 +20,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   groups_published: "Kihirdetett csoportok",
   match_proposal: "Időpont-ajánlat",
   match_agreed_time: "Megbeszélt időpont",
+  match_result: "Eredmény megerősítése",
 };
 
 export function kindLabel(kind: string): string {

@@ -1,11 +1,15 @@
 import {
   agreedTimeErrors,
+  autoAcceptAt,
   proposalErrors,
   proposalKind,
+  resultActions,
+  SCHEDULING_EVENT_KINDS,
   schedulingActions,
   schedulingState,
   slotErrorMessage,
   type SchedulingEvent,
+  type ResultState,
   type SchedulingEventKind,
   type SchedulingState,
   type Side,
@@ -27,16 +31,19 @@ import {
 } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
+import { eventText } from "./matches";
 import { pairName } from "./groups";
 import { formatPhone } from "./phone";
+import { resultOf, resultsOf } from "./result-log.server";
+import { decisionText, resultEventText } from "./results";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
 // matches.ts. Phone numbers leave this module only for the current phase's
 // opponents (spec 3), email addresses never (they go to the outbox).
 
-type Person = { id: string; name: string; email: string; phone: string | null };
-type PairPlayers = { pairId: number; seed: number; players: [Person, Person] };
+export type Person = { id: string; name: string; email: string; phone: string | null };
+export type PairPlayers = { pairId: number; seed: number; players: [Person, Person] };
 
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
@@ -110,9 +117,10 @@ async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEvent[]>>
     })
     .from(matchEvents)
     .leftJoin(users, eq(users.id, matchEvents.userId))
-    .where(inArray(matchEvents.matchId, matchIds))
+    // Result steps (#28) are read by result-log.server.ts.
+    .where(and(inArray(matchEvents.matchId, matchIds), inArray(matchEvents.kind, [...SCHEDULING_EVENT_KINDS])))
     .orderBy(asc(matchEvents.id));
-  for (const r of rows) (out.get(r.matchId) ?? out.set(r.matchId, []).get(r.matchId)!).push(r);
+  for (const r of rows) (out.get(r.matchId) ?? out.set(r.matchId, []).get(r.matchId)!).push({ ...r, kind: r.kind as SchedulingEventKind });
   return out;
 }
 
@@ -154,6 +162,8 @@ export type HomeMatch = {
   side: Side;
   state: SchedulingState;
   venue: string | null;
+  // The result, once recorded (#28).
+  result: ResultState;
 };
 
 export type HomeGroup = {
@@ -212,6 +222,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
   const venues = await clubNames(
     [...states.values()].map((s) => (s.status === "to_schedule" ? null : s.clubId)),
   );
+  const results = await resultsOf(matchRows);
 
   return Promise.all(
     mine.map(async (g) => {
@@ -240,6 +251,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
             side,
             state,
             venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
+            result: results.get(m.id)?.state ?? { status: "none" },
           };
         }),
       };
@@ -249,7 +261,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
 
 // --- The match page (#26) -----------------------------------------------------
 
-type MatchContext = {
+export type MatchContext = {
   match: typeof matches.$inferSelect;
   groupNumber: number;
   groupCount: number;
@@ -262,7 +274,7 @@ type MatchContext = {
   events: StoredEvent[];
 };
 
-async function loadMatch(matchId: number): Promise<MatchContext | null> {
+export async function loadMatch(matchId: number): Promise<MatchContext | null> {
   const [row] = await db
     .select({
       match: matches,
@@ -301,7 +313,7 @@ async function loadMatch(matchId: number): Promise<MatchContext | null> {
 
 // Which side the user plays on; null: not one of the two pairs' players
 // (#26 requirement 6).
-function sideOf(ctx: MatchContext, userId: string): Side | null {
+export function sideOf(ctx: MatchContext, userId: string): Side | null {
   if (ctx.pairs.a.players.some((p) => p.id === userId)) return "a";
   if (ctx.pairs.b.players.some((p) => p.id === userId)) return "b";
   return null;
@@ -329,17 +341,18 @@ export type MatchPage = {
   venue: string | null;
   actions: ReturnType<typeof schedulingActions>;
   clubs: { id: number; name: string }[];
-  log: {
-    id: number;
-    at: Date;
-    who: string;
-    ours: boolean;
-    kind: SchedulingEventKind;
-    slots: Date[] | null;
-    slot: Date | null;
-    venue: string | null;
-  }[];
+  // The result (#28): its state, what this player can do, when a waiting one
+  // is accepted by itself.
+  result: ResultState;
+  resultActions: ReturnType<typeof resultActions>;
+  autoAcceptAt: Date | null;
+  // Scheduling and result steps and rulings, oldest first. `by`: a pair's
+  // player, the organizer (#29) or the 48-hour rule (#28).
+  log: { key: string; at: Date; who: string; ours: boolean; by: "pair" | "organizer" | "auto"; text: string }[];
 };
+
+// Once a result is recorded, disputed or final, scheduling is over (#28).
+const NO_SCHEDULING = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false };
 
 // The match page for a player of either pair; null for anyone else, or a
 // match that doesn't exist (the page answers 404 either way).
@@ -357,6 +370,46 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     .where(and(eq(clubs.city, ctx.city), eq(clubs.active, true)))
     .orderBy(asc(clubs.name));
   const venues = await clubNames([...ctx.events.map((e) => e.clubId), state.status === "to_schedule" ? null : state.clubId]);
+  const results = await resultOf(ctx.match);
+  const result = results.state;
+  const scheduling = schedulingActions(state, side, now, ctx.match.deadline);
+  const log: MatchPage["log"] = [
+    ...ctx.events.map((e) => ({
+      key: `e${e.id}`,
+      id: e.id,
+      at: e.at,
+      who: e.userName || "Törölt játékos",
+      ours: e.pairId === ours.pairId,
+      by: "pair" as const,
+      text: eventText({
+        kind: e.kind,
+        slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+        slot: e.slot,
+        venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+      }),
+    })),
+    ...results.events.map((e) => ({
+      key: `e${e.id}`,
+      id: e.id,
+      at: e.at,
+      who: e.userName || "Törölt játékos",
+      ours: e.pairId === ours.pairId,
+      by: "pair" as const,
+      text: resultEventText(e, side),
+    })),
+    ...results.decisions.map((d) => ({
+      key: `d${d.id}`,
+      id: Number.MAX_SAFE_INTEGER,
+      at: d.at,
+      who: d.kind === "auto_accepted" ? "Padelpárbaj" : d.userName || "Szervező",
+      ours: false,
+      by: d.kind === "auto_accepted" ? ("auto" as const) : ("organizer" as const),
+      text: decisionText(d, side),
+    })),
+  ]
+    // By time; at the same second, in the order they were written.
+    .sort((x, y) => x.at.getTime() - y.at.getTime() || x.id - y.id)
+    .map(({ id: _, ...e }) => e);
   return {
     id: ctx.match.id,
     week: ctx.match.week,
@@ -373,18 +426,12 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     contacts: running ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
     state,
     venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
-    actions: schedulingActions(state, side, now, ctx.match.deadline),
+    actions: result.status === "none" ? scheduling : NO_SCHEDULING,
     clubs: cityClubs,
-    log: ctx.events.map((e) => ({
-      id: e.id,
-      at: e.at,
-      who: e.userName || "Törölt játékos",
-      ours: e.pairId === ours.pairId,
-      kind: e.kind,
-      slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
-      slot: e.slot,
-      venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
-    })),
+    result,
+    resultActions: resultActions(result, side),
+    autoAcceptAt: autoAcceptAt(result),
+    log,
   };
 }
 
@@ -402,6 +449,7 @@ export type StepResult = { ok: true; notice: string } | { ok: false; error: stri
 export const NOT_FOUND = "Nincs ilyen meccs.";
 export const CHANGED = "Közben változott a meccs. Nézd meg újra, és próbáld még egyszer.";
 const CLOSED_SCHEDULED = "A meccs időpontja már le van fixálva.";
+const CLOSED_RESULT = "A meccs eredménye már rögzítve van, itt már nem lehet egyeztetni.";
 const CLOSED_DEADLINE = "Lejárt a kör határideje, itt már nem lehet egyeztetni.";
 const BAD_CLUB = "Válassz a listából helyszínt, vagy hagyd üresen.";
 const NOTHING_TO_ANSWER = "Erre most nincs mit válaszolni. Frissítsd az oldalt.";
@@ -438,6 +486,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   if (!side) return { ok: false, error: NOT_FOUND };
   const deadline = ctx.match.deadline;
   const state = stateOf(ctx, now);
+  if ((await resultOf(ctx.match)).state.status !== "none") return { ok: false, error: CLOSED_RESULT };
   const can = schedulingActions(state, side, now, deadline);
   if (!can.propose) return { ok: false, error: state.status === "scheduled" ? CLOSED_SCHEDULED : CLOSED_DEADLINE };
 

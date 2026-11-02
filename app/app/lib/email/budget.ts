@@ -23,7 +23,8 @@ export type MessageKind =
   | "season_entry_decision"
   | "groups_published"
   | "match_proposal"
-  | "match_agreed_time";
+  | "match_agreed_time"
+  | "match_result";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

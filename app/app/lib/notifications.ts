@@ -29,10 +29,16 @@ export type PlayerKind =
   // Daily-digest items (#31 builds the digest email from these): in the app
   // and by push only for now.
   | "match_scheduled"
-  | "match_declined";
+  | "match_declined"
+  // Results (#28): waiting for confirmation is instant (also by email); a
+  // confirmed or auto-accepted result and an organizer's decision (#29) are
+  // digest items.
+  | "match_result"
+  | "match_result_confirmed"
+  | "match_decided";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
-export const DIGEST_KINDS: readonly PlayerKind[] = ["match_scheduled", "match_declined"];
+export const DIGEST_KINDS: readonly PlayerKind[] = ["match_scheduled", "match_declined", "match_result_confirmed", "match_decided"];
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -236,6 +242,37 @@ export function matchDeclinedMessage(input: { matchId: number; slot: Date }): Me
   return {
     title: "Nem erősítették meg az időpontot",
     body: `Az ellenfeletek szerint nem ${formatDeadline(input.slot)} a meccs. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// --- Results (#28) and organizer decisions (#29, spec 13) --------------------
+// No names; the score from the recipient's side ("ti" first).
+
+// To the other pair: a result waits for confirmation (instant).
+export function matchResultMessage(input: { matchId: number; score: string }): Message {
+  return {
+    title: "Erősítsd meg az eredményt",
+    body: `Az ellenfeletek rögzítette az eredményt: ${input.score}. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To both pairs: the result counts (digest item).
+export function matchResultConfirmedMessage(input: { matchId: number; score: string; auto: boolean }): Message {
+  return {
+    title: "Végleges az eredmény",
+    body: input.auto ? `48 óra után magától elfogadtuk az eredményt: ${input.score}.` : `Megerősítették az eredményt: ${input.score}.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To both pairs: the organizer decided or overrode the outcome (digest item).
+// The reason is on the match page only.
+export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "A szervező döntött a meccsetekről",
+    body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
     url: matchUrl(input.matchId),
   };
 }

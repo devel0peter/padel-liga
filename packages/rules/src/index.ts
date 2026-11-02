@@ -4,6 +4,7 @@ export * from "./divisions";
 export * from "./elo";
 export * from "./fixtures";
 export * from "./groups";
+export * from "./reporting";
 export * from "./results";
 export * from "./scheduling";
 export * from "./seeding";

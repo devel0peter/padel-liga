@@ -14,8 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
-import { SCHEDULING_GUIDE, eventText, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
+import { ResultSection } from "~/components/match-result";
+import { SCHEDULING_GUIDE, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
 import { matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { parseScore, resultStatusView } from "~/lib/results";
+import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
 
 // A match (#25, #26): status, the opponents' phones, scheduling (propose,
@@ -57,6 +60,23 @@ export async function action({ request, params }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const fail = (message: string, rows?: Record<number, string>) => data<ActionResult>({ intent, ok: false, message, rows }, { status: 400 });
+
+  // The result (#28): the form's games from this player's side; the server
+  // turns them into the match's order with the player's side.
+  if (intent === "result-record" || intent === "result-confirm" || intent === "result-dispute") {
+    const page = await matchPage(id, user.id);
+    if (!page) throw new Response(NOT_FOUND, { status: 404 });
+    const input: ResultInput =
+      intent === "result-confirm"
+        ? { kind: "confirm" }
+        : intent === "result-record"
+          ? { kind: "record", score: parseScore(form, page.side) }
+          : { kind: "dispute", score: parseScore(form, page.side), note: String(form.get("note") ?? "") };
+    const done = await resultStep(user.id, id, input);
+    if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
+    if (done.error === NOT_FOUND) throw new Response(NOT_FOUND, { status: 404 });
+    return fail(done.error);
+  }
 
   let input: StepInput;
   // Row numbers of the filled slot fields, so an error lands on its row.
@@ -209,7 +229,11 @@ function AgreedForm({ clubs, result }: { clubs: { id: number; name: string }[]; 
 export default function MatchRoute({ loaderData: m, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const result = actionData as ActionResult | undefined;
-  const status = statusView(m.state, m.side, m.venue);
+  const status = resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue);
+  // The result goes first once there is one or the match is scheduled; before
+  // that, scheduling comes first.
+  const resultFirst = m.result.status !== "none" || m.state.status === "scheduled";
+  const resultSection = <ResultSection key={`r${m.log.length}`} m={m} feedback={result} />;
   const theirs = m.state.status !== "to_schedule" && m.state.status !== "scheduled" && m.state.by !== m.side;
   return (
     <AppPage
@@ -232,6 +256,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
         )}
         <Feedback result={result} intent={["accept", "confirm", "decline"]} />
       </section>
+
+      {resultFirst && resultSection}
 
       {m.state.status !== "scheduled" && m.actions.propose && (
         <section className="grid max-w-2xl gap-1 rounded-lg border border-dashed p-4 text-sm sm:p-6" aria-labelledby="hogyan">
@@ -275,7 +301,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
         </Card>
       )}
 
-      {m.state.status === "proposed" && !theirs && (
+      {m.state.status === "proposed" && !theirs && m.result.status === "none" && (
         <section className="grid max-w-2xl gap-1 rounded-lg border p-4 text-sm sm:p-6">
           <h2 className="font-semibold">Ezeket ajánlottátok</h2>
           <ul className="list-disc pl-5">
@@ -321,6 +347,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
         </>
       )}
 
+      {!resultFirst && resultSection}
+
       <section className="grid max-w-2xl gap-2" aria-labelledby="naplo">
         <h2 id="naplo" className="font-display text-lg font-bold">
           Napló
@@ -330,11 +358,11 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
         ) : (
           <ol className="grid gap-2 text-sm">
             {m.log.map((e) => (
-              <li key={e.id} className="grid gap-0.5 rounded-md border p-3">
+              <li key={e.key} className="grid gap-0.5 rounded-md border p-3">
                 <span className="text-xs text-muted-foreground">
-                  {formatDateTime(e.at)} · {e.who} ({e.ours ? "ti" : "ellenfél"})
+                  {formatDateTime(e.at)} · {e.who} ({e.by === "organizer" ? "szervező" : e.by === "auto" ? "automatikus" : e.ours ? "ti" : "ellenfél"})
                 </span>
-                <span className="break-words">{eventText(e)}</span>
+                <span className="break-words">{e.text}</span>
               </li>
             ))}
           </ol>

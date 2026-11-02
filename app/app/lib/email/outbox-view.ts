@@ -21,6 +21,8 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   match_proposal: "Időpont-ajánlat",
   match_agreed_time: "Megbeszélt időpont",
   stuck_reminder: "Emlékeztető elakadtaknak",
+  match_digest: "Napi összefoglaló",
+  match_tomorrow: "Holnap meccs",
 };
 
 export function kindLabel(kind: string): string {

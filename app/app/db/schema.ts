@@ -67,6 +67,8 @@ export const emailMessages = sqliteTable(
         "match_proposal",
         "match_agreed_time",
         "stuck_reminder",
+        "match_digest",
+        "match_tomorrow",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -378,6 +380,11 @@ export const notifications = sqliteTable(
         "match_agreed_time",
         "match_scheduled",
         "match_declined",
+        "match_cancelled",
+        "match_no_proposal",
+        "match_week_end",
+        "match_deadline_soon",
+        "match_tomorrow",
         "test",
       ],
     }).notNull(),
@@ -386,6 +393,9 @@ export const notifications = sqliteTable(
     // A path on this site, opened through /notifications/<id>.
     url: text("url").notNull(),
     readAt: integer("read_at", { mode: "timestamp" }),
+    // When the daily digest (#31) took this item, whether or not it went into
+    // an email; each item is taken once.
+    digestedAt: integer("digested_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -709,17 +719,37 @@ export const matchEvents = sqliteTable(
       .references(() => pairs.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind", {
-      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined"],
+      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled"],
     }).notNull(),
     // A proposal's slots: JSON array of UTC instants in seconds.
     slots: text("slots", { mode: "json" }).$type<number[]>(),
-    // The accepted slot, or the agreed time.
+    // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
-    // The venue offered with a proposal or an agreed time (optional).
+    // The venue offered with a proposal or an agreed time (optional), or
+    // recorded after booking ("venue", #27).
     clubId: integer("club_id").references(() => clubs.id),
+    // "venue": the court, free text (optional, #27).
+    court: text("court"),
     at: integer("at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
   },
   (t) => [index("match_events_match_idx").on(t.matchId, t.id)],
+);
+
+// The reminders that went out for a match (#31), so each goes once: the
+// digest reminders once per match, "holnap meccs" once per scheduled slot
+// (`slot`, seconds; 0 for the others). The hourly cron claims a row before
+// it notifies the four players.
+export const matchReminders = sqliteTable(
+  "match_reminders",
+  {
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["match_no_proposal", "match_week_end", "match_deadline_soon", "match_tomorrow"] }).notNull(),
+    slot: integer("slot").notNull().default(0),
+    sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.kind, t.slot] })],
 );

@@ -1,6 +1,7 @@
 import { createRequestHandler } from "react-router";
 
 import { deliver } from "../app/lib/email/outbox.server";
+import { runMatchReminders } from "../app/lib/match-reminders.server";
 import { queueDueReminders } from "../app/lib/reminders.server";
 
 const requestHandler = createRequestHandler(
@@ -12,11 +13,14 @@ export default {
   async fetch(request) {
     return requestHandler(request);
   },
-  // Hourly: queue the automatic reminders that are due (#155), then send
-  // whatever waits. A failed reminder step doesn't stop the sending.
-  async scheduled(_controller, _env, ctx) {
+  // Hourly: the match reminders and the daily digest when their hour comes
+  // (#31; a failure there is only logged), the automatic reminders for people
+  // stuck before entering (#155; a failure only logged too), then whatever
+  // email waits.
+  async scheduled(controller, _env, ctx) {
     ctx.waitUntil(
-      queueDueReminders()
+      runMatchReminders(new Date(controller.scheduledTime))
+        .then(() => queueDueReminders())
         .then((queued) => queued && console.log(`cron: queued ${queued} reminders`))
         .catch((e: unknown) => console.error("cron: reminders failed", e))
         .then(() => deliver())

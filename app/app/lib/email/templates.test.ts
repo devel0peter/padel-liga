@@ -6,7 +6,9 @@ import {
   groupsPublished,
   escapeHtml,
   loginCode,
+  dailyDigest,
   matchAgreedTime,
+  matchTomorrow,
   matchProposal,
   pairIntro,
   partnerNotice,
@@ -443,5 +445,37 @@ describe("match scheduling emails (#26, spec 13)", () => {
     expect(email.html).toContain("&lt;b&gt;X&lt;/b&gt;");
     expect(email.html).not.toContain('href="https://evil.example');
     expect(email.text).not.toMatch(/@|\+36/);
+  });
+});
+
+describe("daily digest and holnap meccs (#31, spec 13)", () => {
+  const items = [
+    { title: "Lefixálva a meccsetek", body: "Az ellenfeletek elfogadta az időpontot: nov. 12., csütörtök 18:00.", url: "/matches/7" },
+    { title: "Még nincs időpont-ajánlat", body: "Az 1. heti meccsetekre még senki nem ajánlott időpontot.", url: "/matches/8" },
+  ];
+
+  it("one email with every item and its one-tap link", () => {
+    const email = dailyDigest({ to: "Anna", items });
+    expect(email.subject).toBe("Napi összefoglaló: 2 újdonság – Padelpárbaj");
+    expect(email.text).toContain("Szia Anna!");
+    expect(email.text).toContain("Lefixálva a meccsetek\nAz ellenfeletek elfogadta az időpontot: nov. 12., csütörtök 18:00.");
+    expect(email.text).toContain("https://padelparbaj.hu/matches/7");
+    expect(email.text).toContain("https://padelparbaj.hu/matches/8");
+    expect(email.html).toContain('href="https://padelparbaj.hu/matches/8"');
+    expect(email.text).toContain("Az értesítéseket a profilodban állíthatod be.");
+  });
+
+  it("a single item is the subject itself", () => {
+    expect(dailyDigest({ to: "Anna", items: [items[1]!] }).subject).toBe("Még nincs időpont-ajánlat – Padelpárbaj");
+  });
+
+  it("holnap meccs: time, venue, opponents and the link", () => {
+    const slot = new Date("2026-11-12T17:00:00Z");
+    const email = matchTomorrow({ to: "Anna", opponents: "Kiss Cili és Nagy Dani", matchId: 7, slot, venue: "Ace Padel, 2-es pálya" });
+    expect(email.subject).toBe("Holnap meccs: nov. 12., csütörtök 18:00 – Padelpárbaj");
+    expect(email.text).toContain("Holnap játszotok Kiss Cili és Nagy Dani ellen: nov. 12., csütörtök 18:00.");
+    expect(email.text).toContain("Helyszín: Ace Padel, 2-es pálya");
+    expect(email.text).toContain("https://padelparbaj.hu/matches/7");
+    expect(matchTomorrow({ to: "Anna", opponents: "X és Y", matchId: 7, slot, venue: null }).text).toContain("A helyszínt még nem rögzítettétek");
   });
 });

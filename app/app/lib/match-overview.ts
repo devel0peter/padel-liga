@@ -7,7 +7,7 @@
 import { addDays, budapestTime, isValidActivity, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 
 import { weekDays } from "./groups";
-import { formatSlot, type Tone } from "./matches";
+import { formatSlot, venueLine, type Tone } from "./matches";
 
 export type OverviewStatus = SchedulingState["status"];
 
@@ -29,7 +29,10 @@ export const isOverviewStatus = (v: string): v is OverviewStatus => OVERVIEW_STA
 export function overviewStatus(state: SchedulingState, names: Record<Side, string>, venue?: string | null): { label: string; tone: Tone } {
   switch (state.status) {
     case "to_schedule":
-      return { label: "Egyeztetésre vár", tone: "todo" };
+      // After a late cancellation (#27) the cancelling pair must propose next.
+      return state.nextBy
+        ? { label: `Későn lemondták, ${names[state.nextBy]} ajánl új időpontot`, tone: "todo" }
+        : { label: "Egyeztetésre vár", tone: "todo" };
     case "proposed":
       return { label: `Időpontokat ajánlottak, ${names[state.by === "a" ? "b" : "a"]} válaszára vár`, tone: "waiting" };
     case "agreed_time":
@@ -38,7 +41,8 @@ export function overviewStatus(state: SchedulingState, names: Record<Side, strin
         tone: "waiting",
       };
     case "scheduled":
-      return { label: `Lefixálva: ${formatSlot(state.slot)}${venue ? `, ${venue}` : ""}`, tone: "done" };
+      const where = venueLine(venue, state.court);
+      return { label: `Lefixálva: ${formatSlot(state.slot)}${where ? `, ${where}` : ""}`, tone: "done" };
   }
 }
 

@@ -1,14 +1,14 @@
-// The deploy step of #153 (D62): migration 0030 enters every entry still
+// The deploy step of #153 (D62): migration 0031 enters every entry still
 // pending, with its joining phase worked out as if approved at that moment.
 // Runs every migration before it on a real SQLite, adds rows, then applies
-// 0030.
+// 0031.
 import { describe, expect, it } from "vitest";
 
 const { readdirSync, readFileSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
 const { DatabaseSync } = await import(/* @vite-ignore */ `node:${"sqlite"}`);
 
 const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
-const MIGRATION = "0030_entries_without_approval.sql";
+const MIGRATION = "0031_entries_without_approval.sql";
 
 function apply(raw: any, file: string) {
   for (const stmt of readFileSync(new URL(file, MIGRATIONS), "utf8").split("--> statement-breakpoint"))
@@ -17,7 +17,7 @@ function apply(raw: any, file: string) {
 
 const DAY = 86400;
 
-// Before 0030 is applied: a league, two pairs per season, and seasons whose
+// Before 0031 is applied: a league, two pairs per season, and seasons whose
 // phases start relative to now (the migration reads the clock).
 function before() {
   const raw = new DatabaseSync(":memory:");
@@ -49,7 +49,7 @@ function season(raw: any, id: number, phaseStarts: number[]) {
 const rows = (raw: any) =>
   raw.prepare("select season_id, pair_id, status, joins_phase, decided_at is not null as decided from season_entries order by id").all();
 
-describe("migration 0030_entries_without_approval (#153)", () => {
+describe("migration 0031_entries_without_approval (#153)", () => {
   it("enters pending entries from the next phase, and leaves the others alone", () => {
     const raw = before();
     // Season 1 hasn't started; season 2 is in phase 1; season 3 hasn't

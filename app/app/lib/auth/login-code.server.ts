@@ -111,7 +111,10 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
     const result = checkCode(row ?? null, false, now);
     return { ok: false, error: CODE_MESSAGES[result === "ok" || result === "wrong" ? "missing" : result] };
   }
-  if (!timingSafeEqual(record.codeHash, await codeHash(email, code))) return { ok: false, error: CODE_MESSAGES.wrong };
+  // A deleted account's placeholder address (#152) never logs in, not even
+  // with a guessed code: it reads as a wrong one.
+  if (isAnonymizedEmail(email) || !timingSafeEqual(record.codeHash, await codeHash(email, code)))
+    return { ok: false, error: CODE_MESSAGES.wrong };
 
   // Single use. Deleting by the hash we checked means a parallel request with
   // the same code can't also succeed.

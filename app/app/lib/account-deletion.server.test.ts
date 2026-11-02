@@ -73,26 +73,39 @@ function freshDb() {
   signup.run(12, "solo", "C", "c@x.hu", null, null, 11, null);
   signup.run(13, "pair", "D", "d@x.hu", "A", "a@x.hu", null, 1);
   h.raw.exec(`update interest_signups set status = 'paired' where id in (11, 12)`);
-  // Mail stored for other people that names a (review of #152): the partner
-  // notice a's pair signup sent b (sent: subject only), one from someone
-  // else, a's solo introduction to c (unsent, has a's address), an entry
-  // decision to the partner b (unsent, has a's name) and one to c, who
-  // isn't a's partner.
+  // Mail stored for other people that names a (review of #152). Goes or
+  // changes:
+  // - 100: the partner notice a's pair signup sent b (sent: subject only)
+  // - 102: a's solo introduction to c (unsent, has a's address)
+  // - 103: an entry decision to the partner b (unsent, has a's name)
+  // - 104: group mail to c, an opponent and not a's partner (unsent)
+  // - 108: a failed match proposal to c naming a
+  // Stays:
+  // - 101: a partner notice from someone else
+  // - 105: a pair intro with anna@x.hu, which merely ends in a@x.hu
+  // - 106: a broadcast to another "Anna Teszt", her own name
+  // - 107: group mail naming "Anna Tesztelő", a different name
   h.raw.exec(`update users set name = 'Anna Teszt' where id = 'a'`);
   const mail = h.raw.prepare("insert into email_messages (id, kind, to_email, subject, text, status) values (?, ?, ?, ?, ?, ?)");
   mail.run(100, "partner_notice", "b@x.hu", partnerNoticeSubject("A"), null, "sent");
   mail.run(101, "partner_notice", "b@x.hu", partnerNoticeSubject("Zoli"), null, "sent");
-  mail.run(102, "pair_intro", "c@x.hu", "Találtunk neked párt", "Az e-mail-címe: a@x.hu", "pending");
+  mail.run(102, "pair_intro", "c@x.hu", "Találtunk neked párt", "Az e-mail-címe: a@x.hu\nŐ is megkapta", "pending");
   mail.run(103, "season_entry_decision", "b@x.hu", "Jóváhagyták", "Szia B! Anna Teszt és te nevezhettek.", "pending");
-  mail.run(104, "season_entry_decision", "c@x.hu", "Jóváhagyták", "Szia C! Anna Teszt is nevezett.", "pending");
+  mail.run(104, "groups_published", "c@x.hu", "Itt a csoportod", "1. hét: Anna Teszt és B ellen", "pending");
+  mail.run(105, "pair_intro", "d@x.hu", "Találtunk neked párt", "Az e-mail-címe: anna@x.hu", "pending");
+  mail.run(106, "broadcast", "anna.masik@x.hu", "Hírek", "Szia Anna Teszt!", "pending");
+  mail.run(107, "groups_published", "d@x.hu", "Itt a csoportod", "1. hét: Anna Tesztelő és Béla ellen", "pending");
+  mail.run(108, "match_proposal", "c@x.hu", "Időpontokat ajánlottak", "Anna Teszt és B időpontokat ajánlott.", "failed");
 }
 
-// What is left of other people's mail (ids 100 to 104 above).
+// What is left of other people's mail (ids 100 to 108 above).
 function otherPeoplesMailAfter() {
   expect(all("select id, subject from email_messages where id >= 100 order by id")).toEqual([
     { id: 100, subject: PARTNER_NOTICE_SUBJECT_REMOVED },
     { id: 101, subject: partnerNoticeSubject("Zoli") },
-    { id: 104, subject: "Jóváhagyták" },
+    { id: 105, subject: "Találtunk neked párt" },
+    { id: 106, subject: "Hírek" },
+    { id: 107, subject: "Itt a csoportod" },
   ]);
 }
 
@@ -152,9 +165,8 @@ function interestListAfter() {
   });
   expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and kind = 'login_code'")).toBe(1);
   otherPeoplesMailAfter();
-  // Nothing anywhere has a's address or name, but the kept unsubscribe.
-  expect(n("select count(*) from email_messages where instr(lower(coalesce(text, '') || subject || to_email), 'a@x.hu') > 0")).toBe(0);
-  expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and instr(coalesce(text, '') || subject, 'Anna Teszt') > 0")).toBe(0);
+  // No row has a's address as a whole any more; the unsubscribe below stays.
+  expect(n("select count(*) from email_messages where instr(' ' || lower(coalesce(text, '') || ' ' || subject || ' ' || to_email), ' a@x.hu') > 0")).toBe(0);
   // The unsubscribe stays, so the address is never mailed again.
   expect(n("select count(*) from email_suppressions where email = 'a@x.hu'")).toBe(1);
 }
@@ -231,7 +243,7 @@ describe("deleting an account (#152)", () => {
     expect(one("select status from pairs where id = 1").status).toBe("active");
     expect(n("select count(*) from interest_signups")).toBe(4);
     expect(all("select subject from email_messages where id = 100")).toEqual([{ subject: partnerNoticeSubject("A") }]);
-    expect(n("select count(*) from email_messages where id >= 100")).toBe(5);
+    expect(n("select count(*) from email_messages where id >= 100")).toBe(9);
   });
 
   it("refuses the Admin's own account and another Admin's", async () => {

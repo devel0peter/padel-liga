@@ -48,6 +48,25 @@ describe("open sign-up (#113)", () => {
     expect(all("select email from login_codes")).toEqual([{ email: "deleted-x@deleted.invalid" }]);
   });
 
+  it("never logs into a deleted account's placeholder, even with the right code (#152)", async () => {
+    const email = "deleted-x@deleted.invalid";
+    run("insert into users (id, email, name, deleted_at) values ('x', ?, 'Törölt játékos', 1)", email);
+    const { sha256Hex } = await import("~/lib/auth/tokens");
+    const { CODE_MESSAGES } = await import("~/lib/auth/rules");
+    // A code row whose code is known (as if guessed), as login-code.server.ts hashes it.
+    run(
+      "insert into login_codes (email, code_hash, expires_at, window_start) values (?, ?, ?, ?)",
+      email,
+      await sha256Hex(`${email}:123456`),
+      Math.floor(Date.now() / 1000) + 600,
+      Math.floor(Date.now() / 1000),
+    );
+    expect(await L.verifyLoginCode(email, "123456")).toEqual({ ok: false, error: CODE_MESSAGES.wrong });
+    // The same code on a normal address logs in: the hash above is the real one.
+    run("update login_codes set email = 'uj@example.com', code_hash = ? where email = ?", await sha256Hex("uj@example.com:123456"), email);
+    expect((await L.verifyLoginCode("uj@example.com", "123456")).ok).toBe(true);
+  });
+
   it("creates the account when the code is right", async () => {
     await L.sendLoginCode("uj.jatekos@example.com");
     const result = await L.verifyLoginCode("uj.jatekos@example.com", h.codes[0]!.code);

@@ -54,7 +54,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   const offset = logOffset();
   expect((await fetch(`${BASE_URL}/cdn-cgi/local/scheduled`)).ok).toBe(true);
   const sent = await waitForEmails(offset, 2, (e) => e.to.startsWith("emlek."));
-  expect(sent.map((e) => e.to).sort()).toEqual([CILI.email, UNFINISHED]);
+  expect(sent.map((e) => e.to).sort()).toEqual([UNFINISHED, CILI.email]);
   const cili = sent.find((e) => e.to === CILI.email)!;
   expect(cili.subject).toBe("Küldd el a párlinkedet – Padelpárbaj");
   expect(cili.text).toMatch(/\/pair\/join\/[A-Za-z0-9_-]{20,}/);

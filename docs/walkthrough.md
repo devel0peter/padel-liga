@@ -343,7 +343,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 - Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
 - Expect:
   - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
-  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
+  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero until a result is final (steps 27 and 28 change that), and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
   - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
   - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
   - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
@@ -414,6 +414,19 @@ People stuck before entering get one reminder per situation, once the league's s
   - The decide page shows both versions, the note and the full log (1. pár / 2. pár). Without a reason the form doesn't send (the server refuses it too). After saving: "Elmentettük a döntést. Mindkét pár értesítést kap.", the decision in the log with the Szervező's name, time and reason, and Viták shows "Vitatott eredmények (0)".
   - Both pairs: "Végeredmény: <outcome>" ("Lejátszva: <score>" for a played match) and "A szervező döntött: … Indoklás: …" in the log; all four get it in "Értesítések" (no email: a daily-digest item, #31).
   - "Felülbírálom" works the same for any match, played or not; the latest decision counts.
+
+### 29. A visitor sees the results in the group table (after steps 27 and 28)
+
+The public ladder counts final results (README decision log, 2026-11-03, #186).
+
+- Page: `/league/minta`
+- Account: none (logged out)
+- Do: open the league page after the confirmation of step 27 and the decision of step 28.
+- Expect:
+  - In the player's group the table is no longer at zero: the player's pair has 3 points in 2 matches (the confirmed win of step 27 and the "both lose" decision of step 28, 0 points), the step 27 opponent 1 point in 1 match, the step 28 opponent 0 points in 1 match. Szett and Játék follow the rules (spec 9).
+  - "Lejátszott meccsek" under the table lists both: the score from the 1. pár's side ("4-1 2-4 10-8" or "1-4 4-2 8-10") and "egyik fél sem játszott".
+  - Before the confirmation (a result still waiting) and while a result is disputed (step 28, before the decision) the table does not change; it changes when the result is confirmed, accepted after 48 hours, or decided.
+  - Still no email address or phone number on the page.
 
 ## Start over
 

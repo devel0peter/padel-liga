@@ -139,7 +139,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
   - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
-  - The dialog says "Meghívók elindultak": "24 levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap." (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
+  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
   - The button is now disabled (everyone is invited once).
   - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
 
@@ -375,6 +375,18 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
   - 07:00: every player with an unopened digest item (for example "Lefixálva a meccsetek" or "Lemondták a meccset" from steps 18, 19 and 24, or "Még nincs időpont-ajánlat" from Wednesday of a match's week) gets one "Napi összefoglaló" email in the terminal with every item and its link; the reminders are in "Értesítések" too. Running it again sends nothing.
   - 18:00 the day before a fixed match: "Holnap meccs: <time>" to the match's four players, with the venue if recorded.
   - Any other hour: nothing.
+
+### 26. Szervező checks the automatic reminders (side path)
+
+People stuck before entering get one reminder per situation, once the league's switch is on (#155).
+
+- Page: `/admin/leagues/minta/reminders` ("Emlékeztetők")
+- Account: Szervező
+- Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
+- Expect:
+  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
+  - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
+  - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
 
 ## Start over
 

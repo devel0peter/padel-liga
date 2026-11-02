@@ -104,3 +104,10 @@ const dayAndTime = new Intl.DateTimeFormat("hu-HU", {
 export function formatDeadline(date: Date): string {
   return dayAndTime.format(date);
 }
+
+const weekdayDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric", weekday: "long" });
+
+// A day from an instant, in Budapest: "nov. 9., hétfő"
+export function formatWeekdayDate(date: Date): string {
+  return weekdayDate.format(date);
+}

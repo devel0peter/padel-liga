@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/cities.server", () => ({
   listedCities: async () => [{ slug: "gyor" }],
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
@@ -22,6 +23,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const SP = await import("~/lib/signup-partners.server");
 const { PARTNER_EMAIL_REFUSALS } = await import("~/lib/signup-partners");
 
@@ -64,6 +66,7 @@ describe("partner without an email (#96)", () => {
     const id = signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla" });
     register("a", "Anna");
     expect(await SP.savePartnerEmail(user("a"), id, " Bela@X.hu ")).toEqual({ ok: true });
+    await settleBackground();
     expect(all("select email2 from interest_signups")).toEqual([{ email2: "bela@x.hu" }]);
     expect(invites()).toHaveLength(1);
     expect(invites()[0]).toMatchObject({ to_email: "bela@x.hu", status: "sent" });
@@ -72,7 +75,9 @@ describe("partner without an email (#96)", () => {
     // The box is gone; a second submit (another tab) changes nothing.
     expect(await SP.missingPartnerEmails(user("a"))).toEqual([]);
     expect(await SP.savePartnerEmail(user("a"), id, "bela@x.hu")).toEqual({ ok: true });
+    await settleBackground();
     expect(await SP.savePartnerEmail(user("a"), id, "mas@x.hu")).toMatchObject({ ok: false });
+    await settleBackground();
     expect(all("select email2 from interest_signups")).toEqual([{ email2: "bela@x.hu" }]);
     expect(invites()).toHaveLength(1);
     expect(h.sent).toHaveLength(1);
@@ -82,6 +87,7 @@ describe("partner without an email (#96)", () => {
     const id = signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla" });
     register("a", "Anna");
     await SP.savePartnerEmail(user("a"), id, "b@x.hu");
+    await settleBackground();
     expect(activePairs()).toEqual([]);
     register("b", "Béla");
     await SP.formSignupPairs("b");
@@ -95,6 +101,7 @@ describe("partner without an email (#96)", () => {
     register("a", "Anna");
     register("b", "Béla");
     expect(await SP.savePartnerEmail(user("a"), id, "b@x.hu")).toEqual({ ok: true });
+    await settleBackground();
     expect(invites()).toEqual([]);
     expect(activePairs()).toEqual([{ player_a: "b", player_b: "a" }]);
   });
@@ -105,6 +112,7 @@ describe("partner without an email (#96)", () => {
     register("a", "Anna");
     register("b", "Béla");
     expect(await SP.savePartnerEmail(user("a"), id, "b@x.hu")).toEqual({ ok: true });
+    await settleBackground();
     await SP.formSignupPairs("b");
     expect(activePairs()).toEqual([]);
   });
@@ -116,8 +124,11 @@ describe("partner without an email (#96)", () => {
     register("d", "Dani");
     h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'c', 'd')`);
     expect(await SP.savePartnerEmail(user("a"), id, "A@x.hu")).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.self });
+    await settleBackground();
     expect(await SP.savePartnerEmail(user("a"), id, "nem-cim")).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.email });
+    await settleBackground();
     expect(await SP.savePartnerEmail(user("a"), id, "D@x.hu")).toEqual({ ok: false, error: PARTNER_EMAIL_REFUSALS.paired });
+    await settleBackground();
     expect(all("select email2 from interest_signups")).toEqual([{ email2: null }]);
     expect(invites()).toEqual([]);
   });
@@ -126,6 +137,7 @@ describe("partner without an email (#96)", () => {
     const id = signup({ name1: "Anna", email1: "a@x.hu", name2: "Béla" });
     register("x", "Xavér");
     expect(await SP.savePartnerEmail(user("x"), id, "b@x.hu")).toMatchObject({ ok: false });
+    await settleBackground();
     expect(all("select email2 from interest_signups")).toEqual([{ email2: null }]);
   });
 });

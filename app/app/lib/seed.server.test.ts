@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -21,6 +22,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const { db } = await import("~/db/client.server");
 const { users } = await import("~/db/schema");
 const Seed = await import("./seed");
@@ -216,6 +218,7 @@ describe("the seed carries the walkthrough", () => {
 
   it("sends the registration invite to the 20 pair players and all 4 solos (#96, #112)", async () => {
     expect(await O.queueRegistrationInvites()).toBe(24);
+    await settleBackground();
     const invites = rows("select to_email, status from email_messages where kind = 'registration_invite'");
     expect(invites).toHaveLength(24);
     expect(new Set(invites.map((m) => m.status))).toEqual(new Set(["sent"]));
@@ -227,6 +230,7 @@ describe("the seed carries the walkthrough", () => {
     expect(count("account_invites")).toBe(24);
     // A second run adds nothing.
     expect(await O.queueRegistrationInvites()).toBe(0);
+    await settleBackground();
     expect(h.sent).toHaveLength(24);
   });
 

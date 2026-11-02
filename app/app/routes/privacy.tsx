@@ -144,6 +144,14 @@ export default function Privacy() {
               meccsedről előző este szólunk.
             </p>
             <p>
+              Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
+              regisztráltál; nem fejezted be a regisztrációt; nincs párod; vagy
+              a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
+              egyszer küldünk egy emlékeztetőt a következő lépésről. Benne lehet
+              a párod neve, de más e-mail-címe vagy telefonszáma soha. Ha
+              kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
+            </p>
+            <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
               mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
               őrizzük meg, hogy ne írjunk rá többet.

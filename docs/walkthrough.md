@@ -316,6 +316,23 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
   - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
 
+### 20. Admin filters the Felhasználók list (side path)
+
+- Page: `/admin/users` as the Admin
+- Do: pick "Pár és nevezés" → "Nincs párja", then type a name in the search box, then press "Szűrők törlése".
+- Expect:
+  - Only accounts with the "Nincs párja" chip are listed; each option shows a count that matches the rows it would give with the other filters and the search.
+  - The description says "N fiók (összesen M)" while anything is set; the address holds `?pair=none` (and `q=`), so a reload or a shared link shows the same list.
+  - "Szűrők törlése" shows every account again. At 390 px the email and role sit under the name and no column is cut off.
+
+### 21. A player's level locks after the first season (side path)
+
+- Page: `/profile` as a player of a published group (step 11, for example the first pair's first player), then as a player without a group (step 15)
+- Do: open Profil; open the "i" next to "Értékszámod"; as the second player change "Szinted" and press "Mentés".
+- Expect:
+  - The player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
+  - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
+  - The player without a group can change the level, and the number follows.
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

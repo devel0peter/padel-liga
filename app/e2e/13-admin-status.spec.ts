@@ -84,3 +84,29 @@ test("Jelentkezők: Hol tartanak, people per stage, and the stage filter", async
   await expect(page.getByRole("row").filter({ hasText: akos.name })).toHaveCount(0);
   await context.close();
 });
+
+test("Felhasználók: filter by pair, kept in the address, with search and clear", async ({ browser }) => {
+  const anna = PAIRS.p1[0];
+  const akos = WAITING_SOLOS[1];
+  const { context, page } = await as(browser, ADMIN.email);
+  await visit(page, "/admin/users");
+  await expect(page.getByRole("row").filter({ hasText: anna.email })).toBeVisible();
+
+  await page.getByRole("combobox", { name: "Pár és nevezés" }).click();
+  await page.getByRole("option", { name: /^Nincs párja \(\d+\)$/ }).click();
+  await expect(page).toHaveURL(/pair=none/);
+  await expect(page.getByRole("row").filter({ hasText: akos.email })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: anna.email })).toHaveCount(0);
+  await expect(page.getByText(/ fiók \(összesen \d+\)/)).toBeVisible();
+
+  // Reloading keeps the filter; the search narrows it further.
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "Pár és nevezés" })).toContainText("Nincs párja");
+  await visit(page, `/admin/users?pair=none&q=${encodeURIComponent(anna.email)}`);
+  await expect(page.getByText("Nincs ilyen fiók.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Szűrők törlése" }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(page.getByRole("row").filter({ hasText: anna.email })).toBeVisible();
+  await context.close();
+});

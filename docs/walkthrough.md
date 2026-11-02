@@ -324,7 +324,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 - Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
 - Expect:
   - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
-  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei" ("időpont még nincs").
+  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
   - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
   - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
   - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.

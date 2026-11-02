@@ -1,11 +1,12 @@
 // The public league page (#30): a logged-out visitor sees every group of the
 // published phase in division bands, with tables and this week's matches,
-// names only. Runs after the groups were published (06): 6 pairs are 2 groups
+// names only. Runs after the groups were published (06) and some matches were
+// scheduled (15-matches): 6 pairs are 2 groups
 // of 3, so the bands are Bronz and Réz. The seed's round 1 is about two weeks
 // out, so the page shows week 1 of a phase that has not started.
 import { expect, test } from "@playwright/test";
 
-import { GROUP_PAIRS, PAIRS, content, visit } from "./support";
+import { GROUP_PAIRS, PAIRS, content, d1, visit } from "./support";
 
 test("the landing page's league card leads to the league page", async ({ browser }) => {
   const page = await browser.newPage();
@@ -36,7 +37,10 @@ test("a visitor sees the bands, group tables and the first week's matches", asyn
   await expect(first.getByRole("row")).toHaveCount(4); // header + 3 pairs
   await expect(first.getByRole("heading", { name: /^1\. hét meccsei/ })).toBeVisible();
   await expect(first.getByRole("listitem")).toHaveCount(1);
-  await expect(first).toContainText("időpont még nincs");
+  // 15-matches agreed a time for some matches: those show it, the rest "időpont még nincs".
+  const agreed = d1("select count(*) as n from matches where week = 1 and scheduled_at is not null")[0]!.n as number;
+  await expect(main.getByText("időpont még nincs")).toHaveCount(2 - agreed);
+  await expect(main.locator("li", { hasText: /\d{2}:\d{2}$/ })).toHaveCount(agreed);
   await expect(main).toContainText("1. kör, indul");
 
   // The explainer: three points, reached from a division header.

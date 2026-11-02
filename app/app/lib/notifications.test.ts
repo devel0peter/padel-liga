@@ -7,6 +7,7 @@ import {
   groupsPublishedMessage,
   matchAgreedTimeMessage,
   matchDecidedMessage,
+  matchCancelledMessage,
   matchDeclinedMessage,
   matchProposalMessage,
   matchResultConfirmedMessage,
@@ -268,9 +269,20 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     });
   });
 
-  it("the digest kinds are the scheduled, declined, confirmed and decided ones, not the instant ones", () => {
-    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_result_confirmed", "match_decided"]);
-    for (const instant of ["match_proposal", "match_agreed_time", "match_result"] as const) expect(DIGEST_KINDS).not.toContain(instant);
+  it("a cancellation (#27): late says the cancelling pair proposes next; no names", () => {
+    expect(matchCancelledMessage({ matchId: 7, slot, late: false })).toEqual({
+      title: "Lemondták a meccset",
+      body: "Az ellenfeletek lemondta a nov. 17., kedd 18:00 időpontot. Egyeztessetek újra.",
+      url: "/matches/7",
+    });
+    expect(matchCancelledMessage({ matchId: 7, slot, late: true }).body).toBe(
+      "Az ellenfeletek 24 órán belül lemondta a nov. 17., kedd 18:00 időpontot. Nekik kell új időpontokat ajánlaniuk.",
+    );
+  });
+
+  it("the digest kinds: scheduled, declined, cancelled, the reminders, confirmed and decided results; never an instant one (#31)", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon", "match_result_confirmed", "match_decided"]);
+    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow", "match_result"] as const) expect(DIGEST_KINDS).not.toContain(instant);
   });
 });
 

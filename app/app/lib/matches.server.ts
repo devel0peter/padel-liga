@@ -1,6 +1,7 @@
 import {
   agreedTimeErrors,
   autoAcceptAt,
+  isLateCancel,
   proposalErrors,
   proposalKind,
   resultActions,
@@ -8,6 +9,7 @@ import {
   schedulingActions,
   schedulingState,
   slotErrorMessage,
+  type SchedulingActions,
   type SchedulingEvent,
   type ResultState,
   type SchedulingEventKind,
@@ -23,6 +25,7 @@ import { clubs, groupPairs, groups, leagues, matchEvents, matches, pairs, season
 import { queueMatchEmails } from "~/lib/email/outbox.server";
 import {
   matchAgreedTimeMessage,
+  matchCancelledMessage,
   matchDeclinedMessage,
   matchProposalMessage,
   matchScheduledMessage,
@@ -33,6 +36,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 
 import { eventText } from "./matches";
 import { pairName } from "./groups";
+import { COURT_MAX } from "./matches";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
@@ -96,6 +100,7 @@ export type StoredEvent = {
   slots: number[] | null;
   slot: Date | null;
   clubId: number | null;
+  court: string | null;
   at: Date;
 };
 
@@ -113,6 +118,7 @@ export async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEv
       slots: matchEvents.slots,
       slot: matchEvents.slot,
       clubId: matchEvents.clubId,
+      court: matchEvents.court,
       at: matchEvents.at,
     })
     .from(matchEvents)
@@ -131,6 +137,7 @@ export const toSchedulingEvent = (e: StoredEvent, pairA: number): SchedulingEven
   slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
   slot: e.slot,
   clubId: e.clubId,
+  court: e.court,
 });
 
 export async function clubNames(ids: (number | null | undefined)[]): Promise<Map<number, string>> {
@@ -259,6 +266,75 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
   );
 }
 
+// --- Reminders (#31) ----------------------------------------------------------
+
+export type RunningMatch = {
+  id: number;
+  week: number;
+  phaseStartsAt: Date;
+  deadline: Date;
+  status: string;
+  state: SchedulingState;
+  kinds: SchedulingEventKind[];
+  venue: string | null;
+  // Pair a's and pair b's players (emails go only to the outbox).
+  pairs: { a: [Person, Person]; b: [Person, Person] };
+};
+
+const IDS_PER_QUERY = 90;
+
+function chunked<T>(list: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += IDS_PER_QUERY) out.push(list.slice(i, i + IDS_PER_QUERY));
+  return out;
+}
+
+/**
+ * Every match of a published group whose phase deadline hasn't passed, with
+ * its state, its log's kinds, the venue and both pairs' players, for the
+ * reminders (#31). A few queries for the whole league: the matches, then the
+ * players and the logs in chunks of 90 ids (D1: 100 bound parameters).
+ */
+export async function runningMatches(now = new Date()): Promise<RunningMatch[]> {
+  const rows = await db
+    .select({ match: matches, phaseStartsAt: seasonPhases.startsAt })
+    .from(matches)
+    .innerJoin(groups, eq(groups.id, matches.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(isNotNull(groups.publishedAt), gte(matches.deadline, now)))
+    .orderBy(asc(matches.id));
+  if (rows.length === 0) return [];
+  const members = new Map<number, PairPlayers[]>();
+  for (const ids of chunked([...new Set(rows.map((r) => r.match.groupId))]))
+    for (const [groupId, list] of await groupMembers(ids)) members.set(groupId, list);
+  const events = new Map<number, StoredEvent[]>();
+  for (const ids of chunked(rows.map((r) => r.match.id))) for (const [id, list] of await eventsOf(ids)) events.set(id, list);
+  const states = new Map(
+    rows.map(({ match: m }) => [m.id, schedulingState((events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)), now)]),
+  );
+  const venues = await clubNames([...states.values()].map((s) => (s.status === "scheduled" ? s.clubId : null)));
+  return rows.flatMap(({ match: m, phaseStartsAt }) => {
+    const pairsOf = members.get(m.groupId) ?? [];
+    const a = pairsOf.find((p) => p.pairId === m.pairA);
+    const b = pairsOf.find((p) => p.pairId === m.pairB);
+    if (!a || !b) return [];
+    const state = states.get(m.id)!;
+    return [
+      {
+        id: m.id,
+        week: m.week,
+        phaseStartsAt,
+        deadline: m.deadline,
+        status: m.status,
+        state,
+        kinds: (events.get(m.id) ?? []).map((e) => e.kind),
+        venue: state.status === "scheduled" ? (venues.get(state.clubId ?? -1) ?? null) : null,
+        pairs: { a: a.players, b: b.players },
+      },
+    ];
+  });
+}
+
 // --- The match page (#26) -----------------------------------------------------
 
 export type MatchContext = {
@@ -340,6 +416,8 @@ export type MatchPage = {
   state: SchedulingState;
   venue: string | null;
   actions: ReturnType<typeof schedulingActions>;
+  // Cancelling now would be late (under 24 hours before the slot, #27).
+  cancelLate: boolean;
   clubs: { id: number; name: string }[];
   // The result (#28): its state, what this player can do, when a waiting one
   // is accepted by itself.
@@ -352,7 +430,7 @@ export type MatchPage = {
 };
 
 // Once a result is recorded, disputed or final, scheduling is over (#28).
-const NO_SCHEDULING = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false };
+const NO_SCHEDULING: SchedulingActions = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false };
 
 // The match page for a player of either pair; null for anyone else, or a
 // match that doesn't exist (the page answers 404 either way).
@@ -383,9 +461,11 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       by: "pair" as const,
       text: eventText({
         kind: e.kind,
+        at: e.at,
         slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
         slot: e.slot,
         venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+        court: e.court,
       }),
     })),
     ...results.events.map((e) => ({
@@ -427,6 +507,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     state,
     venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
     actions: result.status === "none" ? scheduling : NO_SCHEDULING,
+    cancelLate: result.status === "none" && state.status === "scheduled" && isLateCancel(state.slot, now),
     clubs: cityClubs,
     result,
     resultActions: resultActions(result, side),
@@ -442,7 +523,9 @@ export type StepInput =
   | { kind: "accept"; slot: Date }
   | { kind: "agreed"; slot: Date; clubId: number | null }
   | { kind: "confirm" }
-  | { kind: "decline" };
+  | { kind: "decline" }
+  | { kind: "venue"; clubId: number | null; court: string }
+  | { kind: "cancel" };
 
 export type StepResult = { ok: true; notice: string } | { ok: false; error: string; slotErrors?: SlotError[] };
 
@@ -454,6 +537,10 @@ const CLOSED_DEADLINE = "Lejárt a kör határideje, itt már nem lehet egyeztet
 const BAD_CLUB = "Válassz a listából helyszínt, vagy hagyd üresen.";
 const NOTHING_TO_ANSWER = "Erre most nincs mit válaszolni. Frissítsd az oldalt.";
 const SLOT_GONE = "Ez az időpont már nem választható. Frissítsd az oldalt.";
+const NOT_SCHEDULED = "A meccsnek most nincs lefixált időpontja. Frissítsd az oldalt.";
+const STARTED = "A meccs időpontja már elkezdődött, nem lehet lemondani.";
+const NO_CLUB = "Válassz helyszínt a listából.";
+const LONG_COURT = `A pálya legfeljebb ${COURT_MAX} karakter lehet.`;
 
 const secs = (d: Date) => Math.floor(d.getTime() / 1000);
 
@@ -471,12 +558,29 @@ async function clubAllowed(clubId: number | null, city: string): Promise<boolean
   return !!row;
 }
 
-type NewEvent = { kind: SchedulingEventKind; slots?: number[] | null; slot?: Date | null; clubId?: number | null };
+type NewEvent = {
+  kind: SchedulingEventKind;
+  slots?: number[] | null;
+  slot?: Date | null;
+  clubId?: number | null;
+  court?: string | null;
+};
+
+// Why a step can't be taken now, or null: recording the venue and cancelling
+// need a scheduled match (#27), everything else one that isn't (#26).
+function closedReason(input: StepInput, state: SchedulingState, can: ReturnType<typeof schedulingActions>, now: Date, deadline: Date): string | null {
+  if (now.getTime() >= deadline.getTime()) return CLOSED_DEADLINE;
+  if (input.kind === "venue" || input.kind === "cancel") {
+    if (state.status !== "scheduled") return NOT_SCHEDULED;
+    return input.kind === "cancel" && !can.cancel ? STARTED : null;
+  }
+  return can.propose ? null : CLOSED_SCHEDULED;
+}
 
 /**
- * One scheduling step by a player of either pair (#26): checked against the
- * slot rules (#8) and the match's state, appended to the log and mirrored on
- * the match in one batch. If someone else's step got in first, nothing is
+ * One scheduling step by a player of either pair (#26, #27): checked against
+ * the slot rules (#8) and the match's state, appended to the log and mirrored
+ * on the match in one batch. If someone else's step got in first, nothing is
  * written. Then the other pair is told (spec 13).
  */
 export async function matchStep(userId: string, matchId: number, input: StepInput, now = new Date()): Promise<StepResult> {
@@ -488,11 +592,29 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   const state = stateOf(ctx, now);
   if ((await resultOf(ctx.match)).state.status !== "none") return { ok: false, error: CLOSED_RESULT };
   const can = schedulingActions(state, side, now, deadline);
-  if (!can.propose) return { ok: false, error: state.status === "scheduled" ? CLOSED_SCHEDULED : CLOSED_DEADLINE };
+  const closed = closedReason(input, state, can, now, deadline);
+  if (closed) return { ok: false, error: closed };
 
   let event: NewEvent;
   let notice: string;
   switch (input.kind) {
+    case "venue": {
+      const court = input.court.trim();
+      if (input.clubId === null || !(await clubAllowed(input.clubId, ctx.city))) return { ok: false, error: NO_CLUB };
+      if (court.length > COURT_MAX) return { ok: false, error: LONG_COURT };
+      event = { kind: "venue", clubId: input.clubId, court: court || null };
+      notice = "Rögzítettük a helyszínt.";
+      break;
+    }
+    case "cancel": {
+      // closedReason made sure the match is scheduled.
+      const slot = (state as Extract<SchedulingState, { status: "scheduled" }>).slot;
+      event = { kind: "cancelled", slot };
+      notice = isLateCancel(slot, now)
+        ? "Lemondtátok. Mivel 24 órán belül volt, nektek kell új időpontokat ajánlani."
+        : "Lemondtátok. Egyeztessetek új időpontot.";
+      break;
+    }
     case "propose": {
       const slotErrors = proposalErrors(input.slots, now, deadline);
       if (slotErrors.length > 0) return { ok: false, error: slotErrorText(slotErrors), slotErrors };
@@ -527,7 +649,15 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   const after = schedulingState(
     [
       ...ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)),
-      { kind: event.kind, side, at: now, slots: event.slots?.map((s) => new Date(s * 1000)), slot: event.slot, clubId: event.clubId },
+      {
+        kind: event.kind,
+        side,
+        at: now,
+        slots: event.slots?.map((s) => new Date(s * 1000)),
+        slot: event.slot,
+        clubId: event.clubId,
+        court: event.court,
+      },
     ],
     now,
   );
@@ -545,6 +675,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
         slots: event.slots ?? null,
         slot: event.slot ?? null,
         clubId: event.clubId ?? null,
+        court: event.court ?? null,
         at: now,
       }),
       db
@@ -562,14 +693,16 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
     throw e;
   }
 
-  await tellOtherPair(ctx, side, event, state);
+  await tellOtherPair(ctx, side, event, state, now);
   return { ok: true, notice };
 }
 
 // The other pair learns about the step (spec 13): a proposal or an agreed
-// time instantly (email, push, the app); a scheduled match or a declined
-// agreed time in the app and by push (the daily digest email is #31).
-async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, before: SchedulingState): Promise<void> {
+// time instantly (email, push, the app); a scheduled match, a declined agreed
+// time or a cancellation in the app and by push (the daily digest email is
+// #31). Recording the venue tells nobody (#27).
+async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, before: SchedulingState, now: Date): Promise<void> {
+  if (event.kind === "venue") return;
   const [ours, theirs] = side === "a" ? [ctx.pairs.a, ctx.pairs.b] : [ctx.pairs.b, ctx.pairs.a];
   const matchId = ctx.match.id;
   const send = (kind: PlayerKind, message: Message) =>
@@ -608,6 +741,9 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
         break;
       case "agreed_declined":
         if (before.status === "agreed_time") await send("match_declined", matchDeclinedMessage({ matchId, slot: before.slot }));
+        break;
+      case "cancelled":
+        await send("match_cancelled", matchCancelledMessage({ matchId, slot: event.slot!, late: isLateCancel(event.slot!, now) }));
         break;
     }
   } catch (error) {

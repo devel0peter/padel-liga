@@ -24,7 +24,9 @@ export type MessageKind =
   | "groups_published"
   | "match_proposal"
   | "match_agreed_time"
-  | "match_result";
+  | "match_result"
+  | "match_digest"
+  | "match_tomorrow";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

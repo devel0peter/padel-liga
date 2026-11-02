@@ -167,7 +167,7 @@ describe("recording a result (#28)", () => {
     const { id, rec, opp } = setup();
     await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
     const page = (await M.matchPage(id, opp, PLAYED))!;
-    expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false });
+    expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false });
     expect(await M.matchStep(opp, id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).toEqual({
       ok: false,
       error: "A meccs eredménye már rögzítve van, itt már nem lehet egyeztetni.",

@@ -2,6 +2,7 @@ import { createRequestHandler } from "react-router";
 
 import { deliver } from "../app/lib/email/outbox.server";
 import { autoAcceptResults } from "../app/lib/results.server";
+import { runMatchReminders } from "../app/lib/match-reminders.server";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -12,12 +13,19 @@ export default {
   async fetch(request) {
     return requestHandler(request);
   },
-  async scheduled(_controller, _env, ctx) {
-    // Results waiting 48 hours are accepted first (#28); a failure there
-    // must not stop the emails.
-    const accepted = autoAcceptResults()
+  // Hourly: results waiting 48 hours are accepted (#28), then the match
+  // reminders and the daily digest when their hour comes (#31); a failure in
+  // either is only logged. Then whatever email waits.
+  async scheduled(controller, _env, ctx) {
+    const now = new Date(controller.scheduledTime);
+    const accepted = autoAcceptResults(now)
       .then((n) => n && console.log(`cron: auto-accepted ${n} results`))
       .catch((error) => console.error("cron: auto-accept failed", error));
-    ctx.waitUntil(accepted.then(() => deliver()).then(({ sent }) => sent && console.log(`cron: sent ${sent} emails`)));
+    ctx.waitUntil(
+      accepted
+        .then(() => runMatchReminders(now))
+        .then(() => deliver())
+        .then(({ sent }) => sent && console.log(`cron: sent ${sent} emails`)),
+    );
   },
 } satisfies ExportedHandler<Env>;

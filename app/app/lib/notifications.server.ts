@@ -108,7 +108,7 @@ const NONE: ReadonlySet<string> = new Set();
 // pushes it to those who didn't switch push off (#115). D1 queries: one
 // opt-out lookup, one insert per INSERT_CHUNK messages, one subscription
 // lookup (per ID_CHUNK users each).
-async function notify(kind: StoredKind, messages: { userId: string; message: Message }[]): Promise<void> {
+async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
   const disabled = await disabledKinds(messages.map((m) => m.userId));
   const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? NONE, kind));
   // Each returned row carries its own message: RETURNING has no set order.
@@ -117,7 +117,7 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
     stored.push(
       ...(await db
         .insert(notifications)
-        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message })))
+        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message, ...(createdAt ? { createdAt } : {}) })))
         .returning({
           id: notifications.id,
           userId: notifications.userId,
@@ -141,9 +141,11 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
 // player switched push off. The email goes through the outbox, which checks
 // the email switch. A push failure never fails the caller; neither does a
 // failure here, since the decision it reports is already saved.
-export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[]): Promise<void> {
+// `createdAt`: the time of a scheduled job (the reminders, #31), so the daily
+// digest reads the same clock; the database time otherwise.
+export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
   try {
-    await notify(kind, messages);
+    await notify(kind, messages, createdAt);
   } catch (error) {
     console.error(`${kind} notification failed`, error);
   }

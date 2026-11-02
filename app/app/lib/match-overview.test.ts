@@ -44,6 +44,17 @@ describe("overviewStatus (#158 requirement 1)", () => {
     const state: SchedulingState = { status: "scheduled", slot, clubId: 1 };
     expect(overviewStatus(state, names, "Ace Padel")).toEqual({ label: "Lefixálva: nov. 12., csütörtök 18:00, Ace Padel", tone: "done" });
     expect(overviewStatus(state, names).label).toBe("Lefixálva: nov. 12., csütörtök 18:00");
+    // With the court recorded (#27).
+    expect(overviewStatus({ ...state, court: "2-es pálya" }, names, "Ace Padel").label).toBe(
+      "Lefixálva: nov. 12., csütörtök 18:00, Ace Padel, 2-es pálya",
+    );
+  });
+
+  it("after a late cancellation: the pair that must propose next (#27)", () => {
+    expect(overviewStatus({ status: "to_schedule", nextBy: "b" }, names)).toEqual({
+      label: "Későn lemondták, Tóth Cili – Szabó Dani ajánl új időpontot",
+      tone: "todo",
+    });
   });
 });
 

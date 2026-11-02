@@ -9,7 +9,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 
 import { pairName } from "./groups";
 import { eventText } from "./matches";
-import { CHANGED, loadMatch } from "./matches.server";
+import { CHANGED, clubNames, loadMatch } from "./matches.server";
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
@@ -168,7 +168,7 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
   const ctx = await loadMatch(matchId);
   if (!ctx) return null;
   const names = { a: pairName(ctx.pairs.a.players), b: pairName(ctx.pairs.b.players) };
-  const results = await resultOf(ctx.match);
+  const [results, venues] = await Promise.all([resultOf(ctx.match), clubNames(ctx.events.map((e) => e.clubId))]);
   const result = results.state;
   const pairLabel = (pairId: number) => (pairId === ctx.match.pairA ? "1. pár" : "2. pár");
   const log = [
@@ -178,8 +178,14 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       at: e.at,
       who: e.userName || "Törölt játékos",
       role: pairLabel(e.pairId),
-      // The venue's name isn't needed here; the players' page has it.
-      text: eventText({ kind: e.kind, slots: e.slots?.map((s) => new Date(s * 1000)) ?? null, slot: e.slot }),
+      text: eventText({
+        kind: e.kind,
+        at: e.at,
+        slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+        slot: e.slot,
+        venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+        court: e.court,
+      }),
     })),
     ...results.events.map((e) => ({
       key: `e${e.id}`,

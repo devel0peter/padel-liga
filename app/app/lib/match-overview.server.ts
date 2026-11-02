@@ -233,9 +233,11 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         pair: pairOf(e.pairId),
         text: eventText({
           kind: e.kind,
+          at: e.at,
           slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
           slot: e.slot,
           venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+          court: e.court,
         }),
       })),
       ...results.events.map((e) => ({

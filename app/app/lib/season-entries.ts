@@ -5,7 +5,7 @@
 // Either player of an active pair enters while the season is open: from the
 // day registration opens until the last phase starts. Both players need a
 // level (the starting Elo). The entry counts at once, no organizer approval
-// (#153, D60). One entry per season and pair. A pair entered after phase 1
+// (#153, D62). One entry per season and pair. A pair entered after phase 1
 // started (or once its groups are out) joins at the next phase. "pending"
 // and "rejected" are left from the approval step: nothing writes them now.
 

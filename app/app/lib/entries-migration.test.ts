@@ -1,4 +1,4 @@
-// The deploy step of #153 (D60): migration 0030 enters every entry still
+// The deploy step of #153 (D62): migration 0030 enters every entry still
 // pending, with its joining phase worked out as if approved at that moment.
 // Runs every migration before it on a real SQLite, adds rows, then applies
 // 0030.

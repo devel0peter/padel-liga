@@ -13,7 +13,7 @@ import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
 
 // A season's entered pairs for the league's Szervezők (#23): an entry counts
-// at once, there is nothing to approve (#153, D60). Names and levels only, no
+// at once, there is nothing to approve (#153, D62). Names and levels only, no
 // contact details.
 
 export function meta({}: Route.MetaArgs) {

@@ -149,7 +149,7 @@ async function entryRefusal(user: User, season: Season, now: Date) {
 
 type Joins = { phase: number; startsAt: Date } | null;
 
-// Enters the pair at `now` (#153, D60): the entry counts at once, from the
+// Enters the pair at `now` (#153, D62): the entry counts at once, from the
 // joining phase. One statement re-checks that the pair is still active, both
 // players have a level and the same two players have no other entry here,
 // and that phase 1's groups weren't published meanwhile; the unique index

@@ -1,4 +1,4 @@
--- #153 (D60): a season entry counts at once, no organizer approval. An entry
+-- #153 (D62): a season entry counts at once, no organizer approval. An entry
 -- still pending when this ships is entered now, with its joining phase worked
 -- out as if approved at this moment (joinsPhase in season-entries.ts): the
 -- first phase that hasn't started, skipping phase 1 once the season has

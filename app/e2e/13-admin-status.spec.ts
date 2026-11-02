@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 
 import { ADMIN, LONE, ORGANIZER, PAIRS, WAITING_SOLOS, as, content, visit } from "./support";
 
-const ENTERED = /Nevezés \(.+\): Jóváhagyva/;
+const ENTERED = /Nevezés \(.+\): Nevezett/;
 
 test("Felhasználók: status chips and, for the Admin, the last login", async ({ browser }) => {
   const [anna, partner] = PAIRS.p1;

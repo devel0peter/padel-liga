@@ -140,23 +140,28 @@ export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// A Szervező decided on the pair's season entry (#23). No names (a lock
-// screen is not a private place); the note is on the Párom page.
-export function seasonEntryDecisionMessage(input: {
-  league: string;
-  season: string;
-  approved: boolean;
-  // Where an approved pair starts; null: the next season.
-  joins: { phase: number; startsAt: Date } | null;
-}): Message {
-  const start = !input.approved
-    ? null
-    : input.joins === null
+// The pair's season entry counts (#153): one of them clicked "Nevezünk", or
+// the organizer entered them from Párok (#154); or the organizer took them
+// out of the season (#154). No names (a lock screen is not a private place).
+export function seasonEntryMessage(
+  input: {
+    league: string;
+    season: string;
+    // Where the pair starts; null: the next season. Not used for "removed".
+    joins: { phase: number; startsAt: Date } | null;
+  },
+  event: "entered" | "entered_by_organizer" | "removed" = "entered",
+): Message {
+  const where = `${input.season}, ${input.league}.`;
+  if (event === "removed")
+    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: "/pair" };
+  const start =
+    input.joins === null
       ? "A következő szezontól játszotok."
       : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
-    title: input.approved ? "Jóváhagyták a nevezéseteket" : "Nem fogadták el a nevezéseteket",
-    body: [`${input.season}, ${input.league}.`, start].filter(Boolean).join(" "),
+    title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
+    body: `${where} ${start}`,
     url: "/pair",
   };
 }

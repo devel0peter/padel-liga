@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queueSeasonEntryDecision: async (...args: any[]) => h.mails.push(args),
+  queueSeasonEntered: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
 }));
 
@@ -56,6 +56,12 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
     expect(h.raw.prepare("select * from pairs").all()).toEqual([]);
   });
 
+  it("#154: another league's Szervező can't enter a pair or take one out (403)", async () => {
+    const cookie = await cookieFor("masik", "player", 2);
+    for (const intent of ["enter", "remove"])
+      expect(await status(R.action(args(post(cookie, { intent, pair: "1", season: "1" }))))).toBe(403);
+  });
+
   it("sends a logged-out visitor to the login page", async () => {
     expect(await status(R.loader(args(get(""))))).toBe(302);
   });
@@ -72,7 +78,7 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
       { actor_id: "szervezo", action: "pair.create" },
     ]);
     const page = await R.loader(args(get(admin)));
-    expect(page.pairs.map((p) => p.players.map((x) => x.id))).toEqual([["a", "b"]]);
+    expect(page.rows.flatMap((r) => (r.kind === "pair" ? [r.pair.players.map((x) => x.id)] : []))).toEqual([["a", "b"]]);
     expect(JSON.stringify(page)).not.toContain("@");
     expect(h.mails).toEqual([]);
   });

@@ -105,8 +105,9 @@ export default function Privacy() {
                 is (kinek az e-mail-címére, mikor, és elfogadták-e),
               </li>
               <li>
-                a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
-                döntése az üzenetével együtt,
+                a párotok nevezései a szezonokra (mikor neveztetek, melyik körtől
+                játszotok), és ha korábban a szervező döntött róluk, a döntése az
+                üzenetével együtt,
               </li>
               <li>
                 az értesítéseid listája, és hogy e-mailben, push értesítésben
@@ -241,6 +242,13 @@ export default function Privacy() {
               nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
               szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
+              Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
+              ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
+              e-mailben nem. Hogy ki és mikor tette, eltároljuk. A Párok oldalon
+              a regisztrált, még pár nélküli játékosok is szerepelnek: a nevük, a
+              szintjük és az, hogy párt keresnek-e. Az Admin innen körlevelet
+              írhat a listán látott játékosoknak (például akik még nem neveztek);
+              aki leiratkozott vagy kikapcsolta az e-mailt, nem kapja meg.
             </p>
             <p>
               A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a

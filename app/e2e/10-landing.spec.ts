@@ -100,3 +100,12 @@ test("the public pages do not scroll sideways at 360 px", async ({ browser }) =>
   }
   await context.close();
 });
+
+// The poster (#120) no longer ties the start to a number of pairs.
+test("the poster doesn't make the start depend on pairs", async ({ browser }) => {
+  const { context, page } = await as(browser, ADMIN.email);
+  await visit(page, "/admin/poster");
+  await expect(page.locator("article")).toContainText("Nevezz a pároddal, és már a következő körtől játszotok.");
+  await expect(page.locator("article")).not.toContainText(/12 pár|összegyűlik/);
+  await context.close();
+});

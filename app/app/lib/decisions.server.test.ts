@@ -17,6 +17,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { MANY, addManyMatches, recordOn } = await import("~/test/many-matches");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 
@@ -138,6 +139,19 @@ describe("the league's disputes and matches (#29 requirement 1)", () => {
     expect(matches.filter((m) => m.label === "Egyeztetés alatt")).toHaveLength(8);
     // No contact details.
     expect(JSON.stringify({ disputes, matches })).not.toMatch(/@|\+36/);
+  });
+
+  it("more matches than one D1 statement can bind: all listed, with names and results", async () => {
+    const ids = addManyMatches(h.raw, DEADLINE);
+    const last = ids.at(-1)!;
+    recordOn(h.raw, last, WIN, PLAYED);
+    h.raw
+      .prepare("insert into match_events (match_id, pair_id, user_id, kind, score, at) values (?, ?, ?, 'result_disputed', ?, ?)")
+      .run(last, 2 * last + 1, `m${2 * last + 1}a`, JSON.stringify(LOSS), Math.floor(LATER.getTime() / 1000));
+    const { disputes, matches } = await D.leagueMatches(1);
+    expect(matches).toHaveLength(9 + MANY);
+    expect(matches.find((m) => m.id === ids[0])).toMatchObject({ a: `Sok ${2 * ids[0]!}A – Sok ${2 * ids[0]!}B`, label: "Egyeztetés alatt" });
+    expect(disputes.map((d) => [d.id, d.recorded, d.counter])).toEqual([[last, "4:1, 4:2", "1:4, 2:4"]]);
   });
 
   it("another league's matches are not listed", async () => {

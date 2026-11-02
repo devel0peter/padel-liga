@@ -1,5 +1,5 @@
 import { decisionErrors, type MatchOutcome, type ResultState, type Side } from "@padel-liga/rules";
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -11,6 +11,7 @@ import { pairName } from "./groups";
 import { eventText } from "./matches";
 import { CHANGED, loadMatch } from "./matches.server";
 import { resultOf, resultsOf } from "./result-log.server";
+import { guardedMatchId, lostRace } from "./results.server";
 import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
 
 // The organizer's side of results (#29): the league's disputes and matches,
@@ -25,14 +26,14 @@ const NOT_IN_LEAGUE = "Nincs ilyen meccs ebben a ligában.";
 const pa = alias(users, "pa_user");
 const pb = alias(users, "pb_user");
 
-async function pairNames(ids: number[]): Promise<Map<number, string>> {
-  if (ids.length === 0) return new Map();
+// The names of the league's pairs, by id: one query (pairs belong to a league).
+async function pairNames(leagueId: number): Promise<Map<number, string>> {
   const rows = await db
     .select({ id: pairs.id, a: pa.name, b: pb.name })
     .from(pairs)
     .innerJoin(pa, eq(pa.id, pairs.playerA))
     .innerJoin(pb, eq(pb.id, pairs.playerB))
-    .where(inArray(pairs.id, [...new Set(ids)]));
+    .where(eq(pairs.leagueId, leagueId));
   return new Map(rows.map((r) => [r.id, pairName([{ name: r.a }, { name: r.b }])]));
 }
 
@@ -90,6 +91,7 @@ function organizerLabel(m: { result: ResultState; status: string; a: string; b: 
  * by phase, group and week; and the disputed ones with both versions.
  */
 export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispute[]; matches: LeagueMatch[] }> {
+  const inLeague = and(eq(seasons.leagueId, leagueId), isNotNull(groups.publishedAt));
   const rows = await db
     .select({
       id: matches.id,
@@ -104,9 +106,17 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
-    .where(and(eq(seasons.leagueId, leagueId), isNotNull(groups.publishedAt)))
+    .where(inLeague)
     .orderBy(desc(seasons.id), asc(groups.phase), asc(groups.number), asc(matches.week), asc(matches.id));
-  const [names, results] = await Promise.all([pairNames(rows.flatMap((r) => [r.pairA, r.pairB])), resultsOf(rows)]);
+  // Every season of the league: more ids than D1 binds (100), so the log is
+  // read by a subquery of the same matches.
+  const ids = db
+    .select({ id: matches.id })
+    .from(matches)
+    .innerJoin(groups, eq(groups.id, matches.groupId))
+    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
+    .where(inLeague);
+  const [names, results] = await Promise.all([pairNames(leagueId), resultsOf(rows, ids)]);
   const list: LeagueMatch[] = rows.map((r) => {
     const a = names.get(r.pairA) ?? "";
     const b = names.get(r.pairB) ?? "";
@@ -236,7 +246,7 @@ export async function decideMatch(
   try {
     await db.batch([
       db.insert(matchDecisions).values({
-        matchId: sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${revision})`,
+        matchId: guardedMatchId(matchId, revision),
         kind: "organizer",
         userId,
         outcome,
@@ -249,7 +259,7 @@ export async function decideMatch(
         .where(and(eq(matches.id, matchId), eq(matches.revision, revision))),
     ]);
   } catch (e) {
-    if (/NOT NULL constraint failed: match_decisions\.match_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) return { ok: false, error: CHANGED };
+    if (lostRace(e)) return { ok: false, error: CHANGED };
     throw e;
   }
   try {

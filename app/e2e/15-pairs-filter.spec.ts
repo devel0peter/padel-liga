@@ -26,6 +26,8 @@ test("search and the Nincs a ligában filter, kept in the address", async ({ bro
   // Nincs a ligában: players without a pair and pairs not entered; the count is the rows shown.
   await page.getByRole("link", { name: "Szűrők törlése" }).click();
   await expect(page).not.toHaveURL(/q=/);
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("link", { name: "Szűrők törlése" })).toHaveCount(0);
   const option = page.getByRole("link", { name: /^Nincs a ligában \(\d+\)$/ });
   const count = Number(/\((\d+)\)/.exec((await option.textContent()) ?? "")![1]);
   await option.click();
@@ -60,7 +62,7 @@ test("Levél nekik opens the broadcast page with the players shown; nothing is s
   await expect(page).toHaveURL(/\/admin\/broadcasts\/new\?pairs=minta&entry=not_in_league/);
   await expect(content(page)).toContainText("Párok, Padelpárbaj Mintaváros");
   await expect(content(page)).toContainText("Nincs a ligában");
-  await page.getByText("Lista").click();
+  await page.getByText("Lista", { exact: true }).click();
   await expect(content(page)).toContainText(akos.name);
   await expect(content(page)).not.toContainText(anna.name);
   await page.getByRole("link", { name: "Szűrők módosítása" }).click();

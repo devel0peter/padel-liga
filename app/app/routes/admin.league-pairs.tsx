@@ -381,11 +381,12 @@ function Filters({ query, counts, slug, canMail, shown }: {
       <div className="flex flex-wrap items-center gap-2">
         <Form method="get" className="w-full sm:w-64">
           {query.entry && <input type="hidden" name="entry" value={query.entry} />}
-          <Input type="search" name="q" defaultValue={query.q} placeholder="Keresés név szerint…" aria-label="Keresés" />
+          {/* Keyed by the search, so clearing it empties the field too. */}
+          <Input key={query.q} type="search" name="q" defaultValue={query.q} placeholder="Keresés név szerint…" aria-label="Keresés" />
         </Form>
         {filtered && (
           <Button variant="ghost" asChild>
-            <Link to=".">Szűrők törlése</Link>
+            <Link to={`/admin/leagues/${slug}/pairs`}>Szűrők törlése</Link>
           </Button>
         )}
         {filtered && canMail && (

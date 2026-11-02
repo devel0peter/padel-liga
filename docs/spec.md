@@ -206,7 +206,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 - A 1st or 2nd strike, with the count (the 2nd is the warning).
 - Reminder 2 days before the registration window closes, to pairs that haven't re-entered.
 
-**Reminders for people stuck before entering** (email only, README decision log, 2026-11-02, #155, D73). Each situation gets one automatic reminder with the person's own next step, never a second, even if they stay stuck or fall back into it; a person due in two gets only the earlier one's (A before D):
+**Reminders for people stuck before entering** (email only, README decision log, 2026-11-02, #155, D73). Each situation gets one automatic reminder with the person's own next step, never a second, even if they stay stuck or fall back into it; a person due in two at the same run gets only the earlier one's (A before D), and the later one on a following run:
 - A: on the interest list (not withdrawn), got the registration invite, no account 2 days later: "Még nem regisztráltál", with their registration link, and "<partner> már regisztrált, csak rád vár" when the pair signup's partner registered.
 - B: started an account (first login), first-login page not done 24 hours later: "Fejezd be a regisztrációt", log in and add name, level and phone.
 - C: registered, no pair in the league 2 days after registering (or after the pair was dissolved, or "Párt keresek" was switched off), "Párt keresek" off: "Küldd el a párlinkedet", with their own pair link, or switch on "Párt keresek"; "<partner> még nem regisztrált" when a pair signup names a partner who hasn't.

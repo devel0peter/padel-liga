@@ -11,10 +11,12 @@
 // Only while the league has a season accepting entries (registration opened,
 // last phase not started), since every reminder gives its dates. When its
 // registration deadline is under 24 hours away, a reminder whose waiting
-// time hasn't passed goes out right away. A person due in two situations
-// gets only the earlier one's (A before B before C before D).
+// time hasn't passed goes out right away. A person due in two situations in
+// the same run gets only the earlier one's (A before B before C before D);
+// once it is sent, the later one is due on a following run, as each
+// situation has its own reminder.
 
-import { isSeeking } from "./partner-search";
+import { defaultSeekers, isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
 import { homeSeasons, type Season } from "./seasons";
 
@@ -227,13 +229,12 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   const active = input.pairs.filter((p) => p.status === "active");
   const inPair = (userId: string, leagueId: number) =>
     active.some((p) => p.leagueId === leagueId && (p.playerA === userId || p.playerB === userId));
+  // "Párt keresek" is on by default for a solo signup still waiting (D59).
+  const registeredEmails = new Set(input.accounts.filter((a) => a.consentAt).map((a) => a.email));
+  const seekersByCity = new Map<string, Map<string, ReminderSignup>>();
   const waitingSolo = (email: string, city: string) => {
-    const byId = new Map(input.signups.map((s) => [s.id, s]));
-    return live.some((s) => {
-      if (s.mode !== "solo" || s.city !== city || s.email1.toLowerCase() !== email) return false;
-      const partner = s.pairedWith == null ? null : byId.get(s.pairedWith);
-      return s.pairedWith == null || !partner || registered(partner.email1);
-    });
+    if (!seekersByCity.has(city)) seekersByCity.set(city, defaultSeekers(input.signups, city, registeredEmails));
+    return seekersByCity.get(city)!.has(email);
   };
   for (const a of input.accounts) {
     if (!a.consentAt || !mailable(a.email, a)) continue;

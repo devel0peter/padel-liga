@@ -4,7 +4,7 @@
 // so the earlier steps' lists stay as they were.
 import { expect, test } from "@playwright/test";
 
-import { content, d1, logIn, save, visit } from "./support";
+import { content, d1, d1Insert, emailsSince, logIn, logOffset, save, visit } from "./support";
 
 const NEW_PLAYER = { name: "Új Játékos", email: "uj.jatekos@example.test" };
 
@@ -44,4 +44,23 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(content(page)).toContainText("a szervező keres neked párt.");
   await expect(content(page).getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
   await context.close();
+});
+
+// #123: a new address that bounced before gets no code, yet the code step
+// says the same as for any other address and names the other ways in: the
+// contact address (and Google login, which the suite has not set up).
+test("15. the code step names the contact address, also when no code goes out", async ({ page }) => {
+  const bounced = "visszapattant@example.test";
+  d1Insert(`insert into email_suppressions (email, reason) values ('${bounced}', 'bounced')`);
+  const offset = logOffset();
+  await visit(page, `/login?email=${encodeURIComponent(bounced)}`);
+  await page.getByRole("button", { name: "Kódot kérek" }).click();
+  await expect(page.getByRole("heading", { name: "Nézd meg a leveleidet" })).toBeVisible();
+  await expect(content(page)).toContainText(`Küldtünk egy 6 jegyű kódot ide: ${bounced}.`);
+  await expect(content(page)).toContainText(
+    "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, vagy írj nekünk: hello@padelparbaj.hu.",
+  );
+  await expect(content(page).getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
+  await expect(content(page).getByRole("link", { name: /Google/ })).toHaveCount(0);
+  expect(emailsSince(offset).filter((e) => e.to === bounced)).toEqual([]);
 });

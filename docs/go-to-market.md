@@ -75,15 +75,38 @@ Ha eddig halogattad: most iratkozz fel, és jelöld meg a párodat! 👇
 👉 padelparbaj.hu/?ref=fb-peter
 ```
 
-### Post 4: 2 Nov (draft)
-```
-Nyílik a nevezés! 🎾
+### Post 4: registration open (ready 2026-10-29)
+Dates from the live season "2026/27 tél": entry 29 Oct – 6 Nov (Fri), round 1 starts 9 Nov, round 2 on 30 Nov. No signup count in the post (Peter, 2026-10-29): interest signups aren't entries, so the post thanks people for the interest instead, in first person singular (Peter organizes alone, no secret).
 
-A Padelpárbaj első köre november 9-én indul Győrben. Regisztrálj, nevezz a pároddal, és hétfőn megkapjátok a csoportotokat.
-
-👉 padelparbaj.hu/?ref=fb-peter
+4a. Facebook page (`facebook.com/padelparbaj`), posted by hand (the app has no `pages_manage_posts`):
 ```
-Check the dates against the milestones before posting.
+Nyitva a nevezés! 🎾
+
+Nagyon örülök, hogy ennyien érdeklődtetek, ezért elindítom a Padelpárbajt, a heti padelligát pároknak! Az első kör november 9-én kezdődik Győrben.
+
+• Szint szerinti csoportok, kezdőtől versenyzőig
+• Hetente 1 meccs, az időpontot ti egyeztetitek
+• 3 hetente feljutás és kiesés
+• Nincs párod? Nevezz egyedül, keresek neked
+• Nevezési díj nincs, csak a pályadíj
+
+Nevezés: november 6-ig, péntek éjfélig.
+Már feliratkoztál? Most regisztrálj, és nevezzetek a pároddal!
+
+Jelöld meg, akivel játszanál! 👇
+padelparbaj.hu/?ref=fb-page
+```
+
+4b. Groups: Peter posts natively in each group (not a share of the page post), same text opening with "Sziasztok!", link `padelparbaj.hu/?ref=<csoport>-fb`. First: `padel-partner-gyor-fb`.
+
+4c. Message to friends and clubs asking them to share:
+```
+Szia! Ma nyílt a nevezés a Padelpárbajra, november 9-én indulunk Győrben. Megosztanád a posztot, vagy megjelölnéd benne, akit érdekelhet? Sokat segítene, köszi! 🎾
+[a poszt linkje]
+```
+Clubs that already posted (Padel Aréna Győr, Padel Club Győr) get the 4a text with their own `?ref=<klub>-fb` link instead.
+
+Same rules as before: link on its own line, wait for the preview card, then delete the link text; no own photo; weekday 19–21h; reply to every comment. Open the link once after posting to check the `?ref=`.
 
 ### Later (after launch)
 - Facebook page: live since 2026-10-21 at `facebook.com/padelparbaj`, platform-wide (not per city). Posting via API needs `pages_manage_posts`, which the Meta app doesn't have yet; post by hand until then.

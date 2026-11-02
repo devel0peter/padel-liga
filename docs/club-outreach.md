@@ -97,6 +97,35 @@ After they post: check `/admin/traffic` for the club's `-fb` ref the next day, a
 - **"Fizetnek a játékosok?"** No entry fee; players only pay for the court, at the club.
 - **"Tele vagyunk, nincs szükségünk több foglalásra."** Fine: the league isn't a bookings deal, it's for the players (new opponents every week, a city ranking). The ask is still just a poster. (Padel Club Győr, 2026-10-04.)
 
+## 4. Registration open (2026-10-29): second ask
+
+All three clubs get the same two messages, each with its own link from the table in section 3. The requirements are the same as in 3a, so the first message is short.
+
+### 4a. Messenger message
+
+> Szia [Név]!
+>
+> Megnyílt a nevezés a Padelpárbajra, november 9-én indul az első kör! Most lenne a legnagyobb segítség, ha kitennétek egy posztot az oldalatokra. A következő üzenetben küldöm a szöveget, a kérések ugyanazok, mint legutóbb: saját posztként, ezzel a linkkel, saját kép nélkül, és jelöljetek meg benne. Nyugodtan írjátok át a saját stílusotokra. Köszi szépen!
+
+### 4b. The post (own message, club link filled in)
+
+```
+Sziasztok!
+
+Megnyílt a nevezés a Padelpárbajra, a heti padelligára pároknak Győrben, és a meccseket nálunk is lejátszhatjátok! 🎾
+
+• Szint szerinti csoportok, kezdőtől versenyzőig
+• Hetente 1 meccs, az időpontot ti egyeztetitek
+• 3 hetente feljutás és kiesés
+• Nincs párod? Nevezz egyedül, keresnek neked
+• Nevezési díj nincs
+
+Első kör: november 9. Nevezés: november 6-ig.
+
+Jelöld meg a párodat! 👇
+padelparbaj.hu/?ref=[klub]-fb
+```
+
 ## Outreach log
 
 | Date | Club | Outcome | Follow-up |

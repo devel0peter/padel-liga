@@ -58,13 +58,26 @@ import {
 } from "~/lib/signups-admin";
 import { SEND_NOW_MAX } from "~/lib/email/budget";
 import { pendingRegistrationInvites, queueRegistrationInvites } from "~/lib/email/outbox.server";
+import {
+  filterByStage,
+  FUNNEL,
+  inviteChip,
+  parseStage,
+  progressContext,
+  signupStages,
+  stageCounts,
+  STAGES,
+  type Stage,
+} from "~/lib/signup-progress";
 import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.server";
 
 const MAX_ADMIN_NOTE = 2000;
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
-  const filters = parseFilters(new URL(request.url).searchParams);
+  const params = new URL(request.url).searchParams;
+  const filters = parseFilters(params);
+  const stage = parseStage(params);
   const [all, clubs, cities, invites, statuses, leagues] = await Promise.all([
     listSignups(),
     listClubs(),
@@ -74,21 +87,30 @@ export async function loader({ request }: Route.LoaderArgs) {
     listLeagues(),
   ]);
   const names = new Map(all.map((r) => [r.id, r.name1]));
-  // Each person's account, pair and entry in the leagues of the signup's city.
-  const chips = (email: string | null, city: string): StatusChip[] => {
+  const ctx = progressContext(all, statuses.byEmail, leagues);
+  // Each person's account (and invite while they have none), pair and entry
+  // in the leagues of the signup's city.
+  const chips = (email: string | null, city: string, at: Stage | undefined): StatusChip[] => {
     if (!email) return [];
-    const ids = leagues.filter((l) => l.city === city).map((l) => l.id);
-    return statusChips(statuses.byEmail.get(email.toLowerCase()), ids, ids.length > 1);
+    const ids = ctx.leagueIds(city);
+    const [account, ...rest] = statusChips(ctx.status(email), ids, ids.length > 1);
+    const invite = at && inviteChip(at);
+    return invite ? [account, invite, ...rest] : [account, ...rest];
   };
-  const rows = filterSignups(all, filters).map((r) => ({
-    ...r,
-    pairedName: r.pairedWith != null ? (names.get(r.pairedWith) ?? null) : null,
-    cityText: cityLabel(r, cities),
-    source: refLabel(r.ref, clubs),
-    plays: homeClubLabel(r.homeClub, clubs),
-    status1: chips(r.email1, r.city),
-    status2: r.mode === "pair" ? chips(r.email2, r.city) : [],
-  }));
+  // The "Hol tart" counts follow the other filters, not the stage itself.
+  const filtered = filterSignups(all, filters);
+  const rows = filterByStage(filtered, stage, ctx).map((r) => {
+    const [stage1, stage2] = signupStages(r, ctx);
+    return {
+      ...r,
+      pairedName: r.pairedWith != null ? (names.get(r.pairedWith) ?? null) : null,
+      cityText: cityLabel(r, cities),
+      source: refLabel(r.ref, clubs),
+      plays: homeClubLabel(r.homeClub, clubs),
+      status1: chips(r.email1, r.city, stage1),
+      status2: r.mode === "pair" ? chips(r.email2, r.city, stage2) : [],
+    };
+  });
   // Filter options: every club, plus any other ref that came in.
   const refs = new Map<string, string>(clubs.map((c) => [c.slug, c.name]));
   for (const r of all) if (r.ref && !refs.has(r.ref)) refs.set(r.ref, r.ref);
@@ -97,6 +119,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     rows,
     counts: countSignups(rows),
+    stages: stageCounts(filtered, ctx),
     total: all.length,
     refs: [...refs],
     clubOptions,
@@ -295,6 +318,36 @@ function SignupTableRow({
   );
 }
 
+const STAGE_NO_MAIL = "A „Hol tart” szűrővel nem küldhetsz levelet és nem tölthetsz le CSV-t.";
+
+// "Hol tartanak": people per stage (signup-progress.ts), each a link that
+// filters the list to the signups with someone at that stage.
+function StageSummary({ counts }: { counts: Record<Stage, number> }) {
+  const [params] = useSearchParams();
+  const current = params.get("stage");
+  const link = (stage: Stage) => {
+    const next = new URLSearchParams(params);
+    if (current === stage) next.delete("stage");
+    else next.set("stage", stage);
+    return `?${next.toString()}`;
+  };
+  const shown = (Object.keys(STAGES) as Stage[]).filter((s) => FUNNEL.includes(s) || counts[s] > 0);
+  return (
+    <section aria-label="Hol tartanak" className="grid gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">Hol tartanak (fő)</h2>
+      <div className="flex flex-wrap gap-2">
+        {shown.map((s) => (
+          <Button key={s} asChild size="sm" variant={current === s ? "default" : "outline"}>
+            <Link to={link(s)} aria-pressed={current === s} preventScrollReset>
+              {STAGES[s]}: <span className="font-semibold tabular-nums">{counts[s]}</span>
+            </Link>
+          </Button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // Registration invite (#20): everyone pending on the interest list, once.
 function InviteButton({ pending }: { pending: number }) {
   // A new fetcher each time the dialog opens, so an earlier result doesn't stick.
@@ -359,9 +412,12 @@ function InviteButton({ pending }: { pending: number }) {
 }
 
 export default function AdminSignups({ loaderData }: Route.ComponentProps) {
-  const { rows, counts, total, refs, clubOptions, cityOptions, invitesPending } = loaderData;
+  const { rows, counts, stages, total, refs, clubOptions, cityOptions, invitesPending } = loaderData;
   const [params] = useSearchParams();
   const filtered = [...params.keys()].length > 0;
+  // Mail and CSV go by the signup filters only (filterSignups), so not with
+  // "Hol tart": a pair signup's two people can be at different stages.
+  const byStage = params.has("stage");
 
   return (
     <AppPage
@@ -375,19 +431,33 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
       actions={
         <>
           <InviteButton pending={invitesPending} />
-          <Button variant="outline" asChild>
-            <Link to={`/admin/broadcasts/new?${params.toString()}`}>
-              <Mail /> Levél nekik
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href={`/admin/export.csv?${params.toString()}`} download>
-              <Download /> CSV letöltése
-            </a>
-          </Button>
+          {byStage ? (
+            <>
+              <Button variant="outline" disabled title={STAGE_NO_MAIL}>
+                <Mail /> Levél nekik
+              </Button>
+              <Button variant="outline" disabled title={STAGE_NO_MAIL}>
+                <Download /> CSV letöltése
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" asChild>
+                <Link to={`/admin/broadcasts/new?${params.toString()}`}>
+                  <Mail /> Levél nekik
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={`/admin/export.csv?${params.toString()}`} download>
+                  <Download /> CSV letöltése
+                </a>
+              </Button>
+            </>
+          )}
         </>
       }
     >
+      <StageSummary counts={stages} />
 
       <div className="flex flex-wrap gap-2">
         <Form method="get" className="w-full sm:w-64">

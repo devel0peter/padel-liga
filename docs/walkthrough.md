@@ -327,7 +327,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 ### 21. The morning digest and "holnap meccs" (cron)
 
 - Page: none; the terminal of `npm run dev`, then "Értesítések"
-- Do: run the hourly job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/handler/scheduled?cron=0+*+*+*+*&time=<unix seconds of 07:00 Budapest on a day of the running phase>` (and again with the time of 18:00 the day before a fixed match).
+- Do: run the hourly job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/local/scheduled?time=<milliseconds since 1970 of 07:00 Budapest, within a day from now>`, then again with the time of 18:00 the day before a fixed match.
 - Expect:
   - 07:00: every player with an unopened digest item (for example "Lefixálva a meccsetek" or "Lemondták a meccset" from steps 18–20, or "Még nincs időpont-ajánlat" from Wednesday of a match's week) gets one "Napi összefoglaló" email in the terminal with every item and its link; the reminders are in "Értesítések" too. Running it again sends nothing.
   - 18:00 the day before a fixed match: "Holnap meccs: <time>" to the match's four players, with the venue if recorded.

@@ -1,11 +1,12 @@
-// Walkthrough steps 17 to 20 (#25, #26, #27): after Közzététel (step 11) a player
+// Walkthrough steps 17 to 21 (#25, #26, #27, #31): after Közzététel (step 11) a player
 // sees their group and matches on Kezdőlap, pairs propose and accept a slot,
 // record and confirm an agreed time, nobody else can open the match, and a
-// booked match gets its venue and is cancelled, once in time and once late.
-import { addDays, budapestClock, budapestDay } from "@padel-liga/rules";
+// booked match gets its venue and is cancelled, once in time and once late;
+// the hourly cron sends the morning digest and "holnap meccs".
+import { addDays, budapestClock, budapestDay, budapestTime } from "@padel-liga/rules";
 import { expect, test, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
+import { PAIRS, as, content, d1, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
 
 // A datetime-local value `days` from today at hh:mm, Budapest time.
 const slot = (days: number, time: string) => `${addDays(budapestDay(new Date()), days)}T${time}`;
@@ -200,5 +201,42 @@ test("20. venue, then a cancellation 4 days ahead and a late one: the log says w
   await visit(other.page, "/home");
   await expect(content(other.page).getByRole("link", { name: new RegExp(`^Ajánlj időpontot \\(.*${anna.name}`) })).toHaveCount(0);
   await other.context.close();
+  await player.context.close();
+});
+
+// Runs the hourly cron as if it were `at` (#31).
+async function cron(page: Page, at: Date) {
+  const response = await page.request.get(`/cdn-cgi/local/scheduled?time=${at.getTime()}`);
+  expect(response.ok()).toBe(true);
+}
+
+const isDigest = (m: { text: string }) => m.text.includes("Ez történt a meccseiddel");
+
+test("21. the cron: 07:00 digest of the unread match news, once; holnap meccs the evening before (#31)", async ({ browser }) => {
+  const [, second] = annasMatches();
+  const player = await as(browser, anna);
+  const today = budapestDay(new Date());
+  // The next 07:00 Budapest: within a day, so this run's items are in its window.
+  const sevenToday = budapestTime(today, 7, 0);
+  const seven = sevenToday.getTime() > Date.now() ? sevenToday : budapestTime(addDays(today, 1), 7, 0);
+
+  const first = logOffset();
+  await cron(player.page, seven);
+  // Steps 18–20 left anna an unread digest item ("Lefixálva a meccsetek").
+  const digests = await waitForEmails(first, 1, (m) => m.to === anna.email && isDigest(m));
+  expect(digests[0]!.text).toContain("Lefixálva a meccsetek");
+  expect(digests[0]!.text).toContain("/matches/");
+  expect(digests[0]!.text).not.toContain("@example.test");
+
+  // Again the same morning and at noon: no digest. Then 18:00 today: the
+  // second match is fixed for tomorrow 23:00 (step 19), so "holnap meccs".
+  const again = logOffset();
+  await cron(player.page, new Date(seven.getTime() + 30 * 60_000));
+  await cron(player.page, budapestTime(today, 12, 0));
+  await cron(player.page, budapestTime(today, 18, 0));
+  const tomorrow = await waitForEmails(again, 4, (m) => m.subject.startsWith("Holnap meccs:"));
+  expect(tomorrow.map((m) => m.to).sort()).toEqual([anna, PAIRS.p1[1], ...second!.opponents].map((p) => p.email).sort());
+  expect(tomorrow[0]!.text).toContain(`/matches/${second!.id}`);
+  expect(emailsSince(again).filter(isDigest)).toEqual([]);
   await player.context.close();
 });

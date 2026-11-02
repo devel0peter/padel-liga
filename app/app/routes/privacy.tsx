@@ -98,7 +98,7 @@ export default function Privacy() {
                 ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>
-              <li>a fiók létrehozásának és a hozzájárulásodnak az időpontja,</li>
+              <li>a fiók létrehozásának, a hozzájárulásodnak és az utolsó belépésednek az időpontja,</li>
               <li>
                 a párod a ligában (a jelentkezésből, vagy akivel a szervező
                 párba tett), és ha korábban pármeghívót küldtél vagy kaptál, az
@@ -209,9 +209,28 @@ export default function Privacy() {
             </p>
           </Section>
 
+          <Section title="Ha linkkel hívod meg a párodat">
+            <p>
+              Amíg nincs párod, a Kezdőlapon és a Párom oldalon kapsz egy saját
+              linket, amit te küldesz el annak, akivel játszanál. Aki megnyitja,
+              a neved és a liga nevét látja, az e-mail-címedet és a
+              telefonszámodat nem. Ha regisztrál és elfogadja, pár lesztek. A
+              linket mi nem küldjük el senkinek, és erről nem megy e-mail.
+            </p>
+          </Section>
+          <Section title="Ha párt keresel">
+            <p>
+              Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
+              jelzést. Ilyenkor a szervező látja a neved, a szinted és azt, hogy
+              mióta keresel párt, és párba tehet egy másik párkeresővel. Ha
+              egyedül jelentkeztél előre, a jelzés eleve be van kapcsolva. Bármikor
+              kikapcsolhatod.
+            </p>
+          </Section>
+
           <Section title="Ha változik a párod">
             <p>
-              Párt létrehozni, felbontani vagy cserélni a szervező tud: írj
+              Felbontani vagy cserélni a párt a szervező tud: írj
               nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
               szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.

@@ -32,16 +32,33 @@ import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
 import { filterSignups, parseFilters } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 import { listCities } from "~/lib/cities.server";
+import { listLeagues } from "~/lib/leagues.server";
+import { playerStatuses } from "~/lib/player-status.server";
+import { NO_MAIL_STAGES, parseStage, progressContext, stageRecipients, STAGES } from "~/lib/signup-progress";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
   const filters = parseFilters(params);
+  const stage = params.has("stage") ? parseStage(params) : null;
+  if (params.has("stage") && (!stage || NO_MAIL_STAGES.includes(stage)))
+    throw new Response("Ennek a csoportnak nem küldhetsz levelet.", { status: 400 });
   const [rows, suppressed, off, cities] = await Promise.all([listSignups(), suppressedSet(), emailSwitchedOff(), listCities()]);
   // Accounts that switched email off get no broadcast either (#115, Peter 2026-10-29).
   const skipped = new Set([...suppressed, ...off]);
-  return { label: audienceLabel(filters, cities), ...signupRecipients(filterSignups(rows, filters), skipped) };
+  const label = audienceLabel(filters, cities);
+  if (!stage) return { label, ...signupRecipients(filterSignups(rows, filters), skipped) };
+  // "Hol tart" (D58): the people at that stage, not every signer of the
+  // signups shown (a pair signup's two people can be at different stages).
+  const [statuses, leagues] = await Promise.all([playerStatuses(), listLeagues()]);
+  const people = stageRecipients(filterSignups(rows, filters), stage, progressContext(rows, statuses.byEmail, leagues));
+  const recipients = people.filter((p) => !skipped.has(p.email));
+  return {
+    label: `${label} · ${STAGES[stage]}`,
+    recipients,
+    suppressed: people.length - recipients.length,
+  };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

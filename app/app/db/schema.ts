@@ -164,6 +164,10 @@ export const users = sqliteTable("users", {
   sex: text("sex", { enum: ["male", "female"] }),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
+  // The latest login (a new session: Google or a login code), for the
+  // Admin's user list. Sessions can't tell: logging out deletes them. Null
+  // until the first login after it was added (backfilled from live sessions).
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -434,8 +438,9 @@ export const pairs = sqliteTable(
       .references((): AnySQLiteColumn => pairInvites.id, { onDelete: "set null" }),
     status: text("status", { enum: ["active", "dissolved"] }).notNull().default("active"),
     // "signup": formed from the interest signup (#89), or by an invite before
-    // #97; "manual": made by a Szervező on the Párok page (#97).
-    source: text("source", { enum: ["signup", "manual"] }).notNull().default("signup"),
+    // #97; "manual": made by a Szervező on the Párok page (#97); "link": a
+    // player accepted the other's pair link (2026-10-31).
+    source: text("source", { enum: ["signup", "manual", "link"] }).notNull().default("signup"),
     dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
     dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -477,6 +482,51 @@ export const pairInvites = sqliteTable(
     index("pair_invites_invitee_idx").on(t.inviteeEmail, t.status),
     index("pair_invites_inviter_idx").on(t.inviterId, t.createdAt),
   ],
+);
+
+// A player's own link to invite a partner (README decision log, 2026-10-31):
+// one per player and league, shown on /home and /pair while they have no
+// pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
+// partner, while both are without a pair in the league. The link carries the
+// token; it is stored as is because the player shows it again on every visit.
+export const pairLinks = sqliteTable(
+  "pair_links",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [uniqueIndex("pair_links_owner_idx").on(t.leagueId, t.ownerId)],
+);
+
+// "Párt keresek" (D59): a registered player without a pair says, per league,
+// whether the organizer should find them a partner; Párkeresők lists them.
+// No row: the default, which is on for someone whose solo signup is still
+// waiting and off for everyone else (partner-search.ts). A row stays when they
+// get a pair; it only counts while they have none.
+export const partnerSearches = sqliteTable(
+  "partner_searches",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seeking: integer("seeking", { mode: "boolean" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.userId] })],
 );
 
 // A pair's entry to a season ("Nevezünk", #23, spec section 4). Either player

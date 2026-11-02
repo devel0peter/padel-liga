@@ -187,10 +187,12 @@ export function broadcastEmail(
   );
 }
 
-// The registration invite (#20) opens the login page with the address filled
-// in (routes/login.tsx); the first login creates the account.
+// The registration invite (#20) opens the registration page with the
+// address filled in (routes/register.tsx, the login flow); the first login
+// creates the account. Invites sent before 2026-10-31 open /login, which
+// works the same.
 export function registrationLink(email: string): string {
-  return `${SITE_URL}/login?email=${encodeURIComponent(email)}`;
+  return `${SITE_URL}/register?email=${encodeURIComponent(email)}`;
 }
 
 // Sent once to everyone on the interest list (spec section 3). It goes to the

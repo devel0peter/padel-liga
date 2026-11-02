@@ -174,6 +174,17 @@ export function pairIntroMessage(cityName: string): Message {
   };
 }
 
+// A Szervező paired two registered players who asked for a partner ("Párt
+// keresek", D59). In the app and as a push only, no email: Párom shows the
+// partner.
+export function partnerFoundMessage(league: string): Message {
+  return {
+    title: "Párt találtunk neked",
+    body: `A szervező párba tett valakivel (${league}). A Párom oldalon látod, ki az.`,
+    url: "/pair",
+  };
+}
+
 export const TEST_MESSAGE: Message = {
   title: "Próba értesítés",
   body: "Ha ezt látod, működnek az értesítések ezen az eszközön.",

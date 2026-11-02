@@ -89,7 +89,7 @@ export async function waitForEmails(offset: number, count: number, filter: (e: E
   return emailsSince(offset).filter(filter);
 }
 
-async function loginCode(email: string, offset: number): Promise<string> {
+export async function loginCode(email: string, offset: number): Promise<string> {
   const [mail] = await waitForEmails(offset, 1, (e) => e.to === email && /belépőkód/.test(e.subject));
   const code = /^(\d{3}) (\d{3})/.exec(mail.subject);
   if (!code) throw new Error(`No login code in "${mail.subject}"`);

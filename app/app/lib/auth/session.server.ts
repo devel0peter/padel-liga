@@ -28,11 +28,17 @@ function sessionToken(request: Request): string | null {
   return parseCookies(request.headers.get("Cookie")).get(COOKIE) || null;
 }
 
-// Returns the Set-Cookie header to send with the response.
+// Returns the Set-Cookie header to send with the response. Every login comes
+// here, so it also records the login time (the Admin's user list).
 export async function createSession(userId: string): Promise<string> {
   const token = randomToken();
-  const [user] = await db.select({ role: users.platformRole }).from(users).where(eq(users.id, userId));
-  const expiresAt = sessionExpiry(new Date(), user?.role);
+  const now = new Date();
+  const [user] = await db
+    .update(users)
+    .set({ lastLoginAt: now })
+    .where(eq(users.id, userId))
+    .returning({ role: users.platformRole });
+  const expiresAt = sessionExpiry(now, user?.role);
   await db.insert(sessions).values({ idHash: await sha256Hex(token), userId, expiresAt });
   return serializeCookie(COOKIE, token, { maxAgeSeconds: COOKIE_MAX_AGE, secure: SECURE });
 }

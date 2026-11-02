@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canDissolve, checkNewPair, NEW_PAIR_REFUSALS, SOURCE_LABELS } from "./pairs";
+import { canDissolve, checkNewPair, checkPairLink, NEW_PAIR_REFUSALS, PAIR_LINK_REFUSALS, SOURCE_LABELS } from "./pairs";
 
 describe("checkNewPair (#97)", () => {
   const ok = { a: "a", b: "b", registered: true, paired: false };
@@ -42,7 +42,33 @@ describe("canDissolve (#97)", () => {
 });
 
 describe("SOURCE_LABELS", () => {
-  it("names both sources", () => {
-    expect(SOURCE_LABELS).toEqual({ signup: "jelentkezésből", manual: "kézzel" });
+  it("names every source", () => {
+    expect(SOURCE_LABELS).toEqual({ signup: "jelentkezésből", manual: "kézzel", link: "linkkel" });
+  });
+});
+
+describe("checkPairLink (2026-10-31)", () => {
+  const ok = { ownerId: "a", userId: "b", userPaired: false, ownerPaired: false };
+
+  it("lets another player without a pair accept", () => {
+    expect(checkPairLink(ok)).toBeNull();
+  });
+
+  it("refuses the owner's own link, even while both flags are set", () => {
+    expect(checkPairLink({ ...ok, userId: "a" })).toBe("own");
+    expect(checkPairLink({ ...ok, userId: "a", userPaired: true, ownerPaired: true })).toBe("own");
+  });
+
+  it("refuses a player already in a pair before looking at the owner", () => {
+    expect(checkPairLink({ ...ok, userPaired: true })).toBe("you_paired");
+    expect(checkPairLink({ ...ok, userPaired: true, ownerPaired: true })).toBe("you_paired");
+  });
+
+  it("refuses when the owner has a pair by now", () => {
+    expect(checkPairLink({ ...ok, ownerPaired: true })).toBe("owner_paired");
+  });
+
+  it("has a Hungarian message for every refusal", () => {
+    expect(Object.keys(PAIR_LINK_REFUSALS).sort()).toEqual(["own", "owner_paired", "you_paired"]);
   });
 });

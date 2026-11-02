@@ -146,6 +146,11 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   );
   await visit(org.page, "/admin/leagues/minta/disputes");
   await expect(content(org.page).getByRole("heading", { name: "Vitatott eredmények (0)" })).toBeVisible();
+  // Meccsek (#158) shows the results: the decision, and the confirmed one.
+  await visit(org.page, "/admin/leagues/minta/matches");
+  await expect(content(org.page)).toContainText("Döntés: Mindkét pár vereséget kap (0:4, 0:4)");
+  // From the 1st pair's side, whichever Anna's pair is.
+  await expect(content(org.page)).toContainText(/Lejátszva: (4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10)/);
   await org.context.close();
 
   // Both pairs see the final outcome and the decision in the log.

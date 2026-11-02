@@ -1,4 +1,4 @@
-import { budapestTime, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
+import { budapestTime, type ResultState, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +7,8 @@ import {
   overviewStatus,
   parseFilter,
   quietUntil,
+  resultStatus,
+  statusOf,
   STUCK_TEXT,
   stuckReason,
   type OverviewStatus,
@@ -42,6 +44,38 @@ describe("overviewStatus (#158 requirement 1)", () => {
     const state: SchedulingState = { status: "scheduled", slot, clubId: 1 };
     expect(overviewStatus(state, names, "Ace Padel")).toEqual({ label: "Lefixálva: nov. 12., csütörtök 18:00, Ace Padel", tone: "done" });
     expect(overviewStatus(state, names).label).toBe("Lefixálva: nov. 12., csütörtök 18:00");
+  });
+});
+
+describe("result statuses (#28, #29 on the #158 overview)", () => {
+  const score = { sets: [[4, 1], [2, 4]] as [number, number][], superTieBreak: [10, 8] as [number, number] };
+  const recorded: ResultState = { status: "recorded", by: "b", score, at: slot };
+  const disputed: ResultState = { status: "disputed", by: "a", score, at: slot, counter: null, disputedAt: slot };
+  const scheduled: SchedulingState = { status: "scheduled", slot, clubId: null };
+
+  it("a recorded result names the score and the pair that has to confirm", () => {
+    expect(resultStatus(recorded, names)).toEqual({ label: "Eredmény: 4:1, 2:4, szuper tie-break 10:8, Kiss Anna – Nagy Béla megerősítésére vár", tone: "waiting" });
+    expect(statusOf(scheduled, recorded)).toBe("result_pending");
+  });
+
+  it("a disputed result waits for the organizer", () => {
+    expect(resultStatus(disputed, names)).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "todo" });
+    expect(statusOf(scheduled, disputed)).toBe("disputed");
+  });
+
+  it("a played match with its score and winner; an organizer's decision says so", () => {
+    const outcome = { kind: "played" as const, score };
+    expect(resultStatus({ status: "final", outcome, how: "confirmed", at: slot }, names)).toEqual({
+      label: "Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyert: Kiss Anna – Nagy Béla)",
+      tone: "done",
+    });
+    expect(resultStatus({ status: "final", outcome, how: "organizer", at: slot }, names)?.label).toMatch(/^Döntés: 4:1, 2:4/);
+    expect(statusOf(scheduled, { status: "final", outcome, how: "auto_accepted", at: slot })).toBe("final");
+  });
+
+  it("without a result: no result line, the scheduling status", () => {
+    expect(resultStatus({ status: "none" }, names)).toBeNull();
+    expect(statusOf(scheduled, { status: "none" })).toBe("scheduled");
   });
 });
 
@@ -122,9 +156,26 @@ describe("stuckReason (#158 stuck match)", () => {
     expect(stuckReason({ ...base, state: { status: "scheduled", slot, clubId: null }, events, now: hours(wednesday, 200) })).toBeNull();
   });
 
+  it("a result decides alone: one that counts is never stuck, an unconfirmed or disputed one always is", () => {
+    const late = hours(wednesday, 200);
+    const score = { sets: [[4, 1], [4, 2]] as [number, number][] };
+    const final: ResultState = { status: "final", outcome: { kind: "played", score }, how: "confirmed", at: monday };
+    // Nobody scheduled, past Wednesday: no_activity without the result.
+    expect(stuckReason({ ...base, state: toSchedule, events: [], now: late })).toBe("no_activity");
+    expect(stuckReason({ ...base, state: toSchedule, events: [], result: final, now: late })).toBeNull();
+    // An offer unanswered for 48 hours, then a result counts.
+    expect(stuckReason({ ...base, state: toSchedule, events: [ev("proposal", monday)], result: final, now: late })).toBeNull();
+    expect(stuckReason({ ...base, state: toSchedule, events: [], result: { status: "recorded", by: "a", score, at: monday }, now: monday })).toBe("unconfirmed");
+    const disputed: ResultState = { status: "disputed", by: "a", score, at: monday, counter: null, disputedAt: monday };
+    expect(stuckReason({ ...base, state: { status: "scheduled", slot, clubId: null }, events: [], result: disputed, now: monday })).toBe("disputed");
+    expect(stuckReason({ ...base, state: toSchedule, events: [], result: { status: "none" }, now: late })).toBe("no_activity");
+  });
+
   it("has a Hungarian text per reason", () => {
     expect(STUCK_TEXT.no_activity).toBe("Elakadt: még egyik pár sem lépett");
     expect(STUCK_TEXT.unanswered).toBe("Elakadt: 48 órája nincs válasz");
+    expect(STUCK_TEXT.unconfirmed).toBe("Elakadt: az eredmény megerősítésre vár");
+    expect(STUCK_TEXT.disputed).toBe("Elakadt: vitatott eredmény, dönts róla");
   });
 });
 
@@ -143,6 +194,8 @@ describe("filters (#158 requirement 3)", () => {
     expect(parseFilter(new URLSearchParams("stuck=1&group=2&status=proposed"))).toEqual({ stuck: true, group: 2, status: "proposed" });
     expect(parseFilter(new URLSearchParams("stuck=yes&group=-1&status=played"))).toEqual({ stuck: false, group: null, status: null });
     expect(parseFilter(new URLSearchParams(""))).toEqual({ stuck: false, group: null, status: null });
+    expect(parseFilter(new URLSearchParams("status=disputed")).status).toBe("disputed");
+    expect(parseFilter(new URLSearchParams("status=final")).status).toBe("final");
   });
 
   it("no filter: everything, and the stuck count", () => {

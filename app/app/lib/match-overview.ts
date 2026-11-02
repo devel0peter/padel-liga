@@ -4,21 +4,58 @@
 // match-overview.server.ts. Everything is read from the match's log
 // (match_events, D68): there is no second log.
 
-import { addDays, budapestTime, isValidActivity, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
+import { addDays, budapestTime, isValidActivity, other, type ResultState, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 
 import { weekDays } from "./groups";
 import { formatSlot, type Tone } from "./matches";
+import { neutralOutcomeText, neutralScoreText } from "./results";
 
-export type OverviewStatus = SchedulingState["status"];
+// Scheduling, then the result (#28): once a result is recorded, its status
+// is the match's.
+export type OverviewStatus = SchedulingState["status"] | "result_pending" | "disputed" | "final";
 
 // The status filter's options, in the order a match goes through them.
-// Result statuses (waiting, disputed, played) join with #28.
 export const OVERVIEW_STATUSES: { value: OverviewStatus; label: string }[] = [
   { value: "to_schedule", label: "Egyeztetésre vár" },
   { value: "proposed", label: "Ajánlat, válaszra vár" },
   { value: "agreed_time", label: "Megbeszélt időpont, megerősítésre vár" },
   { value: "scheduled", label: "Lefixálva" },
+  { value: "result_pending", label: "Eredmény, megerősítésre vár" },
+  { value: "disputed", label: "Vitatott eredmény" },
+  { value: "final", label: "Lejátszva" },
 ];
+
+/** The match's status: the result's once there is one, else scheduling's. */
+export function statusOf(scheduling: SchedulingState, result: ResultState): OverviewStatus {
+  switch (result.status) {
+    case "recorded":
+      return "result_pending";
+    case "disputed":
+      return "disputed";
+    case "final":
+      return "final";
+    case "none":
+      return scheduling.status;
+  }
+}
+
+/**
+ * The status line of a match with a result (#28, #29), or null without one:
+ * the score and whose confirmation it waits for, a dispute, or the outcome
+ * that counts (score and winner, from the 1st pair's side).
+ */
+export function resultStatus(result: ResultState, names: Record<Side, string>): { label: string; tone: Tone } | null {
+  switch (result.status) {
+    case "none":
+      return null;
+    case "recorded":
+      return { label: `Eredmény: ${neutralScoreText(result.score)}, ${names[other(result.by)]} megerősítésére vár`, tone: "waiting" };
+    case "disputed":
+      return { label: "Vitatott eredmény, a szervező dönt", tone: "todo" };
+    case "final":
+      return { label: `${result.how === "organizer" ? "Döntés" : "Lejátszva"}: ${neutralOutcomeText(result.outcome, names)}`, tone: "done" };
+  }
+}
 
 export const isOverviewStatus = (v: string): v is OverviewStatus => OVERVIEW_STATUSES.some((s) => s.value === v);
 
@@ -54,7 +91,7 @@ export function quietUntil(phaseStartsAt: Date, week: number): Date {
   return budapestTime(addDays(weekDays(phaseStartsAt, week).start, QUIET_DAYS), 0, 0);
 }
 
-export type StuckReason = "no_activity" | "unanswered";
+export type StuckReason = "no_activity" | "unanswered" | "unconfirmed" | "disputed";
 
 // The steps that wait for the other pair's answer.
 const OFFER_KINDS: readonly SchedulingEventKind[] = ["proposal", "counter_proposal", "agreed_time"];
@@ -62,6 +99,8 @@ const OFFER_KINDS: readonly SchedulingEventKind[] = ["proposal", "counter_propos
 export const STUCK_TEXT: Record<StuckReason, string> = {
   no_activity: "Elakadt: még egyik pár sem lépett",
   unanswered: `Elakadt: ${ANSWER_HOURS} órája nincs válasz`,
+  unconfirmed: "Elakadt: az eredmény megerősítésre vár",
+  disputed: "Elakadt: vitatott eredmény, dönts róla",
 };
 
 /**
@@ -70,18 +109,23 @@ export const STUCK_TEXT: Record<StuckReason, string> = {
  * or agreed time unanswered for 48 hours. That includes one that lapsed
  * unanswered (all its slots started, or the agreed time passed): the match
  * is back to scheduling, but the other pair still never answered, so it
- * stays stuck until someone steps again. An unconfirmed or disputed result
- * joins with #28.
+ * stays stuck until someone steps again. A result (#28) decides alone: one
+ * that counts is never stuck, an unconfirmed or disputed one always is.
  */
 export function stuckReason(input: {
   state: SchedulingState;
   // The match's log in order: what happened and when.
   events: readonly { kind: SchedulingEventKind; at: Date }[];
+  // The result (#28); none when omitted.
+  result?: ResultState;
   phaseStartsAt: Date;
   week: number;
   now: Date;
 }): StuckReason | null {
   const { state, now } = input;
+  if (input.result?.status === "final") return null;
+  if (input.result?.status === "recorded") return "unconfirmed";
+  if (input.result?.status === "disputed") return "disputed";
   const waited = (since: Date) => now.getTime() - since.getTime() >= ANSWER_HOURS * 3600 * 1000;
   if (state.status === "proposed" || state.status === "agreed_time") return waited(state.at) ? "unanswered" : null;
   if (state.status === "scheduled") return null;

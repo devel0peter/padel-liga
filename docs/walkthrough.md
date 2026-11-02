@@ -355,6 +355,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 - Expect:
   - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match: both pairs (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), <pair> megerősítésére vár", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
   - "Elakadtak (<n>)" shows only the stuck matches, with a red badge saying why: nobody has stepped by Wednesday of the match's week, or a proposal or agreed time has waited 48 hours without an answer (also after it lapsed). Before round 1 starts, a fresh walkthrough has none. The group and status selects narrow the list and the count; "Szűrők törlése" clears them.
+  - After steps 24 and 25, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.
   - A player opening `/admin/leagues/minta/matches` gets "Ehhez nincs jogod" (403).
 
@@ -392,5 +393,5 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
-- Milestone 2 and later: venue and cancelling (#27), standings, reminders. The match overview (step 23) has no result statuses yet: it shows the scheduling state only; results are on the match page and Viták (steps 24 and 25).
+- Milestone 2 and later: venue and cancelling (#27), standings, reminders.
 - The 48-hour auto-accept of a result (#28): the hourly cron doesn't run in local dev; the unit tests cover it.

@@ -137,7 +137,10 @@ export default function Privacy() {
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
               is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük.
+              mindig e-mailben küldjük. A meccseid kevésbé sürgős híreit és az
+              emlékeztetőket naponta legfeljebb egy levélben, reggel kapod meg,
+              csak azt, amit az oldalon még nem nyitottál meg; a holnapi
+              meccsedről előző este szólunk.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján

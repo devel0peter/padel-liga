@@ -253,6 +253,75 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
   );
 }
 
+// --- Reminders (#31) ----------------------------------------------------------
+
+export type RunningMatch = {
+  id: number;
+  week: number;
+  phaseStartsAt: Date;
+  deadline: Date;
+  status: string;
+  state: SchedulingState;
+  kinds: SchedulingEventKind[];
+  venue: string | null;
+  // Pair a's and pair b's players (emails go only to the outbox).
+  pairs: { a: [Person, Person]; b: [Person, Person] };
+};
+
+const IDS_PER_QUERY = 90;
+
+function chunked<T>(list: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += IDS_PER_QUERY) out.push(list.slice(i, i + IDS_PER_QUERY));
+  return out;
+}
+
+/**
+ * Every match of a published group whose phase deadline hasn't passed, with
+ * its state, its log's kinds, the venue and both pairs' players, for the
+ * reminders (#31). A few queries for the whole league: the matches, then the
+ * players and the logs in chunks of 90 ids (D1: 100 bound parameters).
+ */
+export async function runningMatches(now = new Date()): Promise<RunningMatch[]> {
+  const rows = await db
+    .select({ match: matches, phaseStartsAt: seasonPhases.startsAt })
+    .from(matches)
+    .innerJoin(groups, eq(groups.id, matches.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(isNotNull(groups.publishedAt), gte(matches.deadline, now)))
+    .orderBy(asc(matches.id));
+  if (rows.length === 0) return [];
+  const members = new Map<number, PairPlayers[]>();
+  for (const ids of chunked([...new Set(rows.map((r) => r.match.groupId))]))
+    for (const [groupId, list] of await groupMembers(ids)) members.set(groupId, list);
+  const events = new Map<number, StoredEvent[]>();
+  for (const ids of chunked(rows.map((r) => r.match.id))) for (const [id, list] of await eventsOf(ids)) events.set(id, list);
+  const states = new Map(
+    rows.map(({ match: m }) => [m.id, schedulingState((events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)), now)]),
+  );
+  const venues = await clubNames([...states.values()].map((s) => (s.status === "scheduled" ? s.clubId : null)));
+  return rows.flatMap(({ match: m, phaseStartsAt }) => {
+    const pairsOf = members.get(m.groupId) ?? [];
+    const a = pairsOf.find((p) => p.pairId === m.pairA);
+    const b = pairsOf.find((p) => p.pairId === m.pairB);
+    if (!a || !b) return [];
+    const state = states.get(m.id)!;
+    return [
+      {
+        id: m.id,
+        week: m.week,
+        phaseStartsAt,
+        deadline: m.deadline,
+        status: m.status,
+        state,
+        kinds: (events.get(m.id) ?? []).map((e) => e.kind),
+        venue: state.status === "scheduled" ? (venues.get(state.clubId ?? -1) ?? null) : null,
+        pairs: { a: a.players, b: b.players },
+      },
+    ];
+  });
+}
+
 // --- The match page (#26) -----------------------------------------------------
 
 type MatchContext = {

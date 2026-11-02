@@ -373,3 +373,37 @@ export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email 
     matchFooter(),
   );
 }
+
+// The daily digest (#31, spec 13): one email in the morning with the match
+// news and reminders of the last day the player hasn't opened in the app yet,
+// each with its one-tap link. The items are the in-app notifications' own
+// texts (no names), so a new digest kind needs nothing here.
+export function dailyDigest(input: { to: string; items: { title: string; body: string; url: string }[] }): Email {
+  const links = input.items.map((i) => `${SITE_URL}${i.url}`);
+  const lines = input.items.flatMap((i, n) => [`${i.title}\n${i.body}`, links[n]!]);
+  return buildPlain(
+    `${input.items.length === 1 ? input.items[0]!.title : `Napi összefoglaló: ${input.items.length} újdonság`} – ${SITE_NAME}`,
+    [`Szia ${input.to}!`, "Ez történt a meccseiddel, és ez vár rád:", ...lines, SIGNATURE],
+    links,
+    matchFooter(),
+  );
+}
+
+// The evening before an accepted slot (#31, spec 13: instant): time, venue
+// and the opponents, with the match page.
+export function matchTomorrow(input: { to: string; opponents: string; matchId: number; slot: Date; venue: string | null }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `Holnap meccs: ${formatDeadline(input.slot)} – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Holnap játszotok ${input.opponents} ellen: ${formatDeadline(input.slot)}.`,
+      input.venue ? `Helyszín: ${input.venue}` : "A helyszínt még nem rögzítettétek: aki foglalt pályát, írja be az oldalon.",
+      `A meccs oldala:`,
+      link,
+      SIGNATURE,
+    ],
+    [link],
+    matchFooter(),
+  );
+}

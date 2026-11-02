@@ -289,7 +289,8 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     );
   });
 
-  it("the digest kinds are the scheduled, declined and cancelled ones, not the instant ones", () => {
-    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled"]);
+  it("the digest kinds: scheduled, declined, cancelled and the reminders; never an instant one (#31)", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon"]);
+    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow"] as const) expect(DIGEST_KINDS).not.toContain(instant);
   });
 });

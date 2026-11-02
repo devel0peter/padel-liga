@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5be37b5e-e85b-43eb-aa7d-47ca42f55067",
+  "id": "428825a9-8787-40f0-ab75-e2c3f26c82d7",
   "prevId": "f60c2d47-d5f7-46ec-a70b-ec2e291b235b",
   "tables": {
     "account_invites": {
@@ -1247,6 +1247,68 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "match_reminders": {
+      "name": "match_reminders",
+      "columns": {
+        "match_id": {
+          "name": "match_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "match_reminders_match_id_matches_id_fk": {
+          "name": "match_reminders_match_id_matches_id_fk",
+          "tableFrom": "match_reminders",
+          "tableTo": "matches",
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "match_reminders_match_id_kind_slot_pk": {
+          "columns": [
+            "match_id",
+            "kind",
+            "slot"
+          ],
+          "name": "match_reminders_match_id_kind_slot_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "matches": {
       "name": "matches",
       "columns": {
@@ -1522,6 +1584,13 @@
         },
         "read_at": {
           "name": "read_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "digested_at": {
+          "name": "digested_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

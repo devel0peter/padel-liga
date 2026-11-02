@@ -30,10 +30,23 @@ export type PlayerKind =
   // and by push only for now.
   | "match_scheduled"
   | "match_declined"
-  | "match_cancelled";
+  | "match_cancelled"
+  // Reminders (#31): digest items, except "holnap meccs", which is instant.
+  | "match_no_proposal"
+  | "match_week_end"
+  | "match_deadline_soon"
+  | "match_tomorrow";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
-export const DIGEST_KINDS: readonly PlayerKind[] = ["match_scheduled", "match_declined", "match_cancelled"];
+// The digest is built from this list alone, so a kind added here is in it.
+export const DIGEST_KINDS: readonly PlayerKind[] = [
+  "match_scheduled",
+  "match_declined",
+  "match_cancelled",
+  "match_no_proposal",
+  "match_week_end",
+  "match_deadline_soon",
+];
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {

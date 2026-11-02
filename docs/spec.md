@@ -204,7 +204,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 
 **Rules for all notifications:**
 - Every notification has a one-tap action link (accept, confirm, record a time) and a shareable link ("küldd el a párodnak / ellenfélnek").
-- The home screen shows the same open items as a "Teendők" list.
+- The home screen shows the same open items as a "Teendők" list (README decision log, 2026-11-02, D61).
 - Every notification is also kept in the app's notification list (`/notifications`), whatever the switches: unread ones first, opening one marks it read. Szervezők and Admins can switch off their own kinds (e.g. a new signup) on the profile page; a kind switched off is not stored or sent at all. Players have no per-kind switches, only the two channels.
 - **Email switch:** off, no email goes to that account's address except login codes and signup confirmations: broadcasts, pair intros, registration invites and partner notices are skipped too (Peter, 2026-10-29). Addresses without an account get everything as before. A pair intro also appears in the app for whoever has an account.
 - **Push switch:** off, no push goes to any of the account's devices. Turning it on asks this browser for permission and subscribes this device; other devices are switched on from themselves ("Bekapcsolom ezen az eszközön"). On iPhone it needs iOS 16.4+ and the site added to the home screen; the profile explains this. A player who switches email off gets instant items by push and in the app only.

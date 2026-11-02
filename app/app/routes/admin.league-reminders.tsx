@@ -112,7 +112,7 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
           <TableRow>
             <TableHead>Helyzet</TableHead>
             <TableHead className="text-right">Most kapná</TableHead>
-            <TableHead className="text-right">Kiment</TableHead>
+            <TableHead className="text-right">Elindult</TableHead>
             <TableHead>Utoljára</TableHead>
           </TableRow>
         </TableHeader>

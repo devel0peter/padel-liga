@@ -172,6 +172,25 @@ describe("automatic reminders (#155)", () => {
     expect(reminderMail().map((m: any) => m.to_email)).toEqual(["eva@x.hu", "gabi@x.hu", "hedi@x.hu"]);
   });
 
+  it("a failure part-way through queueing leaves no email and no record, so the next run sends each once", async () => {
+    await R.setReminders("admin", league, true, NOW);
+    // Eight more without a pair: 13 emails, more than one insert of 10.
+    for (let i = 1; i <= 8; i++) user(`c${i}`);
+    // The last email (Hedi's, in the second insert) fails.
+    h.raw.exec(
+      `create trigger fail_hedi before insert on email_messages when new.to_email = 'hedi@x.hu' begin select raise(abort, 'boom'); end`,
+    );
+    await expect(R.queueDueReminders(NOW)).rejects.toThrow(/boom/);
+    expect(all("select count(*) as n from email_messages")).toEqual([{ n: 0 }]);
+    expect(all("select count(*) as n from stuck_reminders")).toEqual([{ n: 0 }]);
+    h.raw.exec("drop trigger fail_hedi");
+    expect(await R.queueDueReminders(NOW)).toBe(13);
+    expect(await R.queueDueReminders(NOW)).toBe(0);
+    const to = reminderMail().map((m: any) => m.to_email);
+    expect(to).toHaveLength(13);
+    expect(new Set(to).size).toBe(13);
+  });
+
   it("switching off stops the next run", async () => {
     await R.setReminders("admin", league, true, NOW);
     await R.setReminders("admin", league, false, NOW);

@@ -301,10 +301,14 @@ export async function createBroadcast(input: {
 }
 
 // The automatic reminders for people stuck before entering (#155,
-// reminders.server.ts decides who): queued as bulk mail, after login codes
-// and personal emails, with an unsubscribe link. The cron that queued them
-// sends them in the same run. Returns the message ids.
-export async function queueStuckReminders(messages: { toEmail: string; input: StuckReminderInput }[]): Promise<number[]> {
+// reminders.server.ts decides who, and already leaves out accounts with the
+// email switch off): bulk mail, after login codes and personal emails, with
+// an unsubscribe link. Returned as insert statements, so the caller puts
+// them in one D1 batch with its own records: the emails and the records of
+// what was sent commit or roll back together.
+export async function stuckReminderInserts(
+  messages: { toEmail: string; input: StuckReminderInput }[],
+): Promise<BatchItem<"sqlite">[]> {
   const secret = emailSecret();
   const queued = await Promise.all(
     messages.map(async (m): Promise<NewMessage> => {
@@ -312,7 +316,10 @@ export async function queueStuckReminders(messages: { toEmail: string; input: St
       return { kind: "stuck_reminder", toEmail: m.toEmail, headers: unsubscribeHeaders(url), ...stuckReminder(m.input, url) };
     }),
   );
-  return enqueue(queued);
+  const statements: BatchItem<"sqlite">[] = [];
+  for (let i = 0; i < queued.length; i += INSERT_CHUNK)
+    statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
+  return statements;
 }
 
 // Who would get the registration invite now (#20, audience.ts inviteRecipients).

@@ -1,11 +1,11 @@
-import { and, count, eq, inArray, isNotNull, max, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
 import { cities, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminders, users } from "~/db/schema";
 import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
-import { emailSwitchedOff, queueStuckReminders, suppressedSet } from "~/lib/email/outbox.server";
+import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
 import { stuckReminder, type StuckReminderInput } from "~/lib/email/templates";
 import { audit } from "~/lib/leagues.server";
 import { pairLinkPath } from "~/lib/pair-links.server";
@@ -127,55 +127,60 @@ async function pairLinksFor(owners: { userId: string; leagueId: number }[]): Pro
 }
 
 // The cron's step: queues every reminder due in the leagues with the switch
-// on. Each reminder is claimed first (its stuck_reminders row, unique key),
-// so a run overlapping another queues none twice; if queueing fails, the
-// claims are released. Returns how many emails were queued.
+// on. One D1 batch (a transaction) writes the stuck_reminders records and
+// the emails: both commit or neither does, so a failure part-way can't leave
+// an email queued without its record (it would go out again next run). A
+// run overlapping another fails on the records' unique key and queues
+// nothing; whatever it missed is due on the next run. Returns how many
+// emails were queued.
 export async function queueDueReminders(now = new Date()): Promise<number> {
   const on = await db.select({ id: leagues.id, name: leagues.name }).from(leagues).where(isNotNull(leagues.remindersOnAt));
   if (on.length === 0) return 0;
   const due = dueReminders(await reminderInput(now), on.map((l) => l.id));
   if (due.length === 0) return 0;
 
-  const claims: BatchItem<"sqlite">[] = [];
+  // Made first, outside the batch: a pair link is the player's anyway.
+  const links = await pairLinksFor(
+    due.filter((r) => r.situation === "C").map((r) => ({ userId: r.recipients[0].userId!, leagueId: r.leagueId })),
+  );
+  const leagueName = new Map(on.map((l) => [l.id, l.name]));
+  const messages = due.flatMap((r) =>
+    r.recipients.map((to) => ({
+      toEmail: to.email,
+      input: templateInput(
+        r,
+        to,
+        leagueName.get(r.leagueId) ?? "",
+        r.situation === "C" ? (links.get(`${r.leagueId}:${to.userId}`) ?? null) : null,
+        now,
+      ),
+    })),
+  );
+  const statements: BatchItem<"sqlite">[] = [];
   for (let i = 0; i < due.length; i += RECORD_CHUNK)
-    claims.push(
-      db
-        .insert(stuckReminders)
-        .values(
-          due.slice(i, i + RECORD_CHUNK).map((r) => ({
-            key: r.key,
-            situation: r.situation,
-            leagueId: r.leagueId,
-            seasonId: r.season.id,
-            recipients: r.recipients.length,
-          })),
-        )
-        .onConflictDoNothing()
-        .returning({ key: stuckReminders.key }),
+    statements.push(
+      db.insert(stuckReminders).values(
+        due.slice(i, i + RECORD_CHUNK).map((r) => ({
+          key: r.key,
+          situation: r.situation,
+          leagueId: r.leagueId,
+          seasonId: r.season.id,
+          recipients: r.recipients.length,
+        })),
+      ),
     );
-  const [first, ...rest] = claims;
-  const claimed = new Set(((await db.batch([first, ...rest])) as { key: string }[][]).flat().map((r) => r.key));
-  const mine = due.filter((r) => claimed.has(r.key));
-  if (mine.length === 0) return 0;
-
+  statements.push(...(await stuckReminderInserts(messages)));
+  const [first, ...rest] = statements;
   try {
-    const links = await pairLinksFor(
-      mine.filter((r) => r.situation === "C").map((r) => ({ userId: r.recipients[0].userId!, leagueId: r.leagueId })),
-    );
-    const leagueName = new Map(on.map((l) => [l.id, l.name]));
-    const messages = mine.flatMap((r) =>
-      r.recipients.map((to) => ({
-        toEmail: to.email,
-        input: templateInput(r, to, leagueName.get(r.leagueId) ?? "", r.situation === "C" ? (links.get(`${r.leagueId}:${to.userId}`) ?? null) : null, now),
-      })),
-    );
-    await queueStuckReminders(messages);
-    return messages.length;
+    await db.batch([first, ...rest]);
   } catch (e) {
-    const keys = [...claimed];
-    for (let i = 0; i < keys.length; i += 90) await db.delete(stuckReminders).where(inArray(stuckReminders.key, keys.slice(i, i + 90)));
+    if (String(e).includes("UNIQUE constraint failed")) {
+      console.warn("reminders: another run queued some of these; left to the next run");
+      return 0;
+    }
     throw e;
   }
+  return messages.length;
 }
 
 // --- The switch page --------------------------------------------------------
@@ -190,7 +195,8 @@ export type ReminderOverview = {
   // One email per situation with a real recipient's data, every address
   // and the pair link's token hidden.
   previews: ReminderPreview[];
-  // What went out so far: emails and the latest time, per situation.
+  // What was started so far (queued; the outbox log shows delivery): emails
+  // and the latest time, per situation.
   sent: Record<Situation, { emails: number; last: Date | null }>;
   // The season the reminders are about, or null: none accepts entries now.
   season: string | null;

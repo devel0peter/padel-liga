@@ -81,11 +81,8 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await expect(locked.getByRole("alert")).toContainText("a futó kör csoportjában játszik");
   await expect(locked).toContainText(/Nevezés \(.+\): Nevezett/);
   await expect(content(page)).not.toContainText("@example.test");
-  await context.close();
 
-  // No email for a pair change or an entry change; the players see it on Párom
-  // and on Értesítések.
-  expect(d1("select count(*) as n from email_messages")).toEqual(emailsBefore);
+  // The players see the entry on Párom and both changes on Értesítések.
   const player = await as(browser, torok);
   await visit(player.page, "/pair");
   await expect(content(player.page)).toContainText(boglarka.name);
@@ -94,4 +91,12 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await expect(content(player.page)).toContainText("A szervező kivett titeket a szezonból");
   await expect(content(player.page)).toContainText("A szervező benevezett titeket");
   await player.context.close();
+
+  // Out again, so the later specs see this pair as not entered.
+  await confirm("Kivétel a szezonból", /Kiveszed a szezonból/, "Kivétel");
+  await expect(fresh).toContainText(/Nevezés \(.+\): Visszavonva/);
+  await context.close();
+
+  // No email for a pair change or an entry change.
+  expect(d1("select count(*) as n from email_messages")).toEqual(emailsBefore);
 });

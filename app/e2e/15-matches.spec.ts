@@ -1,4 +1,4 @@
-// Walkthrough steps 17 to 21 (#25, #26, #27, #31): after Közzététel (step 11) a player
+// Walkthrough steps 17 to 19, 23 and 24 (#25, #26, #27, #31): after Közzététel (step 11) a player
 // sees their group and matches on Kezdőlap, pairs propose and accept a slot,
 // record and confirm an agreed time, nobody else can open the match, and a
 // booked match gets its venue and is cancelled, once in time and once late;
@@ -151,7 +151,7 @@ function hoursAhead(hours: number): string {
   return `${day}T${String(Math.floor(minutes / 60)).padStart(2, "0")}:00`;
 }
 
-test("20. venue, then a cancellation 4 days ahead and a late one: the log says who and that it was late (#27)", async ({ browser }) => {
+test("23. venue, then a cancellation 4 days ahead and a late one: the log says who and that it was late (#27)", async ({ browser }) => {
   const [first] = annasMatches();
   const [opponent] = first!.opponents;
   const player = await as(browser, anna);
@@ -212,7 +212,7 @@ async function cron(page: Page, at: Date) {
 
 const isDigest = (m: { text: string }) => m.text.includes("Ez történt a meccseiddel");
 
-test("21. the cron: 07:00 digest of the unread match news, once; holnap meccs the evening before (#31)", async ({ browser }) => {
+test("24. the cron: 07:00 digest of the unread match news, once; holnap meccs the evening before (#31)", async ({ browser }) => {
   const [, second] = annasMatches();
   const player = await as(browser, anna);
   const today = budapestDay(new Date());

@@ -56,9 +56,9 @@ describe("pairName", () => {
 
 describe("cannotSplit (#24: no draft below 6 pairs, except 3 or 4)", () => {
   it("explains 0, 1, 2 and 5 pairs", () => {
-    expect(cannotSplit(0)).toBe("Még nincs jóváhagyott pár. Csoportot 3, 4 vagy legalább 6 párból lehet összeállítani.");
-    expect(cannotSplit(2)).toMatch(/^2 jóváhagyott pár van\./);
-    expect(cannotSplit(5)).toMatch(/^5 jóváhagyott pár van\./);
+    expect(cannotSplit(0)).toBe("Még nincs nevezett pár. Csoportot 3, 4 vagy legalább 6 párból lehet összeállítani.");
+    expect(cannotSplit(2)).toMatch(/^2 nevezett pár van\./);
+    expect(cannotSplit(5)).toMatch(/^5 nevezett pár van\./);
   });
 
   it("allows 3, 4 and every count from 6", () => {

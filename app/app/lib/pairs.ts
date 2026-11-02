@@ -18,10 +18,9 @@ export const SOURCE_LABELS: Record<PairSource, string> = {
 
 export const DISSOLVE_REFUSED = "Kör közben nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
 
-// Párom for a player with no pair, under the pair link: those with nobody
-// to invite (a new account without a signup, #113, or a solo) are paired by
-// a Szervező on the Párok page; the contact address follows the text.
-export const NO_PAIR_TEXT = "Ha nincs kivel játszanod, a szervező keres neked párt. Kérdés esetén írj nekünk:";
+// Párom for a player with no pair, under the pair link and the "Párt
+// keresek" switch (partner-search.ts); the contact address follows the text.
+export const NO_PAIR_TEXT = "Kérdés esetén írj nekünk:";
 
 // The pair link (2026-10-31): the box on /home and /pair while the player
 // has no pair in the league.

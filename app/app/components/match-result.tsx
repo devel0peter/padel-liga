@@ -96,6 +96,8 @@ export function ResultSection({ m, feedback }: { m: View; feedback: Feedback }) 
       <h2 id="eredmeny-cim" className="font-display text-lg font-bold">
         Eredmény
       </h2>
+      {/* A confirmation or dispute closes its card, so its notice shows here. */}
+      {feedback?.ok && <FormFeedback result={feedback} intent={["result-confirm", "result-dispute"]} />}
 
       {r.status === "recorded" && m.resultActions.confirm && (
         <Card>

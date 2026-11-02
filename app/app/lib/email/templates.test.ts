@@ -6,6 +6,8 @@ import {
   groupsPublished,
   escapeHtml,
   loginCode,
+  matchAgreedTime,
+  matchProposal,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -378,6 +380,10 @@ describe("groupsPublished (#24, D22)", () => {
     expect(email.html).toContain('href="https://padelparbaj.hu/home"');
   });
 
+  it("has the line pointing to scheduling on the site (#26 requirement 7)", () => {
+    expect(groupsPublished(base).text).toContain("Az időpontot az oldalon egyeztetitek:\n\nhttps://padelparbaj.hu/home");
+  });
+
   it("uses the right article for the group", () => {
     expect(groupsPublished({ ...base, group: 2 }).text).toContain("pároddal a 2. csoportban játszotok.");
   });
@@ -387,6 +393,53 @@ describe("groupsPublished (#24, D22)", () => {
       ...base,
       weeks: [{ week: 1, range: "nov. 9. – nov. 15.", opponents: ["<b>X</b>", "https://evil.example/y"] }],
     });
+    expect(email.html).toContain("&lt;b&gt;X&lt;/b&gt;");
+    expect(email.html).not.toContain('href="https://evil.example');
+    expect(email.text).not.toMatch(/@|\+36/);
+  });
+});
+
+describe("match scheduling emails (#26, spec 13)", () => {
+  const base = {
+    to: "Nagy Anna",
+    opponents: "Kiss Cecil és Tóth Dóra",
+    matchId: 42,
+    week: 2,
+    deadline: new Date("2026-11-29T22:59:00Z"),
+    venue: null,
+  };
+  const slots = [new Date("2026-11-17T17:00:00Z"), new Date("2026-11-18T08:30:00Z"), new Date("2026-11-19T17:00:00Z")];
+
+  it("a proposal: the slots and a one-tap link to answer", () => {
+    const email = matchProposal({ ...base, counter: false, slots });
+    expect(email.subject).toBe("Időpontokat ajánlottak a meccsetekre – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain(
+      "Kiss Cecil és Tóth Dóra időpontokat ajánlott a 2. heti meccsetekre:\nnov. 17., kedd 18:00\nnov. 18., szerda 09:30\nnov. 19., csütörtök 18:00",
+    );
+    expect(email.text).toContain("Válassz egyet, vagy ajánlj másikat (határidő: nov. 29., vasárnap 23:59):");
+    expect(email.html).toContain('href="https://padelparbaj.hu/matches/42"');
+    expect(email.text).not.toContain("Helyszín");
+    expect(email.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");
+  });
+
+  it("a counter-proposal says so, with the venue", () => {
+    const email = matchProposal({ ...base, counter: true, slots, venue: "Ace Padel" });
+    expect(email.subject).toBe("Új időpontokat ajánlottak a meccsetekre – Padelpárbaj");
+    expect(email.text).toContain("Kiss Cecil és Tóth Dóra új időpontokat ajánlott");
+    expect(email.text).toContain("Helyszín: Ace Padel");
+  });
+
+  it("an agreed time waits for confirmation", () => {
+    const email = matchAgreedTime({ ...base, slot: slots[0]! });
+    expect(email.subject).toBe("Erősítsd meg a meccs időpontját – Padelpárbaj");
+    expect(email.text).toContain("Kiss Cecil és Tóth Dóra rögzítette a 2. heti meccsetek megbeszélt időpontját: nov. 17., kedd 18:00.");
+    expect(email.text).toContain("Erősítsd meg, vagy jelezd, ha nem így beszéltétek:");
+    expect(email.html).toContain('href="https://padelparbaj.hu/matches/42"');
+  });
+
+  it("keeps names plain text and has no contact details", () => {
+    const email = matchProposal({ ...base, opponents: "<b>X</b> és https://evil.example/y", counter: false, slots });
     expect(email.html).toContain("&lt;b&gt;X&lt;/b&gt;");
     expect(email.html).not.toContain('href="https://evil.example');
     expect(email.text).not.toMatch(/@|\+36/);

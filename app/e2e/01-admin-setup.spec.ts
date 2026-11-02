@@ -46,7 +46,7 @@ test("2. the setup pages show the seeded city, league, clubs and season", async 
 
   await page.goto("/admin/leagues/minta/seasons");
   await expect(page.getByRole("main").first()).toContainText("Teszt szezon");
-  await expect(page.getByRole("link", { name: "0 jóváhagyva" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "0 nevezett" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Csoportok" })).toBeVisible();
   // A season can only start on a Monday.
   await page.getByLabel("Név").fill("Keddi szezon");

@@ -27,6 +27,9 @@ export type PlayerStatuses = {
   byEmail: Map<string, PlayerStatus>;
 };
 
+// The entry as the badges need it: season name and status.
+const brief = (e: ReturnType<typeof homeEntry>) => (e ? { season: e.season, status: e.status } : null);
+
 export async function playerStatuses(now = new Date()): Promise<PlayerStatuses> {
   const [accounts, active, entries, seasonList] = await Promise.all([
     db
@@ -70,7 +73,7 @@ export async function playerStatuses(now = new Date()): Promise<PlayerStatuses> 
       leagueId: p.leagueId,
       league: p.league,
       city: p.city,
-      entry: homeEntry(seasons, entries, p.id),
+      entry: brief(homeEntry(seasons, entries, p.id)),
       season: seasons[0]?.name ?? null,
     };
     byId.get(p.aId)?.pairs.push({ ...common, partner: p.bName });

@@ -14,9 +14,10 @@ The page labels below are the Hungarian ones you see on screen.
 | 5, partner without an email (#96) | [`04-partner-email.spec.ts`](../app/e2e/04-partner-email.spec.ts) |
 | 7-9 | [`05-entries.spec.ts`](../app/e2e/05-entries.spec.ts) |
 | 10-12 | [`06-groups.spec.ts`](../app/e2e/06-groups.spec.ts) |
-| 11, a pair approved after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
+| 11, a pair entering after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
 | 13 | [`08-solos.spec.ts`](../app/e2e/08-solos.spec.ts) |
 | 14 | [`09-pairs.spec.ts`](../app/e2e/09-pairs.spec.ts) |
+| 14, search, filter and Levél nekik (#148) | [`15-pairs-filter.spec.ts`](../app/e2e/15-pairs-filter.spec.ts) |
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
 
 ## Set up
@@ -94,8 +95,8 @@ flowchart TD
   C --> D["5. Players register"]
   D --> E["6. Pairs form from the signups"]
   E --> F["7. Pairs enter: Nevezünk"]
-  F --> G["8. Szervező approves"]
-  G --> H["9. Admin checks the decisions went out"]
+  F --> G["8. Szervező sees the entered pairs"]
+  G --> H["9. Admin checks the entry emails went out"]
   H --> I["10. Szervező drafts the groups"]
   I --> J["11. Szervező publishes"]
   J --> K["12. Admin checks the group emails went out"]
@@ -126,7 +127,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
   - `/admin/cities` ("Városok"): Mintaváros is there and listed (shown on the signup form).
   - `/admin/leagues` ("Ligák"): Padelpárbaj Mintaváros with the organizer Teszt Szervező.
   - `/admin/leagues/minta/clubs` ("Klubok: Mintaváros"): the three clubs. "Inaktiválás" on one turns it off, "Aktiválás" turns it on again (deactivate instead of delete, #19). Leave all three active.
-  - `/admin/leagues/minta/seasons` ("Szezonok"): the Teszt szezon with its four rounds, a link under "Nevezések" (0 jóváhagyva) and "Csoportok" under "1. kör". Try "Új szezon" with a start day that is not a Monday: it must be refused.
+  - `/admin/leagues/minta/seasons` ("Szezonok"): the Teszt szezon with its four rounds, a link under "Nevezések" (0 nevezett) and "Csoportok" under "1. kör". Try "Új szezon" with a start day that is not a Monday: it must be refused.
   - `/privacy`: opens without login; check that it describes pairs, season entries, the group emails and how long email text is kept.
 
 ### 3. Admin sends the registration invite
@@ -178,34 +179,30 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Account: either player of a pair
 - Do: press "Nevezünk".
 - Expect:
-  - "Neveztetek. A szervező döntését a Párom oldalon látjátok." and, after a reload, "Neveztetek. A szervező jóváhagyására vár."
+  - "Beneveztetek: az 1. körtől játszotok (kezdés: ...)." and, after a reload, "Beneveztetek: az 1. körtől játszotok." The entry counts at once: there is no organizer approval (#153).
   - The button is gone: a pair can enter a season once. The partner sees the same status.
+  - Both players get "Beneveztetek" on Értesítések, and the terminal prints the "Beneveztetek" email to each of them at once (not to a player who switched email off on the profile).
 - Repeat for every pair.
 
-### 8. Szervező approves the entries
+### 8. Szervező sees the entered pairs
 
-- Page: `/admin/leagues/minta/seasons/<id>/entries` ("Nevezések: Teszt szezon"), linked from "N függőben" on Szezonok
+- Page: `/admin/leagues/minta/seasons/<id>/entries` ("Nevezések: Teszt szezon"), linked from "N nevezett" on Szezonok
 - Account: `szervezo@example.test` (only the Mintaváros league pages show in their sidebar)
 - Expect:
-  - The filter "Függőben" (default), "Jóváhagyva", "Elutasítva". Each row has the two names, their levels, the pair's average starting Elo and when they applied.
-- Do: press "Jóváhagyás" on a pair, write a short message in "Üzenet (nem kötelező)", confirm. Press "Elutasítás" on another one, confirm, then change your mind with "Jóváhagyás" under "Elutasítva". Approve all the others.
-- Expect:
-  - The dialog says both players get an email now.
-  - Approved entries show in "Jóváhagyva".
-  - Back on the players' Párom: "Jóváhagyva: az 1. körtől játszotok." and "A szervező üzenete: ...".
-  - The terminal prints each decision email at once, with the Szervező's message where they wrote one.
+  - "N nevezett pár". Each row has the two names, their levels, the pair's average starting Elo, when they entered and the round they start in.
+  - Nothing to approve or reject, and no "függőben".
 
-### 9. Admin checks the decisions went out
+### 9. Admin checks the entry emails went out
 
 - Page: `/admin/outbox`
 - Account: `admin@example.test`
-- Expect: a row "Döntés a nevezésről" with two sent emails per decision (a flipped decision counts twice) and nothing waiting.
+- Expect: a row "Nevezés" with two sent emails per pair (one fewer for a player who switched email off) and nothing waiting.
 
 ### 10. Szervező drafts the groups
 
 - Page: `/admin/leagues/minta/seasons/<id>/groups` ("Csoportok: Teszt szezon"), the "Csoportok" link in the "1. kör" column of Szezonok
 - Account: `szervezo@example.test`
-- Expect before drafting: a button "Csoportok javaslata". With 0, 1, 2 or 5 approved pairs there is no draft, only a message saying why.
+- Expect before drafting: a button "Csoportok javaslata". With 0, 1, 2 or 5 entered pairs there is no draft, only a message saying why.
 - Do: press "Csoportok javaslata".
 - Expect:
   - Cards "1. csoport", "2. csoport", ...; the strongest pairs (by Elo) in group 1. 11 pairs make 4, 4 and 3; 10 make 4, 3 and 3. Each pair shows its Elo.
@@ -220,8 +217,8 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - The terminal prints one email per player: the group, the opponents' names per week (or the rest week), the deadline and a link. No email address of another player is in any of them.
   - The groups are locked: no select, no "Újragenerálás". The "1. kör" link on Szezonok now reads "Közzétéve", and the season can't be edited or deleted.
-  - A pair in a published group can't be dissolved or changed ("Felbontás" and "Partner cseréje" on Párok are disabled, with the reason, until the round's deadline) and its entry can't be rejected.
-  - A pair approved after publishing joins round 2 (to see it, keep one pair out of steps 7 and 8 until now, then let it enter and approve it: "Jóváhagyva: a 2. körtől játszotok.").
+  - A pair in a published group can't be dissolved or changed ("Felbontás" and "Partner cseréje" on Párok are disabled, with the reason, until the round's deadline).
+  - A pair entering after publishing joins round 2 (to see it, keep one pair out of step 7 until now, then let it enter: "Beneveztetek: a 2. körtől játszotok.").
 
 ### 12. Admin checks the group emails went out
 
@@ -251,10 +248,14 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
+  4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
+  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again.
+  6. Type a name in "Keresés" without accents (for example "kovacs"): only the matching rows stay, and the address has `?q=`. "Szűrők törlése" brings every row back.
+  7. Press "Nincs a ligában (N)": exactly N rows, the players without a pair ("Nincs párja", "Párt keres" where the switch is on) and the pairs without an entry. A reload keeps it. As `admin@example.test`, "Levél nekik" opens "Új körlevél" with those players as recipients ("Lista"); don't send.
 - Expect:
-  - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change.
-  - The players see the change on Párom. From here a new pair enters the season like any other (step 7).
-  - After step 11, a pair in a published group has both buttons disabled, with the reason.
+  - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change or an entry change.
+  - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
+  - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" is refused with the reason until the round's deadline.
 
 ### 15. A new player without a signup registers (side path)
 

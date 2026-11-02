@@ -153,7 +153,7 @@ describe("running it twice", () => {
     run();
     const seeded = sizes();
 
-    // A walkthrough: players register, pair up, enter, get approved, groups
+    // A walkthrough: players register, pair up, enter, groups
     // are drafted and published, mail goes out, they log in, ...
     h.raw.exec(`
       insert into users (id, email, name, level, consent_at) values
@@ -252,23 +252,19 @@ describe("the seed carries the walkthrough", () => {
     }
     expect(rows("select count(*) as n from pairs where status = 'active'")[0].n).toBe(11);
 
-    // Either player of each pair applies ("Nevezünk").
+    // Either player of each pair enters ("Nevezünk"): it counts at once, for round 1 (#153).
     const [season] = rows("select id from seasons");
     for (const pair of rows("select player_a from pairs")) {
       const user = (await db.select().from(users)).find((u) => u.id === pair.player_a)!;
-      expect(await E.applyToSeason(user, season.id, NOW)).toEqual({ ok: true });
+      expect(await E.applyToSeason(user, season.id, NOW)).toMatchObject({ ok: true, joins: { phase: 1 } });
     }
     expect(count("season_entries")).toBe(11);
-
-    // The Szervező approves all of them: they join round 1.
-    const organizer = await userRow(Seed.ORGANIZER.email);
-    for (const e of rows("select id from season_entries order by id"))
-      expect(await E.decideEntry(organizer, season.id, e.id, "approve", null, NOW)).toEqual({ ok: true });
-    expect(rows("select distinct joins_phase from season_entries")).toEqual([{ joins_phase: 1 }]);
-    // Both players of every pair got the decision, with nothing else to do (#112).
+    expect(rows("select distinct status, joins_phase from season_entries")).toEqual([{ status: "approved", joins_phase: 1 }]);
+    // Both players of every pair got the notice, with nothing else to do (#112).
     expect(rows("select status, count(*) as n from email_messages where kind = 'season_entry_decision' group by status")).toEqual([
       { status: "sent", n: 22 },
     ]);
+    const organizer = await userRow(Seed.ORGANIZER.email);
 
     // Draft and publish: 11 pairs split into groups of 3 or 4.
     expect(await G.generateDraft(season.id, organizer.id)).toEqual({ ok: true });

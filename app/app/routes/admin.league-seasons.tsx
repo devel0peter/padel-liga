@@ -289,7 +289,7 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                     <TableCell>{end && formatDate(end)}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <Link to={`${base}/${s.id}/entries`} className="underline">
-                        {s.entries.pending > 0 ? `${s.entries.pending} függőben` : `${s.entries.approved} jóváhagyva`}
+                        {s.entries} nevezett
                       </Link>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

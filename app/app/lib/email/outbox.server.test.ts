@@ -28,15 +28,13 @@ const { backgroundPending, settleBackground } = await import("~/test/background"
 
 const messages = () => h.raw.prepare("select kind, to_email, subject, status from email_messages").all();
 
-describe("queueSeasonEntryDecision", () => {
+describe("queueSeasonEntered", () => {
   const input = {
     to: "Béla",
     partnerName: "Anna",
     league: "Padelpárbaj Győr",
     season: "2026/27 tél",
-    approved: true,
     joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") },
-    note: null,
   };
 
   beforeEach(() => {
@@ -45,16 +43,16 @@ describe("queueSeasonEntryDecision", () => {
   });
 
   it("sends the email right away, without an Admin (#112)", async () => {
-    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    await O.queueSeasonEntered("bela@x.hu", input);
     expect(messages()).toEqual([
-      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Jóváhagyták a nevezéseteket – Padelpárbaj", status: "sent" },
+      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Beneveztetek – Padelpárbaj", status: "sent" },
     ]);
     expect(h.sent.map((m) => m.to)).toEqual(["bela@x.hu"]);
   });
 
   it("sends nothing to a suppressed address", async () => {
     h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "unsubscribed");
-    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    await O.queueSeasonEntered("bela@x.hu", input);
     expect(messages()).toEqual([]);
     expect(h.sent).toEqual([]);
   });
@@ -176,14 +174,12 @@ describe("automatic outbox", () => {
         "Győr",
       ),
     );
-    await O.queueSeasonEntryDecision("bela@x.hu", {
+    await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
       league,
       season: "2026/27 tél",
-      approved: false,
       joins: null,
-      note: null,
     });
     await O.createBroadcast({
       subject: "Hír",
@@ -267,14 +263,12 @@ describe("automatic outbox", () => {
 
   it("with the daily limit used up, a new email stays queued and goes out on the next run after the limit frees up", async () => {
     sentToday(100);
-    await O.queueSeasonEntryDecision("bela@x.hu", {
+    await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
       league: "Padelpárbaj Győr",
       season: "2026/27 tél",
-      approved: true,
       joins: null,
-      note: null,
     });
     expect(h.sent).toEqual([]);
     expect(count("kind = 'season_entry_decision' and status = 'pending'")).toBe(1);

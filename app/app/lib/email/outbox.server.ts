@@ -36,7 +36,7 @@ import {
   pairIntro,
   partnerNotice,
   registrationInvite,
-  seasonEntryDecision,
+  seasonEntered,
   signupConfirmation,
   stuckReminder,
   type Email,
@@ -198,15 +198,14 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
   await deliver(ids);
 }
 
-// A Szervező approved or rejected a season entry (#23): each player of the
-// pair gets one. An unsubscribed or bounced address, or a player who switched
+// A pair entered a season (#153): each player of the pair gets one. An unsubscribed or bounced address, or a player who switched
 // email off (#115), gets nothing; the status still shows in the app.
-export async function queueSeasonEntryDecision(
+export async function queueSeasonEntered(
   toEmail: string,
-  input: Parameters<typeof seasonEntryDecision>[0],
+  input: Parameters<typeof seasonEntered>[0],
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
+  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntered(input) }]));
 }
 
 // The groups are published (#24, D22): one email per player, sent right away

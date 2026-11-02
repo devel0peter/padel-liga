@@ -6,12 +6,14 @@ import {
   KEEP_BACKUPS,
   backupKey,
   cronJob,
+  foreignKeys,
   hasSequences,
   headSql,
   insertOrder,
   insertStatement,
   isInternalTable,
   keysToDelete,
+  orphanCleanupSql,
   rowsSql,
   sqlLiteral,
   tableOrder,
@@ -145,5 +147,44 @@ describe("which job a cron runs", () => {
     const text = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8") as string;
     expect(text).toContain(`"crons": ["${EMAIL_CRON}", "${BACKUP_CRON}"]`);
     expect(text).toMatch(/"binding": "BACKUPS"/);
+  });
+});
+
+describe("foreignKeys", () => {
+  it("reads drizzle's table-level keys, composite ones too", () => {
+    expect(
+      foreignKeys("CREATE TABLE `s` (`id` integer, `u` text, `a` integer, `b` integer, FOREIGN KEY (`u`) REFERENCES `users`(`id`) ON DELETE cascade, FOREIGN KEY (`a`, `b`) REFERENCES `pairs`(`x`, `y`))"),
+    ).toEqual([
+      { columns: ["u"], parent: "users", parentColumns: ["id"] },
+      { columns: ["a", "b"], parent: "pairs", parentColumns: ["x", "y"] },
+    ]);
+  });
+  it("reads a column added with ALTER TABLE ... REFERENCES, once", () => {
+    expect(foreignKeys("CREATE TABLE `m` (`id` integer PRIMARY KEY NOT NULL, `club_id` integer REFERENCES clubs(id))")).toEqual([
+      { columns: ["club_id"], parent: "clubs", parentColumns: ["id"] },
+    ]);
+  });
+  it("finds nothing in a table without keys", () => {
+    expect(foreignKeys("CREATE TABLE `t` (`id` integer PRIMARY KEY, `note` text)")).toEqual([]);
+  });
+});
+
+describe("orphanCleanupSql", () => {
+  const schema = [
+    { type: "table", name: "sessions", sql: 'CREATE TABLE `sessions` (`id` text, `user_id` text, FOREIGN KEY (`user_id`) REFERENCES `users`(`id`))' },
+    { type: "table", name: "users", sql: "CREATE TABLE `users` (`id` text PRIMARY KEY)" },
+    { type: "table", name: "logins", sql: "CREATE TABLE `logins` (`id` text, `session` text REFERENCES sessions(id))" },
+  ];
+  it("deletes children without a parent, parents' tables first", () => {
+    expect(orphanCleanupSql(schema).trim().split("\n")).toEqual([
+      'DELETE FROM "sessions" WHERE "user_id" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "users" AS "r" WHERE "r"."id" = "sessions"."user_id");',
+      'DELETE FROM "logins" WHERE "session" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "sessions" AS "r" WHERE "r"."id" = "logins"."session");',
+    ]);
+  });
+  it("is empty when no table has a key, and goes before the counters in the tail", () => {
+    expect(orphanCleanupSql([{ type: "table", name: "t", sql: "CREATE TABLE t (id integer)" }])).toBe("");
+    const tail = tailSql(schema, [{ name: "t", seq: 3 }], orphanCleanupSql(schema)).split("\n");
+    expect(tail[0]).toContain('DELETE FROM "sessions"');
+    expect(tail.indexOf("DELETE FROM sqlite_sequence;")).toBeGreaterThan(1);
   });
 });

@@ -35,12 +35,13 @@ class Counter {
 }
 
 // The slice of D1Database the export uses, over node:sqlite.
-function fakeD1(raw: any, c: Counter) {
+function fakeD1(raw: any, c: Counter, before?: (sql: string) => void) {
   return {
     prepare: (sql: string) => ({
       bind: (...params: unknown[]) => ({
         all: async () => {
           c.tick("D1");
+          before?.(sql);
           return { results: raw.prepare(sql).all(...params) };
         },
       }),
@@ -87,12 +88,12 @@ function fill(raw: any) {
 }
 
 // Runs steps like the cron does, one invocation each, until the file is there.
-async function runAll(raw: any, c: Counter, bucket: R2Bucket, limits = LIMITS) {
+async function runAll(raw: any, c: Counter, bucket: R2Bucket, limits = LIMITS, before?: (sql: string) => void) {
   const results: any[] = [];
   const calls: number[] = [];
   for (let i = 0; i < 60; i++) {
     c.n = 0;
-    const r = await exportStep({ DB: fakeD1(raw, c), BACKUPS: bucket }, NOW, limits);
+    const r = await exportStep({ DB: fakeD1(raw, c, before), BACKUPS: bucket }, NOW, limits);
     calls.push(c.n);
     results.push(r);
     if (r.status === "finished") return { results, calls };
@@ -108,10 +109,14 @@ const tableCounts = (raw: any) =>
   );
 const schemaOf = (db: any) => db.prepare("SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name").all();
 
+// D1 (and wrangler's local D1) runs a file in one transaction; with foreign
+// keys on, the PRAGMA at its top defers the check to the commit.
 function restore(sql: string) {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
+  db.exec("BEGIN");
   db.exec(sql);
+  db.exec("COMMIT");
   return db;
 }
 
@@ -178,6 +183,41 @@ describe("exportStep", () => {
     expect(Math.max(...seen)).toBeLessThanOrEqual(LIMITS.stepChars + onePage);
     expect(seen.length).toBeGreaterThan(2);
     expect(files.has(FILE)).toBe(true);
+  });
+
+  it("restores although a row was written between two steps and arrived without its parent", async () => {
+    const raw = migratedDatabase();
+    fill(raw);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // A person logs in after `users` was read and before `sessions` is: the
+    // new session (and a session of the new user) reach the file, the user not.
+    let late = false;
+    await runAll(raw, c, bucket, LIMITS, (sql) => {
+      if (late || !sql.includes('FROM "sessions"')) return;
+      late = true;
+      raw.exec(`INSERT INTO users (id, email) VALUES ('u2', 'late@example.test')`);
+      raw.exec(`INSERT INTO sessions (id_hash, user_id, expires_at) VALUES ('s2', 'u2', 1790000000)`);
+    });
+    expect(late).toBe(true);
+    // With foreign keys on, one orphan would fail this with FOREIGN KEY constraint failed.
+    const restored = restore(files.get(FILE)!);
+    // The session of the late user is dropped, the rest is whole.
+    expect(restored.prepare("SELECT id_hash FROM sessions").all()).toEqual([{ id_hash: "s1" }]);
+    expect(restored.prepare("SELECT count(*) AS n FROM users").get()).toEqual({ n: 1 });
+    expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("finds every foreign key of the real schema, so no orphan cleanup is missing", async () => {
+    const { foreignKeys } = await import("./backup");
+    const tables = migratedDatabase().prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL").all() as { name: string; sql: string }[];
+    let found = 0;
+    for (const t of tables) {
+      const written = (t.sql.match(/\bREFERENCES\b/gi) ?? []).length;
+      expect(foreignKeys(t.sql), t.name).toHaveLength(written);
+      found += written;
+    }
+    expect(found).toBeGreaterThan(30);
   });
 
   it("does nothing once the day's file exists", async () => {

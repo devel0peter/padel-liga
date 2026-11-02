@@ -8,6 +8,7 @@ import {
   hasSequences,
   headSql,
   keysToDelete,
+  orphanCleanupSql,
   rowsSql,
   tableOrder,
   tailSql,
@@ -52,7 +53,7 @@ type State = {
   table: number;
   after: number;
   parts: Part[];
-  tail: { schema: SchemaRow[]; sequences: boolean };
+  tail: { schema: SchemaRow[]; sequences: boolean; cleanup: string };
   // Everything is read and written as pieces; the file is not glued yet.
   complete: boolean;
 };
@@ -114,7 +115,7 @@ export async function exportStep(
       table: 0,
       after: Number.MIN_SAFE_INTEGER,
       parts: [],
-      tail: { schema: schema.filter((s) => s.type !== "table" || s.name === "sqlite_sequence"), sequences: hasSequences(schema) },
+      tail: { schema: schema.filter((s) => s.type !== "table" || s.name === "sqlite_sequence"), sequences: hasSequences(schema), cleanup: orphanCleanupSql(schema) },
       complete: false,
     };
     await savePart(state, headSql(schema, now));
@@ -146,7 +147,7 @@ export async function exportStep(
     }
     if (state.table >= state.tables.length) {
       const sequences = state.tail.sequences ? await query<SequenceRow>("SELECT name, seq FROM sqlite_sequence ORDER BY name") : [];
-      buffer.push(tailSql(state.tail.schema, sequences));
+      buffer.push(tailSql(state.tail.schema, sequences, state.tail.cleanup));
       state.complete = true;
     }
     if (buffer.length) await savePart(state, buffer.join(""));

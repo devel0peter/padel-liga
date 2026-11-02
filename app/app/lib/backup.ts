@@ -73,6 +73,53 @@ export function insertOrder(tables: SchemaRow[]): string[] {
   return done;
 }
 
+export type ForeignKey = { columns: string[]; parent: string; parentColumns: string[] };
+
+const ident = (s: string) => s.trim().replace(/^[`"'[]|[`"'\]]$/g, "");
+const identList = (s: string) => s.split(",").map(ident).filter(Boolean);
+
+// The foreign keys in a CREATE TABLE statement, as drizzle writes them
+// (`FOREIGN KEY (a) REFERENCES t(b)`) and as ALTER TABLE ADD COLUMN leaves
+// them (`a integer REFERENCES t(b)`). D1 won't run the foreign_key_list
+// pragma, so the statement is read. One without a parent column list is
+// skipped. A default with parentheses before REFERENCES hides the column.
+export function foreignKeys(sql: string): ForeignKey[] {
+  const keys: ForeignKey[] = [];
+  const tableLevel: [number, number][] = [];
+  for (const m of sql.matchAll(/FOREIGN\s+KEY\s*\(([^)]*)\)\s*REFERENCES\s+([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s*\(([^)]*)\)/gi)) {
+    tableLevel.push([m.index!, m.index! + m[0].length]);
+    keys.push({ columns: identList(m[1]!), parent: ident(m[2]!), parentColumns: identList(m[3]!) });
+  }
+  for (const m of sql.matchAll(/[,(]\s*([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s+[^,()]*?\bREFERENCES\s+([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s*\(([^)]*)\)/gi)) {
+    const at = m.index! + m[0].lastIndexOf("REFERENCES");
+    if (tableLevel.some(([from, to]) => at >= from && at < to)) continue;
+    keys.push({ columns: [ident(m[1]!)], parent: ident(m[2]!), parentColumns: identList(m[3]!) });
+  }
+  return keys;
+}
+
+// DELETEs that drop rows whose parent row is not in the file. The export is
+// read in steps minutes apart, so a row written meanwhile (a login after
+// `users` was read, before `sessions`) can arrive without its parent, and
+// one such row would fail the whole restore with FOREIGN KEY constraint
+// failed. Parents first: a row removed here can orphan rows of a later table,
+// which that table's DELETE then removes. Runs in one transaction with
+// deferred foreign keys (the PRAGMA at the top of the file).
+export function orphanCleanupSql(schema: SchemaRow[]): string {
+  const tables = userTables(schema);
+  const byName = new Map(tables.map((t) => [t.name, t]));
+  const out: string[] = [];
+  for (const name of insertOrder(tables)) {
+    for (const fk of foreignKeys(byName.get(name)!.sql)) {
+      if (!byName.has(fk.parent) || fk.columns.length !== fk.parentColumns.length) continue;
+      const set = fk.columns.map((c) => `${quote(c)} IS NOT NULL`).join(" AND ");
+      const match = fk.columns.map((c, i) => `${quote("r")}.${quote(fk.parentColumns[i]!)} = ${quote(name)}.${quote(c)}`).join(" AND ");
+      out.push(`DELETE FROM ${quote(name)} WHERE ${set} AND NOT EXISTS (SELECT 1 FROM ${quote(fk.parent)} AS ${quote("r")} WHERE ${match});`);
+    }
+  }
+  return out.length ? `${out.join("\n")}\n` : "";
+}
+
 const userTables = (schema: SchemaRow[]) => schema.filter((s) => s.type === "table" && !isInternalTable(s.name));
 
 // The tables to read, parents first.
@@ -101,10 +148,11 @@ export function rowsSql(table: string, rows: Record<string, SqlValue>[]): string
   return rows.map((r) => `${insertStatement(table, r)}\n`).join("");
 }
 
-// Last piece: the AUTOINCREMENT counters, so a deleted highest id is not
-// handed out again after a restore, then the indexes.
-export function tailSql(schema: SchemaRow[], sequences: SequenceRow[]): string {
-  const out: string[] = [];
+// Last piece: the orphan cleanup (orphanCleanupSql), the AUTOINCREMENT
+// counters, so a deleted highest id is not handed out again after a restore,
+// then the indexes.
+export function tailSql(schema: SchemaRow[], sequences: SequenceRow[], cleanup = ""): string {
+  const out: string[] = cleanup ? [cleanup.trimEnd()] : [];
   if (sequences.length) {
     out.push("DELETE FROM sqlite_sequence;");
     for (const s of sequences) out.push(insertStatement("sqlite_sequence", { name: s.name, seq: s.seq }));

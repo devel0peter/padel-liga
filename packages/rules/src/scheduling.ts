@@ -6,7 +6,8 @@
 // pair and time, kept for the walkover decision at the deadline (spec 8).
 // Later steps (cancel, venue, results: #27, #28) add their own kinds.
 
-export type Side = "a" | "b";
+// The match's two pairs, as in results.ts: "a" is pair_a, "b" pair_b.
+import type { Side } from "./results";
 
 export const SCHEDULING_EVENT_KINDS = [
   "proposal", // at least 3 slots by the slot rules

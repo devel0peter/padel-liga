@@ -315,6 +315,15 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
   - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
 
+### 20. The booking pair records the venue; a pair cancels, in time and late
+
+- Page: the match fixed in step 18, as the player of step 17, then as an opponent
+- Do: under "Hol lesz a meccs?" pick "Minta Padel Aréna", type "2-es pálya", press "Mentem a helyszínt". Then "Lemondom a meccset" and "Lemondom". As the opponent, record an agreed time about 3 hours from now; as the first player, confirm it and cancel again.
+- Expect:
+  - Only the city's active clubs are offered. "Lefixálva: <time>, Minta Padel Aréna, 2-es pálya" for both pairs; nobody is notified, "Napló" has "Rögzítette a helyszínt".
+  - Days ahead: the dialog asks "Lemondod a meccset?"; then "Lemondtátok. Egyeztessetek új időpontot." and "Egyeztetésre vár" for both pairs. The opponents get "Lemondták a meccset" in "Értesítések" (no email: it is a daily-digest item).
+  - Under 24 hours before: the card already says "ez késői lemondás", the dialog asks "Késői lemondás. Biztosan lemondod?". Then "Későn mondtátok le, nektek kell új időpontokat ajánlani"; the opponents see "Későn mondták le, nekik kell új időpontokat ajánlaniuk" and no Teendő for this match, but can still propose. "Napló": "Lemondta a meccset (<time>). Késői lemondás: 24 órán belül volt." with who.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.
@@ -323,4 +332,4 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
-- Milestone 2 and later: venue and cancelling (#27), results, standings, reminders.
+- Milestone 2 and later: results, standings, reminders.

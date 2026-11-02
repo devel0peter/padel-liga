@@ -374,6 +374,7 @@ export const notifications = sqliteTable(
         "match_agreed_time",
         "match_scheduled",
         "match_declined",
+        "match_cancelled",
         "test",
       ],
     }).notNull(),
@@ -682,14 +683,17 @@ export const matchEvents = sqliteTable(
       .references(() => pairs.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind", {
-      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined"],
+      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled"],
     }).notNull(),
     // A proposal's slots: JSON array of UTC instants in seconds.
     slots: text("slots", { mode: "json" }).$type<number[]>(),
-    // The accepted slot, or the agreed time.
+    // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
-    // The venue offered with a proposal or an agreed time (optional).
+    // The venue offered with a proposal or an agreed time (optional), or
+    // recorded after booking ("venue", #27).
     clubId: integer("club_id").references(() => clubs.id),
+    // "venue": the court, free text (optional, #27).
+    court: text("court"),
     at: integer("at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

@@ -79,10 +79,10 @@ Organizer and platform admin are roles on a normal player account, inside the ap
    - **counter-propose** with a new proposal under the same rules.
    Simply rejecting is not possible.
 3. **Agreed time (README decision log, 2026-10-05):** if the pairs already agreed on a time elsewhere (Messenger, in person), either pair can record that slot directly, without the 3-slot proposal: any future time before the deadline, no lead time, no time window. Optionally with a venue. The other pair confirms it, which schedules the match as if a slot had been accepted, or declines it, which reopens the proposal process. An unconfirmed agreed time lapses when its start passes.
-4. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration).
+4. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration). Either pair can record or change it, one of the city's active clubs plus an optional court; it notifies nobody (README decision log, 2026-11-02, D74).
 5. Every action is timestamped and logged. This is the evidence for walkovers. The log is shown on the match page to both pairs; how the state follows from it, the slot rules' details and the page: README decision log, 2026-11-02 (D66, D68).
-6. Either side can cancel an accepted or confirmed slot; this reopens the proposal process.
-   - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal. If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
+6. Either side can cancel an accepted or confirmed slot until it starts; this reopens the proposal process. The other pair gets it as a daily-digest item (section 13).
+   - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal: only it gets the Teendő, but the other pair isn't blocked from proposing (D74). If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
 
 ## 7. Recording results
 - Format (league default, one format per league, no per-match variants; see section 12):

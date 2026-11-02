@@ -1,10 +1,21 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { data, Form, useNavigation } from "react-router";
+import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
 import { AppPage } from "~/components/app-page";
 import { Contacts, StatusPill } from "~/components/my-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -15,7 +26,7 @@ import { requireUser } from "~/lib/auth/session.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { SCHEDULING_GUIDE, eventText, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
-import { matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { COURT_MAX, matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
 import { SITE_NAME } from "~/lib/site";
 
 // A match (#25, #26): status, the opponents' phones, scheduling (propose,
@@ -76,8 +87,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     const at = Number(form.get("slot"));
     if (!Number.isFinite(at)) return fail("Válassz egy időpontot.");
     input = { kind: "accept", slot: new Date(at) };
-  } else if (intent === "confirm" || intent === "decline") {
+  } else if (intent === "confirm" || intent === "decline" || intent === "cancel") {
     input = { kind: intent };
+  } else if (intent === "venue") {
+    const club = clubId(form);
+    if (club === undefined) return fail("Válassz helyszínt a listából.");
+    input = { kind: "venue", clubId: club, court: String(form.get("court") ?? "") };
   } else throw new Response("Hibás kérés.", { status: 400 });
 
   const result = await matchStep(user.id, id, input);
@@ -206,6 +221,102 @@ function AgreedForm({ clubs, result }: { clubs: { id: number; name: string }[]; 
   );
 }
 
+// Whoever booked the court records where (#27); both pairs see it. Only the
+// city's active clubs; the court is optional free text.
+function VenueForm({
+  clubs,
+  clubId,
+  court,
+  result,
+}: {
+  clubs: { id: number; name: string }[];
+  clubId: number | null;
+  court: string | null;
+  result?: ActionResult;
+}) {
+  const busy = useNavigation().state !== "idle";
+  if (clubs.length === 0) return null;
+  const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">Hol lesz a meccs?</CardTitle>
+        <CardDescription>Aki lefoglalta a pályát, írja be, hol. Mindkét pár látja.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form method="post" className="grid gap-3">
+          <input type="hidden" name="intent" value="venue" />
+          <div className="grid gap-1.5">
+            <Label htmlFor="venue-club">Helyszín</Label>
+            <Select name="club" defaultValue={current} required>
+              <SelectTrigger id="venue-club" className="w-full sm:w-72">
+                <SelectValue placeholder="Válassz klubot" />
+              </SelectTrigger>
+              <SelectContent>
+                {clubs.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="venue-court">Pálya (nem kötelező)</Label>
+            <Input id="venue-court" name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full sm:w-72" />
+          </div>
+          <Feedback result={result} intent="venue" />
+          <div>
+            <Button type="submit" variant="outline" disabled={busy}>
+              Mentem a helyszínt
+            </Button>
+          </div>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Either pair cancels the scheduled slot until it starts (#27, spec 6.6).
+// Under 24 hours before it the cancellation is late, and the page says what
+// that means before asking.
+function CancelCard({ late }: { late: boolean }) {
+  const busy = useNavigation().state !== "idle";
+  const submit = useSubmit();
+  const consequence = late
+    ? "24 órán belül vagytok a kezdéshez képest, ez késői lemondás: utána nektek kell új időpontokat ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeletek nyer 4-0 4-0-val."
+    : "Utána újra egyeztettek. 24 órán belül a kezdéshez képest a lemondás már késői: akkor nektek kell új időpontokat ajánlani.";
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">Mégsem jó az időpont?</CardTitle>
+        <CardDescription>{consequence}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" className="w-fit" disabled={busy}>
+              Lemondom a meccset
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{late ? "Késői lemondás. Biztosan lemondod?" : "Lemondod a meccset?"}</AlertDialogTitle>
+              <AlertDialogDescription>{consequence} A másik pár értesítést kap.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Mégse</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => submit({ intent: "cancel" }, { method: "post" })}>
+                Lemondom
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MatchRoute({ loaderData: m, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const result = actionData as ActionResult | undefined;
@@ -230,7 +341,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             <Contacts contacts={m.contacts} />
           </div>
         )}
-        <Feedback result={result} intent={["accept", "confirm", "decline"]} />
+        <Feedback result={result} intent={["accept", "confirm", "decline", "cancel"]} />
       </section>
 
       {m.state.status !== "scheduled" && m.actions.propose && (
@@ -312,6 +423,11 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           </CardContent>
         </Card>
       )}
+
+      {m.state.status === "scheduled" && m.actions.venue && (
+        <VenueForm key={`v${m.log.length}`} clubs={m.clubs} clubId={m.state.clubId} court={m.state.court ?? null} result={result} />
+      )}
+      {m.state.status === "scheduled" && m.actions.cancel && <CancelCard late={m.cancelLate} />}
 
       {m.actions.propose && (
         <>

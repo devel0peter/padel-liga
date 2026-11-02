@@ -3,7 +3,7 @@
 // side is matches.server.ts, the rules are in packages/rules (slots.ts,
 // scheduling.ts).
 
-import { DIVISION_NAMES, budapestTime, divisionOf, isDay, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
+import { DIVISION_NAMES, budapestTime, divisionOf, isDay, isLateCancel, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 
 import { formatDeadline } from "./format";
 
@@ -26,13 +26,21 @@ export type Tone = "todo" | "waiting" | "done";
 
 export type StatusView = { label: string; tone: Tone };
 
+// "Padel Arena, 2-es pálya": the venue and the court, if any (#27).
+export function venueLine(venue: string | null | undefined, court?: string | null): string | null {
+  return venue ? [venue, court].filter(Boolean).join(", ") : null;
+}
+
 /**
  * The match's status as the player of `me` sees it (#25 requirement 2). The
- * venue name, if any, is added to a scheduled match.
+ * venue name, if any, is added to a scheduled match, with the court (#27).
+ * After a late cancellation the cancelling pair is told it proposes next.
  */
 export function statusView(state: SchedulingState, me: Side, venue?: string | null): StatusView {
   switch (state.status) {
     case "to_schedule":
+      if (state.nextBy === me) return { label: "Későn mondtátok le, nektek kell új időpontokat ajánlani", tone: "todo" };
+      if (state.nextBy) return { label: "Későn mondták le, nekik kell új időpontokat ajánlaniuk", tone: "waiting" };
       return { label: "Egyeztetésre vár", tone: "todo" };
     case "proposed":
       return state.by === me
@@ -43,7 +51,8 @@ export function statusView(state: SchedulingState, me: Side, venue?: string | nu
         ? { label: `Megbeszélt időpont (${formatSlot(state.slot)}), a másik pár megerősítésére vár`, tone: "waiting" }
         : { label: `Megbeszélt időpont (${formatSlot(state.slot)}), erősítsd meg`, tone: "todo" };
     case "scheduled":
-      return { label: `Lefixálva: ${formatSlot(state.slot)}${venue ? `, ${venue}` : ""}`, tone: "done" };
+      const where = venueLine(venue, state.court);
+      return { label: `Lefixálva: ${formatSlot(state.slot)}${where ? `, ${where}` : ""}`, tone: "done" };
   }
 }
 
@@ -52,7 +61,8 @@ export function statusView(state: SchedulingState, me: Side, venue?: string | nu
 export function todoFor(state: SchedulingState, me: Side, opponents: string): string | null {
   switch (state.status) {
     case "to_schedule":
-      return `Ajánlj időpontot (${opponents} ellen)`;
+      // After a late cancellation only the cancelling pair (D74).
+      return state.nextBy && state.nextBy !== me ? null : `Ajánlj időpontot (${opponents} ellen)`;
     case "proposed":
       return state.by === me ? null : `Válaszolj az időpont-ajánlatra (${opponents})`;
     case "agreed_time":
@@ -62,8 +72,16 @@ export function todoFor(state: SchedulingState, me: Side, opponents: string): st
   }
 }
 
-// A log line (#26 requirement 4): what happened, without who and when.
-export function eventText(e: { kind: SchedulingEventKind; slots?: readonly Date[] | null; slot?: Date | null; venue?: string | null }): string {
+// A log line (#26 requirement 4): what happened, without who and when. A
+// cancellation says whether it was late (#27); `at` is when it happened.
+export function eventText(e: {
+  kind: SchedulingEventKind;
+  at?: Date;
+  slots?: readonly Date[] | null;
+  slot?: Date | null;
+  venue?: string | null;
+  court?: string | null;
+}): string {
   const venue = e.venue ? `, helyszín: ${e.venue}` : "";
   const slot = e.slot ? formatSlot(e.slot) : "";
   switch (e.kind) {
@@ -79,6 +97,12 @@ export function eventText(e: { kind: SchedulingEventKind; slots?: readonly Date[
       return "Megerősítette a megbeszélt időpontot";
     case "agreed_declined":
       return "Nem erősítette meg a megbeszélt időpontot, újra egyeztettek";
+    case "venue":
+      return `Rögzítette a helyszínt: ${venueLine(e.venue, e.court) ?? "–"}`;
+    case "cancelled":
+      return e.slot && e.at && isLateCancel(e.slot, e.at)
+        ? `Lemondta a meccset (${slot}). Késői lemondás: 24 órán belül volt.`
+        : `Lemondta a meccset (${slot})`;
   }
 }
 

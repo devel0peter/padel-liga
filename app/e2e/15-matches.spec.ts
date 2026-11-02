@@ -1,7 +1,8 @@
-// Walkthrough steps 17 to 19 (#25, #26): after Közzététel (step 11) a player
+// Walkthrough steps 17 to 20 (#25, #26, #27): after Közzététel (step 11) a player
 // sees their group and matches on Kezdőlap, pairs propose and accept a slot,
-// record and confirm an agreed time, and nobody else can open the match.
-import { addDays, budapestDay } from "@padel-liga/rules";
+// record and confirm an agreed time, nobody else can open the match, and a
+// booked match gets its venue and is cancelled, once in time and once late.
+import { addDays, budapestClock, budapestDay } from "@padel-liga/rules";
 import { expect, test, type Page } from "@playwright/test";
 
 import { PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
@@ -140,5 +141,64 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   expect(response?.status()).toBe(404);
   await expect(stranger.page.getByText("Ez az oldal nem létezik.")).toBeVisible();
   await stranger.context.close();
+  await player.context.close();
+});
+
+// A datetime-local value about `hours` from now, on the hour, Budapest time.
+function hoursAhead(hours: number): string {
+  const { day, minutes } = budapestClock(new Date(Date.now() + hours * 3_600_000));
+  return `${day}T${String(Math.floor(minutes / 60)).padStart(2, "0")}:00`;
+}
+
+test("20. venue, then a cancellation 4 days ahead and a late one: the log says who and that it was late (#27)", async ({ browser }) => {
+  const [first] = annasMatches();
+  const [opponent] = first!.opponents;
+  const player = await as(browser, anna);
+  await visit(player.page, `/matches/${first!.id}`);
+  const main = content(player.page);
+
+  // The venue: only the city's active clubs; both pairs see it.
+  await player.page.getByLabel("Helyszín").click();
+  await player.page.getByRole("option", { name: "Minta Padel Aréna" }).click();
+  await player.page.getByLabel("Pálya (nem kötelező)").fill("2-es pálya");
+  await player.page.getByRole("button", { name: "Mentem a helyszínt" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Rögzítettük a helyszínt." })).toBeVisible();
+  await expect(status(player.page)).toContainText("Minta Padel Aréna, 2-es pálya");
+  const other = await as(browser, opponent!);
+  await visit(other.page, `/matches/${first!.id}`);
+  await expect(status(other.page)).toContainText("Minta Padel Aréna, 2-es pálya");
+
+  // Days ahead: not late, back to scheduling for both.
+  await main.getByRole("button", { name: "Lemondom a meccset" }).click();
+  await expect(player.page.getByRole("alertdialog", { name: "Lemondod a meccset?" })).toBeVisible();
+  await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Lemondtátok. Egyeztessetek új időpontot." })).toBeVisible();
+  await expect(status(player.page)).toContainText("Egyeztetésre vár");
+
+  // The other pair records a time 3 hours from now, anna confirms, then cancels: late.
+  await visit(other.page, `/matches/${first!.id}`);
+  await other.page.getByLabel("Megbeszélt időpont").fill(hoursAhead(3));
+  await other.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
+  await expect(content(other.page).getByRole("status").filter({ hasText: "Rögzítettük." })).toBeVisible();
+  await visit(player.page, `/matches/${first!.id}`);
+  await player.page.getByRole("button", { name: "Megerősítem" }).click();
+  await expect(status(player.page)).toContainText("Lefixálva");
+  await expect(main).toContainText("ez késői lemondás");
+  await main.getByRole("button", { name: "Lemondom a meccset" }).click();
+  await expect(player.page.getByRole("alertdialog", { name: "Késői lemondás. Biztosan lemondod?" })).toBeVisible();
+  await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();
+  await expect(main.getByRole("status").filter({ hasText: "nektek kell új időpontokat ajánlani" })).toBeVisible();
+  await expect(status(player.page)).toContainText("Későn mondtátok le, nektek kell új időpontokat ajánlani");
+  const log = main.getByRole("region", { name: "Napló" });
+  await expect(log.getByRole("listitem").filter({ hasText: "Késői lemondás" })).toContainText(`${anna.name} (ti)`);
+  await expect(log.getByRole("listitem").filter({ hasText: "Lemondta a meccset" })).toHaveCount(2);
+
+  // The other pair: told it's on anna's pair, no Teendő for this match.
+  await visit(other.page, `/matches/${first!.id}`);
+  await expect(status(other.page)).toContainText("Későn mondták le, nekik kell új időpontokat ajánlaniuk");
+  await expect(content(other.page).getByRole("region", { name: "Napló" })).toContainText(`${anna.name} (ellenfél)`);
+  await visit(other.page, "/home");
+  await expect(content(other.page).getByRole("link", { name: new RegExp(`^Ajánlj időpontot \\(.*${anna.name}`) })).toHaveCount(0);
+  await other.context.close();
   await player.context.close();
 });

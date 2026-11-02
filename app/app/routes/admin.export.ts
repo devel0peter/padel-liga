@@ -9,7 +9,10 @@ import { listSignups } from "~/lib/signups-admin.server";
 // CSV download of the signups, with the same filters as the admin list.
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "signups.manage" });
-  const filters = parseFilters(new URL(request.url).searchParams);
+  const params = new URL(request.url).searchParams;
+  // Like the mail (admin.broadcast-new.tsx): not by "Hol tart".
+  if (params.has("stage")) throw new Response("A „Hol tart” szűrővel nem tölthetsz le CSV-t.", { status: 400 });
+  const filters = parseFilters(params);
   const [signups, clubs, cities] = await Promise.all([listSignups(), listClubs(), listCities()]);
   const rows = filterSignups(signups, filters);
   const date = new Date().toISOString().slice(0, 10);

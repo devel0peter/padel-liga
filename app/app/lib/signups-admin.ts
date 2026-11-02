@@ -4,6 +4,7 @@
 import { cityName, OTHER_CITY, type City } from "./cities";
 import { formatDateTime } from "./format";
 import { LEVELS } from "./interest";
+import { matchesSearch } from "./search";
 
 export const STATUSES = {
   new: "Új",
@@ -35,6 +36,9 @@ export type SignupRow = {
   adminNote: string | null;
   pairedWith: number | null;
   wantsToOrganize: boolean;
+  // When the registration invite went to email1 / email2 (#20).
+  invitedAt: Date | null;
+  invited2At: Date | null;
   consentAt: Date;
   createdAt: Date;
   updatedAt: Date | null;
@@ -66,13 +70,7 @@ export function parseFilters(params: URLSearchParams): Filters {
 // Filter value for signups without a ref (or without a home club).
 export const NO_REF = "none";
 
-// Case- and accent-insensitive, so "kovacs" finds "Kovács".
-function fold(s: string): string {
-  return s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-}
-
 export function filterSignups(rows: SignupRow[], f: Filters): SignupRow[] {
-  const q = fold(f.q);
   return rows.filter(
     (r) =>
       (!f.city || r.city === f.city) &&
@@ -81,10 +79,7 @@ export function filterSignups(rows: SignupRow[], f: Filters): SignupRow[] {
       (!f.mode || r.mode === f.mode) &&
       (!f.ref || (f.ref === NO_REF ? !r.ref : r.ref === f.ref)) &&
       (!f.club || (f.club === NO_REF ? !r.homeClub : r.homeClub === f.club)) &&
-      (!q ||
-        [r.name1, r.email1, r.name2, r.email2, r.cityOther, r.note, r.adminNote].some(
-          (v) => v != null && fold(v).includes(q),
-        )),
+      matchesSearch(f.q, [r.name1, r.email1, r.name2, r.email2, r.cityOther, r.note, r.adminNote]),
   );
 }
 

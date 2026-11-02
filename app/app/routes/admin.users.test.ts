@@ -62,4 +62,15 @@ describe("/admin/users", () => {
     expect(row("a").lastLoginAt).toBeNull();
     expect(row("admin").lastLoginAt).toBeInstanceOf(Date);
   });
+
+  it("finds a name that starts with an accented capital", async () => {
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('k', 'k@x.hu', 'Ákos Új', 1)`);
+    const cookie = await cookieFor("admin", "superadmin");
+    const search = async (q: string) =>
+      (await R.loader(args(new Request(`http://localhost/admin/users?q=${encodeURIComponent(q)}`, { headers: { Cookie: cookie } })))).users.map((u) => u.id);
+    expect(await search("ákos")).toEqual(["k"]);
+    expect(await search("új")).toEqual(["k"]);
+    expect(await search("BÉLA")).toEqual(["b"]);
+    expect(await search("x.hu")).toHaveLength(5);
+  });
 });

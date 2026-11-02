@@ -21,8 +21,8 @@ test("Felhasználók: status chips and, for the Admin, the last login", async ({
 
   // Sándor Ákos lost his pair in step 14 and has none since.
   const akos = WAITING_SOLOS[1];
-  // Searched by surname: SQLite LIKE ignores case for ASCII letters only ("Á").
-  await visit(page, `/admin/users?q=${encodeURIComponent(akos.name.split(" ")[0])}`);
+  // Lowercase and without the accent: the search folds both (search.ts).
+  await visit(page, `/admin/users?q=akos`);
   await expect(page.getByRole("row").filter({ hasText: akos.name })).toContainText("Nincs párja");
   await context.close();
 });
@@ -54,5 +54,28 @@ test("Párok and Párkeresők: entries and pairs made elsewhere, no contact deta
   await expect(pair).toContainText(akos.name);
   await expect(content(page)).not.toContainText("@example.test");
   await expect(content(page)).not.toContainText("+36");
+  await context.close();
+});
+
+test("Jelentkezők: Hol tartanak, people per stage, and the stage filter", async ({ browser }) => {
+  const anna = PAIRS.p1[0];
+  const akos = WAITING_SOLOS[1];
+  const { context, page } = await as(browser, ADMIN.email);
+  await visit(page, "/admin/signups");
+  const stages = page.getByRole("region", { name: "Hol tartanak" });
+  await expect(stages.getByRole("link", { name: /^Nem kapott meghívót: \d+$/ })).toBeVisible();
+
+  await stages.getByRole("link", { name: /^Regisztrált, nincs párja: [1-9]\d*$/ }).click();
+  await expect(page).toHaveURL(/stage=no_pair/);
+  // His own signup, and the solo it was paired with ("Párja: …").
+  await expect(page.getByRole("row").filter({ hasText: akos.name }).first()).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: anna.name })).toHaveCount(0);
+  // Mail and CSV go by signups, not by people: off while the stage is on.
+  await expect(page.getByRole("button", { name: "Levél nekik" })).toBeDisabled();
+
+  await stages.getByRole("link", { name: /^Nevezett: / }).click();
+  await expect(page).toHaveURL(/stage=entered/);
+  await expect(page.getByRole("row").filter({ hasText: anna.name }).first()).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: akos.name })).toHaveCount(0);
   await context.close();
 });

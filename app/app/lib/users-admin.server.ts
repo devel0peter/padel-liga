@@ -1,4 +1,4 @@
-import { asc, eq, like, or } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagueAdmins, leagues, oauthAccounts, users } from "~/db/schema";
@@ -6,6 +6,7 @@ import { leagueAdmins, leagues, oauthAccounts, users } from "~/db/schema";
 import { roleLabel, type RoleLabel } from "./auth/permissions";
 import { statusChips, type StatusChip } from "./player-status";
 import { playerStatuses } from "./player-status.server";
+import { matchesSearch } from "./search";
 
 // The Admin's user list (/admin/users). Never shown to anyone else: it has
 // email addresses (CLAUDE.md: no contact details on public pages).
@@ -26,10 +27,8 @@ export type UserRow = {
 
 // `withLastLogin`: only for the Admin (the route checks the role).
 export async function listUsers(q: string, { withLastLogin = false } = {}): Promise<UserRow[]> {
-  const term = q.trim().toLowerCase();
-  const where = term ? or(like(users.email, `%${term}%`), like(users.name, `%${term}%`)) : undefined;
   const [rows, organized, google, statuses, leagueIds] = await Promise.all([
-    db.select().from(users).where(where).orderBy(asc(users.name), asc(users.email)),
+    db.select().from(users).orderBy(asc(users.name), asc(users.email)),
     db
       .select({ userId: leagueAdmins.userId, name: leagues.name, slug: leagues.slug, city: leagues.city, id: leagues.id })
       .from(leagueAdmins)
@@ -41,7 +40,8 @@ export async function listUsers(q: string, { withLastLogin = false } = {}): Prom
   const withGoogle = new Set(google.map((g) => g.userId));
   // The league name on the pair chip only when there is more than one league.
   const withLeague = leagueIds.length > 1;
-  return rows.map((u) => {
+  // Filtered here, not with LIKE (search.ts); hundreds of accounts at most.
+  return rows.filter((u) => matchesSearch(q, [u.name, u.email])).map((u) => {
     const mine = organized.filter((o) => o.userId === u.id);
     const status = statuses.byId.get(u.id);
     return {

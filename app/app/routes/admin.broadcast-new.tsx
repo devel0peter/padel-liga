@@ -37,6 +37,9 @@ const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
+  // "Hol tart" (signup-progress.ts) is a view of people, not of signups: the
+  // audience would be wider than the list shown (the page disables the link).
+  if (params.has("stage")) throw new Response("A „Hol tart” szűrővel nem küldhetsz levelet.", { status: 400 });
   const filters = parseFilters(params);
   const [rows, suppressed, off, cities] = await Promise.all([listSignups(), suppressedSet(), emailSwitchedOff(), listCities()]);
   // Accounts that switched email off get no broadcast either (#115, Peter 2026-10-29).

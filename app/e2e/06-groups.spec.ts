@@ -24,7 +24,7 @@ test("10. the draft splits six pairs 3 + 3 by Elo, and a move can be undone", as
   const { context, page } = await as(browser, ORGANIZER.email);
   const groups = `${await seasonPath(page)}/groups`;
   await visit(page, groups);
-  await expect(content(page)).toContainText("6 jóváhagyott pár van.");
+  await expect(content(page)).toContainText("6 nevezett pár van.");
   await page.getByRole("button", { name: "Csoportok javaslata" }).click();
   await expect(page.getByRole("status")).toContainText("Kész a javaslat.");
 
@@ -71,13 +71,10 @@ test("11. Közzététel locks the groups, creates the matches and emails every p
   // A group of 3 plays 3 matches: 6 in all.
   expect(d1("select count(*) as n from matches")).toEqual([{ n: 6 }]);
 
-  // An entry in a published group can't be rejected any more.
-  await visit(page, `${season}/entries?status=approved`);
-  const row = page.getByRole("row").filter({ hasText: PAIRS.p1[0].name });
-  await row.getByRole("button", { name: "Elutasítás" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Elutasítás" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Ez a pár már a kiírt csoportjában játszik, ezért most nem utasíthatod el.");
-  await expect(row).toBeVisible();
+  // The entries stay as they were; there is nothing to approve or reject
+  // (#153). Taking a pair in a running round out is refused on Párok (09-pairs).
+  await visit(page, `${season}/entries`);
+  await expect(page.getByRole("row").filter({ hasText: PAIRS.p1[0].name })).toContainText("az 1. körtől");
 
   // One email per player, sent at once (#112), with no one else's address.
   const players = GROUP_PAIRS.flat();

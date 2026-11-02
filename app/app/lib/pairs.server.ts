@@ -6,7 +6,7 @@ import { groupPairs, groups, leagues, pairs, seasonEntries, seasonPhases, users 
 import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { audit } from "~/lib/leagues.server";
-import { averageStartingElo, homeEntry, type EntryStatus } from "~/lib/season-entries";
+import { averageStartingElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
 import { withdrawEntries } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
@@ -81,7 +81,9 @@ export type LeaguePairRow = {
   // In a published group whose round hasn't ended: can't be dissolved or changed.
   locked: boolean;
   // The entry in the league's current (or next) season, if any.
-  entry: { season: string; status: EntryStatus } | null;
+  entry: { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null;
+  // "Benevezés" or "Kivétel a szezonból" for an active pair (#154), or none.
+  entryAction: OrganizerEntryAction | null;
   // The league's first home season (current or next), so "not entered" can
   // say which; null when there is none.
   season: string | null;
@@ -131,7 +133,12 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
     lockedPairs(leagueId, now),
     seasons.length
       ? db
-          .select({ pairId: seasonEntries.pairId, seasonId: seasonEntries.seasonId, status: seasonEntries.status })
+          .select({
+            pairId: seasonEntries.pairId,
+            seasonId: seasonEntries.seasonId,
+            status: seasonEntries.status,
+            joinsPhase: seasonEntries.joinsPhase,
+          })
           .from(seasonEntries)
           .where(
             inArray(
@@ -154,6 +161,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       status: r.status,
       locked: locked.has(r.id),
       entry,
+      entryAction: r.status === "active" ? organizerEntryAction(seasons, entry, now) : null,
       season: seasons[0]?.name ?? null,
     };
   });

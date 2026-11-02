@@ -1,4 +1,4 @@
-// Walkthrough step 22 (#158): the Szervező's "Meccsek" after steps 17 to 19:
+// Walkthrough step 23 (#158): the Szervező's "Meccsek" after steps 17 to 19:
 // every match of the running phase with its status, last step and activity,
 // the stuck filter, one match's log and phones, and nobody else gets in.
 import { addDays, budapestDay, budapestTime } from "@padel-liga/rules";
@@ -20,7 +20,7 @@ function untouchedMatch(): { id: number; pairId: number; userId: string } {
   return { id: row!.id, pairId: row!.pair_id, userId: row!.user_id };
 }
 
-test("22. Meccsek: every match with its status, the stuck filter, one match's log and phones; players and other leagues refused", async ({ browser }) => {
+test("23. Meccsek: every match with its status, the stuck filter, one match's log and phones; players and other leagues refused", async ({ browser }) => {
   // A proposal three days old, nobody answered: stuck. Its slots are ahead,
   // so it hasn't lapsed. No page can backdate a step, so it goes in directly.
   const stuck = untouchedMatch();

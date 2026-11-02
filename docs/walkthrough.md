@@ -334,7 +334,21 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
 
-### 22. The Szervező sees every match of the running phase (after step 19)
+### 22. A visitor looks at the league page (public)
+
+The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
+
+- Page: `/`, then `/league/minta`
+- Account: none (logged out)
+- Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
+- Expect:
+  - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
+  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
+  - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
+  - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
+  - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
+
+### 23. The Szervező sees every match of the running phase (after step 19)
 
 - Page: `/admin/leagues/minta/matches` ("Meccsek" in the league section of the sidebar)
 - Account: the Szervező (or the Admin)
@@ -352,4 +366,4 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
-- Milestone 2 and later: venue and cancelling (#27), results, standings, reminders. The match overview (step 22) has no result statuses yet (#28).
+- Milestone 2 and later: venue and cancelling (#27), results, standings, reminders. The match overview (step 23) has no result statuses yet (#28).

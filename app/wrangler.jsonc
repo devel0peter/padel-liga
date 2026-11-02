@@ -52,8 +52,9 @@
 		]
 	},
 	// Hourly: sends queued emails (retries, broadcasts spread over the daily quota).
-	// Daily 03:17 UTC (BACKUP_CRON in app/lib/backup.ts): exports the database to R2 (#32).
-	"triggers": { "crons": ["0 * * * *", "17 3 * * *"] },
+	// Every 5 minutes, 03:00-05:59 UTC (BACKUP_CRON in app/lib/backup.ts): exports
+	// the database to R2 in small steps, then stops for the day (#32).
+	"triggers": { "crons": ["0 * * * *", "*/5 3-5 * * *"] },
 	// Daily database exports (app/lib/backup.server.ts, #32). Create the
 	// bucket first: `npx wrangler r2 bucket create padel-liga-backups
 	// --jurisdiction eu` (the deploy fails without it). Keep it private.

@@ -1,17 +1,28 @@
 // The daily database export (#32): pure parts. backup.server.ts reads D1 and
-// writes R2; this file turns what it read into one SQL file that restores
-// the database (README, "Restoring a backup").
+// writes R2; this file turns what it read into pieces of one SQL file that
+// restores the database (README, "Restoring a backup").
 
-// UTC 03:17, i.e. 04:17 or 05:17 in Budapest. Must match the second entry of
+// Every 5 minutes from 03:00 to 05:59 UTC (04:00-07:59 in Budapest). The
+// export is split into steps, one per run, because a Workers Free invocation
+// may spend only 10 ms of CPU and make 50 D1 queries; the first runs do the
+// work, the rest find the day's file and stop. Must match the second entry of
 // `triggers.crons` in app/wrangler.jsonc (backup.test.ts checks).
-export const BACKUP_CRON = "17 3 * * *";
+export const BACKUP_CRON = "*/5 3-5 * * *";
+export const EMAIL_CRON = "0 * * * *";
 // How many daily files stay in the bucket. The ticket asks for at least 30.
 export const KEEP_BACKUPS = 35;
 export const BACKUP_PREFIX = "daily/";
+// Unfinished days: the pieces of the file being built.
+export const WORK_PREFIX = "work/";
 
 export type SqlValue = string | number | null | ArrayBuffer | number[];
 export type SchemaRow = { type: string; name: string; sql: string };
-export type TableDump = { name: string; rows: Record<string, SqlValue>[] };
+export type SequenceRow = { name: string; seq: number };
+
+// Which job a scheduled run is for (workers/app.ts).
+export function cronJob(cron: string): "backup" | "email" {
+  return cron === BACKUP_CRON ? "backup" : "email";
+}
 
 // Tables SQLite and Cloudflare keep for themselves: they come back on their
 // own and can't be created by hand.
@@ -62,27 +73,53 @@ export function insertOrder(tables: SchemaRow[]): string[] {
   return done;
 }
 
-// The whole file: schema, then the rows of every table, then the indexes.
-// Plain SQL that sqlite3 and `wrangler d1 execute --file` both run.
-export function dumpSql(schema: SchemaRow[], tables: TableDump[], takenAt: Date): string {
-  const create = schema.filter((s) => s.type === "table" && !isInternalTable(s.name));
-  const rest = schema.filter((s) => s.type !== "table" && !isInternalTable(s.name));
-  const byName = new Map(tables.map((t) => [t.name, t]));
-  const out: string[] = [
+const userTables = (schema: SchemaRow[]) => schema.filter((s) => s.type === "table" && !isInternalTable(s.name));
+
+// The tables to read, parents first.
+export function tableOrder(schema: SchemaRow[]): string[] {
+  return insertOrder(userTables(schema));
+}
+
+// Does the database have AUTOINCREMENT tables (and so a sqlite_sequence)?
+export function hasSequences(schema: SchemaRow[]): boolean {
+  return schema.some((s) => s.type === "table" && s.name === "sqlite_sequence");
+}
+
+// First piece of the file: a comment, the pragma and the CREATE TABLEs.
+export function headSql(schema: SchemaRow[], takenAt: Date): string {
+  const out = [
     `-- padel-liga database export, ${takenAt.toISOString()}`,
     "-- Restore: see README, \"Restoring a backup\".",
     "PRAGMA defer_foreign_keys = TRUE;",
+    ...userTables(schema).map((t) => `${t.sql};`),
   ];
-  for (const t of create) out.push(`${t.sql};`);
-  for (const name of insertOrder(create))
-    for (const row of byName.get(name)?.rows ?? []) out.push(insertStatement(name, row));
-  for (const s of rest) out.push(`${s.sql};`);
   return `${out.join("\n")}\n`;
+}
+
+// The INSERTs for some rows of a table.
+export function rowsSql(table: string, rows: Record<string, SqlValue>[]): string {
+  return rows.map((r) => `${insertStatement(table, r)}\n`).join("");
+}
+
+// Last piece: the AUTOINCREMENT counters, so a deleted highest id is not
+// handed out again after a restore, then the indexes.
+export function tailSql(schema: SchemaRow[], sequences: SequenceRow[]): string {
+  const out: string[] = [];
+  if (sequences.length) {
+    out.push("DELETE FROM sqlite_sequence;");
+    for (const s of sequences) out.push(insertStatement("sqlite_sequence", { name: s.name, seq: s.seq }));
+  }
+  for (const s of schema) if (s.type !== "table" && s.sql && !isInternalTable(s.name)) out.push(`${s.sql};`);
+  return out.length ? `${out.join("\n")}\n` : "";
 }
 
 // "daily/padel-liga-2026-11-02.sql": the UTC day of the export.
 export function backupKey(takenAt: Date): string {
-  return `${BACKUP_PREFIX}padel-liga-${takenAt.toISOString().slice(0, 10)}.sql`;
+  return `${BACKUP_PREFIX}padel-liga-${backupDay(takenAt)}.sql`;
+}
+
+export function backupDay(takenAt: Date): string {
+  return takenAt.toISOString().slice(0, 10);
 }
 
 const KEY = /^daily\/padel-liga-\d{4}-\d{2}-\d{2}\.sql$/;

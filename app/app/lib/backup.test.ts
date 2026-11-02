@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   BACKUP_CRON,
+  EMAIL_CRON,
   KEEP_BACKUPS,
   backupKey,
-  dumpSql,
+  cronJob,
+  hasSequences,
+  headSql,
   insertOrder,
   insertStatement,
   isInternalTable,
   keysToDelete,
+  rowsSql,
   sqlLiteral,
+  tableOrder,
+  tailSql,
 } from "./backup";
 
 describe("sqlLiteral", () => {
@@ -58,7 +64,7 @@ describe("insertOrder", () => {
   });
 });
 
-describe("dumpSql", () => {
+describe("the pieces of the file", () => {
   const schema = [
     { type: "table", name: "child", sql: 'CREATE TABLE "child" (id integer, p integer REFERENCES parent(id))' },
     { type: "table", name: "parent", sql: 'CREATE TABLE "parent" (id integer)' },
@@ -66,31 +72,42 @@ describe("dumpSql", () => {
     { type: "table", name: "sqlite_sequence", sql: "CREATE TABLE sqlite_sequence(name,seq)" },
     { type: "table", name: "_cf_KV", sql: "CREATE TABLE _cf_KV (k)" },
   ];
-  const tables = [
-    { name: "child", rows: [{ id: 1, p: 7 }] },
-    { name: "parent", rows: [{ id: 7 }] },
-  ];
-  const lines = dumpSql(schema, tables, new Date("2026-11-02T03:17:00Z")).trim().split("\n");
 
-  it("creates tables, inserts parents first, then the indexes", () => {
-    expect(lines.slice(3)).toEqual([
+  it("reads the parents first", () => {
+    expect(tableOrder(schema)).toEqual(["parent", "child"]);
+  });
+  it("starts with a timestamp, the pragma and the CREATE TABLEs, not SQLite's own", () => {
+    const lines = headSql(schema, new Date("2026-11-02T03:17:00Z")).trim().split("\n");
+    expect(lines[0]).toContain("2026-11-02T03:17:00.000Z");
+    expect(lines.slice(2)).toEqual([
+      "PRAGMA defer_foreign_keys = TRUE;",
       'CREATE TABLE "child" (id integer, p integer REFERENCES parent(id));',
       'CREATE TABLE "parent" (id integer);',
-      'INSERT INTO "parent" ("id") VALUES (7);',
-      'INSERT INTO "child" ("id", "p") VALUES (1, 7);',
-      'CREATE INDEX "child_p" ON "child" (p);',
     ]);
   });
-  it("starts with a timestamp and the pragma", () => {
-    expect(lines[0]).toContain("2026-11-02T03:17:00.000Z");
-    expect(lines[2]).toBe("PRAGMA defer_foreign_keys = TRUE;");
+  it("writes one INSERT per row", () => {
+    expect(rowsSql("parent", [{ id: 7 }, { id: 8 }])).toBe('INSERT INTO "parent" ("id") VALUES (7);\nINSERT INTO "parent" ("id") VALUES (8);\n');
+    expect(rowsSql("parent", [])).toBe("");
+  });
+  it("ends with the AUTOINCREMENT counters, then the indexes", () => {
+    expect(tailSql(schema, [{ name: "child", seq: 41 }]).trim().split("\n")).toEqual([
+      "DELETE FROM sqlite_sequence;",
+      `INSERT INTO "sqlite_sequence" ("name", "seq") VALUES ('child', 41);`,
+      'CREATE INDEX "child_p" ON "child" (p);',
+    ]);
+    expect(tailSql(schema, [])).toBe('CREATE INDEX "child_p" ON "child" (p);\n');
+  });
+  it("knows whether there are counters to copy", () => {
+    expect(hasSequences(schema)).toBe(true);
+    expect(hasSequences(schema.filter((s) => s.name !== "sqlite_sequence"))).toBe(false);
   });
   it("leaves out SQLite's and Cloudflare's own tables", () => {
     expect(isInternalTable("sqlite_sequence")).toBe(true);
     expect(isInternalTable("_cf_KV")).toBe(true);
     expect(isInternalTable("users")).toBe(false);
-    expect(lines.join("\n")).not.toContain("sqlite_sequence");
-    expect(lines.join("\n")).not.toContain("_cf_KV");
+    const all = headSql(schema, new Date()) + tailSql(schema, []);
+    expect(all).not.toContain("_cf_KV");
+    expect(all).not.toContain("CREATE TABLE sqlite_sequence");
   });
 });
 
@@ -116,11 +133,17 @@ describe("retention", () => {
   });
 });
 
-describe("wrangler.jsonc", () => {
-  it("schedules the export cron and binds the bucket", async () => {
+describe("which job a cron runs", () => {
+  it("sends the export cron to the export and everything else to the email run", () => {
+    expect(cronJob(BACKUP_CRON)).toBe("backup");
+    expect(cronJob(EMAIL_CRON)).toBe("email");
+    expect(cronJob("17 3 * * *")).toBe("email");
+    expect(cronJob("")).toBe("email");
+  });
+  it("is the pair of crons in wrangler.jsonc, with the bucket bound", async () => {
     const { readFileSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
     const text = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8") as string;
-    expect(text).toContain(`"crons": ["0 * * * *", "${BACKUP_CRON}"]`);
+    expect(text).toContain(`"crons": ["${EMAIL_CRON}", "${BACKUP_CRON}"]`);
     expect(text).toMatch(/"binding": "BACKUPS"/);
   });
 });

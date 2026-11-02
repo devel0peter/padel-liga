@@ -1,7 +1,7 @@
 import { createRequestHandler } from "react-router";
 
-import { BACKUP_CRON } from "../app/lib/backup";
-import { exportDatabase } from "../app/lib/backup.server";
+import { cronJob } from "../app/lib/backup";
+import { exportStep } from "../app/lib/backup.server";
 import { deliver } from "../app/lib/email/outbox.server";
 
 const requestHandler = createRequestHandler(
@@ -16,10 +16,14 @@ export default {
   async scheduled(controller, _env, ctx) {
     // Two crons (wrangler.jsonc): the daily database export (#32) and the
     // hourly email run.
-    if (controller.cron === BACKUP_CRON) {
+    if (cronJob(controller.cron) === "backup") {
       // Not caught: a failed export shows as a failed cron run in the logs.
       ctx.waitUntil(
-        exportDatabase().then((r) => r && console.log(`backup: ${r.key}, ${r.tables} tables, ${r.rows} rows, ${r.bytes} bytes, ${r.deleted} old files deleted`)),
+        exportStep().then((r) => {
+          // "done" is every run after the day's file exists: stay quiet.
+          if (r.status === "progress") console.log(`backup: step done, ${r.parts} pieces, ${r.ops} calls`);
+          if (r.status === "finished") console.log(`backup: ${r.key}, ${r.bytes} bytes from ${r.parts} pieces, ${r.deleted} old files deleted, ${r.ops} calls`);
+        }),
       );
       return;
     }

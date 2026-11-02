@@ -18,6 +18,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
+const { formatSlot } = await import("~/lib/matches");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
@@ -238,10 +239,10 @@ describe("matchStep (#26)", () => {
       const page = (await M.matchPage(id, u, NOW))!;
       expect(page.state).toEqual({ status: "scheduled", slot: counter[1], clubId: null });
       expect(page.actions.propose).toBe(false);
-      expect(page.log.map((l) => [l.kind, l.who])).toEqual([
-        ["proposal", "Játékos 1A"],
-        ["counter_proposal", "Játékos 3B"],
-        ["accepted", "Játékos 1B"],
+      expect(page.log.map((l) => [l.text.split(":")[0], l.who])).toEqual([
+        ["Időpontokat ajánlott", "Játékos 1A"],
+        ["Új időpontokat ajánlott", "Játékos 3B"],
+        ["Elfogadta", "Játékos 1B"],
       ]);
     }
     const closed = await M.matchStep("p3a", id, { kind: "propose", slots: counter, clubId: null }, NOW);
@@ -380,7 +381,7 @@ describe("venue and cancellation (#27)", () => {
     const [g] = await M.currentGroups("p1a", NOW);
     expect(g!.matches[0]!.venue).toBe("Ace Padel");
     const log = (await M.matchPage(id, "p1a", NOW))!.log.at(-1)!;
-    expect(log).toMatchObject({ kind: "venue", venue: "Ace Padel", court: "2-es pálya", who: "Játékos 3B", ours: false });
+    expect(log).toMatchObject({ text: "Rögzítette a helyszínt: Ace Padel, 2-es pálya", who: "Játékos 3B", ours: false });
   });
 
   it("an inactive club, another city's club or no club can't be the venue; the court is limited", async () => {
@@ -412,7 +413,7 @@ describe("venue and cancellation (#27)", () => {
     ]);
     expect(h.mails).toEqual([]);
     const log = (await M.matchPage(id, "p3a", when))!.log.at(-1)!;
-    expect(log).toMatchObject({ kind: "cancelled", slot: SLOTS[0], who: "Játékos 1B", ours: false });
+    expect(log).toMatchObject({ text: `Lemondta a meccset (${formatSlot(SLOTS[0]!)})`, who: "Játékos 1B", ours: false });
   });
 
   it("cancelling 23 hours before is late: the cancelling pair must propose next, the log says late and who", async () => {
@@ -427,7 +428,7 @@ describe("venue and cancellation (#27)", () => {
     const other = (await M.matchPage(id, "p1a", when))!;
     expect(other.actions.propose).toBe(true);
     const log = canceller.log.at(-1)!;
-    expect(log).toMatchObject({ kind: "cancelled", who: "Játékos 3B", ours: true });
+    expect(log).toMatchObject({ text: expect.stringMatching(/^Lemondta a meccset \(.*\)\. Késői lemondás: 24 órán belül volt\.$/), who: "Játékos 3B", ours: true });
     expect(log.at).toEqual(when);
     expect(inbox().map((n: any) => n.user)).toEqual(["p1a", "p1b"]);
   });

@@ -24,6 +24,7 @@ export type MessageKind =
   | "groups_published"
   | "match_proposal"
   | "match_agreed_time"
+  | "match_result"
   | "stuck_reminder"
   | "match_digest"
   | "match_tomorrow";

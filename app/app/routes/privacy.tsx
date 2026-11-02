@@ -183,12 +183,18 @@ export default function Privacy() {
                 határidejéig; utána már nem.
               </li>
               <li>
-                <strong>Az időpont-egyeztetést</strong> (ki, mikor, milyen
-                időpontot ajánlott, fogadott el, erősített meg vagy mondott le,
-                és hol lesz a meccs) a meccs két párja látja a meccs oldalán, és a
-                liga szervezője meg az oldal adminja is, hogy lássák, melyik meccs
-                akadt el. Megőrizzük, mert a határidőig le nem
-                játszott meccsekről ez alapján dönt a rendszer.
+                <strong>Az időpont-egyeztetést és az eredményt</strong> (ki,
+                mikor, milyen időpontot ajánlott, fogadott el, erősített meg vagy
+                mondott le, és hol lesz a meccs; ki rögzítette, erősítette meg
+                vagy vitatta az eredményt, a vitához írt megjegyzéssel együtt) a
+                meccs két párja látja a meccs oldalán, és a liga szervezője meg
+                az oldal adminja is (a nevekkel, telefonszám és e-mail-cím
+                nélkül), hogy lássák, melyik meccs akadt el, és dönthessenek a
+                vitás eredményekről. Megőrizzük, mert a határidőig le nem
+                játszott meccsekről ez alapján dönt a rendszer, a vitás
+                eredményekről pedig a szervező. Ha a szervező dönt egy meccsről,
+                a döntése a nevével, idejével és indoklásával bekerül a naplóba,
+                amit mindkét pár lát.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem

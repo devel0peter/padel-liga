@@ -23,6 +23,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   stuck_reminder: "Emlékeztető elakadtaknak",
   match_digest: "Napi összefoglaló",
   match_tomorrow: "Holnap meccs",
+  match_result: "Eredmény megerősítése",
 };
 
 export function kindLabel(kind: string): string {

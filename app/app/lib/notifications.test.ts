@@ -6,9 +6,12 @@ import {
   followsEmailSwitch,
   groupsPublishedMessage,
   matchAgreedTimeMessage,
+  matchDecidedMessage,
   matchCancelledMessage,
   matchDeclinedMessage,
   matchProposalMessage,
+  matchResultConfirmedMessage,
+  matchResultMessage,
   matchScheduledMessage,
   DIGEST_KINDS,
   isChannel,
@@ -277,8 +280,35 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     );
   });
 
-  it("the digest kinds: scheduled, declined, cancelled and the reminders; never an instant one (#31)", () => {
-    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon"]);
-    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow"] as const) expect(DIGEST_KINDS).not.toContain(instant);
+  it("the digest kinds: scheduled, declined, cancelled, the reminders, confirmed and decided results; never an instant one (#31)", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon", "match_result_confirmed", "match_decided"]);
+    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow", "match_result"] as const) expect(DIGEST_KINDS).not.toContain(instant);
+  });
+});
+
+describe("result messages (#28, #29, spec 13)", () => {
+  it("waiting for confirmation: the score from the recipient's side and the 48 hours", () => {
+    expect(matchResultMessage({ matchId: 7, score: "1:4, 2:4" })).toEqual({
+      title: "Erősítsd meg az eredményt",
+      body: "Az ellenfeletek rögzítette az eredményt: 1:4, 2:4. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.",
+      url: "/matches/7",
+    });
+  });
+
+  it("confirmed or accepted after 48 hours", () => {
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: false }).body).toBe("Megerősítették az eredményt: 4:1, 4:2.");
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: true })).toEqual({
+      title: "Végleges az eredmény",
+      body: "48 óra után magától elfogadtuk az eredményt: 4:1, 4:2.",
+      url: "/matches/7",
+    });
+  });
+
+  it("an organizer's decision: the outcome, not the reason", () => {
+    expect(matchDecidedMessage({ matchId: 7, outcome: "Játék nélküli győzelem nektek (4:0, 4:0)" })).toEqual({
+      title: "A szervező döntött a meccsetekről",
+      body: "Játék nélküli győzelem nektek (4:0, 4:0). Az indoklást a meccs oldalán látod.",
+      url: "/matches/7",
+    });
   });
 });

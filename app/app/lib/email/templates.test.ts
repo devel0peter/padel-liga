@@ -10,6 +10,7 @@ import {
   matchAgreedTime,
   matchTomorrow,
   matchProposal,
+  matchResult,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -438,6 +439,18 @@ describe("match scheduling emails (#26, spec 13)", () => {
     expect(email.text).toContain("Kiss Cecil és Tóth Dóra rögzítette a 2. heti meccsetek megbeszélt időpontját: nov. 17., kedd 18:00.");
     expect(email.text).toContain("Erősítsd meg, vagy jelezd, ha nem így beszéltétek:");
     expect(email.html).toContain('href="https://padelparbaj.hu/matches/42"');
+  });
+
+  it("a result waits for confirmation (#28): the score, the one-tap link and the 48-hour time", () => {
+    const email = matchResult({ ...base, score: "1:4, 4:2, szuper tie-break 8:10", autoAcceptAt: slots[2]! });
+    expect(email.subject).toBe("Erősítsd meg a meccs eredményét – Padelpárbaj");
+    expect(email.text).toContain(
+      "Kiss Cecil és Tóth Dóra rögzítette a 2. heti meccsetek eredményét (ti vagytok elöl): 1:4, 4:2, szuper tie-break 8:10.",
+    );
+    expect(email.text).toContain("Erősítsd meg, vagy jelezd, ha nem így volt:");
+    expect(email.html).toContain('href="https://padelparbaj.hu/matches/42#eredmeny"');
+    expect(email.text).toContain("Ha nov. 19., csütörtök 18:00-ig nem válaszoltok, magától elfogadjuk.");
+    expect(email.text).not.toMatch(/@|\+36/);
   });
 
   it("keeps names plain text and has no contact details", () => {

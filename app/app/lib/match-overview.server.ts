@@ -5,14 +5,17 @@ import { db } from "~/db/client.server";
 import { groups, matches, seasonPhases, seasons } from "~/db/schema";
 
 import { pairName } from "./groups";
-import { activityLine, overviewStatus, stuckReason, type OverviewStatus, type StuckReason } from "./match-overview";
+import { activityLine, overviewStatus, resultStatus, statusOf, stuckReason, type OverviewStatus, type StuckReason } from "./match-overview";
 import { eventText, type Tone } from "./matches";
 import { clubNames, eventsOf, groupCount, groupMembers, loadMatch, stateOf, toSchedulingEvent } from "./matches.server";
 import { formatPhone } from "./phone";
+import { resultOf, resultsOf, type MatchResults } from "./result-log.server";
+import { neutralDecisionText, resultEventText } from "./results";
 
 // The organizer's overview of the running phase's matches and one match's
 // log (#158, D76), for the league's Szervező and the Admin (the routes check
-// league.manage). Read from match_events (D68). Names leave this module on
+// league.manage). Read from match_events (D68), and the result steps and
+// rulings (#28, #29) through result-log.server.ts. Names leave this module on
 // the list; phone numbers only on one match's page while its phase runs;
 // email addresses never.
 
@@ -47,6 +50,14 @@ async function inChunks<T>(ids: readonly number[], read: (chunk: number[]) => Pr
   const out: T[] = [];
   for (let i = 0; i < ids.length; i += ID_CHUNK) out.push(await read(ids.slice(i, i + ID_CHUNK)));
   return out;
+}
+
+const EMPTY_RESULT: MatchResults = { state: { status: "none" }, events: [], decisions: [] };
+
+// The latest of some times; null when there is none.
+function newest(times: readonly (Date | undefined)[]): Date | null {
+  const known = times.filter((t): t is Date => t !== undefined);
+  return known.length === 0 ? null : new Date(Math.max(...known.map((t) => t.getTime())));
 }
 
 const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.flatMap((m) => [...m]));
@@ -88,6 +99,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     matchRows.map((m) => [m.id, schedulingState((events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)), now)]),
   );
   const venues = await clubNames([...states.values()].map((s) => (s.status === "to_schedule" ? null : s.clubId)));
+  const results = await resultsOf(matchRows);
   const groupById = new Map(groupRows.map((g) => [g.id, g]));
 
   const phases = new Map<string, OverviewPhase>();
@@ -121,19 +133,20 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       m.deadline,
     );
     const active = { a: sides.includes("a"), b: sides.includes("b") };
-    const status = overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
+    const result = results.get(m.id) ?? EMPTY_RESULT;
+    const status = resultStatus(result.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
     phases.get(`${g.seasonId}:${g.phase}`)!.matches.push({
       id: m.id,
       groupNumber: g.number,
       week: m.week,
       names,
-      status: state.status,
+      status: statusOf(state, result.state),
       label: status.label,
       tone: status.tone,
-      lastActivity: log.at(-1)?.at ?? null,
+      lastActivity: newest([log.at(-1)?.at, result.events.at(-1)?.at, result.decisions.at(-1)?.at]),
       active,
       activity: activityLine(active, names),
-      stuck: stuckReason({ state, events: log, phaseStartsAt: g.startsAt, week: m.week, now }),
+      stuck: stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now }),
     });
   }
   return [...phases.values()];
@@ -185,7 +198,9 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
   );
   const active = { a: sides.includes("a"), b: sides.includes("b") };
   const venues = await clubNames([...ctx.events.map((e) => e.clubId), state.status === "to_schedule" ? null : state.clubId]);
-  const status = overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
+  const results = await resultOf(ctx.match);
+  const status = resultStatus(results.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
+  const pairOf = (pairId: number) => (pairId === ctx.match.pairA ? names.a : names.b);
   return {
     id: ctx.match.id,
     week: ctx.match.week,
@@ -199,7 +214,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
     label: status.label,
     tone: status.tone,
     stuck: running
-      ? stuckReason({ state, events: ctx.events, phaseStartsAt: ctx.phaseStartsAt, week: ctx.match.week, now })
+      ? stuckReason({ state, events: ctx.events, result: results.state, phaseStartsAt: ctx.phaseStartsAt, week: ctx.match.week, now })
       : null,
     activity: activityLine(active, names),
     pairs: (["a", "b"] as const).map((side) => ({
@@ -208,19 +223,38 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       active: active[side],
       players: ctx.pairs[side].players.map((p) => ({ name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
     })),
-    log: ctx.events.map((e) => ({
-      id: e.id,
-      at: e.at,
-      who: e.userName || "Törölt játékos",
-      pair: e.pairId === ctx.match.pairA ? names.a : names.b,
-      text: eventText({
-        kind: e.kind,
+    // Scheduling and result steps in order, then the rulings by time; a
+    // ruling's id is negative so it can't clash with a step's.
+    log: [
+      ...ctx.events.map((e) => ({
+        id: e.id,
         at: e.at,
-        slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
-        slot: e.slot,
-        venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
-        court: e.court,
-      }),
-    })),
+        who: e.userName || "Törölt játékos",
+        pair: pairOf(e.pairId),
+        text: eventText({
+          kind: e.kind,
+          at: e.at,
+          slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+          slot: e.slot,
+          venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+          court: e.court,
+        }),
+      })),
+      ...results.events.map((e) => ({
+        id: e.id,
+        at: e.at,
+        who: e.userName || "Törölt játékos",
+        pair: pairOf(e.pairId),
+        // The score from the 1st pair's side, as the status line.
+        text: resultEventText(e, "a"),
+      })),
+      ...results.decisions.map((d) => ({
+        id: -d.id,
+        at: d.at,
+        who: d.kind === "auto_accepted" ? "Padelpárbaj" : d.userName || "Szervező",
+        pair: d.kind === "auto_accepted" ? "automatikus" : "szervező",
+        text: neutralDecisionText(d, names),
+      })),
+    ].sort((x, y) => x.at.getTime() - y.at.getTime() || Number(x.id < 0) - Number(y.id < 0) || Math.abs(x.id) - Math.abs(y.id)),
   };
 }

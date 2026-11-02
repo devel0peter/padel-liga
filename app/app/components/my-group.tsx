@@ -6,6 +6,7 @@ import { formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { groupLine, statusView, telHref, todoFor, type Tone } from "~/lib/matches";
 import type { HomeGroup, Opponent } from "~/lib/matches.server";
+import { resultStatusView, resultTodo } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
 // Kezdőlap once the groups are out (#25): the Teendők, then the player's
@@ -50,7 +51,8 @@ export type Todo = { matchId: number; text: string };
 export function todos(groups: readonly HomeGroup[]): Todo[] {
   return groups.flatMap((g) =>
     g.matches.flatMap((m) => {
-      const text = todoFor(m.state, m.side, m.opponents);
+      // Once a result exists, only its confirmation can be a Teendő (#28).
+      const text = m.result.status === "none" ? todoFor(m.state, m.side, m.opponents) : resultTodo(m.result, m.side, m.opponents);
       return text ? [{ matchId: m.id, text }] : [];
     }),
   );
@@ -111,7 +113,7 @@ export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeag
                 <>
                   <p className="font-medium break-words">{m.opponents} ellen</p>
                   <div>
-                    <StatusPill {...statusView(m.state, m.side, m.venue)} />
+                    <StatusPill {...(resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue))} />
                   </div>
                   <Contacts contacts={m.contacts} />
                   <Link to={`/matches/${m.id}`} className="inline-flex w-fit items-center gap-1 font-semibold underline">

@@ -34,6 +34,7 @@ import {
   loginCode,
   matchAgreedTime,
   matchProposal,
+  matchResult,
   matchTomorrow,
   pairIntro,
   partnerNotice,
@@ -233,6 +234,7 @@ export async function queueMatchEmails(
   messages: (
     | { kind: "match_proposal"; toEmail: string; input: Parameters<typeof matchProposal>[0] }
     | { kind: "match_agreed_time"; toEmail: string; input: Parameters<typeof matchAgreedTime>[0] }
+    | { kind: "match_result"; toEmail: string; input: Parameters<typeof matchResult>[0] }
   )[],
 ): Promise<void> {
   const suppressed = await suppressedSet();
@@ -242,7 +244,7 @@ export async function queueMatchEmails(
       (m): NewMessage => ({
         kind: m.kind,
         toEmail: m.toEmail,
-        ...(m.kind === "match_proposal" ? matchProposal(m.input) : matchAgreedTime(m.input)),
+        ...(m.kind === "match_proposal" ? matchProposal(m.input) : m.kind === "match_result" ? matchResult(m.input) : matchAgreedTime(m.input)),
       }),
     );
   await deliverNow(await enqueue(queued));

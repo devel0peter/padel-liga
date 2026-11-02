@@ -346,6 +346,26 @@ export function matchProposal(input: MatchEmailInput & { counter: boolean; slots
   );
 }
 
+// A result waits for confirmation (#28, spec 7 and 13): the score from the
+// recipient's side and a one-tap link to the match page, where confirming is
+// the first button.
+export function matchResult(input: MatchEmailInput & { score: string; autoAcceptAt: Date }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}#eredmeny`;
+  return buildPlain(
+    `Erősítsd meg a meccs eredményét – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} rögzítette a ${input.week}. heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
+      `Erősítsd meg, vagy jelezd, ha nem így volt:`,
+      link,
+      `Ha ${formatDeadline(input.autoAcceptAt)}-ig nem válaszoltok, magától elfogadjuk.`,
+      SIGNATURE,
+    ],
+    [link],
+    matchFooter(),
+  );
+}
+
 // An agreed time waits for confirmation (#26, spec 6.3 and 13).
 export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email {
   const link = `${SITE_URL}/matches/${input.matchId}`;

@@ -182,6 +182,80 @@ describe("runningPhases (#158)", () => {
   });
 });
 
+const R = await import("~/lib/results.server");
+const D = await import("~/lib/decisions.server");
+const WIN = { sets: [[4, 1], [4, 2]] as [number, number][] };
+const LOSS = { sets: [[1, 4], [2, 4]] as [number, number][] };
+const pairA = (id: number): number => all("select pair_a from matches where id = ?", id)[0].pair_a;
+const pairB = (id: number): number => all("select pair_b from matches where id = ?", id)[0].pair_b;
+
+// Results on the overview (#28, #29): 2–4 played and confirmed, 1–3
+// recorded and waiting, 6–7 disputed.
+async function results() {
+  await play();
+  const played = matchOf(2, 4);
+  const waiting = matchOf(1, 3);
+  const disputed = matchOf(6, 7);
+  expect((await R.resultStep(`p${pairA(played)}a`, played, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairB(played)}b`, played, { kind: "confirm" }, hours(NOW, -0.5))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(waiting)}a`, waiting, { kind: "record", score: WIN }, hours(NOW, -0.25))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(disputed)}a`, disputed, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairB(disputed)}a`, disputed, { kind: "dispute", score: LOSS, note: "" }, hours(NOW, -0.75))).ok).toBe(true);
+  return { played, waiting, disputed };
+}
+
+describe("results on the overview (#28, #29)", () => {
+  beforeEach(freshDb);
+
+  it("a result is the match's status: waiting and disputed ones are stuck, a played one never", async () => {
+    const { played, waiting, disputed } = await results();
+    const [phase] = await O.runningPhases(1, NOW);
+    const byId = new Map(phase!.matches.map((m) => [m.id, m]));
+    const name = (p: number) => `Játékos ${p}A – Játékos ${p}B`;
+    expect(byId.get(played)).toMatchObject({
+      status: "final",
+      label: `Lejátszva: 4:1, 4:2 (nyert: ${name(pairA(played))})`,
+      tone: "done",
+      lastActivity: hours(NOW, -0.5),
+      stuck: null,
+    });
+    expect(byId.get(waiting)).toMatchObject({
+      status: "result_pending",
+      label: `Eredmény: 4:1, 4:2, ${name(pairB(waiting))} megerősítésére vár`,
+      lastActivity: hours(NOW, -0.25),
+      stuck: "unconfirmed",
+    });
+    // 6–7 had no scheduling step: no longer "no_activity", but disputed.
+    expect(byId.get(disputed)).toMatchObject({ status: "disputed", label: "Vitatott eredmény, a szervező dönt", stuck: "disputed" });
+  });
+
+  it("the result statuses filter, and the stuck count follows the results", async () => {
+    const { played, waiting, disputed } = await results();
+    const [phase] = await O.runningPhases(1, NOW);
+    const { filterMatches } = await import("~/lib/match-overview");
+    const ids = (status: "final" | "result_pending" | "disputed") => filterMatches(phase!.matches, { stuck: false, group: null, status }).shown.map((m) => m.id);
+    expect([ids("final"), ids("result_pending"), ids("disputed")]).toEqual([[played], [waiting], [disputed]]);
+    expect(filterMatches(phase!.matches, { stuck: true, group: null, status: null }).shown.map((m) => m.id).sort()).toEqual([waiting, disputed].sort());
+  });
+
+  it("one match's log has the result steps and the organizer's decision, with who and when", async () => {
+    const { disputed } = await results();
+    const a = pairA(disputed);
+    const b = pairB(disputed);
+    expect((await D.decideMatch("o", 1, disputed, { kind: "played", score: WIN }, "Mindkét pár megerősítette telefonon.", hours(NOW, -0.1))).ok).toBe(true);
+    const m = (await O.organizerMatch(1, disputed, NOW))!;
+    expect(m).toMatchObject({ tone: "done", stuck: null, label: `Döntés: 4:1, 4:2 (nyert: Játékos ${a}A – Játékos ${a}B)` });
+    expect(m.log.map(({ who, pair, at }) => ({ who, pair, at }))).toEqual([
+      { who: `Játékos ${a}A`, pair: `Játékos ${a}A – Játékos ${a}B`, at: hours(NOW, -1) },
+      { who: `Játékos ${b}A`, pair: `Játékos ${b}A – Játékos ${b}B`, at: hours(NOW, -0.75) },
+      { who: "Org", pair: "szervező", at: hours(NOW, -0.1) },
+    ]);
+    expect(m.log[0]!.text).toMatch(/^Rögzítette az eredményt: 4:1, 4:2/);
+    expect(m.log[2]!.text).toContain("Mindkét pár megerősítette telefonon.");
+    expect(new Set(m.log.map((e) => e.id)).size).toBe(3);
+  });
+});
+
 describe("organizerMatch (#158)", () => {
   beforeEach(freshDb);
 

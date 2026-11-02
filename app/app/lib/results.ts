@@ -126,7 +126,9 @@ export function resultStatusView(state: ResultState, me: Side): StatusView | nul
     case "disputed":
       return { label: "Vitatott eredmény, a szervező dönt", tone: "waiting" };
     case "final":
-      return { label: `Lejátszva: ${outcomeText(state.outcome, me)}`, tone: "done" };
+      // "Lejátszva" only for a played match; a walkover, both losing or an
+      // unplayed match is the final outcome without a game.
+      return { label: `${state.outcome.kind === "played" ? "Lejátszva" : "Végeredmény"}: ${outcomeText(state.outcome, me)}`, tone: "done" };
   }
 }
 

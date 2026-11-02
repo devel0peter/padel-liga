@@ -123,7 +123,7 @@ describe("status, Teendő and log lines (#28)", () => {
     expect(resultStatusView(disputed, "b")).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "waiting" });
     expect(resultTodo(disputed, "b", "X")).toBeNull();
     expect(resultStatusView({ status: "final", outcome: { kind: "walkover", winner: "b" }, how: "organizer", at: T }, "b")).toEqual({
-      label: "Lejátszva: Játék nélküli győzelem nektek (4:0, 4:0)",
+      label: "Végeredmény: Játék nélküli győzelem nektek (4:0, 4:0)",
       tone: "done",
     });
   });

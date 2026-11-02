@@ -400,7 +400,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
   - As a player, `/admin/leagues/minta/disputes` and the decide page answer 403.
   - Viták: "Vitatott eredmények (1)" with both pairs' versions (from the 1. pár's side), then "Minden meccs" with every match of the published groups, each with "Felülbírálom". No email address or phone.
   - The decide page shows both versions, the note and the full log (1. pár / 2. pár). Without a reason the form doesn't send (the server refuses it too). After saving: "Elmentettük a döntést. Mindkét pár értesítést kap.", the decision in the log with the Szervező's name, time and reason, and Viták shows "Vitatott eredmények (0)".
-  - Both pairs: "Lejátszva: <outcome>" and "A szervező döntött: … Indoklás: …" in the log; all four get it in "Értesítések" (no email: a daily-digest item, #31).
+  - Both pairs: "Végeredmény: <outcome>" ("Lejátszva: <score>" for a played match) and "A szervező döntött: … Indoklás: …" in the log; all four get it in "Értesítések" (no email: a daily-digest item, #31).
   - "Felülbírálom" works the same for any match, played or not; the latest decision counts.
 
 ## Start over

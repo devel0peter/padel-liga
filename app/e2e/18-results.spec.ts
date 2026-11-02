@@ -155,7 +155,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
 
   // Both pairs see the final outcome and the decision in the log.
   await visit(player.page, `/matches/${second!.id}`);
-  await expect(status(player.page)).toContainText("Lejátszva: Mindkét pár vereséget kap (0:4, 0:4)");
+  await expect(status(player.page)).toContainText("Végeredmény: Mindkét pár vereséget kap (0:4, 0:4)");
   await expect(content(player.page).getByRole("region", { name: "Napló" })).toContainText("A szervező döntött");
   await player.context.close();
 });

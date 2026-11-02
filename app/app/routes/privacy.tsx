@@ -218,6 +218,15 @@ export default function Privacy() {
               linket mi nem küldjük el senkinek, és erről nem megy e-mail.
             </p>
           </Section>
+          <Section title="Ha párt keresel">
+            <p>
+              Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
+              jelzést. Ilyenkor a szervező látja a neved, a szinted és azt, hogy
+              mióta keresel párt, és párba tehet egy másik párkeresővel. Ha
+              egyedül jelentkeztél előre, a jelzés eleve be van kapcsolva. Bármikor
+              kikapcsolhatod.
+            </p>
+          </Section>
 
           <Section title="Ha változik a párod">
             <p>

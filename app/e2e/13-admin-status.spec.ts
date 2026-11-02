@@ -19,10 +19,11 @@ test("Felhasználók: status chips and, for the Admin, the last login", async ({
   // Logged in during the walkthrough: a date, not the dash.
   await expect(row.getByRole("cell").nth(5)).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
 
-  // The player from step 15 has no pair yet.
-  // (Searched without the "Ú": SQLite LIKE ignores case for ASCII only.)
-  await visit(page, `/admin/users?q=${encodeURIComponent("Játékos")}`);
-  await expect(page.getByRole("row").filter({ hasText: "Új Játékos" })).toContainText("Nincs párja");
+  // Sándor Ákos lost his pair in step 14 and has none since.
+  const akos = WAITING_SOLOS[1];
+  // Searched by surname: SQLite LIKE ignores case for ASCII letters only ("Á").
+  await visit(page, `/admin/users?q=${encodeURIComponent(akos.name.split(" ")[0])}`);
+  await expect(page.getByRole("row").filter({ hasText: akos.name })).toContainText("Nincs párja");
   await context.close();
 });
 

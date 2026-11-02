@@ -5,6 +5,11 @@ import {
   channelKey,
   followsEmailSwitch,
   groupsPublishedMessage,
+  matchAgreedTimeMessage,
+  matchDeclinedMessage,
+  matchProposalMessage,
+  matchScheduledMessage,
+  DIGEST_KINDS,
   isChannel,
   isEnabled,
   isNotificationKind,
@@ -234,5 +239,45 @@ describe("player messages (#115)", () => {
       body: "1. kör, 2026/27 tél, Padelpárbaj Győr. Határidő: nov. 29., vasárnap 23:59.",
       url: "/home",
     });
+  });
+});
+
+describe("match scheduling notifications (#26, spec 13)", () => {
+  const slot = new Date("2026-11-17T17:00:00Z");
+
+  it("a proposal or counter-proposal links to the match, without names", () => {
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, slots: 3 })).toEqual({
+      title: "Időpontokat ajánlottak",
+      body: "Az ellenfeletek 3 időpontot ajánlott a 2. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.",
+      url: "/matches/7",
+    });
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, slots: 4 }).title).toBe("Új időpontokat ajánlottak");
+  });
+
+  it("an agreed time waiting for confirmation", () => {
+    expect(matchAgreedTimeMessage({ matchId: 7, slot })).toEqual({
+      title: "Erősítsd meg az időpontot",
+      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.",
+      url: "/matches/7",
+    });
+  });
+
+  it("scheduled: accepted or confirmed", () => {
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: false }).body).toBe("Az ellenfeletek elfogadta az időpontot: nov. 17., kedd 18:00.");
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: true }).body).toBe(
+      "Az ellenfeletek megerősítette a megbeszélt időpontot: nov. 17., kedd 18:00.",
+    );
+  });
+
+  it("declined", () => {
+    expect(matchDeclinedMessage({ matchId: 7, slot })).toEqual({
+      title: "Nem erősítették meg az időpontot",
+      body: "Az ellenfeletek szerint nem nov. 17., kedd 18:00 a meccs. Egyeztessetek újra.",
+      url: "/matches/7",
+    });
+  });
+
+  it("the digest kinds are the scheduled and declined ones, not the instant ones", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined"]);
   });
 });

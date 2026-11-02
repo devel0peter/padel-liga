@@ -82,7 +82,7 @@ export default function Privacy() {
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
                 állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
-                alap), és amiből az induló értékszámod lesz,
+                alap), és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket

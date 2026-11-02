@@ -168,6 +168,11 @@ export const users = sqliteTable("users", {
   // Admin's user list. Sessions can't tell: logging out deletes them. Null
   // until the first login after it was added (backfilled from live sessions).
   lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+  // Set when the account was deleted but kept anonymized for its history
+  // (#152, lib/account-deletion.ts): name "Törölt játékos", no contact data,
+  // no login. Hidden from every list and count; shown only in old pairs,
+  // groups and matches.
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

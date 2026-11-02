@@ -28,6 +28,8 @@ export type Permission =
   | { kind: "leagues.manage" }
   | { kind: "cities.manage" }
   | { kind: "users.view" }
+  // Delete or anonymize an account (#152). Which accounts: account-deletion.ts.
+  | { kind: "users.delete" }
   // A city's clubs (venues): its Szervezők. Without a city: every city's.
   | { kind: "clubs.manage"; city?: string }
   // One league's organizer pages.

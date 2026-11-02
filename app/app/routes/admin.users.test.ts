@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+// Reached through the pair dissolve of an account deletion; nothing is sent.
+vi.mock("~/lib/email/outbox.server", () => ({}));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const { createSession } = await import("~/lib/auth/session.server");
@@ -61,6 +63,36 @@ describe("/admin/users", () => {
     expect(row("n").status.map((c) => c.text)).toEqual(["Félbehagyta a regisztrációt"]);
     expect(row("a").lastLoginAt).toBeNull();
     expect(row("admin").lastLoginAt).toBeInstanceOf(Date);
+  });
+
+  // #152: "Törlés" is the Admin's only.
+  const post = (cookie: string, user: string) =>
+    new Request("http://localhost/admin/users", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: new URLSearchParams({ intent: "delete", user }),
+    });
+
+  it("refuses a hand-made delete request from a Szervező", async () => {
+    expect(await status(R.action(args(post(await cookieFor("szervezo", "player", 1), "n"))))).toBe(403);
+    expect(h.raw.prepare("select count(*) as n from users where id = 'n'").get().n).toBe(1);
+  });
+
+  it("lets the Admin delete an account; it leaves the list", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    const page = await R.loader(args(get(cookie)));
+    expect(page.canDelete).toBe(true);
+    const row = (id: string) => page.users.find((u) => u.id === id)!;
+    expect(row("n").deletion).toEqual({ mode: "remove" });
+    expect(row("admin").deletion).toEqual({ refused: "A saját fiókodat itt nem törölheted." });
+    expect(await R.action(args(post(cookie, "n")))).toEqual({ ok: true, message: "A fiók törölve." });
+    expect((await R.loader(args(get(cookie)))).users.map((u) => u.id)).not.toContain("n");
+  });
+
+  it("doesn't list an anonymized account", async () => {
+    h.raw.exec(`update users set name = 'Törölt játékos', deleted_at = 1 where id = 'b'`);
+    const page = await R.loader(args(get(await cookieFor("admin", "superadmin"))));
+    expect(page.users.map((u) => u.id)).not.toContain("b");
   });
 
   it("finds a name that starts with an accented capital", async () => {

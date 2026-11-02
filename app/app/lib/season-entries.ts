@@ -160,3 +160,20 @@ export type EntryFilter = keyof typeof ENTRY_FILTERS;
 export function parseEntryFilter(value: string | null): EntryFilter {
   return value && Object.hasOwn(ENTRY_FILTERS, value) ? (value as EntryFilter) : "pending";
 }
+
+// An entry's status on the organizer pages, in a word.
+export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = { ...ENTRY_FILTERS, withdrawn: "Visszavonva" };
+
+// A pair's entry the admin tables show: in the first of the league's home
+// seasons (current before next, see homeSeasons) the pair entered, or null.
+export function homeEntry(
+  seasons: readonly { id: number; name: string }[],
+  entries: readonly { pairId: number; seasonId: number; status: EntryStatus }[],
+  pairId: number,
+): { season: string; status: EntryStatus } | null {
+  for (const s of seasons) {
+    const e = entries.find((x) => x.pairId === pairId && x.seasonId === s.id);
+    if (e) return { season: s.name, status: e.status };
+  }
+  return null;
+}

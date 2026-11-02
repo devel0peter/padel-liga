@@ -199,35 +199,39 @@ describe("pairs.server on real SQLite (#97)", () => {
       .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
     h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec("2026-11-08T23:00:00Z"), sec("2026-11-29T22:59:00Z"));
     h.raw.exec(`insert into season_entries (season_id, pair_id, status) values (1, 8, 'pending')`);
+    h.raw.exec(`update users set phone = '+36301234567' where id = 'c'`);
     const rows = await P.leaguePairs(1, NOW);
     expect(rows).toEqual([
       {
         id: 8,
         players: [
-          { id: "c", name: "Cecil", level: "kozephalado" },
-          { id: "d", name: "Dóra", level: "versenyzo" },
+          { id: "c", name: "Cecil", level: "kozephalado", phone: true },
+          { id: "d", name: "Dóra", level: "versenyzo", phone: false },
         ],
         elo: 1400,
         source: "manual",
         status: "active",
         locked: false,
         entry: { season: "Tél", status: "pending" },
+        season: "Tél",
       },
       {
         id: 7,
         players: [
-          { id: "a", name: "Anna", level: "halado" },
-          { id: "b", name: "Béla", level: "kezdo" },
+          { id: "a", name: "Anna", level: "halado", phone: false },
+          { id: "b", name: "Béla", level: "kezdo", phone: false },
         ],
         elo: 1200,
         source: "signup",
         status: "dissolved",
         locked: false,
         entry: null,
+        season: "Tél",
       },
     ]);
     // Never an email address or phone on the page's data.
     expect(JSON.stringify(rows)).not.toContain("@");
+    expect(JSON.stringify(rows)).not.toContain("+36");
   });
 });
 

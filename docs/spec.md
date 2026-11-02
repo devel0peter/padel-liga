@@ -18,6 +18,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Organizer rights are granted per league (a row per league and account), so one account can organize one league and not another.
 - Platform admin is a flag on the account, set only by a CLI command; no screen can grant or remove it. Peter's work Google account is the platform admin; his personal account is a player and the Győr organizer.
 - Design and delivery: `docs/admin-plan.md`.
+- Player status on the admin tables (README decision log, 2026-10-31, D56): "Felhasználók", "Jelentkezők", "Párkeresők" and "Párok" show, per player, whether they have an account and finished the first-login page, a missing level or phone number (never the number itself), their active pair in the league and its entry in the league's current or next season (or "Nem nevezett" while there is one). Only the Admin sees each account's last login (the time of its newest session, recorded at every login).
 
 ## 3. Authentication
 - **No passwords** (2026-10-04): log in with Google, or with a one-time 6-digit code sent by email (valid 10 minutes, at most 5 tries, single use). Nothing to hash, reset or leak.

@@ -6,7 +6,7 @@ import { groupPairs, groups, leagues, pairs, seasonEntries, seasonPhases, users 
 import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { audit } from "~/lib/leagues.server";
-import { averageStartingElo, type EntryStatus } from "~/lib/season-entries";
+import { averageStartingElo, homeEntry, type EntryStatus } from "~/lib/season-entries";
 import { withdrawEntries } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
@@ -73,7 +73,8 @@ export async function pairOverview(user: User, list: PairLeague[]): Promise<Pair
 
 export type LeaguePairRow = {
   id: number;
-  players: { id: string; name: string; level: string | null }[];
+  // phone: whether they gave a number (the page never shows it).
+  players: { id: string; name: string; level: string | null; phone: boolean }[];
   elo: number | null;
   source: PairSource;
   status: "active" | "dissolved";
@@ -81,6 +82,9 @@ export type LeaguePairRow = {
   locked: boolean;
   // The entry in the league's current (or next) season, if any.
   entry: { season: string; status: EntryStatus } | null;
+  // The league's first home season (current or next), so "not entered" can
+  // say which; null when there is none.
+  season: string | null;
 };
 
 const playerA = alias(users, "pair_player_a");
@@ -110,9 +114,11 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       aId: pairs.playerA,
       aName: playerA.name,
       aLevel: playerA.level,
+      aPhone: playerA.phone,
       bId: pairs.playerB,
       bName: playerB.name,
       bLevel: playerB.level,
+      bPhone: playerB.phone,
     })
     .from(pairs)
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
@@ -136,26 +142,19 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       : Promise.resolve([]),
   ]);
   return rows.map((r) => {
-    // The first home season (current before next) the pair has an entry in.
-    let entry: LeaguePairRow["entry"] = null;
-    for (const s of seasons) {
-      const e = entries.find((x) => x.pairId === r.id && x.seasonId === s.id);
-      if (e) {
-        entry = { season: s.name, status: e.status };
-        break;
-      }
-    }
+    const entry = homeEntry(seasons, entries, r.id);
     return {
       id: r.id,
       players: [
-        { id: r.aId, name: r.aName, level: r.aLevel },
-        { id: r.bId, name: r.bName, level: r.bLevel },
+        { id: r.aId, name: r.aName, level: r.aLevel, phone: !!r.aPhone },
+        { id: r.bId, name: r.bName, level: r.bLevel, phone: !!r.bPhone },
       ],
       elo: averageStartingElo(r.aLevel, r.bLevel),
       source: r.source,
       status: r.status,
       locked: locked.has(r.id),
       entry,
+      season: seasons[0]?.name ?? null,
     };
   });
 }

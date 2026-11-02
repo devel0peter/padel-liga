@@ -164,6 +164,10 @@ export const users = sqliteTable("users", {
   sex: text("sex", { enum: ["male", "female"] }),
   // Set on the first-login page; until then the account can't use the app.
   consentAt: integer("consent_at", { mode: "timestamp" }),
+  // The latest login (a new session: Google or a login code), for the
+  // Admin's user list. Sessions can't tell: logging out deletes them. Null
+  // until the first login after it was added (backfilled from live sessions).
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

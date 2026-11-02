@@ -3,6 +3,7 @@ import { data, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-pairs";
 import { AppPage } from "~/components/app-page";
+import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +35,8 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, createPair, dissolvePair, leaguePairs, pairCandidates } from "~/lib/pairs.server";
-import { ENTRY_FILTERS, type EntryStatus } from "~/lib/season-entries";
+import { entryChip, missingChips } from "~/lib/player-status";
+import { ENTRY_STATUS_LABELS } from "~/lib/season-entries";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
 
@@ -80,9 +82,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 type Pair = Route.ComponentProps["loaderData"]["pairs"][number];
 type Candidate = Route.ComponentProps["loaderData"]["candidates"][number];
 
-const ENTRY_LABELS: Record<EntryStatus, string> = { ...ENTRY_FILTERS, withdrawn: "Visszavonva" };
-
 const who = (p: { name: string; level: string | null }) => (p.level ? `${p.name} (${levelLabel(p.level)})` : p.name);
+
+// An active pair's entry in the current or next season, or that it hasn't
+// entered one that is there.
+function EntryCell({ pair }: { pair: Pair }) {
+  const chip = entryChip(pair);
+  return chip ? <StatusChips chips={[chip]} /> : "–";
+}
 
 function PlayerSelect({
   name,
@@ -301,6 +308,9 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
                       <div key={pl.id}>
                         <span className="font-medium">{pl.name}</span>
                         {pl.level && <span className="text-xs text-muted-foreground"> · {levelLabel(pl.level)}</span>}
+                        {p.status === "active" && (
+                          <StatusChips chips={missingChips({ registered: true, level: pl.level, phone: pl.phone, pairs: [] })} />
+                        )}
                       </div>
                     ))}
                   </TableCell>
@@ -311,7 +321,15 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
                       {p.status === "active" ? "Aktív" : "Felbontva"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm">{p.entry ? `${p.entry.season}: ${ENTRY_LABELS[p.entry.status]}` : "–"}</TableCell>
+                  <TableCell className="text-sm">
+                    {p.status === "active" ? (
+                      <EntryCell pair={p} />
+                    ) : p.entry ? (
+                      `${p.entry.season}: ${ENTRY_STATUS_LABELS[p.entry.status]}`
+                    ) : (
+                      "–"
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     {p.status === "active" && (
                       <div className="grid justify-items-end gap-1">

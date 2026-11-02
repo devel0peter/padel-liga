@@ -2,7 +2,9 @@
 //
 // Phase 0 audience: the signup list, filtered the same way as the admin list.
 // Only the person who signed up is mailed, never the partner they entered
-// (spec section 17: nothing else goes to the partner until they register).
+// (spec section 17: nothing else goes to the partner until they register);
+// a mail to one "Hol tart" stage reaches a partner who registered
+// (signup-progress.ts stageRecipients).
 // Later audiences (e.g. active league players) get their own function here.
 
 import { cityName, OTHER_CITY, type City } from "../cities";

@@ -70,8 +70,13 @@ test("Jelentkezők: Hol tartanak, people per stage, and the stage filter", async
   // His own signup, and the solo it was paired with ("Párja: …").
   await expect(page.getByRole("row").filter({ hasText: akos.name }).first()).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: anna.name })).toHaveCount(0);
-  // Mail and CSV go by signups, not by people: off while the stage is on.
-  await expect(page.getByRole("button", { name: "Levél nekik" })).toBeDisabled();
+  // The mail goes to the people at the stage: not sent here, only the list.
+  await page.getByRole("link", { name: "Levél nekik" }).click();
+  await expect(page).toHaveURL(/\/admin\/broadcasts\/new\?stage=no_pair/);
+  await expect(content(page)).toContainText("Regisztrált, nincs párja");
+  await expect(content(page)).toContainText(akos.name);
+  await expect(content(page)).not.toContainText(anna.name);
+  await page.goBack();
 
   await stages.getByRole("link", { name: /^Nevezett: / }).click();
   await expect(page).toHaveURL(/stage=entered/);

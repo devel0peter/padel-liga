@@ -130,3 +130,30 @@ export function parseStage(params: URLSearchParams): Stage | null {
   const value = params.get("stage") ?? "";
   return isStage(value) ? value : null;
 }
+
+// Stages a broadcast can't go to: they withdrew (#114).
+export const NO_MAIL_STAGES: readonly Stage[] = ["withdrawn"];
+
+// Who a broadcast to `stage` goes to: each person at that stage once, by
+// address. The partner named on a pair signup only once they registered
+// themselves (spec: nothing else goes to them until then); the signer always,
+// as with every broadcast to the list (audience.ts signupRecipients).
+export function stageRecipients(
+  rows: readonly (Signup & Pick<SignupRow, "name1" | "name2">)[],
+  stage: Stage,
+  ctx: ProgressContext,
+): { email: string; name: string }[] {
+  if (NO_MAIL_STAGES.includes(stage)) return [];
+  const seen = new Set<string>();
+  const recipients: { email: string; name: string }[] = [];
+  for (const r of rows) {
+    const stages = signupStages(r, ctx);
+    signupEmails(r).forEach((email, i) => {
+      if (stages[i] !== stage || seen.has(email)) return;
+      if (i === 1 && !ctx.status(email)?.registered) return;
+      seen.add(email);
+      recipients.push({ email, name: (i === 0 ? r.name1 : r.name2) ?? "" });
+    });
+  }
+  return recipients;
+}

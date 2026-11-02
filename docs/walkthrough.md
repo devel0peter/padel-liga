@@ -244,10 +244,12 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
+  4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
+  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again.
 - Expect:
-  - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change.
-  - The players see the change on Párom. From here a new pair enters the season like any other (step 7).
-  - After step 11, a pair in a published group has both buttons disabled, with the reason.
+  - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change or an entry change.
+  - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
+  - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" is refused with the reason until the round's deadline.
 
 ### 15. A new player without a signup registers (side path)
 

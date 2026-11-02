@@ -56,6 +56,12 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
     expect(h.raw.prepare("select * from pairs").all()).toEqual([]);
   });
 
+  it("#154: another league's Szervező can't enter a pair or take one out (403)", async () => {
+    const cookie = await cookieFor("masik", "player", 2);
+    for (const intent of ["enter", "remove"])
+      expect(await status(R.action(args(post(cookie, { intent, pair: "1", season: "1" }))))).toBe(403);
+  });
+
   it("sends a logged-out visitor to the login page", async () => {
     expect(await status(R.loader(args(get(""))))).toBe(302);
   });

@@ -136,12 +136,49 @@ export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = {
 // seasons (current before next, see homeSeasons) the pair entered, or null.
 export function homeEntry(
   seasons: readonly { id: number; name: string }[],
-  entries: readonly { pairId: number; seasonId: number; status: EntryStatus }[],
+  entries: readonly { pairId: number; seasonId: number; status: EntryStatus; joinsPhase?: number | null }[],
   pairId: number,
-): { season: string; status: EntryStatus } | null {
+): { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null {
   for (const s of seasons) {
     const e = entries.find((x) => x.pairId === pairId && x.seasonId === s.id);
-    if (e) return { season: s.name, status: e.status };
+    if (e) return { seasonId: s.id, season: s.name, status: e.status, joinsPhase: e.joinsPhase ?? null };
   }
   return null;
 }
+
+// What the organizer can do on Párok with an active pair's entry (#154): take
+// an entered pair out of its season, or enter a pair that has no entry (or
+// was taken out) for the first home season open for entries. A rejected
+// entry (left from the approval step) offers nothing. Whether the pair plays
+// in a running phase is checked on the server.
+export type OrganizerEntryAction = { kind: "enter" | "remove"; seasonId: number; season: string };
+
+export function organizerEntryAction(
+  seasons: readonly (Calendar & { id: number; name: string })[],
+  entry: { seasonId: number; status: EntryStatus } | null,
+  now: Date,
+): OrganizerEntryAction | null {
+  const seasonOf = (id: number) => seasons.find((s) => s.id === id);
+  if (entry && (entry.status === "approved" || entry.status === "pending")) {
+    const s = seasonOf(entry.seasonId);
+    return s ? { kind: "remove", seasonId: s.id, season: s.name } : null;
+  }
+  if (entry?.status === "rejected") return null;
+  const target = entry ? seasonOf(entry.seasonId) : seasons.find((s) => entryOpen(s, now));
+  return target && entryOpen(target, now) ? { kind: "enter", seasonId: target.id, season: target.name } : null;
+}
+
+// Why the organizer can't enter a pair (#154), for the organizer.
+export const ORGANIZER_ENTRY_REFUSALS = {
+  no_pair: "Ez a pár már nem aktív ebben a ligában.",
+  closed: "Erre a szezonra most nem lehet nevezni.",
+  entered: "Ez a pár (vagy ugyanez a két játékos) már nevezett erre a szezonra.",
+} as const;
+
+// "Kovács Anna még nem adta meg a szintjét…": who is missing a level.
+export function noLevelRefusal(names: readonly string[]): string {
+  return `${names.join(" és ")} még nem adta meg a szintjét a profiljában, ezért a pár nem nevezhető.`;
+}
+
+export const IN_RUNNING_PHASE =
+  "Ez a pár a futó kör csoportjában játszik, ezért a kör határidejéig nem vehető ki a szezonból. A kör közbeni visszalépést itt még nem lehet kezelni.";

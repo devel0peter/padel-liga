@@ -10,6 +10,7 @@ import {
   fromPhase,
   joinsPhase,
   lateEntry,
+  organizerEntryAction,
 } from "./season-entries";
 
 // The first season (README decision log 2026-10-21): registration 2–5 Nov,
@@ -166,5 +167,34 @@ describe("entryView", () => {
     const entry = { status: "rejected" as const, joinsPhase: null, note: "Tele vagyunk." };
     expect(entryView({ ...base, entry })).toEqual({ kind: "status", status: "rejected", text: entryStatusText(entry), note: "Tele vagyunk." });
     expect(entryView({ ...base, entry, now: at("2027-01-30T12:00:00Z") })).toMatchObject({ kind: "status" });
+  });
+});
+
+describe("organizerEntryAction (#154)", () => {
+  const winter = { ...season, id: 1, name: "Tél" };
+  const spring = {
+    ...season,
+    id: 2,
+    name: "Tavasz",
+    registrationOpensAt: at("2027-02-01T12:00:00Z"),
+    registrationClosesAt: at("2027-02-10T12:00:00Z"),
+  };
+  const now = at("2026-11-03T12:00:00Z");
+
+  it("offers to take an entered pair out", () => {
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "approved" }, now)).toEqual({ kind: "remove", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "pending" }, now)).toMatchObject({ kind: "remove" });
+  });
+
+  it("offers to enter a pair without an entry, for the first season open for entries", () => {
+    expect(organizerEntryAction([winter, spring], null, now)).toEqual({ kind: "enter", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([spring], null, now)).toBeNull();
+    expect(organizerEntryAction([winter], null, at("2027-01-26T12:00:00Z"))).toBeNull();
+  });
+
+  it("offers to enter a taken-out pair again while its season is open, nothing for a rejected one", () => {
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, now)).toEqual({ kind: "enter", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, at("2027-01-26T12:00:00Z"))).toBeNull();
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "rejected" }, now)).toBeNull();
   });
 });

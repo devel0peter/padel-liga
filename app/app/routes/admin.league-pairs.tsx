@@ -36,14 +36,16 @@ import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, createPair, dissolvePair, leaguePairs, pairCandidates } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
-import { ENTRY_STATUS_LABELS } from "~/lib/season-entries";
+import { ENTRY_STATUS_LABELS, fromPhase } from "~/lib/season-entries";
+import { enterPairByOrganizer, removePairFromSeason } from "~/lib/season-entries.server";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
 
 // Párok (#97): the Szervező of the league (or the Admin) creates, dissolves
-// and changes pairs. Players can't change their pair themselves. No email
-// goes out: the organizer tells the players. Names and levels only, never an
-// email address or phone number.
+// and changes pairs, and enters a pair for the season or takes it out (#154).
+// Players can't change their pair themselves. No email goes out: the
+// organizer tells the players (an entry change is also an in-app notice).
+// Names and levels only, never an email address or phone number.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -67,14 +69,21 @@ export async function action({ request, params }: Route.ActionArgs) {
   const form = await request.formData();
   const field = (name: string) => String(form.get(name) ?? "");
   const pairId = Number(field("pair"));
+  const seasonId = Number(field("season"));
   const intent = field("intent");
+  const valid = (n: number) => Number.isInteger(n) && n > 0;
   let result: { ok: true } | { ok: false; error: string };
   if (intent === "create") result = await createPair(actor.id, league.id, field("a"), field("b"));
-  else if ((intent === "dissolve" || intent === "change") && Number.isInteger(pairId) && pairId > 0)
+  else if ((intent === "dissolve" || intent === "change") && valid(pairId))
     result =
       intent === "dissolve"
         ? await dissolvePair(actor.id, league.id, pairId)
         : await changePartner(actor.id, league.id, pairId, field("keep"), field("partner"));
+  else if ((intent === "enter" || intent === "remove") && valid(pairId) && valid(seasonId))
+    result =
+      intent === "enter"
+        ? await enterPairByOrganizer(actor, league.id, pairId, seasonId)
+        : await removePairFromSeason(actor, league.id, pairId, seasonId);
   else throw new Response("Hibás kérés.", { status: 400 });
   return result.ok ? { ok: true as const } : { error: result.error };
 }
@@ -84,11 +93,66 @@ type Candidate = Route.ComponentProps["loaderData"]["candidates"][number];
 
 const who = (p: { name: string; level: string | null }) => (p.level ? `${p.name} (${levelLabel(p.level)})` : p.name);
 
-// An active pair's entry in the current or next season, or that it hasn't
-// entered one that is there.
+// An active pair's entry in the current or next season (with the round it
+// starts in), or that it hasn't entered one that is there; and "Benevezés" or
+// "Kivétel a szezonból" (#154).
 function EntryCell({ pair }: { pair: Pair }) {
   const chip = entryChip(pair);
-  return chip ? <StatusChips chips={[chip]} /> : "–";
+  const starts =
+    pair.entry?.status === "approved" ? (pair.entry.joinsPhase === null ? "a következő szezontól" : fromPhase(pair.entry.joinsPhase)) : null;
+  return (
+    <div className="grid justify-items-start gap-1">
+      {chip ? <StatusChips chips={[chip]} /> : "–"}
+      {starts && <span className="text-xs text-muted-foreground">{starts}</span>}
+      {pair.entryAction && <EntryActionButton pair={pair} action={pair.entryAction} />}
+    </div>
+  );
+}
+
+function EntryActionButton({ pair, action }: { pair: Pair; action: NonNullable<Pair["entryAction"]> }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const [a, b] = pair.players;
+  const enter = action.kind === "enter";
+  return (
+    <>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant={enter ? "outline" : "ghost"} size="sm" disabled={fetcher.state !== "idle"}>
+            {enter ? "Benevezés" : "Kivétel a szezonból"}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {enter ? "Benevezed" : "Kiveszed a szezonból"}: {a.name} – {b.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {enter
+                ? `A pár nevezése azonnal érvényes erre a szezonra (${action.season}), mintha ők nyomták volna meg a „Nevezünk” gombot. Ha a szezon már elindult, a következő körtől játszanak.`
+                : `A pár nevezése visszavonódik (${action.season}), és kimarad minden ezután készülő csoportbeosztásból. A pár megmarad, később újra benevezheted.`}{" "}
+              Mindkét játékos értesítést kap az oldalon; e-mailt nem, szólj nekik te.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Mégse</AlertDialogCancel>
+            <AlertDialogAction
+              variant={enter ? "default" : "destructive"}
+              onClick={() =>
+                fetcher.submit({ intent: action.kind, pair: String(pair.id), season: String(action.seasonId) }, { method: "post" })
+              }
+            >
+              {enter ? "Benevezés" : "Kivétel"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {fetcher.data?.error && (
+        <p role="alert" className="max-w-64 text-xs font-semibold whitespace-normal text-destructive">
+          {fetcher.data.error}
+        </p>
+      )}
+    </>
+  );
 }
 
 function PlayerSelect({

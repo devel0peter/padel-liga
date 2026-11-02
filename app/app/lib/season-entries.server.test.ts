@@ -242,3 +242,102 @@ describe("season entries on real SQLite", () => {
     expect((await E.entryViews(user("a"), [season], at("2026-10-01T12:00:00Z"))).has(1)).toBe(false);
   });
 });
+
+describe("#154: the organizer enters a pair or takes it out, from Párok", () => {
+  beforeEach(freshDb);
+  const org = { id: "o" };
+
+  it("enters a pair without an entry, like Nevezünk: entered for round 1, in the draft, notice in the app, no email", async () => {
+    expect(await E.enterPairByOrganizer(org, 1, 1, 1, DURING_REGISTRATION)).toEqual({ ok: true, joins: { phase: 1, startsAt: at(PHASES[0]) } });
+    expect(entry()).toMatchObject({ status: "approved", joins_phase: 1, decided_by: "o" });
+    expect(await E.listSeasonEntries(1)).toHaveLength(1);
+    expect(h.mails).toEqual([]);
+    expect(all("select user_id, kind, title from notifications order by user_id")).toEqual([
+      { user_id: "a", kind: "season_entry_decision", title: "A szervező benevezett titeket" },
+      { user_id: "b", kind: "season_entry_decision", title: "A szervező benevezett titeket" },
+    ]);
+    expect(one("select actor_id, action, target, detail from audit_log")).toEqual({
+      actor_id: "o",
+      action: "season_entry.enter",
+      target: `season_entry:${entry().id}`,
+      detail: "pair:1",
+    });
+    // The players see it on Párom too.
+    const season = (await S.getSeason(1))!;
+    expect((await E.entryViews(user("a"), [season], DURING_REGISTRATION)).get(1)).toMatchObject({ kind: "status", status: "approved" });
+  });
+
+  it("uses the same joining rules: after phase 1 started, round 2", async () => {
+    expect(await E.enterPairByOrganizer(org, 1, 1, 1, IN_PHASE_1)).toMatchObject({ ok: true, joins: { phase: 2 } });
+    expect(entry()).toMatchObject({ joins_phase: 2 });
+  });
+
+  it("refuses a pair where a player has no level, naming them, in Hungarian", async () => {
+    expect(await E.enterPairByOrganizer(org, 1, 2, 1, DURING_REGISTRATION)).toEqual({
+      ok: false,
+      error: "Dóra még nem adta meg a szintjét a profiljában, ezért a pár nem nevezhető.",
+    });
+    expect(all("select * from season_entries")).toHaveLength(0);
+    expect(all("select * from notifications")).toHaveLength(0);
+  });
+
+  it("refuses a pair already entered, a closed season, a dissolved pair, another league's pair or season", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    expect(await E.enterPairByOrganizer(org, 1, 1, 1, DURING_REGISTRATION)).toMatchObject({ ok: false, error: expect.stringContaining("már nevezett") });
+    h.raw.exec("update users set level = 'kezdo' where id = 'd'");
+    expect(await E.enterPairByOrganizer(org, 1, 2, 1, at(PHASES[3]))).toMatchObject({ ok: false, error: expect.stringContaining("most nem lehet") });
+    addSeason(2, 2, "Debreceni tél");
+    // Pair 2 is in Győr (league 1): not through Debrecen, and not into Debrecen's season.
+    expect(await E.enterPairByOrganizer(org, 2, 2, 2, DURING_REGISTRATION)).toMatchObject({ ok: false });
+    expect(await E.enterPairByOrganizer(org, 1, 2, 2, DURING_REGISTRATION)).toMatchObject({ ok: false, error: "Nincs ilyen szezon." });
+    h.raw.exec("update pairs set status = 'dissolved' where id = 2");
+    expect(await E.enterPairByOrganizer(org, 1, 2, 1, DURING_REGISTRATION)).toMatchObject({ ok: false, error: expect.stringContaining("nem aktív") });
+    expect(all("select pair_id from season_entries")).toEqual([{ pair_id: 1 }]);
+  });
+
+  it("takes an entered pair out before round 1's groups: out of the list and the draft, notice in the app, no email; the pair stays", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    h.mails = [];
+    h.raw.exec("delete from notifications");
+    expect(await E.removePairFromSeason(org, 1, 1, 1, DURING_REGISTRATION)).toEqual({ ok: true });
+    expect(entry()).toMatchObject({ status: "withdrawn", decided_by: "o" });
+    expect(await E.listSeasonEntries(1)).toHaveLength(0);
+    expect(one("select status from pairs where id = 1")).toEqual({ status: "active" });
+    expect(h.mails).toEqual([]);
+    expect(all("select user_id, title from notifications order by user_id")).toEqual([
+      { user_id: "a", title: "A szervező kivett titeket a szezonból" },
+      { user_id: "b", title: "A szervező kivett titeket a szezonból" },
+    ]);
+    expect(one("select action, detail from audit_log where action = 'season_entry.remove'")).toEqual({ action: "season_entry.remove", detail: "pair:1" });
+    // Twice: nothing left to take out.
+    expect(await E.removePairFromSeason(org, 1, 1, 1, DURING_REGISTRATION)).toMatchObject({ ok: false });
+  });
+
+  it("can enter a removed pair again, with the joining phase worked out then", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    await E.removePairFromSeason(org, 1, 1, 1, DURING_REGISTRATION);
+    expect(await E.enterPairByOrganizer(org, 1, 1, 1, IN_PHASE_1)).toMatchObject({ ok: true, joins: { phase: 2 } });
+    expect(all("select status, joins_phase from season_entries")).toEqual([{ status: "approved", joins_phase: 2 }]);
+  });
+
+  it("refuses to take out a pair that plays in a running phase, with the reason; between phases it may", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    h.raw.exec(`insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, ${sec("2026-11-07T10:00:00Z")})`);
+    h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1)`);
+    expect(await E.removePairFromSeason(org, 1, 1, 1, IN_PHASE_1)).toEqual({
+      ok: false,
+      error: expect.stringContaining("a futó kör csoportjában játszik"),
+    });
+    expect(entry()).toMatchObject({ status: "approved" });
+    // After phase 1's deadline: between phases.
+    expect(await E.removePairFromSeason(org, 1, 1, 1, at("2026-11-30T12:00:00Z"))).toEqual({ ok: true });
+  });
+
+  it("refuses another league's season or pair", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    addSeason(2, 2, "Debreceni tél");
+    expect(await E.removePairFromSeason(org, 2, 1, 1, DURING_REGISTRATION)).toMatchObject({ ok: false });
+    expect(await E.removePairFromSeason(org, 2, 1, 2, DURING_REGISTRATION)).toMatchObject({ ok: false });
+    expect(entry()).toMatchObject({ status: "approved" });
+  });
+});

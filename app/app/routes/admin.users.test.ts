@@ -73,4 +73,28 @@ describe("/admin/users", () => {
     expect(await search("BÉLA")).toEqual(["b"]);
     expect(await search("x.hu")).toHaveLength(5);
   });
+
+  it("filters by role, registration, missing data and pair, counts the options and keeps the total (#151)", async () => {
+    h.raw.exec(`insert into users (id, email, name, level, phone, consent_at) values ('c', 'c@x.hu', 'Cecil', 'kezdo', '+36301234567', 1)`);
+    const cookie = await cookieFor("admin", "superadmin");
+    const load = (query: string) =>
+      R.loader(args(new Request(`http://localhost/admin/users?${query}`, { headers: { Cookie: cookie } })));
+    const ids = async (query: string) => (await load(query)).users.map((u) => u.id).sort();
+
+    expect(await ids("role=admin")).toEqual(["admin"]);
+    expect(await ids("registration=unfinished")).toEqual(["n"]);
+    expect(await ids("missing=level")).toEqual(["admin"]);
+    expect(await ids("missing=phone")).toEqual(["a", "admin", "b"]);
+    // Cecil has no pair; Anna and Béla are paired, the admin account has none either.
+    expect(await ids("pair=none")).toEqual(["admin", "c"]);
+    // With a search term as well.
+    expect(await ids("pair=none&q=cec")).toEqual(["c"]);
+    // An unknown value is no filter.
+    expect(await ids("pair=bogus")).toHaveLength(5);
+
+    const page = await load("pair=none");
+    expect(page.total).toBe(5);
+    expect(page.counts.pair.none).toBe(2);
+    expect(page.counts.role).toEqual({ player: 1, organizer: 0, admin: 1 });
+  });
 });

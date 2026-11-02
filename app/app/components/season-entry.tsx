@@ -1,13 +1,20 @@
 import { Form, Link, useNavigation } from "react-router";
 
 import { Button } from "~/components/ui/button";
-import type { EntryView } from "~/lib/season-entries";
+import { formatShortDate } from "~/lib/format";
+import { fromPhase, type EntryView } from "~/lib/season-entries";
 
 // A season's entry for the player (#23), on Párom and the home page: the
-// status with the organizer's note, the "Nevezünk" button, or why they can't
-// apply yet. The form posts intent "enter" to the page's own action.
+// status (with a note left from the approval step), the "Nevezünk" button,
+// or why they can't enter yet. The form posts intent "enter" to the page's
+// own action. The entry counts at once (#153).
 
-export const ENTERED_NOTICE = "Neveztetek. A szervező döntését a Párom oldalon látjátok.";
+// What the player who clicked sees: entered, and from which round.
+export function enteredNotice(joins: { phase: number; startsAt: Date } | null): string {
+  return joins === null
+    ? "Beneveztetek: a következő szezontól játszotok."
+    : `Beneveztetek: ${fromPhase(joins.phase)} játszotok (kezdés: ${formatShortDate(new Date(joins.startsAt))}).`;
+}
 
 const BLOCKED_LINKS: Partial<Record<Extract<EntryView, { kind: "blocked" }>["reason"], { to: string; label: string }>> = {
   no_pair: { to: "/pair", label: "Párom" },
@@ -42,7 +49,7 @@ export function SeasonEntry({ seasonId, view }: { seasonId: number; view: EntryV
       <input type="hidden" name="season" value={seasonId} />
       {view.late && (
         <p className="text-muted-foreground">
-          A szezon már elindult, de még nevezhettek: ha a szervező jóváhagyja, a következő körtől játszotok.
+          A szezon már elindult, de még nevezhettek: a következő körtől játszotok.
         </p>
       )}
       <div>

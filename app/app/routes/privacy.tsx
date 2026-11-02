@@ -169,8 +169,8 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>Az időpont-egyeztetést</strong> (ki, mikor, milyen
-                időpontot ajánlott, fogadott el vagy erősített meg) a meccs két
-                párja látja a meccs oldalán. Megőrizzük, mert a határidőig le nem
+                időpontot ajánlott, fogadott el, erősített meg vagy mondott le,
+                és hol lesz a meccs) a meccs két párja látja a meccs oldalán. Megőrizzük, mert a határidőig le nem
                 játszott meccsekről ez alapján dönt a rendszer.
               </li>
               <li>

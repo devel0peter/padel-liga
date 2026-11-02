@@ -19,7 +19,7 @@ import { webAnalyticsToken } from "./lib/web-analytics.server";
 export async function loader({ request }: Route.LoaderArgs) {
   return {
     webAnalyticsToken: webAnalyticsToken(),
-    // The public header shows "Kezdőlap" instead of "Belépés".
+    // The public header shows "Saját oldalam" instead of "Belépés".
     signedIn: !!(await getUser(request)),
   };
 }

@@ -14,6 +14,7 @@ vi.mock("cloudflare:workers", () => ({
   env: { EMAIL_DAILY_LIMIT: "100", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private" },
 }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/cities.server", () => ({
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
   listedCities: async () => [{ slug: "gyor" }],
@@ -37,6 +38,7 @@ vi.stubGlobal("fetch", async (request: Request) => {
 });
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const E = await import("~/lib/season-entries.server");
 const N = await import("~/lib/notifications.server");
 const O = await import("~/lib/email/outbox.server");
@@ -185,6 +187,7 @@ describe("notification switches (#115)", () => {
       ],
       createdBy: "o@x.hu",
     });
+    await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);
     expect(await O.emailSwitchedOff()).toEqual(new Set(["a@x.hu"]));
 

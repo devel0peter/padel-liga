@@ -139,7 +139,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
   - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
-  - The dialog says "Meghívók elindultak": "24 levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap." (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
+  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
   - The button is now disabled (everyone is invited once).
   - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
 
@@ -355,7 +355,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 - Expect:
   - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match: both pairs (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), <pair> megerősítésére vár", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
   - "Elakadtak (<n>)" shows only the stuck matches, with a red badge saying why: nobody has stepped by Wednesday of the match's week, or a proposal or agreed time has waited 48 hours without an answer (also after it lapsed). Before round 1 starts, a fresh walkthrough has none. The group and status selects narrow the list and the count; "Szűrők törlése" clears them.
-  - After steps 26 and 27, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
+  - After steps 27 and 28, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.
   - A player opening `/admin/leagues/minta/matches` gets "Ehhez nincs jogod" (403).
 
@@ -377,7 +377,19 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
   - 18:00 the day before a fixed match: "Holnap meccs: <time>" to the match's four players, with the venue if recorded.
   - Any other hour: nothing.
 
-### 26. A pair records the result, the other confirms
+### 26. Szervező checks the automatic reminders (side path)
+
+People stuck before entering get one reminder per situation, once the league's switch is on (#155).
+
+- Page: `/admin/leagues/minta/reminders` ("Emlékeztetők")
+- Account: Szervező
+- Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
+- Expect:
+  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
+  - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
+  - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
+
+### 27. A pair records the result, the other confirms
 
 - Page: the match of step 18 (`/matches/<id>`), then the same as an opponent
 - Accounts: the player of step 17, then one of the opponents
@@ -387,10 +399,10 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
   - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések".
-  - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 27).
+  - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 28).
   - A result nobody answers is accepted by the hourly cron 48 hours after it was recorded; locally the cron doesn't run.
 
-### 27. The other pair disputes a result, the Szervező decides
+### 28. The other pair disputes a result, the Szervező decides
 
 - Page: the match of step 19, then `/admin/leagues/minta/disputes` ("Viták" in the sidebar) and its "Döntök" link
 - Accounts: the player of step 17, one of the opponents, then `szervezo@example.test`

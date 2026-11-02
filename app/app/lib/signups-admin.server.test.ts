@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -17,6 +18,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const S = await import("~/lib/signups-admin.server");
 const O = await import("~/lib/email/outbox.server");
 const SP = await import("~/lib/signup-partners.server");
@@ -128,6 +130,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     pairUp(c, d);
     await S.updateSignup(c, { status: "withdrawn" });
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await settleBackground();
     expect(queued()).toEqual(["d@x.hu"]);
     expect(mail("to_email = 'c@x.hu'")).toEqual([]);
   });
@@ -139,6 +142,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const d = solo("Dani", "d@x.hu");
     expect(await SOLO.pairSolos(c, d, "gyor", "Győr")).toBeNull();
     expect(await O.queueRegistrationInvites()).toBe(2);
+    await settleBackground();
     expect(mail().map((m: any) => `${m.kind} ${m.to_email}`)).toEqual([
       "pair_intro c@x.hu",
       "pair_intro d@x.hu",
@@ -174,6 +178,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     expect(h.raw.prepare("select invited_at from interest_signups where id = ?").get(c)).toEqual({ invited_at: null });
     await S.updateSignup(c, { status: "new" });
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await settleBackground();
     expect(mail("to_email = 'c@x.hu'")).toEqual([{ kind: "registration_invite", to_email: "c@x.hu", status: "pending" }]);
     expect(row(c)).toEqual({ status: "new", paired_with: null });
   });
@@ -186,6 +191,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     await SOLO.pairSolos(a, b, "gyor", "Győr");
     await SOLO.pairSolos(h2, z, "gyor", "Győr");
     await O.queueRegistrationInvites();
+    await settleBackground();
     await S.updateSignup(a, { status: "withdrawn" });
     expect(mail("kind = 'pair_intro'").map((m: any) => m.to_email)).toEqual(["hanna@x.hu", "zoli@x.hu"]);
     expect(mail("kind = 'registration_invite'").map((m: any) => m.to_email)).toEqual([

@@ -377,8 +377,13 @@ function InviteButton({ pending }: { pending: number }) {
               <AlertDialogTitle>Meghívók elindultak</AlertDialogTitle>
               <AlertDialogDescription>
                 {queued <= SEND_NOW_MAX
-                  ? `${queued} levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
-                  : `${queued} levél indul: az első ${SEND_NOW_MAX} most, a többi óránként, a napi limit szerint.`}
+                  ? `${queued} levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
+                  : `${queued} levél a háttérben indul: az első ${SEND_NOW_MAX} most, a többi óránként, a napi limit szerint.`}{" "}
+                Hogy hol tart, a{" "}
+                <Link to="/admin/outbox" className="underline">
+                  Kimenő levelek
+                </Link>{" "}
+                oldalon látod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -1,4 +1,4 @@
-// Walkthrough steps 26 and 27 (#28, #29): after the match of step 18, one
+// Walkthrough steps 27 and 28 (#28, #29): after the match of step 18, one
 // pair records the result (an invalid one first), the other gets the email
 // and confirms it, and it shows as played for both pairs; on the match of
 // step 19 the other pair disputes the result and the Szervező decides it on

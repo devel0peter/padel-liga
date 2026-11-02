@@ -24,7 +24,7 @@ test("10. the draft splits six pairs 3 + 3 by Elo, and a move can be undone", as
   const { context, page } = await as(browser, ORGANIZER.email);
   const groups = `${await seasonPath(page)}/groups`;
   await visit(page, groups);
-  await expect(content(page)).toContainText("6 jóváhagyott pár van.");
+  await expect(content(page)).toContainText("6 nevezett pár van.");
   await page.getByRole("button", { name: "Csoportok javaslata" }).click();
   await expect(page.getByRole("status")).toContainText("Kész a javaslat.");
 

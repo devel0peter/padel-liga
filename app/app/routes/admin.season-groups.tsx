@@ -280,7 +280,7 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
       ) : empty ? (
         <p className="py-6 text-center text-muted-foreground">
           {d.splitProblem ??
-            `${d.eligibleCount} jóváhagyott pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`}
+            `${d.eligibleCount} nevezett pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`}
         </p>
       ) : (
         d.blocker && (

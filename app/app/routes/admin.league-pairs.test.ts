@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queueSeasonEntryDecision: async (...args: any[]) => h.mails.push(args),
+  queueSeasonEntered: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
 }));
 

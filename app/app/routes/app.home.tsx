@@ -6,7 +6,7 @@ import { PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { PartnerEmailBox } from "~/components/partner-email";
-import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
+import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
@@ -89,7 +89,7 @@ export async function action({ request }: Route.ActionArgs): Promise<{ season: n
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
     throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
-  return result.ok ? { season, notice: ENTERED_NOTICE } : { season, error: result.error };
+  return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
 }
 
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {

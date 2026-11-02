@@ -4,7 +4,7 @@ import { AppPage } from "~/components/app-page";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { PartnerEmailBox } from "~/components/partner-email";
-import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
+import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { requireUser } from "~/lib/auth/session.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
@@ -97,7 +97,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
   const id = Number(form.get("season") || 0);
   if (intent !== "enter" || !Number.isInteger(id) || id <= 0) throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, id);
-  return result.ok ? { intent, notice: ENTERED_NOTICE } : { intent, error: result.error };
+  return result.ok ? { intent, notice: enteredNotice(result.joins) } : { intent, error: result.error };
 }
 
 type Overview = Route.ComponentProps["loaderData"]["overview"][number];

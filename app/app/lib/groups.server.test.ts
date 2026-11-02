@@ -11,7 +11,7 @@ vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockCl
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueGroupsPublished: async (messages: any[]) => h.mails.push(...messages),
-  queueSeasonEntryDecision: async (to: string, input: any) => h.mails.push({ kind: "decision", toEmail: to, input }),
+  queueSeasonEntered: async (to: string, input: any) => h.mails.push({ kind: "decision", toEmail: to, input }),
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -229,7 +229,7 @@ describe("first-phase groups on real SQLite", () => {
     h.raw.exec("update pairs set status = 'dissolved' where id = 10");
     expect(await G.publishGroups(1, "o", NOW)).toEqual({
       ok: false,
-      error: "A jóváhagyott párok változtak a javaslat óta. Generáld újra.",
+      error: "A nevezett párok változtak a javaslat óta. Generáld újra.",
     });
     expect(all("select count(*) n from matches")[0].n).toBe(0);
     // A new draft leaves the dissolved pair out: 9 pairs, 3+3+3.
@@ -397,21 +397,13 @@ describe("first-phase groups on real SQLite", () => {
       expect(await P.dissolvePair("o", 1, 20, NOW)).toEqual({ ok: true });
     });
 
-    it("a pair approved now joins phase 2, since phase 1 is locked", async () => {
-      addPair(20, ["kezdo", "kezdo"], { status: "pending" });
-      const id = all("select id from season_entries where pair_id = 20")[0].id;
-      expect(await E.decideEntry({ id: "o" }, 1, id, "approve", null, NOW)).toEqual({ ok: true });
-      expect(all("select joins_phase from season_entries where pair_id = 20")[0].joins_phase).toBe(2);
+    it("#153: a pair entering now joins phase 2, since phase 1 is locked", async () => {
+      addPair(20, ["kezdo", "kezdo"], { status: "withdrawn" });
+      h.raw.exec("delete from season_entries where pair_id = 20");
+      const player = { id: "p20a", email: "p20a@x.hu", name: "Játékos 20A", level: "kezdo" } as any;
+      expect(await E.applyToSeason(player, 1, NOW)).toMatchObject({ ok: true, joins: { phase: 2 } });
+      expect(all("select status, joins_phase from season_entries where pair_id = 20")[0]).toEqual({ status: "approved", joins_phase: 2 });
       expect(h.mails.filter((m) => m.kind === "decision")[0].input.joins.phase).toBe(2);
-    });
-
-    it("a pair in a published group can't be rejected", async () => {
-      const id = all("select id from season_entries where pair_id = 3")[0].id;
-      expect(await E.decideEntry({ id: "o" }, 1, id, "reject", null, NOW)).toEqual({
-        ok: false,
-        error: "Ez a pár már a kiírt csoportjában játszik, ezért most nem utasíthatod el.",
-      });
-      expect(all("select status from season_entries where pair_id = 3")[0].status).toBe("approved");
     });
   });
 });

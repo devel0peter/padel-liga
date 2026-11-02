@@ -2,23 +2,18 @@
 // D17-D19). Pure (no I/O) so every rule is unit tested; the D1 side is
 // season-entries.server.ts.
 //
-// Either player of an active pair applies while the season is open: from the
+// Either player of an active pair enters while the season is open: from the
 // day registration opens until the last phase starts. Both players need a
-// level (the starting Elo). A Szervező approves or rejects, with an optional
-// note, and can change the decision later. One entry per season and pair, so
-// a rejected pair can't apply again. A pair approved after phase 1 started
-// joins at the next phase; approved during the last phase, it moves into the
-// next season.
+// level (the starting Elo). The entry counts at once, no organizer approval
+// (#153, D60). One entry per season and pair. A pair entered after phase 1
+// started (or once its groups are out) joins at the next phase. "pending"
+// and "rejected" are left from the approval step: nothing writes them now.
 
 import { isLevel, pairElo, startingElo } from "@padel-liga/rules";
 
 import type { Season, StoredPhase } from "./seasons";
 
 export type EntryStatus = "pending" | "approved" | "rejected" | "withdrawn";
-export type Decision = "approve" | "reject";
-
-export const MAX_NOTE = 500;
-
 type Calendar = Pick<Season, "registrationOpensAt" | "registrationClosesAt" | "phases">;
 
 function lastPhase(phases: readonly StoredPhase[]): StoredPhase | undefined {
@@ -32,13 +27,13 @@ export function entryOpen(season: Calendar, now: Date): boolean {
   return !!last && now >= season.registrationOpensAt && now < last.startsAt;
 }
 
-// Applying once phase 1 has started: approved, the pair joins a later phase.
+// Entering once phase 1 has started: the pair joins a later phase.
 export function lateEntry(season: Pick<Season, "phases">, now: Date): boolean {
   const first = season.phases.reduce<StoredPhase | undefined>((a, p) => (!a || p.number < a.number ? p : a), undefined);
   return !!first && now >= first.startsAt;
 }
 
-// The phase a pair approved at `at` starts in: the first phase that hasn't
+// The phase a pair entered at `at` starts in: the first phase that hasn't
 // started yet (1 before the season starts) and whose groups aren't published
 // yet (#24: a published phase is locked), or null once there is none (it
 // moves into the next season).
@@ -47,19 +42,6 @@ export function joinsPhase(phases: readonly StoredPhase[], at: Date, published: 
     .sort((a, b) => a.number - b.number)
     .find((p) => p.startsAt > at && !published.includes(p.number));
   return next?.number ?? null;
-}
-
-// The entries a decision may change: the Szervező can flip an earlier
-// decision, but a withdrawn entry (the pair was dissolved) stays withdrawn.
-export const DECIDABLE_FROM: Record<Decision, readonly EntryStatus[]> = {
-  approve: ["pending", "rejected"],
-  reject: ["pending", "approved"],
-};
-
-export function canDecide(status: EntryStatus, decision: Decision, pairActive: boolean): boolean {
-  if (!DECIDABLE_FROM[decision].includes(status)) return false;
-  // A dissolved pair can't be approved; rejecting its leftover entry is fine.
-  return decision === "reject" || pairActive;
 }
 
 export type EntryRefusal = "no_pair" | "closed" | "entered" | "no_level" | "partner_no_level";
@@ -90,13 +72,6 @@ export function checkEntry(c: EntryCheck): EntryRefusal | null {
   return null;
 }
 
-// The organizer's optional note: trimmed, empty is none.
-export function parseNote(value: unknown): { ok: true; note: string | null } | { ok: false; error: string } {
-  const note = typeof value === "string" ? value.trim() : "";
-  if (note.length > MAX_NOTE) return { ok: false, error: `Legfeljebb ${MAX_NOTE} karakter.` };
-  return { ok: true, note: note || null };
-}
-
 // The pair's starting rating: the average of the two players' starting Elo
 // (spec section 11); null while a level is missing.
 export function averageStartingElo(a: string | null, b: string | null): number | null {
@@ -112,11 +87,11 @@ export function fromPhase(n: number): string {
 export function entryStatusText(entry: { status: EntryStatus; joinsPhase: number | null }): string {
   switch (entry.status) {
     case "pending":
-      return "Neveztetek. A szervező jóváhagyására vár.";
+      return "Neveztetek.";
     case "approved":
       return entry.joinsPhase === null
-        ? "Jóváhagyva: a következő szezontól játszotok."
-        : `Jóváhagyva: ${fromPhase(entry.joinsPhase)} játszotok.`;
+        ? "Beneveztetek: a következő szezontól játszotok."
+        : `Beneveztetek: ${fromPhase(entry.joinsPhase)} játszotok.`;
     case "rejected":
       return "A szervező nem fogadta el a nevezéseteket.";
     case "withdrawn":
@@ -148,21 +123,14 @@ export function entryView(input: {
   return { kind: "apply", late: lateEntry(input.season, input.now) };
 }
 
-// The organizer page's filter (?status=), pending by default.
-export const ENTRY_FILTERS = {
+// An entry's status on the organizer pages, in a word. "pending" is left
+// from the approval step (#153): nothing writes it now.
+export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = {
+  approved: "Nevezett",
   pending: "Függőben",
-  approved: "Jóváhagyva",
   rejected: "Elutasítva",
-} as const satisfies Partial<Record<EntryStatus, string>>;
-
-export type EntryFilter = keyof typeof ENTRY_FILTERS;
-
-export function parseEntryFilter(value: string | null): EntryFilter {
-  return value && Object.hasOwn(ENTRY_FILTERS, value) ? (value as EntryFilter) : "pending";
-}
-
-// An entry's status on the organizer pages, in a word.
-export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = { ...ENTRY_FILTERS, withdrawn: "Visszavonva" };
+  withdrawn: "Visszavonva",
+};
 
 // A pair's entry the admin tables show: in the first of the league's home
 // seasons (current before next, see homeSeasons) the pair entered, or null.

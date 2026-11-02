@@ -43,7 +43,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={d.id} className="grid gap-1 rounded-lg border p-4 text-sm">
                 <p className="text-xs text-muted-foreground">{where(d)}</p>
                 <p className="font-medium break-words">
-                  {d.a} – {d.b}
+                  {d.a} <span className="text-xs font-normal text-muted-foreground">ellen</span> {d.b}
                 </p>
                 <p className="break-words">
                   {d.recordedBy} szerint: <strong>{d.recorded}</strong>
@@ -74,7 +74,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={m.id} className="grid gap-0.5 rounded-md border p-3 text-sm">
                 <p className="text-xs text-muted-foreground">{where(m)}</p>
                 <p className="font-medium break-words">
-                  {m.a} – {m.b}
+                  {m.a} <span className="text-xs font-normal text-muted-foreground">ellen</span> {m.b}
                 </p>
                 <p className="break-words">{m.label}</p>
                 <Link to={decide(m.id)} className="inline-flex w-fit items-center gap-1 underline">

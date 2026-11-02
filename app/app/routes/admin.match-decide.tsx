@@ -75,7 +75,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
   const score = m.current?.kind === "played" ? m.current.score : null;
   return (
     <AppPage
-      title={`${m.a} – ${m.b}`}
+      title={`${m.a} ellen ${m.b}`}
       description={`${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét · határidő: ${formatDeadline(m.deadline)}`}
       back={{ to: `/admin/leagues/${slug}/disputes`, label: "Viták" }}
     >

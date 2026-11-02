@@ -235,6 +235,9 @@ export default function Privacy() {
               nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
               szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
+              Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
+              ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
+              e-mailben nem. Hogy ki és mikor tette, eltároljuk.
             </p>
             <p>
               A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a

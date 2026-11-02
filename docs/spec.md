@@ -230,7 +230,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 - Mobile-first; most usage will be from a phone link.
 - Hungarian characters everywhere (ő, ű), including email subject lines.
 - Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
-- Logs: an audit log for every match status change.
+- Logs: an audit log for every match status change. The match log (`match_events`, D68) is it; the league's Szervező and the Admin see every running-phase match with its status, activity and log on "Meccsek" (README decision log, 2026-11-02, D76).
 
 ## 17. Privacy page (Adatkezelési tájékoztató)
 A short, plain-language Hungarian page. Needed from Phase 0, since the landing page already collects personal data. Contents:

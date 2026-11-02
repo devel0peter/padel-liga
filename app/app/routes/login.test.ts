@@ -112,4 +112,45 @@ describe("code step hint (#123)", () => {
       for (const page of pages.slice(1)) expect(page).toBe(pages[0]);
     });
   }
+
+  it("stays identical after wrong codes and resends, up to the code limits", async () => {
+    run("insert into users (id, email, name) values ('u1', 'fiok@example.com', 'Fiók')");
+    run("insert into email_suppressions (email, reason) values ('visszapattant@example.com', 'bounced')");
+    const cases = ["fiok@example.com", "uj1@example.com", "uj2@example.com", "korlat@example.com", "visszapattant@example.com"];
+    // Nobody types a code that could be right: a wrong one, never sent.
+    const wrong = async (email: string) => {
+      const sent = h.codes.includes(email);
+      return post({ email, intent: "verify", code: sent ? "000000" : "123456" });
+    };
+    const steps = async (email: string) => {
+      const out: unknown[] = [await requestCode(email)];
+      out.push(await wrong(email));
+      // 5 codes per hour: 4 more resends work, the 5th is refused.
+      for (let i = 0; i < 5; i++) out.push(await post({ email, intent: "resend" }));
+      // 5 attempts per code: the 6th wrong code finds it locked.
+      for (let i = 0; i < 6; i++) out.push(await wrong(email));
+      return out;
+    };
+    const runs = [];
+    for (const email of cases) runs.push(await steps(email));
+
+    const masked = await Promise.all(
+      runs.map(async (results, i) => {
+        const pages = await Promise.all(results.map((r) => render("login", r)));
+        return JSON.stringify({ results, pages }).replaceAll(cases[i]!, "CIM");
+      }),
+    );
+    // The account's run shows each message: wrong code, new code sent, too
+    // many codes, locked.
+    expect(masked[0]).toContain("Ez nem jó kód.");
+    expect(masked[0]).toContain("Új kódot küldtünk.");
+    expect(masked[0]).toContain("Túl sok kódot kértél.");
+    expect(masked[0]).toContain("Túl sok hibás próbálkozás.");
+    for (const run of masked.slice(1)) expect(run).toBe(masked[0]);
+  });
 });
+
+async function post(fields: Record<string, string>) {
+  const body = new URLSearchParams({ returnTo: "/home", ...fields });
+  return R.action(args(new Request("http://localhost/login", { method: "POST", body })));
+}

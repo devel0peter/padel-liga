@@ -323,7 +323,7 @@ People stuck before entering get one reminder per situation, once the league's s
 - Account: Szervező
 - Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
 - Expect:
-  - Off by default. The table lists the four situations with "Most kapná", "Kiment" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
+  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
   - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
   - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
 

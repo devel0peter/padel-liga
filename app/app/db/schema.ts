@@ -64,6 +64,8 @@ export const emailMessages = sqliteTable(
         "pair_dissolved",
         "season_entry_decision",
         "groups_published",
+        "match_proposal",
+        "match_agreed_time",
         "stuck_reminder",
       ],
     }).notNull(),
@@ -366,7 +368,19 @@ export const notifications = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["new_signup", "season_entry_decision", "groups_published", "pair_intro", "test"] }).notNull(),
+    kind: text("kind", {
+      enum: [
+        "new_signup",
+        "season_entry_decision",
+        "groups_published",
+        "pair_intro",
+        "match_proposal",
+        "match_agreed_time",
+        "match_scheduled",
+        "match_declined",
+        "test",
+      ],
+    }).notNull(),
     title: text("title").notNull(),
     body: text("body").notNull(),
     // A path on this site, opened through /notifications/<id>.
@@ -635,8 +649,8 @@ export const groupPairs = sqliteTable(
 );
 
 // A match between two pairs of a group (spec section 4), created when the
-// groups are published. Minimal for now (D21): scheduling, results and the
-// other statuses come with milestone 2.
+// groups are published (D21). Its log (match_events) is the source of truth;
+// status, scheduled_at and club_id are kept in step with it for lists.
 export const matches = sqliteTable(
   "matches",
   {
@@ -653,7 +667,16 @@ export const matches = sqliteTable(
     week: integer("week").notNull(), // the scheduled week, 1–3
     // The end of the phase: its last Sunday 23:59 Budapest (spec section 5).
     deadline: integer("deadline", { mode: "timestamp" }).notNull(),
-    status: text("status", { enum: ["open"] }).notNull().default("open"),
+    // "open": not scheduled yet (a proposal or agreed time may be waiting:
+    // packages/rules schedulingState); "scheduled": a slot was accepted or an
+    // agreed time confirmed (#26). Results and the rest come with #27, #28.
+    status: text("status", { enum: ["open", "scheduled"] }).notNull().default("open"),
+    // The agreed start and the venue offered with it, once scheduled.
+    scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+    clubId: integer("club_id").references(() => clubs.id),
+    // Bumped by every step in the log, so two answers at the same moment
+    // can't both win (matches.server.ts).
+    revision: integer("revision").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -666,4 +689,37 @@ export const matches = sqliteTable(
     index("matches_pair_a_idx").on(t.pairA),
     index("matches_pair_b_idx").on(t.pairB),
   ],
+);
+
+// A match's log (spec 6.5, #26): every scheduling step with its pair, player
+// and time, kept for the walkover decision at the deadline (spec 8) and shown
+// on the match page. Append-only. Later steps (cancel and venue #27, results
+// #28, reminders #31, the organizer's overview #158) add their own kinds.
+// Personal data: who acted (user_id; set null when the account is deleted).
+export const matchEvents = sqliteTable(
+  "match_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The acting pair, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    kind: text("kind", {
+      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined"],
+    }).notNull(),
+    // A proposal's slots: JSON array of UTC instants in seconds.
+    slots: text("slots", { mode: "json" }).$type<number[]>(),
+    // The accepted slot, or the agreed time.
+    slot: integer("slot", { mode: "timestamp" }),
+    // The venue offered with a proposal or an agreed time (optional).
+    clubId: integer("club_id").references(() => clubs.id),
+    at: integer("at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("match_events_match_idx").on(t.matchId, t.id)],
 );

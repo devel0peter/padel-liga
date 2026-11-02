@@ -80,7 +80,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
    Simply rejecting is not possible.
 3. **Agreed time (README decision log, 2026-10-05):** if the pairs already agreed on a time elsewhere (Messenger, in person), either pair can record that slot directly, without the 3-slot proposal: any future time before the deadline, no lead time, no time window. Optionally with a venue. The other pair confirms it, which schedules the match as if a slot had been accepted, or declines it, which reopens the proposal process. An unconfirmed agreed time lapses when its start passes.
 4. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration).
-5. Every action is timestamped and logged. This is the evidence for walkovers.
+5. Every action is timestamped and logged. This is the evidence for walkovers. The log is shown on the match page to both pairs; how the state follows from it, the slot rules' details and the page: README decision log, 2026-11-02 (D66, D68).
 6. Either side can cancel an accepted or confirmed slot; this reopens the proposal process.
    - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal. If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
 
@@ -215,7 +215,8 @@ Only while the league has a season accepting entries (section 4), since every re
 
 **Rules for all notifications:**
 - Every notification has a one-tap action link (accept, confirm, record a time) and a shareable link ("küldd el a párodnak / ellenfélnek").
-- The home screen shows the same open items as a "Teendők" list.
+- The home screen shows the same open items as a "Teendők" list (README decision log, 2026-11-02, D67).
+- Scheduling (D68): "a proposal arrived" and "an agreed time is waiting" are instant; "a slot was accepted", a confirmed agreed time and a declined one are daily-digest items, in the app and by push until the digest email exists (#31).
 - Every notification is also kept in the app's notification list (`/notifications`), whatever the switches: unread ones first, opening one marks it read. Szervezők and Admins can switch off their own kinds (e.g. a new signup) on the profile page; a kind switched off is not stored or sent at all. Players have no per-kind switches, only the two channels.
 - **Email switch:** off, no email goes to that account's address except login codes and signup confirmations: broadcasts, pair intros, registration invites and partner notices are skipped too (Peter, 2026-10-29). Addresses without an account get everything as before. A pair intro also appears in the app for whoever has an account.
 - **Push switch:** off, no push goes to any of the account's devices. Turning it on asks this browser for permission and subscribes this device; other devices are switched on from themselves ("Bekapcsolom ezen az eszközön"). On iPhone it needs iOS 16.4+ and the site added to the home screen; the profile explains this. A player who switches email off gets instant items by push and in the app only.

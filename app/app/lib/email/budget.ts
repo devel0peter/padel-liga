@@ -22,6 +22,8 @@ export type MessageKind =
   | "pair_dissolved"
   | "season_entry_decision"
   | "groups_published"
+  | "match_proposal"
+  | "match_agreed_time"
   | "stuck_reminder";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big

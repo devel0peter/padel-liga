@@ -313,12 +313,64 @@ export function groupsPublished(input: {
       `Kész ${withArticle(input.phase)} kör csoportbeosztása (${input.season}, ${input.league}). ${input.partnerName} pároddal ${withArticle(input.group)} csoportban játszotok.`,
       `A meccseitek:\n${schedule}`,
       `Határidő: ${formatDeadline(input.deadline)}. Addig bármikor lejátszhatjátok a meccseket, de érdemes a kiírt héten.`,
-      `Belépés:`,
+      // #26 requirement 7: the link leads to the matches, each with the
+      // short scheduling guide.
+      `Az időpontot az oldalon egyeztetitek:`,
       home,
       SIGNATURE,
     ],
     [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+type MatchEmailInput = {
+  to: string;
+  // The other pair's two names ("Kiss Anna és Nagy Béla").
+  opponents: string;
+  matchId: number;
+  week: number;
+  deadline: Date;
+  venue: string | null;
+};
+
+const matchFooter = () =>
+  footer(`Azért kaptad ezt a levelet, mert a pároddal játszol a ${SITE_URL.replace("https://", "")} ligájában. Az értesítéseket a profilodban állíthatod be.`);
+
+// A proposal or counter-proposal arrived (#26, spec 13): the slots and a
+// one-tap link to answer. Names stay plain text.
+export function matchProposal(input: MatchEmailInput & { counter: boolean; slots: Date[] }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `${input.counter ? "Új időpontokat" : "Időpontokat"} ajánlottak a meccsetekre – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre:\n${input.slots.map((s) => formatDeadline(s)).join("\n")}`,
+      input.venue ? `Helyszín: ${input.venue}` : null,
+      `Válassz egyet, vagy ajánlj másikat (határidő: ${formatDeadline(input.deadline)}):`,
+      link,
+      SIGNATURE,
+    ].filter((p): p is string => p !== null),
+    [link],
+    matchFooter(),
+  );
+}
+
+// An agreed time waits for confirmation (#26, spec 6.3 and 13).
+export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `Erősítsd meg a meccs időpontját – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} rögzítette a ${input.week}. heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
+      input.venue ? `Helyszín: ${input.venue}` : null,
+      `Erősítsd meg, vagy jelezd, ha nem így beszéltétek:`,
+      link,
+      SIGNATURE,
+    ].filter((p): p is string => p !== null),
+    [link],
+    matchFooter(),
   );
 }
 

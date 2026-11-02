@@ -64,6 +64,8 @@ export const emailMessages = sqliteTable(
         "pair_dissolved",
         "season_entry_decision",
         "groups_published",
+        "match_proposal",
+        "match_agreed_time",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),

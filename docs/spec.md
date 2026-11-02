@@ -137,6 +137,9 @@ Set and game difference are counted over all of the pair's matches in the group 
 When 3 or more pairs are tied, apply steps 3–5 in order. As soon as a step separates one or more pairs and only 2 are still tied with each other, go back to step 2 (head-to-head) for those 2.
 Example: A beat B, B beat C, C beat A, so all have 2 wins. A has the best set difference and is 1st. B and C are still tied, and B beat C, so B is 2nd.
 
+Pairs still equal after every step (head-to-head undecided or unplayed, same set and game difference, same Elo) keep their seed order in the group (strongest first), so the order is always strict (README decision log, 2026-11-02, D61).
+A withdrawn pair (section 4) is left out of the table with all of its matches; unplayed matches (section 8) give no points and count in neither difference.
+
 
 ## 10. Promotion and relegation
 - At the end of a phase, 1st place moves up a group and last place (4th, or 3rd in a group of 3) moves down. The top group has no promotion and the bottom group has no relegation.

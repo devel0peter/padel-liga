@@ -218,13 +218,6 @@
       "when": 1793644391865,
       "tag": "0030_match_scheduling",
       "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "6",
-      "when": 1793649451749,
-      "tag": "0031_match_results",
-      "breakpoints": true
     }
   ]
 }

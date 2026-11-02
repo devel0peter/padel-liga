@@ -64,12 +64,14 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
   const email = normalizeEmail(input);
   if (!isValidEmail(email)) return { ok: false, error: "Ez nem tűnik e-mail-címnek." };
   // Any address may log in; a new one gets an account at its first login
-  // (#113). The bot check (login route) and the code limits stay. No code and
+  // (#113). The bot check (login route) and the code limits stay. No email and
   // no error when the address may not get one (mayEmailCode): an error would
-  // tell anyone which addresses have an account.
-  // A deleted account's placeholder address (#152) never gets one either.
+  // tell anyone which addresses have an account. Such an address still gets a
+  // code row (a code nobody knows) under the same limits, so a wrong code,
+  // a locked code and "too many codes" read the same as for a sent one (#123).
+  // A deleted account's placeholder address (#152) is never emailed either.
   const now = new Date();
-  if (isAnonymizedEmail(email) || !(await mayEmailCode(email, now))) return { ok: true, email };
+  const mayEmail = !isAnonymizedEmail(email) && (await mayEmailCode(email, now));
 
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
   const decision = codeSendDecision(existing ?? null, now);
@@ -84,7 +86,7 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
     sentInWindow: decision.sentInWindow,
   };
   await db.insert(loginCodes).values({ email, ...row }).onConflictDoUpdate({ target: loginCodes.email, set: row });
-  await queueLoginCode(email, code);
+  if (mayEmail) await queueLoginCode(email, code);
   return { ok: true, email };
 }
 

@@ -10,7 +10,7 @@ import { sendLoginCode, verifyLoginCode } from "~/lib/auth/login-code.server";
 import { loginEmailParam, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
 import { formSignupPairs } from "~/lib/signup-partners.server";
-import { SITE_NAME } from "~/lib/site";
+import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
 // Login and registration (/register) are the same flow: the first login of
@@ -25,6 +25,7 @@ const WORDS = {
     title: "Belépés",
     intro: "Nincs jelszó: lépj be Google-lel, vagy kérj egy belépőkódot",
     google: "Belépés Google-lel",
+    googleHint: "lépj be Google-lel",
     verify: "Belépek",
     other: { text: "Még nincs fiókod?", link: "Regisztráció", to: "/register" },
   },
@@ -32,6 +33,7 @@ const WORDS = {
     title: "Regisztráció",
     intro: "Nincs jelszó: regisztrálj Google-lel, vagy kérj egy kódot",
     google: "Regisztráció Google-lel",
+    googleHint: "regisztrálj Google-lel",
     verify: "Tovább",
     other: { text: "Már van fiókod?", link: "Belépés", to: "/login" },
   },
@@ -138,11 +140,26 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
             </Button>
           </div>
         </Form>
+        {/* The same for every address (#123): a code to a new address may be
+            skipped (bounced, daily cap), and the page must not tell which. */}
         <p className="text-sm text-muted-foreground">
-          Nem jött meg? Nézd meg a spam mappát is, vagy{" "}
+          Nem jött meg? Nézd meg a spam mappát is,{" "}
           <Link to={`${self}?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
             adj meg másik címet
           </Link>
+          ,{" "}
+          {google && (
+            <>
+              <a href={`/auth/google?returnTo=${encodeURIComponent(returnTo)}`} className="underline">
+                {words.googleHint}
+              </a>
+              ,{" "}
+            </>
+          )}
+          vagy írj nekünk:{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+            {CONTACT_EMAIL}
+          </a>
           .
         </p>
       </AuthPage>

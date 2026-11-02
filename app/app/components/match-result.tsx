@@ -115,7 +115,7 @@ export function ResultSection({ m, feedback }: { m: View; feedback: Feedback }) 
                 Megerősítem
               </Button>
             </Form>
-            <FormFeedback result={feedback} intent="result-confirm" />
+            {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-confirm" />}
           </CardContent>
         </Card>
       )}
@@ -134,7 +134,7 @@ export function ResultSection({ m, feedback }: { m: View; feedback: Feedback }) 
                 <Label htmlFor="dispute-note">Megjegyzés a szervezőnek (nem kötelező)</Label>
                 <Textarea id="dispute-note" name="note" maxLength={NOTE_MAX} rows={2} />
               </div>
-              <FormFeedback result={feedback} intent="result-dispute" />
+              {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-dispute" />}
               <div>
                 <Button type="submit" variant="outline" disabled={busy}>
                   Vitatom az eredményt

@@ -241,7 +241,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Notifications: the in-app list, the email and push choices, and each device's push subscription (the browser's push address; the push itself goes encrypted through the browser maker's push service: Google, Apple, Mozilla, Microsoft).
 - **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
 - **Who sees what:**
-  - Public: names, results, standings and ratings.
+  - Public: names, results, standings and ratings. Names and the group tables are public from the day the groups are published (the league page, section 14; README decision log, 2026-11-02, #30), results and ratings once the league has started.
   - Never public: email and phone number.
   - Phone number: only the current round's opponents see it (section 3).
 - **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).

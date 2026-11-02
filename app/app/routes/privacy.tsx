@@ -153,8 +153,9 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a liga indulása után): a neved, az
-                eredményeitek, a tabella és az értékszámok.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
+                és a csoportod tabellája a ligaoldalon; a liga indulása után az
+                eredményeitek és az értékszámok is.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a

@@ -1,4 +1,4 @@
-// Párok's rows, search and entry filter (#148, D62). Pure (no I/O) so every
+// Párok's rows, search and entry filter (#148, D64). Pure (no I/O) so every
 // rule is unit tested. A row is a pair of the league, or a registered player
 // without an active pair in it ("Nincs párja"). The filter and the search
 // live in the address (?entry=, ?q=), so a reload or a shared link shows the

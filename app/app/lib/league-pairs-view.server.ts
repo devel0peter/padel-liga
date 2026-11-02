@@ -8,7 +8,7 @@ import { filterPairsRows, PAIRS_FILTERS, rowAccounts, type PairsQuery, type Pair
 import { leaguePairs, pairCandidates, type LeaguePairRow } from "./pairs.server";
 import { leagueSeekers } from "./partner-search.server";
 
-// Párok's rows in D1 (#148, D62): every pair of the league, then every
+// Párok's rows in D1 (#148, D64): every pair of the league, then every
 // registered player without an active pair in it, with whether their "Párt
 // keresek" switch is on (D59). Names and levels only on the page; the
 // addresses are read only for the broadcast page ("Levél nekik").

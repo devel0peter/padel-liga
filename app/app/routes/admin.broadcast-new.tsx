@@ -42,7 +42,7 @@ const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
-  // "Levél nekik" on Párok (#148, D62): the players of the rows it shows.
+  // "Levél nekik" on Párok (#148, D64): the players of the rows it shows.
   if (params.has("pairs")) return pairsAudience(params);
   const filters = parseFilters(params);
   const stage = params.has("stage") ? parseStage(params) : null;

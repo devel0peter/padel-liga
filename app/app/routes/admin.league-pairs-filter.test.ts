@@ -1,4 +1,4 @@
-// Párok's search, entry filter and "Levél nekik" (#148, D62) on a real
+// Párok's search, entry filter and "Levél nekik" (#148, D64) on a real
 // SQLite (~/test/sqlite), with the real session lookup. Email sending is
 // stubbed: nothing leaves the process, and the broadcast page only lists the
 // recipients (nothing is sent from Párok).

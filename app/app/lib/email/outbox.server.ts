@@ -29,6 +29,8 @@ import {
   broadcastEmail,
   groupsPublished,
   loginCode,
+  matchAgreedTime,
+  matchProposal,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -215,6 +217,29 @@ export async function queueGroupsPublished(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, ...groupsPublished(m.input) }));
+  await deliverNow(await enqueue(queued));
+}
+
+// A scheduling step the other pair must answer (#26, spec 13): a proposal or
+// an agreed time, sent at once to each of its players. Unsubscribed or
+// bounced addresses, and players who switched email off (#115), get nothing;
+// the in-app list and push still have it.
+export async function queueMatchEmails(
+  messages: (
+    | { kind: "match_proposal"; toEmail: string; input: Parameters<typeof matchProposal>[0] }
+    | { kind: "match_agreed_time"; toEmail: string; input: Parameters<typeof matchAgreedTime>[0] }
+  )[],
+): Promise<void> {
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map(
+      (m): NewMessage => ({
+        kind: m.kind,
+        toEmail: m.toEmail,
+        ...(m.kind === "match_proposal" ? matchProposal(m.input) : matchAgreedTime(m.input)),
+      }),
+    );
   await deliverNow(await enqueue(queued));
 }
 

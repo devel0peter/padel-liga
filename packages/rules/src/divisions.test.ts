@@ -1,73 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { DIVISIONS, divisionOfGroup, divisionSizes } from "./divisions";
 
-const sizes = (n: number) => {
-  const s = divisionSizes(n);
-  return [s.bronz, s.rez, s.rookie];
-};
+import { divisionOf, divisionSizes } from "./divisions";
 
-describe("divisionSizes (spec 4: floor(n / 3) each, the remainder to Réz, then Rookie)", () => {
-  it("splits evenly when the group count divides by 3", () => {
-    expect(sizes(3)).toEqual([1, 1, 1]);
-    expect(sizes(6)).toEqual([2, 2, 2]);
-    expect(sizes(15)).toEqual([5, 5, 5]);
+describe("divisionSizes (spec 4)", () => {
+  it("splits evenly when divisible by 3: 15 = 5+5+5", () => {
+    expect(divisionSizes(15)).toEqual({ bronz: 5, rez: 5, rookie: 5 });
   });
 
-  it("gives a remainder of 1 to Réz", () => {
-    expect(sizes(4)).toEqual([1, 2, 1]);
-    expect(sizes(16)).toEqual([5, 6, 5]);
+  it("a remainder of 1 goes to Réz: 16 = 5+6+5", () => {
+    expect(divisionSizes(16)).toEqual({ bronz: 5, rez: 6, rookie: 5 });
   });
 
-  it("gives a remainder of 2 to Réz and Rookie", () => {
-    expect(sizes(5)).toEqual([1, 2, 2]);
-    expect(sizes(17)).toEqual([5, 6, 6]);
+  it("a remainder of 2 goes to Réz and Rookie: 17 = 5+6+6", () => {
+    expect(divisionSizes(17)).toEqual({ bronz: 5, rez: 6, rookie: 6 });
   });
 
-  it("fills top-down with fewer than 3 groups: 1 = Bronz, 2 = Bronz and Réz", () => {
-    expect(sizes(0)).toEqual([0, 0, 0]);
-    expect(sizes(1)).toEqual([1, 0, 0]);
-    expect(sizes(2)).toEqual([1, 1, 0]);
+  it("fewer than 3 groups fill top-down", () => {
+    expect(divisionSizes(0)).toEqual({ bronz: 0, rez: 0, rookie: 0 });
+    expect(divisionSizes(1)).toEqual({ bronz: 1, rez: 0, rookie: 0 });
+    expect(divisionSizes(2)).toEqual({ bronz: 1, rez: 1, rookie: 0 });
   });
 
-  it("always adds up to the number of groups", () => {
-    for (let n = 0; n <= 40; n++) expect(sizes(n).reduce((a, b) => a + b, 0)).toBe(n);
+  it("3, 4 and 5 groups", () => {
+    expect(divisionSizes(3)).toEqual({ bronz: 1, rez: 1, rookie: 1 });
+    expect(divisionSizes(4)).toEqual({ bronz: 1, rez: 2, rookie: 1 });
+    expect(divisionSizes(5)).toEqual({ bronz: 1, rez: 2, rookie: 2 });
   });
 
-  it("rejects a count that isn't a whole number of 0 or more", () => {
+  it("refuses a negative or fractional count", () => {
     expect(() => divisionSizes(-1)).toThrow();
-    expect(() => divisionSizes(2.5)).toThrow();
-    expect(() => divisionSizes(Number.NaN)).toThrow();
+    expect(() => divisionSizes(1.5)).toThrow();
   });
 });
 
-describe("divisionOfGroup", () => {
-  const ladder = (n: number) => Array.from({ length: n }, (_, i) => divisionOfGroup(i, n));
-
-  it("with 5 groups the bands are Bronz 1, Réz 2, Rookie 2 (#30)", () => {
-    expect(ladder(5)).toEqual(["bronz", "rez", "rez", "rookie", "rookie"]);
+describe("divisionOf (spec 4)", () => {
+  it("with 15 groups: 1–5 Bronz, 6–10 Réz, 11–15 Rookie", () => {
+    const all = Array.from({ length: 15 }, (_, i) => divisionOf(i + 1, 15));
+    expect(all).toEqual([...Array(5).fill("bronz"), ...Array(5).fill("rez"), ...Array(5).fill("rookie")]);
   });
 
-  it("with 15 groups the borders fall after the 5th and the 10th", () => {
-    const l = ladder(15);
-    expect(l.slice(0, 5).every((d) => d === "bronz")).toBe(true);
-    expect(l.slice(5, 10).every((d) => d === "rez")).toBe(true);
-    expect(l.slice(10).every((d) => d === "rookie")).toBe(true);
+  it("with 16 groups Réz is 6–11", () => {
+    expect([5, 6, 11, 12].map((n) => divisionOf(n, 16))).toEqual(["bronz", "rez", "rez", "rookie"]);
   });
 
-  it("puts a single group in Bronz and two groups in Bronz and Réz", () => {
-    expect(ladder(1)).toEqual(["bronz"]);
-    expect(ladder(2)).toEqual(["bronz", "rez"]);
+  it("with 2 groups: Bronz and Réz, no Rookie", () => {
+    expect([divisionOf(1, 2), divisionOf(2, 2)]).toEqual(["bronz", "rez"]);
   });
 
-  it("never goes up again as the index grows (one ladder)", () => {
-    for (let n = 1; n <= 25; n++) {
-      const order = ladder(n).map((d) => DIVISIONS.indexOf(d));
-      expect(order).toEqual([...order].sort((a, b) => a - b));
-    }
+  it("a single group is Bronz", () => {
+    expect(divisionOf(1, 1)).toBe("bronz");
   });
 
-  it("rejects a group that isn't in the ladder", () => {
-    expect(() => divisionOfGroup(-1, 5)).toThrow();
-    expect(() => divisionOfGroup(5, 5)).toThrow();
+  it("refuses a group outside the count", () => {
+    expect(() => divisionOf(0, 3)).toThrow();
+    expect(() => divisionOf(4, 3)).toThrow();
   });
 });

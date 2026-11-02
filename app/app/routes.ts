@@ -25,6 +25,7 @@ export default [
     route("pair", "routes/pair.tsx"),
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
+    route("matches/:id", "routes/match.tsx"),
     layout("routes/admin.tsx", [
       route("admin", "routes/admin._index.tsx"),
       route("admin/signups", "routes/admin.signups.tsx"),

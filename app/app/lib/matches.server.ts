@@ -68,7 +68,7 @@ const toPlayers = (r: PairPlayerRow): [Person, Person] => [
 ];
 
 // The pairs of these groups with their players, by group, in seed order.
-async function groupMembers(groupIds: number[]): Promise<Map<number, PairPlayers[]>> {
+export async function groupMembers(groupIds: number[]): Promise<Map<number, PairPlayers[]>> {
   const out = new Map<number, PairPlayers[]>();
   if (groupIds.length === 0) return out;
   const rows = await db
@@ -86,7 +86,7 @@ async function groupMembers(groupIds: number[]): Promise<Map<number, PairPlayers
   return out;
 }
 
-type StoredEvent = {
+export type StoredEvent = {
   id: number;
   matchId: number;
   pairId: number;
@@ -99,7 +99,7 @@ type StoredEvent = {
   at: Date;
 };
 
-async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEvent[]>> {
+export async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEvent[]>> {
   const out = new Map<number, StoredEvent[]>();
   if (matchIds.length === 0) return out;
   const rows = await db
@@ -124,7 +124,7 @@ async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEvent[]>>
   return out;
 }
 
-const toSchedulingEvent = (e: StoredEvent, pairA: number): SchedulingEvent => ({
+export const toSchedulingEvent = (e: StoredEvent, pairA: number): SchedulingEvent => ({
   kind: e.kind,
   side: e.pairId === pairA ? "a" : "b",
   at: e.at,
@@ -133,7 +133,7 @@ const toSchedulingEvent = (e: StoredEvent, pairA: number): SchedulingEvent => ({
   clubId: e.clubId,
 });
 
-async function clubNames(ids: (number | null | undefined)[]): Promise<Map<number, string>> {
+export async function clubNames(ids: (number | null | undefined)[]): Promise<Map<number, string>> {
   const wanted = [...new Set(ids.filter((id): id is number => typeof id === "number"))];
   if (wanted.length === 0) return new Map();
   const rows = await db.select({ id: clubs.id, name: clubs.name }).from(clubs).where(inArray(clubs.id, wanted));
@@ -141,7 +141,7 @@ async function clubNames(ids: (number | null | undefined)[]): Promise<Map<number
 }
 
 // How many published groups the phase has, for the division (spec 4).
-async function groupCount(seasonId: number, phase: number): Promise<number> {
+export async function groupCount(seasonId: number, phase: number): Promise<number> {
   const [row] = await db
     .select({ n: count() })
     .from(groups)
@@ -319,7 +319,7 @@ export function sideOf(ctx: MatchContext, userId: string): Side | null {
   return null;
 }
 
-const stateOf = (ctx: MatchContext, now: Date) =>
+export const stateOf = (ctx: MatchContext, now: Date) =>
   schedulingState(ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)), now);
 
 export type MatchPage = {

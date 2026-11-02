@@ -1,9 +1,9 @@
-// Walkthrough steps 23 and 24 (#28, #29): after the match of step 18, one
+// Walkthrough steps 24 and 25 (#28, #29): after the match of step 18, one
 // pair records the result (an invalid one first), the other gets the email
 // and confirms it, and it shows as played for both pairs; on the match of
 // step 19 the other pair disputes the result and the Szervező decides it on
 // Viták, with a reason in the log.
-// Runs after 16-public-ladder, which expects every pair still at zero.
+// Runs after 16-public-ladder (every pair still at zero) and 17-match-overview.
 import { expect, test, type Page } from "@playwright/test";
 
 import { ORGANIZER, PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";

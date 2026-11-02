@@ -164,21 +164,25 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>A telefonszámodat</strong> csak azok látják, akikkel az
-                aktuális körben meccsed van, hogy egyeztetni tudjatok. Más
-                játékos nem látja, és a szervezői felületeken sem jelenik meg. A
-                csoportok kihirdetése után az ellenfeleid a Kezdőlapjukon és a
-                meccs oldalán látják, a kör határidejéig; utána már nem.
+                aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
+                ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
+                elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése
+                után az ellenfeleid a Kezdőlapjukon és a meccs oldalán, a
+                szervező és az admin a meccsek szervezői oldalán látja, a kör
+                határidejéig; utána már nem.
               </li>
               <li>
                 <strong>Az időpont-egyeztetést és az eredményt</strong> (ki,
                 mikor, milyen időpontot ajánlott, fogadott el vagy erősített meg;
                 ki rögzítette, erősítette meg vagy vitatta az eredményt, a
                 vitához írt megjegyzéssel együtt) a meccs két párja látja a meccs
-                oldalán. Megőrizzük, mert a határidőig le nem játszott meccsekről
-                és a vitás eredményekről ez alapján döntünk. A ligád szervezője
-                is látja (a nevekkel, telefonszám és e-mail-cím nélkül), és ha
-                dönt egy meccsről, a döntése a nevével, idejével és indoklásával
-                bekerül a naplóba, amit mindkét pár lát.
+                oldalán, és a liga szervezője meg az oldal adminja is (a
+                nevekkel, telefonszám és e-mail-cím nélkül), hogy lássák, melyik
+                meccs akadt el, és dönthessenek a vitás eredményekről.
+                Megőrizzük, mert a határidőig le nem játszott meccsekről ez
+                alapján dönt a rendszer, a vitás eredményekről pedig a szervező.
+                Ha a szervező dönt egy meccsről, a döntése a nevével, idejével és
+                indoklásával bekerül a naplóba, amit mindkét pár lát.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem

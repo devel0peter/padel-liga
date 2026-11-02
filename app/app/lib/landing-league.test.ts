@@ -214,6 +214,19 @@ describe("landingByCity", () => {
     );
     expect(m.get("gyor")!.title).toBe("Nyitva a nevezés");
   });
+
+  it("links the league's public page (#30) when the league has a slug", () => {
+    const m = landingByCity(
+      [
+        { id: 1, city: "gyor", slug: "gyor-liga" },
+        { id: 2, city: "pecs" },
+      ],
+      [{ ...FIRST, leagueId: 1 }],
+      now,
+    );
+    expect(m.get("gyor")!.ladderPath).toBe("/league/gyor-liga");
+    expect(m.get("pecs")!.ladderPath).toBeUndefined();
+  });
 });
 
 describe("landing chip and register button", () => {

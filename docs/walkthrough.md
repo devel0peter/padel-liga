@@ -316,7 +316,39 @@ A player without a pair sends their own link; the partner registers and accepts 
   - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
   - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
 
-### 20. Szervező checks the automatic reminders (side path)
+### 20. Admin filters the Felhasználók list (side path)
+
+- Page: `/admin/users` as the Admin
+- Do: pick "Pár és nevezés" → "Nincs párja", then type a name in the search box, then press "Szűrők törlése".
+- Expect:
+  - Only accounts with the "Nincs párja" chip are listed; each option shows a count that matches the rows it would give with the other filters and the search.
+  - The description says "N fiók (összesen M)" while anything is set; the address holds `?pair=none` (and `q=`), so a reload or a shared link shows the same list.
+  - "Szűrők törlése" shows every account again. At 390 px the email and role sit under the name and no column is cut off.
+
+### 21. A player's level locks after the first season (side path)
+
+- Page: `/profile` as a player of a published group (step 11, for example the first pair's first player), then as a player without a group (step 15)
+- Do: open Profil; open the "i" next to "Értékszámod"; as the second player change "Szinted" and press "Mentés".
+- Expect:
+  - The player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
+  - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
+  - The player without a group can change the level, and the number follows.
+
+### 22. A visitor looks at the league page (public)
+
+The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
+
+- Page: `/`, then `/league/minta`
+- Account: none (logged out)
+- Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
+- Expect:
+  - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
+  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero, and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
+  - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
+  - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
+  - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
+
+### 23. Szervező checks the automatic reminders (side path)
 
 People stuck before entering get one reminder per situation, once the league's switch is on (#155).
 

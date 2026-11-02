@@ -43,6 +43,14 @@ export function formatDay(day: string): string {
   return shortDay.format(new Date(`${day}T00:00:00Z`));
 }
 
+const slotDay = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric", weekday: "long" });
+const slotTime = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false });
+
+// "nov. 10., kedd 18:30" (24-hour, Budapest time)
+export function formatSlot(date: Date): string {
+  return `${slotDay.format(date)} ${slotTime.format(date)}`;
+}
+
 const shortDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric" });
 
 // "okt. 1."

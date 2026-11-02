@@ -5,6 +5,7 @@ export default [
   index("routes/home.tsx"),
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  route("league/:league", "routes/league.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),

@@ -82,7 +82,7 @@ export default function Privacy() {
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
                 állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
-                alap), és amiből az induló értékszámod lesz,
+                alap), és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
@@ -162,8 +162,9 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a liga indulása után): a neved, az
-                eredményeitek, a tabella és az értékszámok.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
+                és a csoportod tabellája a ligaoldalon; a liga indulása után az
+                eredményeitek és az értékszámok is.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a

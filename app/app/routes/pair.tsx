@@ -108,7 +108,7 @@ function Entries({ entries }: { entries: Entry[] }) {
     <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle className="font-display text-lg">Nevezés</CardTitle>
-        <CardDescription>Elég, ha egyikőtök nevez. A szervező döntését itt látjátok.</CardDescription>
+        <CardDescription>Elég, ha egyikőtök nevez: a nevezés azonnal érvényes, mindkettőtöknek.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
         {entries.map((e) => (

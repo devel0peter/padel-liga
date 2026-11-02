@@ -3,4 +3,6 @@ export * from "./calendar";
 export * from "./elo";
 export * from "./fixtures";
 export * from "./groups";
+export * from "./results";
 export * from "./seeding";
+export * from "./standings";

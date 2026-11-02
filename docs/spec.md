@@ -223,7 +223,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 ## 16. Non-functional requirements
 - Mobile-first; most usage will be from a phone link.
 - Hungarian characters everywhere (ő, ű), including email subject lines.
-- Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
+- Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger (README decision log, 2026-11-02, D60): one SQL file of the whole database per day in a private EU bucket, the newest 35 kept, restore steps in the README ("Backups").
 - Logs: an audit log for every match status change.
 
 ## 17. Privacy page (Adatkezelési tájékoztató)

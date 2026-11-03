@@ -55,11 +55,11 @@ describe("stuckReminder", () => {
 
   it("C: send the pair link, or switch on Párt keresek", () => {
     const input = { ...base, situation: "C" as const, partner: "Béla", pairLink: "https://padelparbaj.hu/pair/join/tok" };
-    expect(stuckReminder(input, UNSUB).subject).toBe("Küldd el a párlinkedet – Padelpárbaj");
+    expect(stuckReminder(input, UNSUB).subject).toBe("Hívd meg a párodat – Padelpárbaj");
     expect(body(input)).toBe(
       [
         "Szia Anna!",
-        "Még nincs párod (Padelpárbaj Győr). Küldd el a párlinkedet a párodnak: ha megnyitja és regisztrál, párban vagytok, és nevezhettek.",
+        "Még nincs párod (Padelpárbaj Győr). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.",
         "https://padelparbaj.hu/pair/join/tok",
         "Béla még nem regisztrált: neki is küldd el.",
         "Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:",

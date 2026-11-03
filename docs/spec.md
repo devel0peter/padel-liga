@@ -10,7 +10,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 |---|---|
 | Visitor | See the landing page, rules and public standings |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
-| Organizer ("Szervező") | Per league: create and configure seasons, approve pairs, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
+| Organizer ("Szervező") | Per league: create and configure seasons, enter or take out a pair, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
 | Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users (Peter) |
 
 Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).

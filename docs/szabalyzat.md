@@ -8,7 +8,7 @@
 - Az időpontot az oldalon egyeztetitek. A kör végéig minden meccset le kell játszani.
 - 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
-- A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a három divízió győztese díjat kap.
+- A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a divíziók győztesei díjat kapnak.
 
 A részleteket lent találod.
 
@@ -41,7 +41,7 @@ A részleteket lent találod.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod:
-  - küldd el a párlinkedet (Kezdőlap vagy Párom) annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
+  - a „Hívd meg a párodat” kártyán (Kezdőlap vagy Párom) másold ki a meghívó linkedet, és küldd el annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
   - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Csak az aktuális kör ellenfelei látják, nyilvánosan soha nem jelenik meg.
@@ -53,7 +53,7 @@ A részleteket lent találod.
   - A helyettes értékszáma változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja.
-- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, és ki is vehet a szezonból, de kör közben nem.
+- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket bármikor (kör közben is: a következő kör elején kapcsolódtok be), és ki is vehet a szezonból, de kör közben kivenni nem tud.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
@@ -151,7 +151,7 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Egy szezon 4 körből, vagyis 12 hétből áll. Utána 1–2 hét szünet jön, és indul a következő szezon.
 - A szezon végeredménye: az utolsó kör csoportja és helyezése.
 - **Díjak:** az utolsó kör tabellája dönt, a feljutás és a kiesés előtt.
-  - Díjat a három **divíziógyőztes** kap: a Bronz, a Réz és a Rookie divízió legfelső csoportjának első helyezettje. Páronként egy díj jár. A többi csoportgyőztes nem kap díjat.
+  - Díjat minden **divíziógyőztes** kap: az egyes divíziók (Bronz, Réz, Rookie) legfelső csoportjának első helyezettje. Háromnál kevesebb csoportnál kevesebb divízió van (1 csoportnál csak a Bronz, 2 csoportnál a Bronz és a Réz), így annyi díj jár, ahány divízió van. Páronként egy díj jár. A többi csoportgyőztes nem kap díjat.
   - Díjat az a pár kaphat, amelynek mindkét tagja legalább 2 körben játszott a szezonban (akár más-más párral; helyettesként nem számít).
   - Ha a divízió legfelső csoportját nem jogosult pár nyeri, az eredmény és a feljutás marad, a díjat pedig a csoport legjobb helyezett jogosult párja kapja. Ha nincs ilyen pár, a díj elmarad.
   - A díjakat és a felajánlókat szezononként az oldalon hirdetjük meg. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.

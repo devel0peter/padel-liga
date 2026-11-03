@@ -20,6 +20,9 @@ export function formatDateTime(date: Date): string {
 const percent = new Intl.NumberFormat("hu-HU", { style: "percent", maximumFractionDigits: 1 });
 
 // 0.125 -> "12,5%"
+/** A set or game difference with its sign: "+3", "−2", "0" (a real minus). */
+export const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
+
 export function formatPercent(ratio: number): string {
   return percent.format(ratio);
 }

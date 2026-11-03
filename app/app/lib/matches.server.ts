@@ -37,9 +37,11 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import { eventText, schedulingEmailDue } from "./matches";
 import { pairName } from "./groups";
 import { COURT_MAX } from "./matches";
+import { groupTable } from "./ladder";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
+import { averageStartingElo } from "./season-entries";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
@@ -47,7 +49,8 @@ import { decisionText, resultEventText } from "./results";
 // opponents (spec 3), email addresses never (they go to the outbox).
 
 export type Person = { id: string; name: string; email: string; phone: string | null };
-export type PairPlayers = { pairId: number; seed: number; players: [Person, Person] };
+// `elo`: the pair's rating, the last tiebreak of the table (D20).
+export type PairPlayers = { pairId: number; seed: number; elo: number; players: [Person, Person] };
 
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
@@ -58,6 +61,8 @@ const pairPlayerColumns = {
   aName: playerA.name,
   aEmail: playerA.email,
   aPhone: playerA.phone,
+  aLevel: playerA.level,
+  bLevel: playerB.level,
   bId: playerB.id,
   bName: playerB.name,
   bEmail: playerB.email,
@@ -85,7 +90,7 @@ export async function groupMembers(groupIds: number[]): Promise<Map<number, Pair
     .orderBy(asc(groupPairs.groupId), asc(groupPairs.seed));
   for (const r of rows) {
     const list = out.get(r.groupId) ?? out.set(r.groupId, []).get(r.groupId)!;
-    list.push({ pairId: r.pairId, seed: r.seed, players: toPlayers(r) });
+    list.push({ pairId: r.pairId, seed: r.seed, elo: averageStartingElo(r.aLevel, r.bLevel) ?? 0, players: toPlayers(r) });
   }
   return out;
 }
@@ -182,8 +187,10 @@ export type HomeGroup = {
   groupCount: number;
   phaseStartsAt: Date;
   deadline: Date;
-  // Every pair of the group by seed, names only; `mine` marks the player's.
-  pairs: { pairId: number; name: string; mine: boolean }[];
+  // Every pair of the group in table order (#201), names only; `mine` marks
+  // the player's. The table is the public league page's, from final results
+  // only; before any result it is the seed order (every `matches` is 0).
+  pairs: { pairId: number; name: string; mine: boolean; rank: number; matches: number; points: number; setDiff: number; gameDiff: number }[];
   matches: HomeMatch[];
 };
 
@@ -245,7 +252,15 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
         groupCount: await groupCount(g.seasonId, g.phase),
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
-        pairs: pairsOf.map((p) => ({ pairId: p.pairId, name: pairName(p.players), mine: p.pairId === g.pairId })),
+        pairs: groupTable(
+          pairsOf.map((p) => ({ id: p.pairId, elo: p.elo })),
+          // Only a final outcome counts (#186, #201): a waiting or disputed
+          // result has none on the match yet.
+          matchRows.filter((m) => m.groupId === g.groupId).map((m) => ({ a: m.pairA, b: m.pairB, outcome: m.status === "final" ? m.outcome : null })),
+        ).map((row) => {
+          const p = byId.get(row.pairId)!;
+          return { ...row, name: pairName(p.players), mine: p.pairId === g.pairId };
+        }),
         matches: own.map((m) => {
           const side: Side = m.pairA === g.pairId ? "a" : "b";
           const them = byId.get(side === "a" ? m.pairB : m.pairA);

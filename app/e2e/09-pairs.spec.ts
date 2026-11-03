@@ -75,10 +75,15 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await confirm("Benevezés", /Benevezed/, "Benevezés");
   await expect(fresh).toContainText(/Nevezés \(.+\): Nevezett/);
 
-  // A pair that plays in the running round can't be taken out: the reason shows.
+  // A pair that plays in the running round: taking it out is a mid-round
+  // withdrawal, which needs a reason (#34; done in 21-withdrawal). Cancelled
+  // here, it stays entered.
   await locked.getByRole("button", { name: "Kivétel a szezonból" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Kivétel", exact: true }).click();
-  await expect(locked.getByRole("alert")).toContainText("a futó kör csoportjában játszik");
+  const withdraw = page.getByRole("dialog");
+  await expect(withdraw).toContainText("Visszaléptetés kör közben");
+  await expect(withdraw.getByRole("button", { name: "Visszaléptetés" })).toBeDisabled();
+  await withdraw.getByRole("button", { name: "Mégse" }).click();
+  await expect(withdraw).toHaveCount(0);
   await expect(locked).toContainText(/Nevezés \(.+\): Nevezett/);
   await expect(content(page)).not.toContainText("@example.test");
 

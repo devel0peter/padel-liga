@@ -47,11 +47,12 @@ export type DeletionFacts = { history: Set<string>; playing: Set<string> };
 
 const CHANGED = "Közben változott valami. Frissítsd az oldalt, és próbáld újra.";
 
-// A pair of the user `u` is in a published group; with `now`, one whose
-// phase hasn't reached its deadline yet.
+// A pair of the user `u` is in a published group (history, also after a
+// withdrawal); with `now`, one whose phase hasn't reached its deadline yet
+// and that the pair wasn't withdrawn from (#34).
 function inPublishedGroup(u: SQLWrapper | string, now?: Date) {
   const running = now
-    ? sql`and exists (select 1 from season_phases sp where sp.season_id = g.season_id and sp.number = g.phase
+    ? sql`and gp.withdrawn_at is null and exists (select 1 from season_phases sp where sp.season_id = g.season_id and sp.number = g.phase
         and sp.deadline >= ${Math.floor(now.getTime() / 1000)})`
     : sql``;
   return sql`exists (select 1 from group_pairs gp join groups g on g.id = gp.group_id join pairs p on p.id = gp.pair_id

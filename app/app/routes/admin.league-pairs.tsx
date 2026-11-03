@@ -33,6 +33,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
 import {
@@ -49,8 +50,8 @@ import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, createPair, dissolvePair, pairCandidates } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
-import { ENTRY_STATUS_LABELS, fromPhase } from "~/lib/season-entries";
-import { enterPairByOrganizer, removePairFromSeason } from "~/lib/season-entries.server";
+import { ENTRY_STATUS_LABELS, fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
+import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
 
@@ -111,6 +112,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       intent === "enter"
         ? await enterPairByOrganizer(actor, league.id, pairId, seasonId)
         : await removePairFromSeason(actor, league.id, pairId, seasonId);
+  else if (intent === "withdraw" && valid(pairId) && valid(seasonId))
+    result = await withdrawPairMidPhase(actor, league.id, pairId, seasonId, field("reason"));
   else throw new Response("Hibás kérés.", { status: 400 });
   return result.ok ? { ok: true as const } : { error: result.error };
 }
@@ -133,8 +136,76 @@ function EntryCell({ pair }: { pair: Pair }) {
     <div className="grid justify-items-start gap-1">
       {chip ? <StatusChips chips={[chip]} /> : "–"}
       {starts && <span className="text-xs text-muted-foreground">{starts}</span>}
-      {pair.entryAction && <EntryActionButton pair={pair} action={pair.entryAction} />}
+      {pair.entryAction?.kind === "remove" && pair.locked ? (
+        <WithdrawDialog pair={pair} action={pair.entryAction} />
+      ) : (
+        pair.entryAction && <EntryActionButton pair={pair} action={pair.entryAction} />
+      )}
     </div>
+  );
+}
+
+// "Kivétel a szezonból" while the pair plays in the running round (#34): a
+// mid-round withdrawal, with a required reason.
+function WithdrawDialog({ pair, action }: { pair: Pair; action: NonNullable<Pair["entryAction"]> }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [a, b] = pair.players;
+  const busy = fetcher.state !== "idle";
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.ok) setOpen(false);
+  }, [fetcher.state, fetcher.data]);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" disabled={busy}>
+          Kivétel a szezonból
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Visszaléptetés kör közben: {a.name} – {b.name}
+          </DialogTitle>
+          <DialogDescription>
+            A pár a futó kör csoportjában játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
+            lejátszottak is, a többi meccse elmarad, és a pár a szezonból is kikerül ({action.season}). Később újra
+            benevezheted: a következő körtől játszik. A pár és a csoport többi párja értesítést kap az oldalon; e-mailt nem.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor={`withdraw-reason-${pair.id}`}>Indok</Label>
+          <Textarea
+            id={`withdraw-reason-${pair.id}`}
+            value={reason}
+            maxLength={WITHDRAWAL_REASON_MAX}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Pl. sérülés, költözés"
+          />
+          <p className="text-xs text-muted-foreground">Csak te és a pár látja, a csoport többi párja nem.</p>
+          {fetcher.data?.error && (
+            <p role="alert" className="text-sm font-semibold text-destructive">
+              {fetcher.data.error}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Mégse</Button>
+          </DialogClose>
+          <Button
+            variant="destructive"
+            disabled={busy || !reason.trim()}
+            onClick={() =>
+              fetcher.submit({ intent: "withdraw", pair: String(pair.id), season: String(action.seasonId), reason }, { method: "post" })
+            }
+          >
+            Visszaléptetés
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

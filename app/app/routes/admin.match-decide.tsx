@@ -101,6 +101,11 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
         )}
       </section>
 
+      {m.voided ? (
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Az egyik pár visszalépett a körből: ez a meccs nem számít a tabellában, nincs miről dönteni.
+        </p>
+      ) : (
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="font-display text-lg">{r.status === "disputed" ? "Döntés a vitában" : "Kimenetel felülbírálása"}</CardTitle>
@@ -138,6 +143,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
           </Form>
         </CardContent>
       </Card>
+      )}
 
       <section className="grid max-w-2xl gap-2" aria-labelledby="naplo">
         <h2 id="naplo" className="font-display text-lg font-bold">

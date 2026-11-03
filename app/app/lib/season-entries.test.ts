@@ -7,6 +7,8 @@ import {
   entryOpen,
   entryStatusText,
   TAKEN_OUT_TEXT,
+  WITHDRAWAL_REASON_MAX,
+  withdrawalReasonError,
   ENTRY_STATUS_LABELS,
   entryView,
   fromPhase,
@@ -142,6 +144,19 @@ describe("status texts", () => {
     expect(TAKEN_OUT_TEXT).toMatch(/A szervező kivett titeket a szezonból/);
     expect(TAKEN_OUT_TEXT).toMatch(/szóljatok neki/);
     expect(TAKEN_OUT_TEXT).not.toMatch(/Nevezünk/);
+  });
+});
+
+describe("withdrawalReasonError (#34)", () => {
+  it("needs a reason", () => {
+    expect(withdrawalReasonError("")).toMatch(/miért/);
+    expect(withdrawalReasonError("   ")).toMatch(/miért/);
+  });
+
+  it("takes at most the limit, counted without the spaces around it", () => {
+    expect(withdrawalReasonError("Sérülés")).toBeNull();
+    expect(withdrawalReasonError(` ${"x".repeat(WITHDRAWAL_REASON_MAX)} `)).toBeNull();
+    expect(withdrawalReasonError("x".repeat(WITHDRAWAL_REASON_MAX + 1))).toMatch(/300/);
   });
 });
 

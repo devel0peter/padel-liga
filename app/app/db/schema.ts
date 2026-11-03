@@ -395,6 +395,7 @@ export const notifications = sqliteTable(
         "match_result",
         "match_result_confirmed",
         "match_decided",
+        "pair_withdrawn",
         "test",
       ],
     }).notNull(),
@@ -683,6 +684,12 @@ export const groupPairs = sqliteTable(
       .notNull()
       .references(() => pairs.id, { onDelete: "cascade" }),
     seed: integer("seed").notNull(),
+    // Withdrawn mid-phase by the organizer (#34, D87): the pair and every
+    // match it has in this group leave the table, played or not, and the
+    // group goes on without it (groups-withdrawal.server.ts). The reason is
+    // for the organizer and the pair itself, never shown to other players.
+    withdrawnAt: integer("withdrawn_at", { mode: "timestamp" }),
+    withdrawalReason: text("withdrawal_reason"),
   },
   (t) => [primaryKey({ columns: [t.groupId, t.pairId] }), index("group_pairs_pair_idx").on(t.pairId)],
 );

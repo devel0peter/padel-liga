@@ -154,3 +154,41 @@ describe("formatSlot", () => {
     expect(formatSlot(new Date("2026-07-14T05:05:00Z"))).toBe("júl. 14., kedd 07:05");
   });
 });
+
+describe("buildLadder: a pair withdrawn mid-phase (#34, rules 2)", () => {
+  const withdrawnGroup = (): LadderGroupInput => ({
+    id: 1,
+    number: 1,
+    pairs: [pair(11), pair(12), pair(13), { ...pair(14), withdrawn: true }],
+    matches: [
+      played(1, 11, 12, 1, [[4, 0], [4, 0]]),
+      played(2, 14, 13, 1, [[4, 0], [4, 0]]),
+      played(3, 13, 11, 2, [[4, 1], [4, 1]]),
+      open(4, 11, 14, 2),
+      played(5, 12, 13, 3, [[4, 2], [4, 2]]),
+      open(6, 12, 14, 3),
+    ],
+  });
+  const without = (): LadderGroupInput => {
+    const g = withdrawnGroup();
+    return { ...g, pairs: g.pairs.slice(0, 3), matches: g.matches.filter((m) => m.a !== 14 && m.b !== 14) };
+  };
+
+  it("leaves the pair and all of its matches out of the table, as if it never played", () => {
+    const [band] = buildLadder([withdrawnGroup()], 2);
+    const [never] = buildLadder([without()], 2);
+    expect(band!.groups[0]!.rows).toEqual(never!.groups[0]!.rows);
+    expect(band!.groups[0]!.rows).toHaveLength(3);
+  });
+
+  it("drops its matches from this week's list and the results, and names it apart", () => {
+    for (const week of [1, 2, 3]) {
+      const g = buildLadder([withdrawnGroup()], week)[0]!.groups[0]!;
+      const n = buildLadder([without()], week)[0]!.groups[0]!;
+      expect(g.weekMatches).toEqual(n.weekMatches);
+      expect(g.results).toEqual(n.results);
+    }
+    expect(buildLadder([withdrawnGroup()], 1)[0]!.groups[0]!.withdrawn).toEqual([["Játékos 14A", "Játékos 14B"]]);
+    expect(buildLadder([without()], 1)[0]!.groups[0]!.withdrawn).toEqual([]);
+  });
+});

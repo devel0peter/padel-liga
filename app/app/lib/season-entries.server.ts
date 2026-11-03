@@ -1,10 +1,10 @@
-import { and, asc, count, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { leagues, pairs, seasonEntries, users } from "~/db/schema";
+import { groupPairs, groups, leagues, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { queueSeasonEntered } from "~/lib/email/outbox.server";
-import { seasonEntryMessage } from "~/lib/notifications";
+import { pairWithdrawnMessage, seasonEntryMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
@@ -18,7 +18,9 @@ import {
   IN_RUNNING_PHASE,
   joinsPhase,
   noLevelRefusal,
+  NOT_IN_RUNNING_PHASE,
   ORGANIZER_ENTRY_REFUSALS,
+  withdrawalReasonError,
   type EntryStatus,
   type EntryView,
 } from "./season-entries";
@@ -311,8 +313,8 @@ export async function enterPairByOrganizer(
 
 // "Kivétel a szezonból" (#154): the organizer withdraws an entered pair's
 // entry, so it is left out of every group draft made from then on; the pair
-// stays a pair. Refused while the pair plays in a running phase (mid-phase
-// withdrawal is #34), checked inside the write. Both players are told in the
+// stays a pair. Refused while the pair plays in a running phase (that is
+// withdrawPairMidPhase, #34), checked inside the write. Both players are told in the
 // app only; no email.
 export async function removePairFromSeason(
   actor: { id: string },
@@ -345,6 +347,86 @@ export async function removePairFromSeason(
   await audit(actor.id, "season_entry.remove", `season_entry:${updated[0]!.id}`, `pair:${pairId}`);
   await notifyPair(pairId, season, "removed", null);
   return { ok: true };
+}
+
+// "Kivétel a szezonból" while the pair plays in a running round (#34, D87):
+// the pair is withdrawn from its group(s) of the season whose phase hasn't
+// ended, so every match it has there leaves the table, played or not, and
+// takes no more steps; and its entry is withdrawn as after "Kivétel" (no
+// next phase, entered again it joins the next one). One batch: the group
+// rows, the matches' revision (a step in flight fails its guard), the entry.
+// The pair's players and the group's other pairs are told in the app and by
+// push only; no email.
+export async function withdrawPairMidPhase(
+  actor: { id: string },
+  leagueId: number,
+  pairId: number,
+  seasonId: number,
+  reason: string,
+  now = new Date(),
+): Promise<Result> {
+  const season = await getSeason(seasonId);
+  if (!season || season.leagueId !== leagueId) return { ok: false, error: "Nincs ilyen szezon." };
+  const pair = await leaguePair(leagueId, pairId);
+  if (!pair) return { ok: false, error: "Nincs ilyen pár." };
+  const invalid = withdrawalReasonError(reason);
+  if (invalid) return { ok: false, error: invalid };
+  const why = reason.trim();
+  const running = await db
+    .select({ id: groups.id, number: groups.number, phase: groups.phase })
+    .from(groupPairs)
+    .innerJoin(groups, eq(groups.id, groupPairs.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(
+      and(
+        eq(groupPairs.pairId, pairId),
+        isNull(groupPairs.withdrawnAt),
+        eq(groups.seasonId, seasonId),
+        isNotNull(groups.publishedAt),
+        gte(seasonPhases.deadline, now),
+      ),
+    );
+  if (running.length === 0) return { ok: false, error: NOT_IN_RUNNING_PHASE };
+  const ids = running.map((g) => g.id);
+  const [withdrawn] = await db.batch([
+    db
+      .update(groupPairs)
+      .set({ withdrawnAt: now, withdrawalReason: why })
+      .where(and(inArray(groupPairs.groupId, ids), eq(groupPairs.pairId, pairId), isNull(groupPairs.withdrawnAt)))
+      .returning({ groupId: groupPairs.groupId }),
+    db
+      .update(matches)
+      .set({ revision: sql`${matches.revision} + 1` })
+      .where(and(inArray(matches.groupId, ids), or(eq(matches.pairA, pairId), eq(matches.pairB, pairId)))),
+    db
+      .update(seasonEntries)
+      .set({ status: "withdrawn", decidedBy: actor.id, decidedAt: now, updatedAt: now })
+      .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.pairId, pairId), inArray(seasonEntries.status, ["approved", "pending"]))),
+  ]);
+  if (withdrawn.length === 0) return { ok: false, error: NOT_IN_RUNNING_PHASE };
+  await audit(actor.id, "season_entry.withdraw", `pair:${pairId}`, `season:${seasonId} groups:${ids.join(",")}`);
+  await notifyWithdrawal(pairId, season, running, why);
+  return { ok: true };
+}
+
+async function notifyWithdrawal(pairId: number, season: Season, running: { id: number; number: number; phase: number }[], reason: string) {
+  const players = await pairPlayers(pairId);
+  if (!players) return;
+  const others = await db
+    .select({ groupId: groupPairs.groupId, a: pairs.playerA, b: pairs.playerB })
+    .from(groupPairs)
+    .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
+    .where(and(inArray(groupPairs.groupId, running.map((g) => g.id)), ne(groupPairs.pairId, pairId), isNull(groupPairs.withdrawnAt)));
+  const messages = running.flatMap((g) => {
+    const input = { league: players.league, season: season.name, phase: g.phase, group: g.number, reason };
+    const own = pairWithdrawnMessage(input, "pair");
+    const theirs = pairWithdrawnMessage(input, "group");
+    return [
+      ...[players.a, players.b].map((p) => ({ userId: p.id, message: own })),
+      ...others.filter((o) => o.groupId === g.id).flatMap((o) => [o.a, o.b].map((userId) => ({ userId, message: theirs }))),
+    ];
+  });
+  await notifyPlayers("pair_withdrawn", messages);
 }
 
 export type EntryRow = {

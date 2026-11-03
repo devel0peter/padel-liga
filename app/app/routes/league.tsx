@@ -95,6 +95,11 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
           ))}
         </TableBody>
       </Table>
+      {group.withdrawn.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
+        </p>
+      )}
 
       <div className="grid gap-2">
         <h4 className="font-bold">

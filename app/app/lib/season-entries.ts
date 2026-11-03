@@ -188,4 +188,22 @@ export function noLevelRefusal(names: readonly string[]): string {
 }
 
 export const IN_RUNNING_PHASE =
-  "Ez a pár a futó kör csoportjában játszik, ezért a kör határidejéig nem vehető ki a szezonból. A kör közbeni visszalépést itt még nem lehet kezelni.";
+  "Ez a pár a futó kör csoportjában játszik: kör közben csak indokkal veheted ki (visszaléptetés). Frissítsd az oldalt.";
+
+// --- Withdrawing mid-phase (#34, D87) ----------------------------------------
+// The organizer takes a pair out of the running round: every match it has
+// in its group leaves the table, played or not, the rest are off, and the
+// pair leaves the season as after "Kivétel a szezonból". Entered again, it
+// joins at the next phase. A reason is required; only the organizer and the
+// pair itself see it.
+
+export const WITHDRAWAL_REASON_MAX = 300;
+
+export function withdrawalReasonError(reason: string): string | null {
+  const r = reason.trim();
+  if (!r) return "Írd meg röviden, miért lép vissza a pár.";
+  if (r.length > WITHDRAWAL_REASON_MAX) return `Az indok legfeljebb ${WITHDRAWAL_REASON_MAX} karakter lehet.`;
+  return null;
+}
+
+export const NOT_IN_RUNNING_PHASE = "Ez a pár most nem játszik futó körben. Frissítsd az oldalt.";

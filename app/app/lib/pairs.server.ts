@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -102,7 +102,16 @@ async function lockedPairs(leagueId: number, now: Date): Promise<Set<number>> {
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
+    .where(
+      and(
+        eq(pairs.leagueId, leagueId),
+        eq(pairs.status, "active"),
+        // A pair withdrawn from its group (#34) plays there no more.
+        isNull(groupPairs.withdrawnAt),
+        isNotNull(groups.publishedAt),
+        gte(seasonPhases.deadline, now),
+      ),
+    );
   return new Set(rows.map((r) => r.id));
 }
 

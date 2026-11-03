@@ -18,8 +18,11 @@ import { formatSlot } from "./format";
 
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
-/** A pair as the ladder shows it: the two players' names and the pair's rating for the last tiebreak. */
-export type LadderPair = { id: number; names: [string, string]; elo: number };
+/**
+ * A pair as the ladder shows it: the two players' names and the pair's rating
+ * for the last tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
+ */
+export type LadderPair = { id: number; names: [string, string]; elo: number; withdrawn?: boolean };
 
 /** A group match. `scheduledAt` and `outcome` are null until the match is agreed or played. */
 export type LadderMatch = {
@@ -60,6 +63,8 @@ export type LadderGroup = {
   weekMatches: LadderMatchView[];
   /** Every played match of the phase, in week order. */
   results: LadderMatchView[];
+  /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
+  withdrawn: [string, string][];
 };
 
 export type LadderBand = { division: Division; label: string; groups: LadderGroup[] };
@@ -91,11 +96,15 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
   ordered.forEach((group, index) => {
     const byId = new Map(group.pairs.map((p) => [p.id, p]));
     const names = (id: number) => byId.get(id)!.names;
+    // A withdrawn pair's matches leave the group (rules 2): not in the
+    // table (the engine drops them too), this week's list or the results.
+    const counts = (m: LadderMatch) => !byId.get(m.a)?.withdrawn && !byId.get(m.b)?.withdrawn;
+    const shown = group.matches.filter(counts);
     const decided: GroupMatch[] = group.matches.flatMap((m) =>
       m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : [],
     );
     const standings = groupStandings(
-      group.pairs.map((p) => ({ id: String(p.id), elo: p.elo })),
+      group.pairs.map((p) => ({ id: String(p.id), elo: p.elo, withdrawn: !!p.withdrawn })),
       decided,
     );
     const view = (m: LadderMatch): LadderMatchView => ({
@@ -114,11 +123,12 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
         setDiff: r.setDiff,
         gameDiff: r.gameDiff,
       })),
-      weekMatches: group.matches.filter((m) => m.week === week).map(view),
-      results: [...group.matches]
+      weekMatches: shown.filter((m) => m.week === week).map(view),
+      results: [...shown]
         .filter((m) => m.outcome && scoreText(m.outcome))
         .sort((x, y) => x.week - y.week || x.id - y.id)
         .map(view),
+      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
     });
   });
   return DIVISIONS.map((division) => ({ division, label: divisionLabel(division), groups: bands.get(division)! })).filter(

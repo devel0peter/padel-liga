@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "ee29623e-c141-413d-8449-6a02d1fd1d86",
-  "prevId": "09c77203-524f-4549-854d-386008649170",
+  "prevId": "c819c66d-daf8-4e94-92d3-8c199d679412",
   "tables": {
     "account_invites": {
       "name": "account_invites",
@@ -488,6 +488,20 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "withdrawal_reason": {
+          "name": "withdrawal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },

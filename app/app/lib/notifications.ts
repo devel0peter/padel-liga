@@ -48,7 +48,10 @@ export type PlayerKind =
   | "match_decided"
   // A dispute (#178): the recording pair is told at once, in the app and by
   // push, not in the digest (D83). The organizers' kind is `result_disputed`.
-  | "match_result_disputed";
+  | "match_result_disputed"
+  // A pair withdrawn mid-phase (#34): to its players and the group's other
+  // pairs, in the app and by push only, never by email.
+  | "pair_withdrawn";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -192,6 +195,27 @@ export function seasonEntryMessage(
     title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
     body: `${where} ${start}`,
     url: "/pair",
+  };
+}
+
+// A pair withdrawn mid-phase (#34). To its own players, with the
+// organizer's reason; to the group's other pairs, no names (a lock screen is
+// not a private place) and no reason (it may be about someone's health).
+export function pairWithdrawnMessage(
+  input: { league: string; season: string; phase: number; group: number; reason: string },
+  to: "pair" | "group",
+): Message {
+  const where = `${input.group}. csoport, ${input.phase}. kör, ${input.season}, ${input.league}.`;
+  if (to === "pair")
+    return {
+      title: "A szervező visszaléptetett titeket a körből",
+      body: `${where} A meccseitek nem számítanak, és a szezonból is kikerültetek. Ha újra játszanátok, szóljatok a szervezőnek. Indok: ${input.reason}`,
+      url: "/pair",
+    };
+  return {
+    title: "Visszalépett egy pár a csoportodból",
+    body: `${where} A meccseik kikerültek a tabellából, a lejátszottak is. A csoport nélkülük folytatja.`,
+    url: "/home",
   };
 }
 

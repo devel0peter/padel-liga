@@ -64,7 +64,8 @@ const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.
 
 /**
  * Every match of the league's running phases (groups published, deadline not
- * passed), by group and week. Normally one phase; a league running two
+ * passed), by group and week; not those of a pair withdrawn mid-phase (#34),
+ * which don't count. Normally one phase; a league running two
  * seasons at once gets one each.
  */
 export async function runningPhases(leagueId: number, now = new Date()): Promise<OverviewPhase[]> {
@@ -121,6 +122,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
   for (const m of matchRows) {
     const g = groupById.get(m.groupId)!;
     const pairsOf = members.get(m.groupId) ?? [];
+    if (pairsOf.some((p) => p.withdrawn && (p.pairId === m.pairA || p.pairId === m.pairB))) continue;
     const name = (pairId: number) => {
       const p = pairsOf.find((x) => x.pairId === pairId);
       return p ? pairName(p.players) : "Ismeretlen pár";
@@ -153,6 +155,9 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
 }
 
 // --- One match ----------------------------------------------------------------
+
+// A withdrawn pair's match (#34): out of the table, nothing left to do.
+const VOIDED_STATUS: { label: string; tone: Tone } = { label: "Nem számít: visszalépés", tone: "done" };
 
 export type OrganizerMatch = {
   id: number;
@@ -199,7 +204,9 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
   const active = { a: sides.includes("a"), b: sides.includes("b") };
   const venues = await clubNames([...ctx.events.map((e) => e.clubId), state.status === "to_schedule" ? null : state.clubId]);
   const results = await resultOf(ctx.match);
-  const status = resultStatus(results.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
+  const status = ctx.voided
+    ? VOIDED_STATUS
+    : (resultStatus(results.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1)));
   const pairOf = (pairId: number) => (pairId === ctx.match.pairA ? names.a : names.b);
   return {
     id: ctx.match.id,
@@ -213,7 +220,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
     running,
     label: status.label,
     tone: status.tone,
-    stuck: running
+    stuck: running && !ctx.voided
       ? stuckReason({ state, events: ctx.events, result: results.state, phaseStartsAt: ctx.phaseStartsAt, week: ctx.match.week, now })
       : null,
     activity: activityLine(active, names),

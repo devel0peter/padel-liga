@@ -20,7 +20,7 @@ import { queueMatchEmails } from "~/lib/email/outbox.server";
 import { matchResultConfirmedMessage, matchResultDisputedMessage, matchResultMessage, type Message } from "~/lib/notifications";
 import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server";
 
-import { CHANGED, loadMatch, NOT_FOUND, sideOf, type MatchContext } from "./matches.server";
+import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { NOTE_MAX, scoreText } from "./results";
 
@@ -72,6 +72,7 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
   if (!ctx) return { ok: false, error: NOT_FOUND };
   const side = sideOf(ctx, userId);
   if (!side) return { ok: false, error: NOT_FOUND };
+  if (ctx.voided) return { ok: false, error: VOIDED };
   const before = await resultOf(ctx.match);
   const can = resultActions(before.state, side);
 
@@ -205,13 +206,14 @@ export const AUTO_ACCEPT_BATCH = 10;
  * Accepts every result that has waited 48 hours without an answer (spec 7),
  * from the hourly cron: a ruling in match_decisions (no user), the match
  * final, and both pairs told in the app and by push (a digest item). A result
- * answered meanwhile is left alone (the revision guard). Returns how many.
+ * answered meanwhile is left alone (the revision guard), and so is a match
+ * of a pair withdrawn mid-phase (#34), which doesn't count. Returns how many.
  */
 export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BATCH): Promise<number> {
   const pending = await db
     .select({ id: matches.id, pairA: matches.pairA, pairB: matches.pairB, revision: matches.revision })
     .from(matches)
-    .where(eq(matches.status, "result_pending"))
+    .where(and(eq(matches.status, "result_pending"), noWithdrawnPair))
     .orderBy(asc(matches.id));
   if (pending.length === 0) return 0;
   const results = await resultsOf(pending, db.select({ id: matches.id }).from(matches).where(eq(matches.status, "result_pending")));

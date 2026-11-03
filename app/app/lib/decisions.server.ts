@@ -1,5 +1,5 @@
 import { decisionErrors, type MatchOutcome, type ResultState, type Side } from "@padel-liga/rules";
-import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -9,7 +9,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 
 import { pairName } from "./groups";
 import { eventText } from "./matches";
-import { CHANGED, clubNames, loadMatch } from "./matches.server";
+import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matches.server";
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
@@ -22,6 +22,8 @@ import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText,
 // request with another league's match id finds nothing.
 
 const NOT_IN_LEAGUE = "Nincs ilyen meccs ebben a ligában.";
+// A withdrawn pair's match (#34): out of the table, nothing to decide.
+const VOIDED_LABEL = "Nem számít: visszalépés";
 
 const pa = alias(users, "pa_user");
 const pb = alias(users, "pb_user");
@@ -61,6 +63,8 @@ export type LeagueMatch = {
   result: ResultState;
   // The status in a few words, for the organizer.
   label: string;
+  // A pair of it was withdrawn mid-phase (#34): it doesn't count.
+  voided: boolean;
 };
 
 export type Dispute = LeagueMatch & {
@@ -102,6 +106,7 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
       season: seasons.name,
       phase: groups.phase,
       groupNumber: groups.number,
+      live: sql<number>`${noWithdrawnPair}`,
     })
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
@@ -121,11 +126,13 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
     const a = names.get(r.pairA) ?? "";
     const b = names.get(r.pairB) ?? "";
     const result = results.get(r.id)?.state ?? { status: "none" };
-    return { id: r.id, season: r.season, phase: r.phase, groupNumber: r.groupNumber, week: r.week, a, b, result, label: organizerLabel({ result, status: r.status, a, b }) };
+    const voided = !r.live;
+    const label = voided ? VOIDED_LABEL : organizerLabel({ result, status: r.status, a, b });
+    return { id: r.id, season: r.season, phase: r.phase, groupNumber: r.groupNumber, week: r.week, a, b, result, label, voided };
   });
   const disputes = list.flatMap((m): Dispute[] => {
     const r = m.result;
-    if (r.status !== "disputed") return [];
+    if (r.status !== "disputed" || m.voided) return [];
     const by = (s: Side) => (s === "a" ? m.a : m.b);
     return [
       {
@@ -160,6 +167,8 @@ export type DecisionPage = {
   // The prefill of the form: the current outcome, or the recorded score.
   current: MatchOutcome | null;
   log: { key: string; at: Date; who: string; role: string; text: string }[];
+  // A pair of it was withdrawn mid-phase (#34): nothing to decide.
+  voided: boolean;
 };
 
 /** A match of this league for its organizer; null if it isn't one. */
@@ -218,10 +227,11 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
     deadline: ctx.match.deadline,
     ...names,
     result,
-    label: organizerLabel({ result, status: ctx.match.status, ...names }),
+    label: ctx.voided ? VOIDED_LABEL : organizerLabel({ result, status: ctx.match.status, ...names }),
     note,
     current: result.status === "final" ? result.outcome : result.status === "none" ? null : { kind: "played", score: result.score },
     log,
+    voided: ctx.voided,
   };
 }
 
@@ -246,6 +256,7 @@ export async function decideMatch(
   if ((await leagueOf(matchId)) !== leagueId) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
   const ctx = await loadMatch(matchId);
   if (!ctx) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
+  if (ctx.voided) return { ok: false, error: VOIDED };
   const errors = decisionErrors(outcome, reason);
   if (errors.length > 0) return { ok: false, error: errors.join(" ") };
   const revision = ctx.match.revision;

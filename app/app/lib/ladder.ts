@@ -19,8 +19,11 @@ import { MATCH_LOST_BOTH_TEXT, neutralScoreText } from "./results";
 
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
-/** A pair as the ladder shows it: the two players' names and the pair's rating for the last tiebreak. */
-export type LadderPair = { id: number; names: [string, string]; elo: number };
+/**
+ * A pair as the ladder shows it: the two players' names and the pair's rating
+ * for the last tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
+ */
+export type LadderPair = { id: number; names: [string, string]; elo: number; withdrawn?: boolean };
 
 /** A group match. `scheduledAt` and `outcome` are null until the match is agreed or played. */
 export type LadderMatch = {
@@ -61,6 +64,8 @@ export type LadderGroup = {
   weekMatches: LadderMatchView[];
   /** Every played match of the phase, in week order. */
   results: LadderMatchView[];
+  /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
+  withdrawn: [string, string][];
 };
 
 export type LadderBand = { division: Division; label: string; groups: LadderGroup[] };
@@ -82,15 +87,16 @@ function scoreText(outcome: MatchOutcome): string | null {
 /**
  * One group's table, from the final outcomes only (matches without an outcome
  * are left out). The one standing computation of the public ladder and of the
- * player's own group card on Kezdőlap (#201): same order, same numbers.
+ * player's own group card on Kezdőlap (#201): same order, same numbers. A pair
+ * withdrawn mid-phase (#34, rules 2) is left out with all of its matches.
  */
 export function groupTable(
-  pairs: readonly { id: number; elo: number }[],
+  pairs: readonly { id: number; elo: number; withdrawn?: boolean }[],
   matches: readonly { a: number; b: number; outcome: MatchOutcome | null }[],
 ): (Omit<LadderRow, "names"> & { pairId: number })[] {
   const decided: GroupMatch[] = matches.flatMap((m) => (m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : []));
   return groupStandings(
-    pairs.map((p) => ({ id: String(p.id), elo: p.elo })),
+    pairs.map((p) => ({ id: String(p.id), elo: p.elo, withdrawn: !!p.withdrawn })),
     decided,
   ).map((r) => ({
     pairId: Number(r.id),
@@ -112,6 +118,10 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
   ordered.forEach((group, index) => {
     const byId = new Map(group.pairs.map((p) => [p.id, p]));
     const names = (id: number) => byId.get(id)!.names;
+    // A withdrawn pair's matches leave the group (rules 2): not in the
+    // table (groupTable drops them), this week's list or the results.
+    const counts = (m: LadderMatch) => !byId.get(m.a)?.withdrawn && !byId.get(m.b)?.withdrawn;
+    const shown = group.matches.filter(counts);
     const standings = groupTable(group.pairs, group.matches);
     const view = (m: LadderMatch): LadderMatchView => ({
       a: names(m.a),
@@ -122,13 +132,14 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
     bands.get(divisionOf(index + 1, ordered.length))!.push({
       number: group.number,
       rows: standings.map(({ pairId, ...r }) => ({ ...r, names: names(pairId) })),
-      weekMatches: group.matches.filter((m) => m.week === week).map(view),
+      weekMatches: shown.filter((m) => m.week === week).map(view),
       // A result is listed once: a played match of the week shown is already
       // under "meccsei" (#202).
-      results: [...group.matches]
+      results: [...shown]
         .filter((m) => m.week !== week && m.outcome && scoreText(m.outcome))
         .sort((x, y) => x.week - y.week || x.id - y.id)
         .map(view),
+      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
     });
   });
   return DIVISIONS.map((division) => ({ division, label: divisionLabel(division), groups: bands.get(division)! })).filter(

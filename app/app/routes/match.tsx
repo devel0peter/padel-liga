@@ -353,9 +353,15 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
       back={{ to: "/home", label: "Kezdőlap" }}
     >
       <section className="grid max-w-2xl gap-3 rounded-lg border p-4 sm:p-6" aria-label="Állapot">
-        <div>
-          <StatusPill {...status} />
-        </div>
+        {m.voided ? (
+          <p role="status" className="font-semibold">
+            {m.voided}
+          </p>
+        ) : (
+          <div>
+            <StatusPill {...status} />
+          </div>
+        )}
         <p className="text-sm">
           <span className="font-medium">Ti:</span> {m.us}
         </p>

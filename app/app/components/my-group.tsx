@@ -140,7 +140,11 @@ function GroupTable({ pairs }: { pairs: HomeGroup["pairs"] }) {
 }
 
 export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
-  const weeks = [1, 2, 3].map((week) => ({ week, match: g.matches.find((m) => m.week === week) ?? null }));
+  const weeks = [1, 2, 3].map((week) => ({
+    week,
+    match: g.matches.find((m) => m.week === week) ?? null,
+    off: g.offWeeks.find((o) => o.week === week) ?? null,
+  }));
   return (
     <Card className="max-w-2xl" aria-label={groupLine(g.number, g.groupCount)}>
       <CardHeader>
@@ -152,8 +156,11 @@ export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeag
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
         <GroupTable pairs={g.pairs} />
+        {g.withdrawn.length > 0 && (
+          <p className="text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>
+        )}
         <ul className="grid gap-3" aria-label="Meccseitek">
-          {weeks.map(({ week, match: m }) => (
+          {weeks.map(({ week, match: m, off }) => (
             <li key={week} className="grid gap-1.5 rounded-md border p-3">
               <p className="text-xs font-semibold text-muted-foreground">
                 {week}. hét · {weekRange(g.phaseStartsAt, week)}
@@ -170,6 +177,10 @@ export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeag
                     <ChevronRight className="size-4" />
                   </Link>
                 </>
+              ) : off ? (
+                <p className="text-muted-foreground">
+                  {off.opponents} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.
+                </p>
               ) : (
                 <p className="text-muted-foreground">Pihenőhét: ezen a héten nem játszotok.</p>
               )}

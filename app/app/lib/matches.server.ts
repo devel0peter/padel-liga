@@ -17,7 +17,7 @@ import {
   type Side,
   type SlotError,
 } from "@padel-liga/rules";
-import { and, asc, count, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -50,7 +50,9 @@ import { averageStartingElo } from "./season-entries";
 
 export type Person = { id: string; name: string; email: string; phone: string | null };
 // `elo`: the pair's rating, the last tiebreak of the table (D20).
-export type PairPlayers = { pairId: number; seed: number; elo: number; players: [Person, Person] };
+// `withdrawn`: taken out of the group mid-phase (#34); its matches there
+// don't count and can't be played.
+export type PairPlayers = { pairId: number; seed: number; elo: number; players: [Person, Person]; withdrawn: boolean };
 
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
@@ -81,7 +83,7 @@ export async function groupMembers(groupIds: number[]): Promise<Map<number, Pair
   const out = new Map<number, PairPlayers[]>();
   if (groupIds.length === 0) return out;
   const rows = await db
-    .select({ groupId: groupPairs.groupId, seed: groupPairs.seed, ...pairPlayerColumns })
+    .select({ groupId: groupPairs.groupId, seed: groupPairs.seed, withdrawnAt: groupPairs.withdrawnAt, ...pairPlayerColumns })
     .from(groupPairs)
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
@@ -90,7 +92,13 @@ export async function groupMembers(groupIds: number[]): Promise<Map<number, Pair
     .orderBy(asc(groupPairs.groupId), asc(groupPairs.seed));
   for (const r of rows) {
     const list = out.get(r.groupId) ?? out.set(r.groupId, []).get(r.groupId)!;
-    list.push({ pairId: r.pairId, seed: r.seed, elo: averageStartingElo(r.aLevel, r.bLevel) ?? 0, players: toPlayers(r) });
+    list.push({
+      pairId: r.pairId,
+      seed: r.seed,
+      elo: averageStartingElo(r.aLevel, r.bLevel) ?? 0,
+      players: toPlayers(r),
+      withdrawn: r.withdrawnAt !== null,
+    });
   }
   return out;
 }
@@ -189,15 +197,22 @@ export type HomeGroup = {
   deadline: Date;
   // Every pair of the group in table order (#201), names only; `mine` marks
   // the player's. The table is the public league page's, from final results
-  // only; before any result it is the seed order (every `matches` is 0).
+  // only; before any result it is the seed order (every `matches` is 0). A
+  // pair withdrawn mid-phase (#34) is not in it, with all of its matches.
   pairs: { pairId: number; name: string; mine: boolean; rank: number; matches: number; points: number; setDiff: number; gameDiff: number }[];
+  // The pairs withdrawn mid-phase (#34), by name, shown below the table.
+  withdrawn: string[];
   matches: HomeMatch[];
+  // The weeks whose match is off because the opponents withdrew (#34).
+  offWeeks: { week: number; opponents: string }[];
 };
 
 /**
  * The player's groups in the current phase (published, deadline not passed),
  * one per league, with every match of their pair. Empty before the groups are
- * out and after the phase ends; past phases never show phone numbers.
+ * out and after the phase ends; past phases never show phone numbers. A pair
+ * withdrawn mid-phase (#34) has no group any more, and its matches leave the
+ * other pairs' lists.
  */
 export async function currentGroups(userId: string, now = new Date()): Promise<HomeGroup[]> {
   const mine = await db
@@ -218,7 +233,14 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
     .innerJoin(leagues, eq(leagues.id, seasons.leagueId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))))
+    .where(
+      and(
+        isNotNull(groups.publishedAt),
+        gte(seasonPhases.deadline, now),
+        isNull(groupPairs.withdrawnAt),
+        or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)),
+      ),
+    )
     .orderBy(asc(leagues.name));
   if (mine.length === 0) return [];
 
@@ -242,7 +264,9 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
     mine.map(async (g) => {
       const pairsOf = members.get(g.groupId) ?? [];
       const byId = new Map(pairsOf.map((p) => [p.pairId, p]));
-      const own = matchRows.filter((m) => m.groupId === g.groupId && (m.pairA === g.pairId || m.pairB === g.pairId));
+      const ours = matchRows.filter((m) => m.groupId === g.groupId && (m.pairA === g.pairId || m.pairB === g.pairId));
+      const own = ours.filter((m) => !voided(m, byId));
+      const other = (m: { pairA: number; pairB: number }) => byId.get(m.pairA === g.pairId ? m.pairB : m.pairA);
       return {
         groupId: g.groupId,
         league: g.league,
@@ -253,7 +277,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
         pairs: groupTable(
-          pairsOf.map((p) => ({ id: p.pairId, elo: p.elo })),
+          pairsOf.map((p) => ({ id: p.pairId, elo: p.elo, withdrawn: p.withdrawn })),
           // Only a final outcome counts (#186, #201): a waiting or disputed
           // result has none on the match yet.
           matchRows.filter((m) => m.groupId === g.groupId).map((m) => ({ a: m.pairA, b: m.pairB, outcome: m.status === "final" ? m.outcome : null })),
@@ -261,9 +285,13 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
           const p = byId.get(row.pairId)!;
           return { ...row, name: pairName(p.players), mine: p.pairId === g.pairId };
         }),
+        withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
+        offWeeks: ours
+          .filter((m) => voided(m, byId))
+          .map((m) => ({ week: m.week, opponents: pairName(other(m)?.players ?? []) })),
         matches: own.map((m) => {
           const side: Side = m.pairA === g.pairId ? "a" : "b";
-          const them = byId.get(side === "a" ? m.pairB : m.pairA);
+          const them = other(m);
           const state = states.get(m.id)!;
           return {
             id: m.id,
@@ -307,7 +335,7 @@ function chunked<T>(list: readonly T[]): T[][] {
 /**
  * Every match of a published group whose phase deadline hasn't passed, with
  * its state, its log's kinds, the venue and both pairs' players, for the
- * reminders (#31). A few queries for the whole league: the matches, then the
+ * reminders (#31). A withdrawn pair's matches (#34) are left out. A few queries for the whole league: the matches, then the
  * players and the logs in chunks of 90 ids (D1: 100 bound parameters).
  */
 export async function runningMatches(now = new Date()): Promise<RunningMatch[]> {
@@ -332,7 +360,7 @@ export async function runningMatches(now = new Date()): Promise<RunningMatch[]> 
     const pairsOf = members.get(m.groupId) ?? [];
     const a = pairsOf.find((p) => p.pairId === m.pairA);
     const b = pairsOf.find((p) => p.pairId === m.pairB);
-    if (!a || !b) return [];
+    if (!a || !b || a.withdrawn || b.withdrawn) return [];
     const state = states.get(m.id)!;
     return [
       {
@@ -365,6 +393,9 @@ export type MatchContext = {
   phaseStartsAt: Date;
   pairs: { a: PairPlayers; b: PairPlayers };
   events: StoredEvent[];
+  // A pair of the match was withdrawn mid-phase (#34): it doesn't count and
+  // takes no step any more.
+  voided: boolean;
 };
 
 export async function loadMatch(matchId: number): Promise<MatchContext | null> {
@@ -405,6 +436,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     phaseStartsAt: row.phaseStartsAt,
     pairs: { a, b },
     events: (await eventsOf([matchId])).get(matchId) ?? [],
+    voided: a.withdrawn || b.withdrawn,
   };
 }
 
@@ -448,10 +480,32 @@ export type MatchPage = {
   // Scheduling and result steps and rulings, oldest first. `by`: a pair's
   // player, the organizer (#29) or the 48-hour rule (#28).
   log: { key: string; at: Date; who: string; ours: boolean; by: "pair" | "organizer" | "auto"; text: string }[];
+  // Why the match no longer counts (#34), or null.
+  voided: string | null;
 };
 
 // Once a result is recorded, disputed or final, scheduling is over (#28).
 const NO_SCHEDULING: SchedulingActions = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false };
+const NO_RESULT_ACTIONS = { record: false, confirm: false, dispute: false };
+
+// Whether a match of the group has a withdrawn pair (#34), by the group's
+// members.
+export function voided(m: { pairA: number; pairB: number }, members: ReadonlyMap<number, PairPlayers>): boolean {
+  return !!members.get(m.pairA)?.withdrawn || !!members.get(m.pairB)?.withdrawn;
+}
+
+const withdrawnOf = (ctx: MatchContext): PairPlayers => (ctx.pairs.a.withdrawn ? ctx.pairs.a : ctx.pairs.b);
+
+// On the match page of a withdrawn pair's match (#34).
+export function voidedText(withdrawn: PairPlayers, ourPairId: number): string {
+  return withdrawn.pairId === ourPairId
+    ? "Visszaléptetek a körből: ez a meccs elmarad, és nem számít a tabellában."
+    : `${pairName(withdrawn.players)} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.`;
+}
+
+// The same as a condition on `matches`, for queries that read matches alone.
+export const noWithdrawnPair = sql`not exists (select 1 from group_pairs gp where gp.group_id = ${matches.groupId}
+  and gp.pair_id in (${matches.pairA}, ${matches.pairB}) and gp.withdrawn_at is not null)`;
 
 // The match page for a player of either pair; null for anyone else, or a
 // match that doesn't exist (the page answers 404 either way).
@@ -524,16 +578,18 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     side,
     us: pairName(ours.players),
     opponents: pairName(theirs.players),
-    contacts: running ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
+    // A withdrawn pair's match (#34): the two are no opponents any more.
+    contacts: running && !ctx.voided ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
     state,
     venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
-    actions: result.status === "none" ? scheduling : NO_SCHEDULING,
-    cancelLate: result.status === "none" && state.status === "scheduled" && isLateCancel(state.slot, now),
+    actions: result.status === "none" && !ctx.voided ? scheduling : NO_SCHEDULING,
+    cancelLate: !ctx.voided && result.status === "none" && state.status === "scheduled" && isLateCancel(state.slot, now),
     clubs: cityClubs,
     result,
-    resultActions: resultActions(result, side),
-    autoAcceptAt: autoAcceptAt(result),
+    resultActions: ctx.voided ? NO_RESULT_ACTIONS : resultActions(result, side),
+    autoAcceptAt: ctx.voided ? null : autoAcceptAt(result),
     log,
+    voided: ctx.voided ? voidedText(withdrawnOf(ctx), ours.pairId) : null,
   };
 }
 
@@ -552,6 +608,7 @@ export type StepResult = { ok: true; notice: string } | { ok: false; error: stri
 
 export const NOT_FOUND = "Nincs ilyen meccs.";
 export const CHANGED = "Közben változott a meccs. Nézd meg újra, és próbáld még egyszer.";
+export const VOIDED = "Ez a meccs elmarad: az egyik pár visszalépett a körből, a meccseik nem számítanak.";
 const CLOSED_SCHEDULED = "A meccs időpontja már le van fixálva.";
 const CLOSED_RESULT = "A meccs eredménye már rögzítve van, itt már nem lehet egyeztetni.";
 const CLOSED_DEADLINE = "Lejárt a kör határideje, itt már nem lehet egyeztetni.";
@@ -609,6 +666,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   if (!ctx) return { ok: false, error: NOT_FOUND };
   const side = sideOf(ctx, userId);
   if (!side) return { ok: false, error: NOT_FOUND };
+  if (ctx.voided) return { ok: false, error: VOIDED };
   const deadline = ctx.match.deadline;
   const state = stateOf(ctx, now);
   if ((await resultOf(ctx.match)).state.status !== "none") return { ok: false, error: CLOSED_RESULT };

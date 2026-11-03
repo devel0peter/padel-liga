@@ -13,6 +13,7 @@ import {
   leagueAdmins,
   loginCodes,
   notificationOptOuts,
+  groupPairs,
   notifications,
   oauthAccounts,
   pairInvites,
@@ -255,6 +256,36 @@ async function remove(userId: string, email: string, mail: MailContext): Promise
 // withdrawn, D19). The first statement only runs while no pair of theirs
 // plays in a running phase; everything after it waits for it. Returns the
 // pairs it dissolved, or false when nothing changed.
+// A mid-phase withdrawal's reason (#34) is free text that may be about the
+// person's health: anonymizing takes it off their pairs' group rows and out
+// of the partner's notice of it (the notice ends "Indok: <reason>"). The
+// notice goes first, while the reason is still there to find it by.
+function withdrawalReasonStatements(userId: string, guard: SQL) {
+  const theirPairs = db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  return [
+    db
+      .update(notifications)
+      .set({ body: sql`substr(${notifications.body}, 1, instr(${notifications.body}, ' Indok: ') - 1)` })
+      .where(
+        and(
+          eq(notifications.kind, "pair_withdrawn"),
+          sql`instr(${notifications.body}, ' Indok: ') > 0`,
+          sql`exists (select 1 from group_pairs gp join pairs p on p.id = gp.pair_id
+            where (p.player_a = ${userId} or p.player_b = ${userId}) and gp.withdrawal_reason is not null
+            and ${notifications.body} like '%' || ' Indok: ' || gp.withdrawal_reason)`,
+          guard,
+        ),
+      ),
+    db
+      .update(groupPairs)
+      .set({ withdrawalReason: null })
+      .where(and(isNotNull(groupPairs.withdrawalReason), inArray(groupPairs.pairId, theirPairs), guard)),
+  ];
+}
+
 async function anonymize(
   actorId: string,
   userId: string,
@@ -284,6 +315,7 @@ async function anonymize(
       .returning({ id: users.id }),
     ...active.flatMap((p) => dissolveStatements(actorId, p.id, now, gone)),
     ...personalDataStatements(userId, email, mail, gone),
+    ...withdrawalReasonStatements(userId, gone),
   ]);
   return updated.length > 0 ? active : false;
 }

@@ -203,8 +203,12 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     await withdraw();
     expect(await G.pairInRunningGroup(4, NOW)).toBe(false);
     expect(await G.pairInRunningGroup(1, NOW)).toBe(true);
-    const locked = new Map((await P.leaguePairs(1, NOW)).map((p) => [p.id, p.locked]));
+    const list = await P.leaguePairs(1, NOW);
+    const locked = new Map(list.map((p) => [p.id, p.locked]));
     expect([locked.get(1), locked.get(4)]).toEqual([true, false]);
+    // By season: Párok offers the withdrawal only for the season it plays in.
+    expect(list.find((p) => p.id === 1)?.lockedIn).toEqual([1]);
+    expect(list.find((p) => p.id === 4)?.lockedIn).toEqual([]);
     const facts = await A.deletionFacts(NOW);
     expect(facts.playing.has("g")).toBe(false);
     expect(facts.playing.has("a")).toBe(true);
@@ -245,6 +249,34 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     });
     expect(await R.resultStep("c", 6, { kind: "record", score: S40 } as any, NOW)).toEqual({ ok: false, error: M.VOIDED });
     expect(await R.resultStep("g", 4, { kind: "confirm" } as any, NOW)).toEqual({ ok: false, error: M.VOIDED });
+  });
+
+  it("match page: no phone numbers either way, they are no opponents any more", async () => {
+    expect((await M.matchPage(6, "c", NOW))?.contacts).toHaveLength(2);
+    await withdraw();
+    expect((await M.matchPage(6, "c", NOW))?.contacts).toEqual([]);
+    expect((await M.matchPage(6, "g", NOW))?.contacts).toEqual([]);
+    expect((await M.matchPage(1, "a", NOW))?.contacts).toHaveLength(2);
+  });
+
+  it("anonymizing a withdrawn player's account takes the reason off the group row and the partner's notice", async () => {
+    await withdraw();
+    // A notice of another withdrawal with a reason, not about this pair, stays.
+    h.raw
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/pair')")
+      .run();
+    expect(await A.deleteAccount("o", "g", NOW)).toEqual({ ok: true, mode: "anonymize" });
+    expect(row("select withdrawn_at is not null as w, withdrawal_reason from group_pairs where pair_id = 4")).toEqual({
+      w: 1,
+      withdrawal_reason: null,
+    });
+    const partner = rows("select body from notifications where user_id = 'h' and kind = 'pair_withdrawn' order by id").map((n: any) => n.body);
+    expect(partner[0]).not.toContain(REASON);
+    expect(partner[0]).toMatch(/szóljatok a szervezőnek\.$/);
+    expect(partner[1]).toBe("Más. Indok: Költözés");
+    expect(rows("select id from notifications where user_id = 'g'")).toEqual([]);
+    // The other pairs' notices had no reason and are untouched.
+    expect(rows("select body from notifications where user_id = 'a'")[0].body).toContain("A csoport nélkülük folytatja.");
   });
 
   it("auto-accept leaves the pair's waiting result alone", async () => {

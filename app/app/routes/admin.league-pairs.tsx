@@ -136,7 +136,7 @@ function EntryCell({ pair }: { pair: Pair }) {
     <div className="grid justify-items-start gap-1">
       {chip ? <StatusChips chips={[chip]} /> : "–"}
       {starts && <span className="text-xs text-muted-foreground">{starts}</span>}
-      {pair.entryAction?.kind === "remove" && pair.locked ? (
+      {pair.entryAction?.kind === "remove" && pair.lockedIn.includes(pair.entryAction.seasonId) ? (
         <WithdrawDialog pair={pair} action={pair.entryAction} />
       ) : (
         pair.entryAction && <EntryActionButton pair={pair} action={pair.entryAction} />

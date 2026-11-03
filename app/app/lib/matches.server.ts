@@ -548,7 +548,8 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     side,
     us: pairName(ours.players),
     opponents: pairName(theirs.players),
-    contacts: running ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
+    // A withdrawn pair's match (#34): the two are no opponents any more.
+    contacts: running && !ctx.voided ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
     state,
     venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
     actions: result.status === "none" && !ctx.voided ? scheduling : NO_SCHEDULING,

@@ -28,10 +28,13 @@ test("29. the group table counts the confirmed win and the organizer's decision"
   await expect(annas.locator("td").nth(2)).toHaveText("2");
   await expect(annas.locator("td").nth(3)).toHaveText("3");
 
-  // The played matches show their scores (from the 1st pair's side) and the decision.
-  const results = group.getByRole("heading", { name: "Lejátszott meccsek" }).locator("..");
-  await expect(results.getByRole("listitem")).toHaveCount(2);
-  await expect(results).toContainText(/4-1 2-4 10-8|1-4 4-2 8-10/);
-  await expect(results).toContainText("egyik fél sem játszott");
+  // The played matches show their scores (from the 1st pair's side, as in the
+  // app) and the decision, each once: under the week shown or under
+  // "Lejátszott meccsek" (#202).
+  await expect(group).toContainText(/4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10/);
+  await expect(group).toContainText("Mindkét pár vereséget kap (0:4, 0:4)");
+  await expect(group).not.toContainText("egyik fél sem játszott");
+  await expect(group.getByText("Mindkét pár vereséget kap (0:4, 0:4)")).toHaveCount(1);
+  await expect(group.getByText(/szuper tie-break/)).toHaveCount(1);
   await page.close();
 });

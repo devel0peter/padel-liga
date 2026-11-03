@@ -462,10 +462,10 @@ export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string)
       case "C": {
         const link = input.pairLink ?? pairPage;
         return {
-          subject: `Küldd el a párlinkedet – ${SITE_NAME}`,
+          subject: `Hívd meg a párodat – ${SITE_NAME}`,
           paragraphs: [
             hi,
-            `Még nincs párod (${input.league}). Küldd el a párlinkedet a párodnak: ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
+            `Még nincs párod (${input.league}). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
             link,
             input.partner ? `${input.partner} még nem regisztrált: neki is küldd el.` : null,
             `Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,

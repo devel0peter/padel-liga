@@ -6,6 +6,7 @@ import {
   accountInvites,
   auditLog,
   emailMessages,
+  emailSuppressions,
   groups,
   interestSignups,
   leagueAdminInvites,
@@ -137,8 +138,8 @@ function otherPeoplesMail(mail: MailContext, mine: (c: SQL | undefined) => SQL |
 // Everything personal tied to the account or its address, other than the
 // users row and the pairs. `guard`: a condition every statement waits for
 // (on anonymize: that the users row was anonymized in the same batch).
-// The unsubscribe (email_suppressions) stays, so the address is never
-// mailed again.
+// The address's unsubscribe, bounce and complaint (email_suppressions) go
+// too, so a later sign-up with it starts clean (#193).
 function personalDataStatements(userId: string, email: string, mail: MailContext, guard: SQL) {
   const mine = (c: SQL | undefined) => and(c, guard);
   return [
@@ -179,6 +180,7 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
       .where(mine(eq(lower(interestSignups.email2), email))),
     // Every stored email to them, sent or not (as for a signup deletion).
     db.delete(emailMessages).where(mine(eq(lower(emailMessages.toEmail), email))),
+    db.delete(emailSuppressions).where(mine(eq(lower(emailSuppressions.email), email))),
     // Old log rows that name the address (Szervező appointments).
     db
       .update(auditLog)

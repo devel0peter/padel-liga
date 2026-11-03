@@ -4,6 +4,7 @@ import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { ProfileFields } from "~/components/profile-fields";
+import { RatingInfo } from "~/components/rating-info";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
@@ -16,6 +17,8 @@ import { requireUser } from "~/lib/auth/session.server";
 import { channelEnabled, CHANNELS, isChannel, isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
 import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
+import { ratingFor, resolveLevel } from "~/lib/profile-level";
+import { hasTakenPartInSeason } from "~/lib/profile-level.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
@@ -29,12 +32,15 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const disabled = await disabledKindsFor(user.id);
+  const [disabled, levelLocked] = await Promise.all([disabledKindsFor(user.id), hasTakenPartInSeason(user.id)]);
   return {
     name: user.name,
     email: user.email,
     imageUrl: user.imageUrl,
     level: user.level,
+    // Took part in a season: the level is read-only (#135).
+    levelLocked,
+    rating: ratingFor(user.level),
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -57,8 +63,15 @@ export async function action({ request }: Route.ActionArgs) {
   if (form.get("intent") === "profile") {
     // A missing phone field must not clear the saved number.
     if (!form.has("phone")) return data({ saved: false, errors: {} as ProfileErrors }, { status: 400 });
+    // A locked level can't be changed by any post, only the UI hides it (#135).
+    const level = resolveLevel({
+      locked: await hasTakenPartInSeason(user.id),
+      stored: user.level,
+      submitted: form.get("level"),
+    });
+    if (!level.ok) return data({ saved: false, errors: { level: level.error } as ProfileErrors }, { status: 400 });
     const result = validateProfile(
-      { name: form.get("name"), level: form.get("level"), phone: form.get("phone"), sex: form.get("sex") },
+      { name: form.get("name"), level: level.level, phone: form.get("phone"), sex: form.get("sex") },
       { requireConsent: false },
     );
     if (!result.ok) return data({ saved: false, errors: result.errors }, { status: 400 });
@@ -140,6 +153,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
 
       <section id="adatok" className="grid max-w-2xl scroll-mt-6 gap-4">
         <h2 className="font-display text-lg font-extrabold">Adataid</h2>
+        {d.rating != null && <RatingInfo rating={d.rating} />}
         {!d.level && (
           <p role="status" className="rounded-md border border-dashed p-3 text-sm">
             Még nem adtad meg a szinted. Kell a jelentkezéshez.
@@ -147,7 +161,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
         )}
         <Form method="post" className="grid gap-5">
           <input type="hidden" name="intent" value="profile" />
-          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} />
+          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={busy}>
               Mentés

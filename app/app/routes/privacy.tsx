@@ -82,7 +82,7 @@ export default function Privacy() {
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
                 állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
-                alap), és amiből az induló értékszámod lesz,
+                alap), és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
@@ -138,7 +138,18 @@ export default function Privacy() {
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
               is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük.
+              mindig e-mailben küldjük. A meccseid kevésbé sürgős híreit és az
+              emlékeztetőket naponta legfeljebb egy levélben, reggel kapod meg,
+              csak azt, amit az oldalon még nem nyitottál meg; a holnapi
+              meccsedről előző este szólunk.
+            </p>
+            <p>
+              Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
+              regisztráltál; nem fejezted be a regisztrációt; nincs párod; vagy
+              a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
+              egyszer küldünk egy emlékeztetőt a következő lépésről. Benne lehet
+              a párod neve, de más e-mail-címe vagy telefonszáma soha. Ha
+              kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
@@ -154,8 +165,9 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a liga indulása után): a neved, az
-                eredményeitek, a tabella és az értékszámok.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
+                és a csoportod tabellája a ligaoldalon; a liga indulása után az
+                eredményeitek és az értékszámok is.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
@@ -163,16 +175,26 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>A telefonszámodat</strong> csak azok látják, akikkel az
-                aktuális körben meccsed van, hogy egyeztetni tudjatok. Más
-                játékos nem látja, és a szervezői felületeken sem jelenik meg. A
-                csoportok kihirdetése után az ellenfeleid a Kezdőlapjukon és a
-                meccs oldalán látják, a kör határidejéig; utána már nem.
+                aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
+                ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
+                elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése
+                után az ellenfeleid a Kezdőlapjukon és a meccs oldalán, a
+                szervező és az admin a meccsek szervezői oldalán látja, a kör
+                határidejéig; utána már nem.
               </li>
               <li>
-                <strong>Az időpont-egyeztetést</strong> (ki, mikor, milyen
-                időpontot ajánlott, fogadott el vagy erősített meg) a meccs két
-                párja látja a meccs oldalán. Megőrizzük, mert a határidőig le nem
-                játszott meccsekről ez alapján dönt a rendszer.
+                <strong>Az időpont-egyeztetést és az eredményt</strong> (ki,
+                mikor, milyen időpontot ajánlott, fogadott el, erősített meg vagy
+                mondott le, és hol lesz a meccs; ki rögzítette, erősítette meg
+                vagy vitatta az eredményt, a vitához írt megjegyzéssel együtt) a
+                meccs két párja látja a meccs oldalán, és a liga szervezője meg
+                az oldal adminja is (a nevekkel, telefonszám és e-mail-cím
+                nélkül), hogy lássák, melyik meccs akadt el, és dönthessenek a
+                vitás eredményekről. Megőrizzük, mert a határidőig le nem
+                játszott meccsekről ez alapján dönt a rendszer, a vitás
+                eredményekről pedig a szervező. Ha a szervező dönt egy meccsről,
+                a döntése a nevével, idejével és indoklásával bekerül a naplóba,
+                amit mindkét pár lát.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem

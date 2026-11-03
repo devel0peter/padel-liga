@@ -1,4 +1,4 @@
-import { Form, useFetcher, useSearchParams } from "react-router";
+import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.users";
 import { AppPage } from "~/components/app-page";
@@ -17,6 +17,7 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { DELETED, DELETION_EFFECTS } from "~/lib/account-deletion";
 import { deleteAccount } from "~/lib/account-deletion.server";
@@ -24,6 +25,15 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
 import { formatDateTime } from "~/lib/format";
 import { listUsers, type UserRow } from "~/lib/users-admin.server";
+import {
+  FILTER_KEYS,
+  filterCounts,
+  filterUsers,
+  hasUserFilters,
+  parseUserFilters,
+  USER_FILTERS,
+  type FilterKey,
+} from "~/lib/users-filter";
 
 // Every account (Admin only). Roles are shown, not edited: Szervezők are
 // appointed on Ligák, the Admin only by the CLI. No phone numbers here.
@@ -32,10 +42,17 @@ import { listUsers, type UserRow } from "~/lib/users-admin.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const actor = await requirePermission(request, { kind: "users.view" });
-  const q = new URL(request.url).searchParams.get("q") ?? "";
+  const filters = parseUserFilters(new URL(request.url).searchParams);
   const lastLogin = actor.platformRole === "superadmin";
   const deleteAs = can(actor, { kind: "users.delete" }) ? actor.id : null;
-  return { users: await listUsers(q, { withLastLogin: lastLogin, deleteAs }), lastLogin, canDelete: !!deleteAs };
+  const all = await listUsers({ withLastLogin: lastLogin, deleteAs });
+  return {
+    users: filterUsers(all, filters),
+    total: all.length,
+    counts: filterCounts(all, filters),
+    lastLogin,
+    canDelete: !!deleteAs,
+  };
 }
 
 // "Törlés": removes the account, or anonymizes it when it has history
@@ -105,18 +122,75 @@ function DeleteResult() {
   );
 }
 
-export default function AdminUsers({ loaderData }: Route.ComponentProps) {
-  const { users, lastLogin, canDelete } = loaderData;
-  const [params] = useSearchParams();
+const ALL = "all";
+
+// One filter group as a select; each option shows how many accounts it
+// matches with the other filters and the search applied.
+function FilterSelect({ name, counts }: { name: FilterKey; counts: Record<string, number> }) {
+  const [params, setParams] = useSearchParams();
+  const { label, options } = USER_FILTERS[name];
+  const current = params.get(name) ?? "";
   return (
-    <AppPage title="Felhasználók" description={`${users.length} fiók${params.get("q") ? " a keresésre" : ""}`}>
-      <Form method="get" className="w-full sm:w-72">
-        <Input name="q" type="search" defaultValue={params.get("q") ?? ""} placeholder="Keresés név vagy e-mail szerint…" aria-label="Keresés" />
-      </Form>
+    <Select
+      value={Object.hasOwn(options, current) ? current : ALL}
+      onValueChange={(value) =>
+        setParams((prev) => {
+          if (value === ALL) prev.delete(name);
+          else prev.set(name, value);
+          return prev;
+        })
+      }
+    >
+      <SelectTrigger aria-label={label} className="w-full sm:w-56">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL}>{label}: mind</SelectItem>
+        {Object.entries(options).map(([value, o]) => (
+          <SelectItem key={value} value={value}>
+            {o.label} ({counts[value]})
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+export default function AdminUsers({ loaderData }: Route.ComponentProps) {
+  const { users, total, counts, lastLogin, canDelete } = loaderData;
+  const [params] = useSearchParams();
+  const filtered = hasUserFilters(parseUserFilters(params));
+  return (
+    <AppPage title="Felhasználók" description={`${users.length} fiók${filtered ? ` (összesen ${total})` : ""}`}>
+      <div className="flex flex-wrap gap-2">
+        <Form method="get" className="w-full sm:w-72">
+          {[...params.entries()]
+            .filter(([k]) => k !== "q")
+            .map(([k, v]) => (
+              <input key={k} type="hidden" name={k} value={v} />
+            ))}
+          <Input
+            key={params.get("q") ?? ""}
+            name="q"
+            type="search"
+            defaultValue={params.get("q") ?? ""}
+            placeholder="Keresés név vagy e-mail szerint…"
+            aria-label="Keresés"
+          />
+        </Form>
+        {FILTER_KEYS.map((key) => (
+          <FilterSelect key={key} name={key} counts={counts[key]} />
+        ))}
+        {filtered && (
+          <Button variant="ghost" asChild>
+            <Link to="/admin/users">Szűrők törlése</Link>
+          </Button>
+        )}
+      </div>
       {canDelete && <DeleteResult />}
       {users.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
-          {params.get("q") ? "Nincs ilyen fiók." : "Még senki nem regisztrált."}
+          {filtered ? "Nincs ilyen fiók." : "Még senki nem regisztrált."}
         </p>
       ) : (
         <div className="rounded-lg border">
@@ -124,12 +198,12 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Név</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Szerep</TableHead>
+                <TableHead className="hidden sm:table-cell">E-mail</TableHead>
+                <TableHead className="hidden sm:table-cell">Szerep</TableHead>
                 <TableHead>Állapot</TableHead>
-                <TableHead>Belépés</TableHead>
-                {lastLogin && <TableHead>Utolsó belépés</TableHead>}
-                <TableHead>Regisztrált</TableHead>
+                <TableHead className="hidden sm:table-cell">Belépés</TableHead>
+                {lastLogin && <TableHead className="hidden sm:table-cell">Utolsó belépés</TableHead>}
+                <TableHead className="hidden sm:table-cell">Regisztrált</TableHead>
                 {canDelete && (
                   <TableHead>
                     <span className="sr-only">Műveletek</span>
@@ -140,24 +214,29 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
             <TableBody>
               {users.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium whitespace-normal">
                     {u.name || <span className="text-muted-foreground">nincs megadva</span>}
+                    {/* The columns that don't fit a phone fold under the name (#146). */}
+                    <div className="grid gap-0.5 text-sm font-normal break-all text-muted-foreground sm:hidden">
+                      <span>{u.email}</span>
+                      <span>{u.role}</span>
+                    </div>
                   </TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">{u.email}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge variant={u.role === "Játékos" ? "outline" : "secondary"}>{u.role}</Badge>
                     {u.leagues.length > 0 && <span className="ml-2 text-sm text-muted-foreground">{u.leagues.join(", ")}</span>}
                   </TableCell>
                   <TableCell className="min-w-48 whitespace-normal">
                     <StatusChips chips={u.status} />
                   </TableCell>
-                  <TableCell>{u.google ? "Google, kód" : "Kód"}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{u.google ? "Google, kód" : "Kód"}</TableCell>
                   {lastLogin && (
-                    <TableCell className="text-sm whitespace-nowrap">
+                    <TableCell className="hidden text-sm whitespace-nowrap sm:table-cell">
                       {u.lastLoginAt ? formatDateTime(new Date(u.lastLoginAt)) : <span className="text-muted-foreground">–</span>}
                     </TableCell>
                   )}
-                  <TableCell className="text-sm whitespace-nowrap">{formatDateTime(new Date(u.createdAt))}</TableCell>
+                  <TableCell className="hidden text-sm whitespace-nowrap sm:table-cell">{formatDateTime(new Date(u.createdAt))}</TableCell>
                   {canDelete && (
                     <TableCell className="text-right">
                       <DeleteDialog user={u} />

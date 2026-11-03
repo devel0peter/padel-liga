@@ -1,7 +1,7 @@
 import { budapestTime, type SchedulingState } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
-import { SCHEDULING_GUIDE, eventText, groupLine, parseSlot, parseSlots, statusView, telHref, todoFor } from "./matches";
+import { SCHEDULING_GUIDE, eventText, groupLine, parseSlot, parseSlots, statusView, telHref, todoFor, venueLine } from "./matches";
 
 const slot = budapestTime("2026-11-12", 18, 0);
 
@@ -108,5 +108,34 @@ describe("SCHEDULING_GUIDE (#26 requirement 7)", () => {
     expect(text).toContain("2 különböző napra");
     expect(text).toContain("megbeszéltétek");
     expect(text).toContain("A másik pár");
+  });
+});
+
+describe("venue and cancellation (#27)", () => {
+  const them = "Kiss Anna – Nagy Béla";
+
+  it("a scheduled match shows the venue with the court", () => {
+    expect(statusView({ status: "scheduled", slot, clubId: 1, court: "2-es pálya" }, "a", "Ace Padel").label).toBe(
+      "Lefixálva: nov. 12., csütörtök 18:00, Ace Padel, 2-es pálya",
+    );
+    expect(venueLine("Ace Padel", null)).toBe("Ace Padel");
+    expect(venueLine(null, "2-es pálya")).toBeNull();
+  });
+
+  it("after a late cancellation the cancelling pair sees it must propose next; only it gets the Teendő", () => {
+    const state: SchedulingState = { status: "to_schedule", nextBy: "b" };
+    expect(statusView(state, "b")).toEqual({ label: "Későn mondtátok le, nektek kell új időpontokat ajánlani", tone: "todo" });
+    expect(statusView(state, "a")).toEqual({ label: "Későn mondták le, nekik kell új időpontokat ajánlaniuk", tone: "waiting" });
+    expect(todoFor(state, "b", them)).toBe("Ajánlj időpontot (Kiss Anna – Nagy Béla ellen)");
+    expect(todoFor(state, "a", them)).toBeNull();
+  });
+
+  it("the log names the venue, and a late cancellation as late", () => {
+    expect(eventText({ kind: "venue", venue: "Ace Padel", court: "2-es pálya" })).toBe("Rögzítette a helyszínt: Ace Padel, 2-es pálya");
+    const hoursBefore = (n: number) => new Date(slot.getTime() - n * 3_600_000);
+    expect(eventText({ kind: "cancelled", slot, at: hoursBefore(23) })).toBe(
+      "Lemondta a meccset (nov. 12., csütörtök 18:00). Késői lemondás: 24 órán belül volt.",
+    );
+    expect(eventText({ kind: "cancelled", slot, at: hoursBefore(25) })).toBe("Lemondta a meccset (nov. 12., csütörtök 18:00)");
   });
 });

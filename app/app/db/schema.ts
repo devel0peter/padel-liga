@@ -1,3 +1,4 @@
+import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -66,6 +67,10 @@ export const emailMessages = sqliteTable(
         "groups_published",
         "match_proposal",
         "match_agreed_time",
+        "stuck_reminder",
+        "match_digest",
+        "match_tomorrow",
+        "match_result",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -253,6 +258,9 @@ export const leagues = sqliteTable("leagues", {
   city: text("city").notNull(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  // When the league's Szervező or the Admin switched on the automatic
+  // reminders for people stuck before entering (#155); null: off.
+  remindersOnAt: integer("reminders_on_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -379,6 +387,14 @@ export const notifications = sqliteTable(
         "match_agreed_time",
         "match_scheduled",
         "match_declined",
+        "match_cancelled",
+        "match_no_proposal",
+        "match_week_end",
+        "match_deadline_soon",
+        "match_tomorrow",
+        "match_result",
+        "match_result_confirmed",
+        "match_decided",
         "test",
       ],
     }).notNull(),
@@ -387,6 +403,9 @@ export const notifications = sqliteTable(
     // A path on this site, opened through /notifications/<id>.
     url: text("url").notNull(),
     readAt: integer("read_at", { mode: "timestamp" }),
+    // When the daily digest (#31) took this item, whether or not it went into
+    // an email; each item is taken once.
+    digestedAt: integer("digested_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -586,6 +605,29 @@ export const seasonEntries = sqliteTable(
   ],
 );
 
+// The automatic reminders already sent (#155, reminders.ts): one row per
+// reminder, so none goes out twice. `key` is "A:<email>", "B:<user id>",
+// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key holds
+// the address; deleting a signup deletes it (outbox.server.ts deleteMessagesTo).
+export const stuckReminders = sqliteTable(
+  "stuck_reminders",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    key: text("key").notNull().unique(),
+    situation: text("situation", { enum: ["A", "B", "C", "D"] }).notNull(),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    seasonId: integer("season_id").references(() => seasons.id, { onDelete: "set null" }),
+    // How many emails it queued (D: up to both players).
+    recipients: integer("recipients").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("stuck_reminders_league_idx").on(t.leagueId, t.situation)],
+);
+
 // A phase's groups (#24, D21), 1. csoport the strongest. Until published_at
 // is set they are the Szervező's draft: regenerated or adjusted at will, and
 // stored so moves persist. Publishing creates the matches and the emails;
@@ -647,14 +689,18 @@ export const matches = sqliteTable(
     deadline: integer("deadline", { mode: "timestamp" }).notNull(),
     // "open": not scheduled yet (a proposal or agreed time may be waiting:
     // packages/rules schedulingState); "scheduled": a slot was accepted or an
-    // agreed time confirmed (#26). Results and the rest come with #27, #28.
-    status: text("status", { enum: ["open", "scheduled"] }).notNull().default("open"),
+    // agreed time confirmed (#26); "result_pending": a result waits for the
+    // other pair, "disputed": the organizer decides, "final": the outcome
+    // counts (#28, #29; packages/rules resultState).
+    status: text("status", { enum: ["open", "scheduled", "result_pending", "disputed", "final"] }).notNull().default("open"),
     // The agreed start and the venue offered with it, once scheduled.
     scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
     clubId: integer("club_id").references(() => clubs.id),
     // Bumped by every step in the log, so two answers at the same moment
     // can't both win (matches.server.ts).
     revision: integer("revision").notNull().default(0),
+    // The outcome that counts, once final (#28, #29); sides as pair_a/pair_b.
+    outcome: text("outcome", { mode: "json" }).$type<MatchOutcome>(),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -687,17 +733,67 @@ export const matchEvents = sqliteTable(
       .references(() => pairs.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind", {
-      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined"],
+      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled", "result_recorded", "result_confirmed", "result_disputed"],
     }).notNull(),
     // A proposal's slots: JSON array of UTC instants in seconds.
     slots: text("slots", { mode: "json" }).$type<number[]>(),
-    // The accepted slot, or the agreed time.
+    // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
-    // The venue offered with a proposal or an agreed time (optional).
+    // The venue offered with a proposal or an agreed time (optional), or
+    // recorded after booking ("venue", #27).
     clubId: integer("club_id").references(() => clubs.id),
+    // "venue": the court, free text (optional, #27).
+    court: text("court"),
+    // A recorded result, or the disputing pair's version (#28); sides as
+    // pair_a/pair_b.
+    score: text("score", { mode: "json" }).$type<MatchScore>(),
+    // The disputing pair's note to the organizer (#28, optional).
+    note: text("note"),
     at: integer("at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
   },
   (t) => [index("match_events_match_idx").on(t.matchId, t.id)],
+);
+
+// A match's outcome set from outside the two pairs (#28, #29): the 48-hour
+// auto-accept of a waiting result (user_id null), or the organizer's decision
+// on a dispute or override of any match, with a required reason. Append-only;
+// the latest row counts (packages/rules resultState). Shown in the match log.
+// Kept apart from match_events, whose pair_id names the acting pair.
+// Personal data: who decided (user_id; set null when the account is deleted).
+export const matchDecisions = sqliteTable(
+  "match_decisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["auto_accepted", "organizer"] }).notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // Sides as pair_a/pair_b.
+    outcome: text("outcome", { mode: "json" }).$type<MatchOutcome>().notNull(),
+    reason: text("reason"),
+    at: integer("at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("match_decisions_match_idx").on(t.matchId, t.id)],
+);
+
+// The reminders that went out for a match (#31), so each goes once: the
+// digest reminders once per match, "holnap meccs" once per scheduled slot
+// (`slot`, seconds; 0 for the others). The hourly cron claims a row before
+// it notifies the four players.
+export const matchReminders = sqliteTable(
+  "match_reminders",
+  {
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["match_no_proposal", "match_week_end", "match_deadline_soon", "match_tomorrow"] }).notNull(),
+    slot: integer("slot").notNull().default(0),
+    sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.kind, t.slot] })],
 );

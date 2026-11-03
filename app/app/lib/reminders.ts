@@ -10,11 +10,12 @@
 //   D  active pair, no entry in the season accepting entries, 2 days
 // Only while the league has a season accepting entries (registration opened,
 // last phase not started), since every reminder gives its dates. When its
-// registration deadline is under 24 hours away, a reminder whose waiting
-// time hasn't passed goes out right away. A person due in two situations in
-// the same run gets only the earlier one's (A before B before C before D);
-// once it is sent, the later one is due on a following run, as each
-// situation has its own reminder.
+// registration deadline is under 24 hours away, a reminder goes out after 24
+// hours instead of its full waiting time, never sooner (#191). A person gets
+// at most one reminder per league season, whatever the situation (#191, by
+// address): due in two, they get the earlier one's (A before B before C
+// before D) and never the other that season; D then goes to the other player
+// only.
 
 import { defaultSeekers, isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
@@ -36,8 +37,11 @@ const DAY = 24 * HOUR;
 
 // How long someone is in a situation before the reminder.
 export const WAIT_MS: Record<Situation, number> = { A: 2 * DAY, B: DAY, C: 2 * DAY, D: 2 * DAY };
-// Under this before the registration deadline, the reminder doesn't wait.
+// Under this before the registration deadline, the reminder waits only
+// MIN_WAIT_MS.
 export const DEADLINE_RUSH_MS = DAY;
+// No reminder sooner than this after getting stuck (#191).
+export const MIN_WAIT_MS = DAY;
 
 export type ReminderLeague = { id: number; city: string; name: string };
 
@@ -93,6 +97,8 @@ export type ReminderInput = {
   suppressed: ReadonlySet<string>;
   // Keys of the reminders already sent (reminderKey).
   sent: ReadonlySet<string>;
+  // Who got a reminder in which season (personKey), any situation (#191).
+  reminded: ReadonlySet<string>;
 };
 
 export type ReminderRecipient = {
@@ -119,17 +125,25 @@ export function reminderKey(situation: Situation, id: string | number, seasonId?
   return situation === "D" ? `D:${id}:${seasonId}` : `${situation}:${id}`;
 }
 
+// What makes a person reminded for the season (#191): the season and the
+// address, lowercase. A invites an address without an account, so the
+// address is what A, B, C and D share.
+export function personKey(seasonId: number, email: string): string {
+  return `${seasonId}:${email.toLowerCase()}`;
+}
+
 // The season of the league that accepts entries now, the earliest if more do.
 export function entrySeason(seasons: readonly Season[], leagueId: number, now: Date): Season | null {
   return homeSeasons(seasons, now).find((s) => s.leagueId === leagueId && entryOpen(s, now)) ?? null;
 }
 
-// Due: in the situation since `since` for its waiting time, or the deadline
-// is under 24 hours away (and hasn't passed).
+// Due: in the situation since `since` for its waiting time, or for 24 hours
+// when the deadline is under 24 hours away (and hasn't passed).
 export function isDue(situation: Situation, since: Date, season: Pick<Season, "registrationClosesAt">, now: Date): boolean {
-  if (now.getTime() - since.getTime() >= WAIT_MS[situation]) return true;
+  const stuck = now.getTime() - since.getTime();
+  if (stuck >= WAIT_MS[situation]) return true;
   const left = season.registrationClosesAt.getTime() - now.getTime();
-  return left > 0 && left < DEADLINE_RUSH_MS;
+  return stuck >= MIN_WAIT_MS && left > 0 && left < DEADLINE_RUSH_MS;
 }
 
 // The next phase that hasn't started: "the next round" in the reminders.
@@ -141,8 +155,8 @@ const latest = (...dates: (Date | null | undefined)[]) =>
   new Date(Math.max(...dates.filter((d): d is Date => !!d).map((d) => d.getTime())));
 
 // Every reminder due now in the given leagues (the ones with the switch on),
-// not sent before, each person in at most one. Pass all leagues to count
-// what the switch would send.
+// not sent before, each person in at most one, and only people not reminded
+// in that season yet. Pass all leagues to count what the switch would send.
 export function dueReminders(input: ReminderInput, leagueIds: readonly number[]): Reminder[] {
   const { now } = input;
   const enabled = input.leagues.filter((l) => leagueIds.includes(l.id));
@@ -174,9 +188,10 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   const out: Reminder[] = [];
   const taken = new Set<string>();
   const add = (r: Reminder) => {
-    if (input.sent.has(r.key) || r.recipients.some((p) => taken.has(p.email))) return;
-    for (const p of r.recipients) taken.add(p.email);
-    out.push(r);
+    const recipients = r.recipients.filter((p) => !input.reminded.has(personKey(r.season.id, p.email)));
+    if (input.sent.has(r.key) || recipients.length === 0 || recipients.some((p) => taken.has(p.email))) return;
+    for (const p of recipients) taken.add(p.email);
+    out.push({ ...r, recipients });
   };
 
   // A: invited addresses without an account, by their earliest invite.

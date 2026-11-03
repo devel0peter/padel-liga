@@ -61,6 +61,7 @@ function freshDb() {
   h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'a')`);
   h.raw.exec(`insert into login_codes (email, code_hash, expires_at, window_start) values ('a@x.hu', 'h', 1, 1)`);
   h.raw.exec(`insert into account_invites (email) values ('a@x.hu')`);
+  h.raw.exec(`insert into stuck_reminder_people (season_id, email, situation) values (1, 'a@x.hu', 'C'), (1, 'b@x.hu', 'D')`);
   h.raw.exec(`insert into email_suppressions (email, reason) values ('a@x.hu', 'unsubscribed')`);
   h.raw.exec(`insert into audit_log (actor_id, action, target) values ('admin', 'league_admin.grant', 'a@x.hu')`);
   h.raw.exec(`insert into email_messages (kind, to_email, subject, status) values ('login_code', 'a@x.hu', 's', 'pending'), ('login_code', 'a@x.hu', 's', 'sent'), ('login_code', 'b@x.hu', 's', 'pending')`);
@@ -133,6 +134,7 @@ function personalRowsLeft() {
     organizer: n("select count(*) from league_admins where user_id = 'a'"),
     loginCodes: n("select count(*) from login_codes where email = 'a@x.hu'"),
     invites: n("select count(*) from account_invites where email = 'a@x.hu'"),
+    reminded: n("select count(*) from stuck_reminder_people where email = 'a@x.hu'"),
     mail: n("select count(*) from email_messages where to_email = 'a@x.hu'"),
     signups: n("select count(*) from interest_signups where lower(email1) = 'a@x.hu' or lower(email2) = 'a@x.hu'"),
     audit: n("select count(*) from audit_log where target like '%a@x.hu%'"),
@@ -150,6 +152,7 @@ const NONE = {
   organizer: 0,
   loginCodes: 0,
   invites: 0,
+  reminded: 0,
   mail: 0,
   signups: 0,
   audit: 0,

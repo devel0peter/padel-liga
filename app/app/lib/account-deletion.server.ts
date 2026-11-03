@@ -20,6 +20,7 @@ import {
   partnerSearches,
   pushSubscriptions,
   sessions,
+  stuckReminderPeople,
   users,
 } from "~/db/schema";
 import { partnerNoticeSubject } from "~/lib/email/templates";
@@ -153,6 +154,8 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
     db.delete(pairInvites).where(mine(or(eq(pairInvites.inviterId, userId), eq(lower(pairInvites.inviteeEmail), email)))),
     db.delete(loginCodes).where(mine(eq(loginCodes.email, email))),
     db.delete(accountInvites).where(mine(eq(accountInvites.email, email))),
+    // Who got a stuck reminder this season (#191), by address.
+    db.delete(stuckReminderPeople).where(mine(eq(stuckReminderPeople.email, email))),
     db.delete(leagueAdminInvites).where(mine(eq(lower(leagueAdminInvites.email), email))),
     // Interest list: a solo paired with one of their signups goes back to
     // the waiting list (as deleteSignup does); their own signups go; on

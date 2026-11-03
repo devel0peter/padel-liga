@@ -2,7 +2,7 @@ import { and, count, eq, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { cities, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminders, users } from "~/db/schema";
+import { cities, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminderPeople, stuckReminders, users } from "~/db/schema";
 import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
 import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
@@ -19,6 +19,7 @@ import {
   dueReminders,
   entrySeason,
   nextPhase,
+  personKey,
   SITUATIONS,
   type Reminder,
   type ReminderInput,
@@ -34,7 +35,7 @@ import {
 
 // Everything reminders.ts needs, read now.
 export async function reminderInput(now = new Date()): Promise<ReminderInput> {
-  const [leagueRows, seasonList, signups, accounts, emailOff, pairRows, entries, searches, suppressed, sent] =
+  const [leagueRows, seasonList, signups, accounts, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
     await Promise.all([
       db
         .select({ id: leagues.id, city: leagues.city, name: leagues.name })
@@ -71,6 +72,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
       db.select().from(partnerSearches),
       suppressedSet(),
       db.select({ key: stuckReminders.key }).from(stuckReminders),
+      db.select({ seasonId: stuckReminderPeople.seasonId, email: stuckReminderPeople.email }).from(stuckReminderPeople),
     ]);
   return {
     now,
@@ -86,6 +88,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
     partnerSearches: searches,
     suppressed,
     sent: new Set(sent.map((r) => r.key)),
+    reminded: new Set(reminded.map((r) => personKey(r.seasonId, r.email))),
   };
 }
 
@@ -105,9 +108,11 @@ function templateInput(r: Reminder, to: ReminderRecipient, league: string, pairL
   };
 }
 
-// account_invites-style chunks: 3 parameters per pair link, 5 per record.
+// account_invites-style chunks: 3 parameters per pair link, 5 per record, 3
+// per person.
 const LINK_CHUNK = 30;
 const RECORD_CHUNK = 15;
+const PERSON_CHUNK = 30;
 
 // C needs the player's own pair link: made now for whoever has none yet
 // (as Párom would on their next visit).
@@ -129,12 +134,12 @@ async function pairLinksFor(owners: { userId: string; leagueId: number }[]): Pro
 }
 
 // The cron's step: queues every reminder due in the leagues with the switch
-// on. One D1 batch (a transaction) writes the stuck_reminders records and
-// the emails: both commit or neither does, so a failure part-way can't leave
-// an email queued without its record (it would go out again next run). A
-// run overlapping another fails on the records' unique key and queues
-// nothing; whatever it missed is due on the next run. Returns how many
-// emails were queued.
+// on. One D1 batch (a transaction) writes the stuck_reminders records, who
+// got one this season (stuck_reminder_people, #191) and the emails: all
+// commit or none does, so a failure part-way can't leave an email queued
+// without its record (it would go out again next run). A run overlapping
+// another fails on a unique key and queues nothing; whatever it missed is
+// due on the next run. Returns how many emails were queued.
 export async function queueDueReminders(now = new Date()): Promise<number> {
   const on = await db.select({ id: leagues.id, name: leagues.name }).from(leagues).where(isNotNull(leagues.remindersOnAt));
   if (on.length === 0) return 0;
@@ -171,6 +176,8 @@ export async function queueDueReminders(now = new Date()): Promise<number> {
         })),
       ),
     );
+  const people = due.flatMap((r) => r.recipients.map((to) => ({ seasonId: r.season.id, email: to.email.toLowerCase(), situation: r.situation })));
+  for (let i = 0; i < people.length; i += PERSON_CHUNK) statements.push(db.insert(stuckReminderPeople).values(people.slice(i, i + PERSON_CHUNK)));
   statements.push(...(await stuckReminderInserts(messages)));
   const [first, ...rest] = statements;
   try {

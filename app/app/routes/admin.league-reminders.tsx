@@ -65,7 +65,7 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
   return (
     <AppPage
       title="Emlékeztetők"
-      description="Egy automatikus levél annak, aki elakadt a nevezés előtt. Helyzetenként mindenki csak egyszer kapja."
+      description="Egy automatikus levél annak, aki elakadt a nevezés előtt. Szezononként mindenki legfeljebb egyet kap, bármelyik helyzetben van."
     >
       <Card className="max-w-2xl">
         <CardHeader className="gap-3">
@@ -152,7 +152,7 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
         <p className="text-sm text-muted-foreground">
           Egy valódi címzett adataival; az e-mail-cím és a párlink rejtve. Nem kap emlékeztetőt, aki leiratkozott, akinek
           visszapattant a levele, aki kikapcsolta az e-mailt, akinél be van kapcsolva a „Párt keresek”, a már nevezett
-          párok és az Admin.
+          párok, az Admin, és aki ebben a szezonban már kapott emlékeztetőt.
         </p>
       </section>
     </AppPage>

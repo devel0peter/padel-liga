@@ -12,6 +12,7 @@ import {
   interestSignups,
   leagues,
   notificationOptOuts,
+  stuckReminderPeople,
   stuckReminders,
   users,
 } from "~/db/schema";
@@ -743,13 +744,15 @@ export async function cancelUnsentSignupMail(emails: string[]): Promise<number> 
   return rows.length;
 }
 
-// Deletion request: remove the stored emails sent to these addresses, and
-// the record of an A reminder (#155), whose key holds the address.
+// Deletion request: remove the stored emails sent to these addresses, the
+// record of an A reminder (#155), whose key holds the address, and who got a
+// reminder this season (#191), by address.
 export async function deleteMessagesTo(emails: string[]) {
   if (emails.length === 0) return;
   const lowered = emails.map((e) => e.toLowerCase());
   await db.batch([
     db.delete(emailMessages).where(inArray(emailMessages.toEmail, lowered)),
     db.delete(stuckReminders).where(inArray(stuckReminders.key, lowered.map((e) => `A:${e}`))),
+    db.delete(stuckReminderPeople).where(inArray(stuckReminderPeople.email, lowered)),
   ]);
 }

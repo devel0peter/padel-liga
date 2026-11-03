@@ -140,6 +140,9 @@ async function pairLinksFor(owners: { userId: string; leagueId: number }[]): Pro
 // without its record (it would go out again next run). A run overlapping
 // another fails on a unique key and queues nothing; whatever it missed is
 // due on the next run. Returns how many emails were queued.
+// It reads each table it needs once, whatever their size: STUCK_QUERIES at
+// most (the cron keeps that much of its run for it, #183; checked by a test).
+export const STUCK_QUERIES = 20;
 export async function queueDueReminders(now = new Date()): Promise<number> {
   const on = await db.select({ id: leagues.id, name: leagues.name }).from(leagues).where(isNotNull(leagues.remindersOnAt));
   if (on.length === 0) return 0;

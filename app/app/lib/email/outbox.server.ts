@@ -18,6 +18,7 @@ import {
 } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
 import { channelKey, followsEmailSwitch } from "~/lib/notifications";
+import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, inviteStarts, type InviteRecipient, type InviteStart, type Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
@@ -262,24 +263,32 @@ export async function queueMatchEmails(
 // personal (transactional) mail within the daily limit. Unsubscribed or
 // bounced addresses, and players who switched email off (#115), get nothing;
 // the in-app list and push still have the items.
-export async function queueReminderEmails(
-  messages: (
-    | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
-    | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] }
-  )[],
-): Promise<void> {
-  if (messages.length === 0) return;
+export type ReminderEmail =
+  | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
+  | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] };
+
+// Returned as insert statements for the hourly job's own D1 batch (#183):
+// stored together with the job's records of what it sent, and sent by the
+// job's delivery step within the run's limits. Two queries at most (the
+// suppressed addresses and the email switch).
+// `batches`: one list of emails per D1 batch the caller makes; the statements
+// come back split the same way.
+export async function reminderEmailInserts(batches: ReminderEmail[][]): Promise<BatchItem<"sqlite">[][]> {
+  const messages = batches.flat();
+  if (messages.length === 0) return batches.map(() => []);
   const suppressed = await suppressedSet();
-  const queued = messages
-    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
-    .map(
-      (m): NewMessage => ({
-        kind: m.kind,
-        toEmail: m.toEmail,
-        ...(m.kind === "match_digest" ? dailyDigest(m.input) : matchTomorrow(m.input)),
-      }),
-    );
-  await deliverNow(await enqueue(queued));
+  const off = messages.some((m) => followsEmailSwitch(m.kind)) ? await emailSwitchedOff() : new Set<string>();
+  const wanted = (m: ReminderEmail) =>
+    toSomeone(m) && !suppressed.has(m.toEmail.toLowerCase()) && (!followsEmailSwitch(m.kind) || !off.has(m.toEmail.toLowerCase()));
+  return batches.map((list) => {
+    const queued = list
+      .filter(wanted)
+      .map((m): NewMessage => ({ kind: m.kind, toEmail: m.toEmail, ...(m.kind === "match_digest" ? dailyDigest(m.input) : matchTomorrow(m.input)) }));
+    const statements: BatchItem<"sqlite">[] = [];
+    for (let i = 0; i < queued.length; i += INSERT_CHUNK)
+      statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
+    return statements;
+  });
 }
 
 // SEND_NOW_MAX (budget.ts): one deliver() call, a handful of D1 queries and
@@ -599,8 +608,11 @@ export async function sentLast24h(now = Date.now()): Promise<number> {
 
 // Sends pending emails within the daily budget: login codes first, then
 // signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
-export async function deliver(ids?: number[]): Promise<{ sent: number }> {
-  const now = Date.now();
+// `at`: the cron run's scheduled time (#188); the time of the call otherwise.
+// `run`: the cron run's limits (#183); `left` says how many emails wait when
+// the run stopped early because of them.
+export async function deliver(ids?: number[], at = new Date(), run?: RunBudget): Promise<{ sent: number; left?: number }> {
+  const now = at.getTime();
   const runStart = new Date(now);
   await db
     .update(emailMessages)
@@ -612,6 +624,8 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   let sent = 0;
   for (const group of GROUPS) {
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
+      // The run's limits (#183): what's left waits for the next run.
+      if (run && !run.fits(BATCH_COST)) return { sent, left: await pendingCount() };
       const budget = sendBudget(limit, sentBefore + sent, GROUP_BUDGET_KIND[group]);
       const rows = await claim(budget, group, runStart, ids);
       if (rows.length === 0) break;
@@ -621,6 +635,18 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
     }
   }
   return { sent };
+}
+
+// One batch of deliver(): the claim, the results (one D1 batch) and the
+// count of what's left when the run stops; the relay connection, maybe a
+// second one, and Resend for what the relay refused.
+const BATCH_COST: Usage = { queries: 3, calls: 3 };
+// What deliver() needs to send anything in a run.
+export const DELIVER_MIN: Usage = { queries: 2 + BATCH_COST.queries, calls: BATCH_COST.calls };
+
+async function pendingCount(): Promise<number> {
+  const [{ n }] = await db.select({ n: count() }).from(emailMessages).where(eq(emailMessages.status, "pending"));
+  return n;
 }
 
 export type BroadcastSummary = typeof broadcasts.$inferSelect & {

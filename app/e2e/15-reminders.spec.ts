@@ -43,7 +43,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   // Switching on asks first and queues nothing by itself.
   await toggle.click();
   const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toContainText("A következő óránkénti futás 2 embernek küld emlékeztetőt");
+  await expect(dialog).toContainText("A következő futás (10 percen belül) 2 embernek küld emlékeztetőt");
   await dialog.getByRole("button", { name: "Bekapcsolom" }).click();
   await expect(content(page).getByRole("switch", { name: "Bekapcsolva" })).toBeChecked();
   await visit(page, "/admin/leagues/minta/reminders");

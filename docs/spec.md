@@ -261,7 +261,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - A mid-phase withdrawal's reason (section 4): only the organizer, the Admin and the pair itself; the others only see that the pair withdrew. Anonymizing a player's account (section 3) clears it, also from the partner's notice.
 - **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).
 - **Retention:**
-  - Interest list: deleted after the first season starts, unless the person registers.
+  - Interest list: deleted at the end of the first season's first round, unless the person registers (README decision log, 2026-11-03, D88, #224).
   - Accounts: kept until deletion, then removed, or anonymized when results depend on them (section 3).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address. A deletion request is carried out by the Admin (section 3); the deletion also removes the address's unsubscribe and bounce record, so every stored data of the address is gone (only the anonymized name in old results stays).
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).

@@ -350,8 +350,8 @@ export default function Privacy() {
           <Section title="Meddig őrizzük?">
             <ul className={list}>
               <li>
-                <strong>Jelentkezési lista:</strong> az első szezon indulása után
-                töröljük, kivéve, ha regisztráltál.
+                <strong>Jelentkezési lista:</strong> az első szezon első körének
+                végén töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
                 <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem

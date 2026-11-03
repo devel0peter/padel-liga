@@ -291,7 +291,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Account: any player in a published group, for example the first pair's first player
 - Expect:
   - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match.
-  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours, then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
+  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours (without numbers until a result is final; then the same table as on the public league page: place, pair, M, P, Szett, Játék, #201), then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
   - Each match: the opponents, "Egyeztetésre vár", their two phone numbers (tap to call) and "Egyeztetés és részletek". No email address anywhere.
   - "Hamarosan itt lesz a csoportod" is gone.
 
@@ -426,7 +426,7 @@ The public ladder counts final results (README decision log, 2026-11-03, #186).
 - Do: open the league page after the confirmation of step 27 and the decision of step 28.
 - Expect:
   - In the player's group the table is no longer at zero: the player's pair has 3 points in 2 matches (the confirmed win of step 27 and the "both lose" decision of step 28, 0 points), the step 27 opponent 1 point in 1 match, the step 28 opponent 0 points in 1 match. Szett and Játék follow the rules (spec 9).
-  - "Lejátszott meccsek" under the table lists both: the score from the 1. pár's side ("4-1 2-4 10-8" or "1-4 4-2 8-10") and "egyik fél sem játszott".
+  - Both results are listed once (#202): under "<n>. hét meccsei" when they belong to the week shown, else under "Lejátszott meccsek". Scores read as in the app, from the 1. pár's side ("4:1, 2:4, szuper tie-break 10:8" or "1:4, 4:2, szuper tie-break 8:10"), and the decision as "Mindkét pár vereséget kap (0:4, 0:4)".
   - Before the confirmation (a result still waiting) and while a result is disputed (step 28, before the decision) the table does not change; it changes when the result is confirmed, accepted after 48 hours, or decided.
   - Still no email address or phone number on the page.
 

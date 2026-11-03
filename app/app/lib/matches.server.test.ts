@@ -18,6 +18,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
+const L = await import("~/lib/ladder.server");
 const { formatSlot } = await import("~/lib/matches");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -130,6 +131,61 @@ describe("currentGroups (#25)", () => {
 
   it("someone not in a group gets nothing", async () => {
     expect(await M.currentGroups("x", NOW)).toEqual([]);
+  });
+
+  describe("the group's standing (#201)", () => {
+    const setMatch = (a: number, b: number, status: string, outcome: object | null) =>
+      h.raw
+        .prepare("update matches set status = ?, outcome = ? where pair_a = ? and pair_b = ?")
+        .run(status, outcome ? JSON.stringify(outcome) : null, a, b);
+    const won = (sets: [number, number][]) => ({ kind: "played", score: { sets } });
+
+    it("before any result every pair is there in seed order with no points", async () => {
+      const [g] = await M.currentGroups("p1a", NOW);
+      expect(g!.pairs.map((p) => [p.pairId, p.matches, p.points])).toEqual([
+        [1, 0, 0],
+        [2, 0, 0],
+        [4, 0, 0],
+        [3, 0, 0],
+      ]);
+    });
+
+    it("after results the pairs are in table order, counting final results only", async () => {
+      // 3 beats 1 and 4, 1 beats 2; 2–4 waits for the other pair and 1–4 is disputed.
+      setMatch(1, 3, "final", won([[1, 4], [2, 4]]));
+      setMatch(4, 3, "final", won([[1, 4], [1, 4]]));
+      setMatch(1, 2, "final", won([[4, 1], [4, 1]]));
+      setMatch(2, 4, "result_pending", won([[4, 0], [4, 0]]));
+      setMatch(1, 4, "disputed", won([[4, 0], [4, 0]]));
+      const [g] = await M.currentGroups("p1a", NOW);
+      expect(g!.pairs.map((p) => [p.pairId, p.rank, p.matches, p.points, p.mine])).toEqual([
+        [3, 1, 2, 6, false],
+        [1, 2, 2, 4, true],
+        [2, 3, 1, 1, false],
+        [4, 4, 1, 1, false],
+      ]);
+      expect(g!.pairs[0]).toMatchObject({ setDiff: 4, gameDiff: 11 });
+    });
+
+    it("is the public league page's table for the same group: same order, same numbers", async () => {
+      setMatch(1, 3, "final", won([[1, 4], [2, 4]]));
+      setMatch(4, 3, "final", won([[1, 4], [1, 4]]));
+      setMatch(1, 2, "final", won([[4, 1], [4, 1]]));
+      setMatch(2, 4, "result_pending", won([[4, 0], [4, 0]]));
+      const [g] = await M.currentGroups("p1a", NOW);
+      const page = await L.ladderPage("gyor", NOW);
+      if (page?.kind !== "ladder") throw new Error("no ladder");
+      const table = page.bands.flatMap((b) => b.groups).find((x) => x.number === 1)!;
+      const row = (name: string, r: { rank: number; matches: number; points: number; setDiff: number; gameDiff: number }) => ({
+        name,
+        rank: r.rank,
+        matches: r.matches,
+        points: r.points,
+        setDiff: r.setDiff,
+        gameDiff: r.gameDiff,
+      });
+      expect(g!.pairs.map((p) => row(p.name, p))).toEqual(table.rows.map((r) => row(r.names.join(" – "), r)));
+    });
   });
 
   it("each status shows on the home view", async () => {

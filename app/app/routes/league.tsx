@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/league";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { signed } from "~/lib/format";
 import type { LadderBand, LadderGroup, LadderMatchView } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { ladderPage } from "~/lib/ladder.server";
@@ -35,7 +36,6 @@ const BAND: Record<Division, { band: string; chip: string }> = {
 };
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-const signed =(n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
 
 function PairNames({ names }: { names: [string, string] }) {
   return (

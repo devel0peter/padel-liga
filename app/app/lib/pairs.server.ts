@@ -256,7 +256,7 @@ export const NEW_PARTNER_REFUSED = "Válassz új partnert.";
 // running-group check is repeated in the update, so a group published in the
 // meantime wins; the withdrawal only runs once the pair is dissolved.
 // `also`: an extra condition for the update.
-function dissolveStatements(actorId: string, pairId: number, now: Date, also = sql`1`) {
+export function dissolveStatements(actorId: string, pairId: number, now: Date, also = sql`1`) {
   return [
     db
       .update(pairs)

@@ -111,7 +111,7 @@ flowchart LR
 | `/admin/broadcasts`, `/admin/broadcasts/new` | Admin | broadcasts (unchanged) |
 | `/admin/traffic` | Admin | traffic (unchanged) |
 | `/admin/leagues` | Admin | create a league, appoint and remove Szervezők |
-| `/admin/users` | Admin | user list, search, roles shown read-only |
+| `/admin/users` | Admin | user list, search, roles shown read-only, "Törlés" (delete or anonymize, #152) |
 
 Old paths (`/admin/clubs`) redirect. `/admin/poster` and `/admin/export.csv` stay where they are, behind the same guard.
 

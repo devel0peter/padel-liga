@@ -26,6 +26,7 @@ const platformOnly: Permission[] = [
   { kind: "leagues.manage" },
   { kind: "cities.manage" },
   { kind: "users.view" },
+  { kind: "users.delete" },
   { kind: "clubs.manage" },
 ];
 

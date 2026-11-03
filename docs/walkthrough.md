@@ -428,6 +428,19 @@ The public ladder counts final results (README decision log, 2026-11-03, #186).
   - Before the confirmation (a result still waiting) and while a result is disputed (step 28, before the decision) the table does not change; it changes when the result is confirmed, accepted after 48 hours, or decided.
   - Still no email address or phone number on the page.
 
+### 30. Admin deletes an account (side path)
+
+On a deletion request the Admin removes the account (#152, README decision log D60).
+
+- Page: `/admin/users` ("Felhasználók")
+- Account: `admin@example.test`
+- Do: "Törlés" on the player of step 15 (`uj.jatekos@example.test`; skip step 16, or their link pair goes with them), read the dialog, press "Törlés".
+- Expect:
+  - The dialog names the account and its address and says everything goes, because it has no history. "A fiók törölve." shows and the row is gone; the account isn't in Párok, Párkeresők or any count either, and logging in with the address starts a new registration.
+  - "Törlés" on a player whose pair is in a published group (after step 11): the dialog says it can't be deleted until the pair is withdrawn, with no delete button. On your own row: "A saját fiókodat itt nem törölheted."
+  - Nothing new in the terminal or on Kimenő levelek.
+  - A Szervező has no Felhasználók page at all.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

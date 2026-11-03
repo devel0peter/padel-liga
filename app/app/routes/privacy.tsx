@@ -345,10 +345,13 @@ export default function Privacy() {
                 töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
-                <strong>Fiókok:</strong> amíg nem kéred a törlést. Utána
-                anonimizáljuk, hogy a korábbi eredmények megmaradjanak, de ne
-                lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
-                töröljük.
+                <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem
+                játszottál kihirdetett csoportban, a fiókodat mindenestül
+                töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
+                játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
+                lehessen hozzád kötni őket. Az e-mail-címedet, a
+                telefonszámodat, a nemedet, a belépéseidet és az eszközeidet
+                ilyenkor teljesen töröljük.
               </li>
               <li>
                 <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
@@ -363,6 +366,15 @@ export default function Privacy() {
               Bármikor kérheted, hogy megmutassuk, javítsuk vagy töröljük az
               adataidat, és visszavonhatod a hozzájárulásodat. Ehhez elég egy
               e-mail a {mail} címre, és legkésőbb egy hónapon belül intézzük.
+            </p>
+            <p>
+              Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
+              neked szóló leveleket, és a neved meg a címed mások
+              jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
+              közben kéred, amikor a párod kihirdetett csoportban játszik, a
+              kör végén törlünk. Ha leiratkoztál a levelekről, azt
+              megtartjuk, hogy erre a címre soha többé ne írjunk. A törlésről
+              nem küldünk levelet.
             </p>
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti

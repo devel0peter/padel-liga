@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { and, inArray, isNull } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { users } from "~/db/schema";
@@ -44,7 +44,8 @@ export async function leaguePairsAudience(
     const rows = await db
       .select({ id: users.id, email: users.email, name: users.name })
       .from(users)
-      .where(inArray(users.id, ids.slice(i, i + CHUNK)));
+      // A deleted account (#152) still has its dissolved pair's row, but no one to write to.
+      .where(and(inArray(users.id, ids.slice(i, i + CHUNK)), isNull(users.deletedAt)));
     const byId = new Map(rows.map((r) => [r.id, r]));
     for (const id of ids.slice(i, i + CHUNK)) {
       const u = byId.get(id);

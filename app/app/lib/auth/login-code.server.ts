@@ -2,6 +2,7 @@ import { and, count, eq, gt, lt, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, emailMessages, emailSuppressions, loginCodes, users } from "~/db/schema";
+import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { dailyLimit, queueLoginCode } from "~/lib/email/outbox.server";
 
 import { createUser, findUserIdByEmail } from "./accounts.server";
@@ -68,8 +69,9 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
   // tell anyone which addresses have an account. Such an address still gets a
   // code row (a code nobody knows) under the same limits, so a wrong code,
   // a locked code and "too many codes" read the same as for a sent one (#123).
+  // A deleted account's placeholder address (#152) is never emailed either.
   const now = new Date();
-  const mayEmail = await mayEmailCode(email, now);
+  const mayEmail = !isAnonymizedEmail(email) && (await mayEmailCode(email, now));
 
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
   const decision = codeSendDecision(existing ?? null, now);
@@ -109,7 +111,10 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
     const result = checkCode(row ?? null, false, now);
     return { ok: false, error: CODE_MESSAGES[result === "ok" || result === "wrong" ? "missing" : result] };
   }
-  if (!timingSafeEqual(record.codeHash, await codeHash(email, code))) return { ok: false, error: CODE_MESSAGES.wrong };
+  // A deleted account's placeholder address (#152) never logs in, not even
+  // with a guessed code: it reads as a wrong one.
+  if (isAnonymizedEmail(email) || !timingSafeEqual(record.codeHash, await codeHash(email, code)))
+    return { ok: false, error: CODE_MESSAGES.wrong };
 
   // Single use. Deleting by the hash we checked means a parallel request with
   // the same code can't also succeed.

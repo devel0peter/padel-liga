@@ -19,6 +19,7 @@ vi.mock("~/lib/email/send.server", () => ({
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const R = await import("~/lib/reminders.server");
+const { anonymizedEmail } = await import("~/lib/account-deletion");
 const O = await import("~/lib/email/outbox.server");
 
 // Monday 2 Nov 2026, 13:00 Budapest; registration until Fri 6 Nov 23:59.
@@ -64,6 +65,10 @@ function people() {
   user("nora");
   const pair = h.raw.prepare("insert into pairs (league_id, player_a, player_b) values (1, 'mari', 'nora') returning id").get().id;
   h.raw.prepare("insert into season_entries (season_id, pair_id) values (1, ?)").run(pair);
+  // An anonymized account (#152), as anonymize leaves it: no consent, the
+  // placeholder address, no opt-outs. Nothing, and not counted.
+  user("olga", { consent: null, created: T - 2 * DAY });
+  h.raw.prepare("update users set name = 'Törölt játékos', email = ?, phone = null, deleted_at = ? where id = 'olga'").run(anonymizedEmail("olga"), T - DAY);
 }
 
 describe("automatic reminders (#155)", () => {

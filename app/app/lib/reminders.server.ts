@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, max, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -52,7 +52,9 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
           createdAt: users.createdAt,
           role: users.platformRole,
         })
-        .from(users),
+        .from(users)
+        // An anonymized account (#152) is nobody to remind.
+        .where(isNull(users.deletedAt)),
       emailSwitchedOff(),
       db
         .select({

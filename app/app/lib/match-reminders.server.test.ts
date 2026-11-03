@@ -185,6 +185,13 @@ describe("the daily digest (#31)", () => {
     expect(mails("match_digest")).toHaveLength(7);
   });
 
+  it("a deleted account (#152) gets no digest, even with an item left", async () => {
+    h.raw.exec("update users set deleted_at = unixepoch() where id = 'p1a'");
+    await R.runMatchReminders(at("2026-11-11", 7));
+    expect(mails("match_digest").map((m: any) => m.to)).not.toContain("p1a@x.hu");
+    expect(mails("match_digest")).toHaveLength(7);
+  });
+
   it("takes each item once, and only from the last day", async () => {
     h.raw.exec(
       `insert into notifications (user_id, kind, title, body, url, created_at) values ('p1a', 'match_cancelled', 'Régi', 'x', '/matches/1', ${sec("2026-11-09T05:00:00Z")})`,

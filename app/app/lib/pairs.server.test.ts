@@ -241,9 +241,10 @@ describe("pairs.server on real SQLite (#97)", () => {
 describe("the player-side pair invite is gone (#97)", () => {
   // Every app source file except tests and the files that only name the
   // kinds and the table for rows already stored (schema, budget, outbox
-  // labels, the local seed reset).
+  // labels, the local seed reset, and the account deletion that removes a
+  // deleted person's old rows, #152).
   const ROOT = new URL("../", import.meta.url);
-  const KEEP = new Set(["db/schema.ts", "lib/email/budget.ts", "lib/email/outbox-view.ts", "lib/seed.ts"]);
+  const KEEP = new Set(["db/schema.ts", "lib/email/budget.ts", "lib/email/outbox-view.ts", "lib/seed.ts", "lib/account-deletion.server.ts"]);
   function sources(dir: URL, prefix = ""): string[] {
     return (readdirSync(dir) as string[]).flatMap((name) => {
       const url = new URL(name, dir);

@@ -191,6 +191,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 - New phase (Monday morning after the deadline): your group, opponents and the deadline.
 - A proposal arrived, or an agreed time is waiting for confirmation. The email at most once per match per recipient a Budapest calendar day; later steps that day in the app and by push only (README decision log, 2026-11-03, #191, #171, D83).
 - A result is waiting for confirmation.
+- A result was disputed, to the pair that recorded it: "Vitatják az eredményt", the organizer decides. In the app and by push only, no email, not a digest item; no names or score in the text (README decision log, 2026-11-03, #178, D86).
 - The match is tomorrow (the evening before an accepted slot). In the app and by push only for now, no email (D83).
 - A 3rd strike: the pair leaves at the end of the phase.
 - End of a phase, with your new group.
@@ -198,6 +199,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 
 **Szervezők and Admins** (in the app and by push, no email):
 - A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
+- A disputed result in their league (Admins: any league), at once, linking to the match's decision page; the league's Szervezők and every Admin, once each, accounts being deleted left out. No names, scores or contact details in the text. They can switch this kind ("Vitatott eredmény") off on the profile (README decision log, 2026-11-03, #178, D86).
 
 **Daily digest** (one email in the morning, only on days with something in it; push gets the same items one by one). The email is off for now (D83): the items are in the app and pushed as below, and no digest email goes out:
 - A slot was accepted, a time was cancelled, a result was confirmed.

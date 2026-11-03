@@ -342,6 +342,8 @@ export type MatchContext = {
   groupNumber: number;
   groupCount: number;
   league: string;
+  leagueId: number;
+  leagueSlug: string;
   city: string;
   season: string;
   phase: number;
@@ -359,6 +361,8 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
       phase: groups.phase,
       season: seasons.name,
       league: leagues.name,
+      leagueId: leagues.id,
+      leagueSlug: leagues.slug,
       city: leagues.city,
       phaseStartsAt: seasonPhases.startsAt,
     })
@@ -378,6 +382,8 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     groupNumber: row.groupNumber,
     groupCount: await groupCount(row.seasonId, row.phase),
     league: row.league,
+    leagueId: row.leagueId,
+    leagueSlug: row.leagueSlug,
     city: row.city,
     season: row.season,
     phase: row.phase,

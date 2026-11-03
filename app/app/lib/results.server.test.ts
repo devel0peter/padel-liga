@@ -265,10 +265,55 @@ describe("disputing a result (#28)", () => {
     expect(page.result).toMatchObject({ status: "disputed", counter: theirs });
     expect(page.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect(page.log.at(-1)!.text).toBe("Vitatta az eredményt, ezt írta be helyette: 1:4, 1:4. Megjegyzés: Fordítva volt.");
-    // Nobody is told yet (a follow-up); nothing is auto-accepted.
-    expect(inbox()).toEqual([]);
+    // Told at once (#178): the recording pair and the organizers, app only, no mail.
     expect(h.mails).toEqual([]);
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 100 * HOUR))).toBe(0);
+    expect(matchRow(id).status).toBe("disputed");
+  });
+
+  it("tells the recording pair and the organizers at once, never by email (#178)", async () => {
+    const { id, rec, recPartner, opp, oppPartner } = setup();
+    // Szervező 'o', a second one who switched the kind off, an Admin who is
+    // also a Szervező (once), another Admin, a deleted Szervező, and the
+    // Szervező of another league (nothing).
+    h.raw.exec(`insert into users (id, email, name, level, consent_at, platform_role) values
+      ('adm', 'adm@x.hu', 'Admin', 'halado', 1, 'superadmin'), ('adm2', 'adm2@x.hu', 'Admin 2', 'halado', 1, 'superadmin'),
+      ('o2', 'o2@x.hu', 'Org 2', 'halado', 1, 'player'), ('o3', 'o3@x.hu', 'Org 3', 'halado', 1, 'player'), ('o4', 'o4@x.hu', 'Org 4', 'halado', 1, 'player')`);
+    h.raw.exec(`update users set deleted_at = 1 where id = 'o3'`);
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o'), (1, 'o2'), (1, 'adm'), (1, 'o3'), (2, 'o4')`);
+    h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('o2', 'result_disputed')`);
+    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    h.raw.exec("delete from notifications");
+    h.mails = [];
+
+    await R.resultStep(opp, id, { kind: "dispute", score: score([[1, 4], [1, 4]]), note: "" }, PLAYED);
+
+    const decide = `/admin/leagues/gyor/matches/${id}/decide`;
+    const rows = all("select user_id, kind, title, body, url from notifications order by kind, user_id");
+    expect(rows.map((r: any) => [r.user_id, r.kind, r.url])).toEqual([
+      [rec, "match_result_disputed", `/matches/${id}`],
+      [recPartner, "match_result_disputed", `/matches/${id}`],
+      ["adm", "result_disputed", decide],
+      ["adm2", "result_disputed", decide],
+      ["o", "result_disputed", decide],
+    ]);
+    // The disputing pair gets nothing; no names, contacts or scores in any text.
+    expect(rows.some((r: any) => r.user_id === opp || r.user_id === oppPartner)).toBe(false);
+    expect(JSON.stringify(rows)).not.toMatch(/Játékos|@|\+36|[0-9]:[0-9]/);
+    expect(h.mails).toEqual([]);
+    expect(all("select 1 from email_messages")).toEqual([]);
+  });
+
+  it("a failed notice never undoes the dispute", async () => {
+    const { id, rec, opp } = setup();
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`);
+    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    h.raw.exec("delete from notifications");
+    h.raw.exec("drop table notification_opt_outs");
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await R.resultStep(opp, id, { kind: "dispute", score: score([[1, 4], [1, 4]]), note: "" }, PLAYED)).toMatchObject({ ok: true });
+    spy.mockRestore();
     expect(matchRow(id).status).toBe("disputed");
   });
 });

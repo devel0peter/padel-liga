@@ -372,9 +372,12 @@ export default function Privacy() {
               neked szóló leveleket, és a neved meg a címed mások
               jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
               közben kéred, amikor a párod kihirdetett csoportban játszik, a
-              kör végén törlünk. Ha leiratkoztál a levelekről, azt
-              megtartjuk, hogy erre a címre soha többé ne írjunk. A törlésről
-              nem küldünk levelet.
+              kör végén törlünk. A címedhez tartozó minden tárolt adatot
+              törlünk, a leiratkozásodat vagy a visszapattanó levelek
+              nyomát is. Csak a régi eredményekben marad meg a neved
+              névtelenítve („Törölt játékos”). Ha később újra regisztrálsz
+              ezzel a címmel, tiszta lappal indulsz. A törlésről nem
+              küldünk levelet.
             </p>
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti

@@ -27,6 +27,7 @@ test("Törlés: an account without history is removed with its signup", async ({
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText(`Törlöd ${TEST.name} fiókját?`);
   await expect(dialog).toContainText("Nincs lejátszott múltja");
+  await expect(dialog).toContainText("a leiratkozás vagy visszapattanás nyoma is");
   await expect(dialog).toContainText("Senki nem kap róla e-mailt.");
   await dialog.getByRole("button", { name: "Törlés" }).click();
   await expect(content(page).getByRole("status")).toHaveText("A fiók törölve.");

@@ -141,7 +141,7 @@ export default function Privacy() {
               mindig e-mailben küldjük. Ha időpontot ajánlanak a meccsedre vagy
               meg kell erősítened egyet, egy meccsről naponta legfeljebb egy
               levelet kapsz, a többit az oldalon és push értesítésben látod. A
-              meccseid kevésbé sürgős híreiről, az emlékeztetőkről és a holnapi
+              meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
               meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
               nem.
             </p>

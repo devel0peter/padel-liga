@@ -3,12 +3,38 @@
 // side is matches.server.ts, the rules are in packages/rules (slots.ts,
 // scheduling.ts).
 
-import { DIVISION_NAMES, budapestTime, divisionOf, isDay, isLateCancel, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
+import {
+  DIVISION_NAMES,
+  budapestDay,
+  budapestTime,
+  divisionOf,
+  isDay,
+  isLateCancel,
+  type SchedulingEventKind,
+  type SchedulingState,
+  type Side,
+} from "@padel-liga/rules";
 
 import { formatDeadline } from "./format";
 
 // "nov. 12., csütörtök 18:00": a slot or an agreed time.
 export const formatSlot = formatDeadline;
+
+// The steps the other pair gets an email about (spec 13, D68).
+const EMAILED_STEPS: readonly SchedulingEventKind[] = ["proposal", "counter_proposal", "agreed_time"];
+
+/**
+ * Whether a proposal, counter-proposal or agreed time from `side` now also
+ * goes to the other pair by email (#191 requirement 3, #171): only the first
+ * of the Budapest calendar day on the match. The other pair's players get
+ * every step from `side`, so this is one per match per recipient a day;
+ * later ones that day reach them in the app and by push only. `earlier` is
+ * the match's log before this step.
+ */
+export function schedulingEmailDue(earlier: readonly { kind: SchedulingEventKind; side: Side; at: Date }[], side: Side, now: Date): boolean {
+  const today = budapestDay(now);
+  return !earlier.some((e) => e.side === side && EMAILED_STEPS.includes(e.kind) && budapestDay(e.at) === today);
+}
 
 // "Réz divízió, 3. csoport" (spec 14).
 export function groupLine(number: number, groupCount: number): string {

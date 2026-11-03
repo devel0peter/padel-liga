@@ -1,7 +1,7 @@
-import { budapestTime, type SchedulingState } from "@padel-liga/rules";
+import { budapestTime, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
-import { SCHEDULING_GUIDE, eventText, groupLine, parseSlot, parseSlots, statusView, telHref, todoFor, venueLine } from "./matches";
+import { SCHEDULING_GUIDE, eventText, groupLine, parseSlot, schedulingEmailDue, parseSlots, statusView, telHref, todoFor, venueLine } from "./matches";
 
 const slot = budapestTime("2026-11-12", 18, 0);
 
@@ -137,5 +137,32 @@ describe("venue and cancellation (#27)", () => {
       "Lemondta a meccset (nov. 12., csütörtök 18:00). Késői lemondás: 24 órán belül volt.",
     );
     expect(eventText({ kind: "cancelled", slot, at: hoursBefore(25) })).toBe("Lemondta a meccset (nov. 12., csütörtök 18:00)");
+  });
+});
+
+describe("schedulingEmailDue (#191 requirement 3, #171)", () => {
+  const t = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+  const step = (kind: SchedulingEventKind, side: Side, at: Date) => ({ kind, side, at });
+
+  it("the first proposal, counter-proposal or agreed time of the day from a pair: an email", () => {
+    expect(schedulingEmailDue([], "a", t("2026-11-10", 11))).toBe(true);
+    // The other pair's steps were emailed to this pair, not to the other.
+    expect(schedulingEmailDue([step("proposal", "b", t("2026-11-10", 9))], "a", t("2026-11-10", 11))).toBe(true);
+  });
+
+  it("a second one the same Budapest day from the same pair: none", () => {
+    for (const kind of ["proposal", "counter_proposal", "agreed_time"] as const)
+      expect(schedulingEmailDue([step(kind, "a", t("2026-11-10", 0, 5))], "a", t("2026-11-10", 23, 55))).toBe(false);
+  });
+
+  it("the next Budapest day: an email again, also across midnight and in summer time", () => {
+    expect(schedulingEmailDue([step("proposal", "a", t("2026-11-10", 23, 50))], "a", t("2026-11-11", 0, 10))).toBe(true);
+    expect(schedulingEmailDue([step("proposal", "a", t("2026-06-10", 23, 50))], "a", t("2026-06-11", 0, 10))).toBe(true);
+    expect(schedulingEmailDue([step("proposal", "a", t("2026-06-10", 0, 10))], "a", t("2026-06-10", 23, 50))).toBe(false);
+  });
+
+  it("steps that send no email don't count", () => {
+    const quiet = (["accepted", "agreed_confirmed", "agreed_declined", "venue", "cancelled"] as const).map((k) => step(k, "a", t("2026-11-10", 9)));
+    expect(schedulingEmailDue(quiet, "a", t("2026-11-10", 11))).toBe(true);
   });
 });

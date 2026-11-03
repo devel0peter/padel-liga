@@ -24,6 +24,7 @@ import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
+import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { listCities } from "~/lib/cities.server";
 import { listSeasons } from "~/lib/seasons.server";
 
@@ -109,9 +110,15 @@ export async function emailSwitchedOff(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.email.toLowerCase()));
 }
 
+// A deleted account's placeholder address (#152) is nobody: whatever list
+// it slips into, no email is stored for it.
+const toSomeone = (m: { toEmail: string }) => !isAnonymizedEmail(m.toEmail);
+
 // Stores the emails, except notifications to an account that switched email
-// off (#115, followsEmailSwitch); the in-app list still has them.
-async function enqueue(queued: NewMessage[]): Promise<number[]> {
+// off (#115, followsEmailSwitch; the in-app list still has them) and mail to a
+// deleted account's placeholder address.
+async function enqueue(all: NewMessage[]): Promise<number[]> {
+  const queued = all.filter(toSomeone);
   const off = queued.some((m) => followsEmailSwitch(m.kind)) ? await emailSwitchedOff() : new Set<string>();
   const messages = queued.filter((m) => !followsEmailSwitch(m.kind) || !off.has(m.toEmail.toLowerCase()));
   const ids: number[] = [];
@@ -299,20 +306,21 @@ export async function createBroadcast(input: {
   recipients: Recipient[];
   createdBy: string;
 }): Promise<number> {
+  const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
   const [{ id }] = await db
     .insert(broadcasts)
     .values({
       subject: input.subject,
       body: input.body,
       audience: input.audience,
-      recipients: input.recipients.length,
+      recipients: recipients.length,
       createdBy: input.createdBy,
     })
     .returning({ id: broadcasts.id });
 
   const secret = emailSecret();
   const messages = await Promise.all(
-    input.recipients.map(async (r): Promise<NewMessage> => {
+    recipients.map(async (r): Promise<NewMessage> => {
       const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
       return {
         kind: "broadcast",
@@ -338,7 +346,7 @@ export async function stuckReminderInserts(
 ): Promise<BatchItem<"sqlite">[]> {
   const secret = emailSecret();
   const queued = await Promise.all(
-    messages.map(async (m): Promise<NewMessage> => {
+    messages.filter(toSomeone).map(async (m): Promise<NewMessage> => {
       const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(m.toEmail, secret));
       return { kind: "stuck_reminder", toEmail: m.toEmail, headers: unsubscribeHeaders(url), ...stuckReminder(m.input, url) };
     }),
@@ -432,7 +440,7 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // player just added (#96); the same rules apply. Never to an address with an
 // account (inviteRecipients), so the email switch (#115) has nothing to skip.
 export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
-  const pending = (await pendingRegistrationInvites()).filter((r) => !only || only.includes(r.email));
+  const pending = (await pendingRegistrationInvites()).filter((r) => (!only || only.includes(r.email)) && toSomeone({ toEmail: r.email }));
   if (pending.length === 0) return 0;
   const claimed = await markInvited(
     pending.map((r) => r.email),

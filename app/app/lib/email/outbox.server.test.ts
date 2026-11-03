@@ -116,6 +116,68 @@ describe("queueGroupsPublished", () => {
   });
 });
 
+// Whatever list a deleted account's placeholder address (#152) slips into,
+// no email is stored for it.
+describe("a deleted account's placeholder address", () => {
+  const group = (to: string, partnerName: string) => ({
+    to,
+    partnerName,
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  });
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+  });
+
+  it("gets no personal, match or reminder email", async () => {
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: group("Anna", "Béla") },
+      { toEmail: "Deleted-u1@deleted.invalid", input: group("Törölt játékos", "Anna") },
+    ]);
+    await O.queueReminderEmails([
+      { kind: "match_digest", toEmail: "deleted-u1@deleted.invalid", input: { to: "Törölt játékos", items: [{ title: "x", body: "y", url: "/matches/1" }] } },
+    ]);
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+  });
+
+  it("gets no broadcast, and the broadcast doesn't count it", async () => {
+    await O.createBroadcast({
+      subject: "Hír",
+      body: "Szia {nev}!",
+      audience: "Párok",
+      recipients: [
+        { email: "anna@x.hu", name: "Anna" },
+        { email: "deleted-u1@deleted.invalid", name: "Törölt játékos" },
+      ],
+      createdBy: "admin@x.hu",
+    });
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+    expect(h.raw.prepare("select recipients from broadcasts").get()).toEqual({ recipients: 1 });
+  });
+
+  it("gets no automatic reminder", async () => {
+    const input = {
+      situation: "B" as const,
+      to: "Törölt játékos",
+      email: "deleted-u1@deleted.invalid",
+      partner: null,
+      league: "L",
+      season: "S",
+      deadline: new Date("2026-11-06T22:59:00Z"),
+      nextRound: null,
+      pairLink: null,
+      now: new Date("2026-11-02T12:00:00Z"),
+    };
+    expect(await O.stuckReminderInserts([{ toEmail: "deleted-u1@deleted.invalid", input }])).toEqual([]);
+  });
+});
+
 // Every email goes out by itself (#112, replaces the held outbox of #88).
 describe("automatic outbox", () => {
   const signup: InterestSignup = {

@@ -273,9 +273,12 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
         and(
           eq(notifications.kind, "pair_withdrawn"),
           sql`instr(${notifications.body}, ' Indok: ') > 0`,
+          // Only the pair's own players got the reason, and only at the end
+          // of the notice: an exact suffix match, no LIKE wildcards.
           sql`exists (select 1 from group_pairs gp join pairs p on p.id = gp.pair_id
             where (p.player_a = ${userId} or p.player_b = ${userId}) and gp.withdrawal_reason is not null
-            and ${notifications.body} like '%' || ' Indok: ' || gp.withdrawal_reason)`,
+            and ${notifications.userId} in (p.player_a, p.player_b)
+            and substr(${notifications.body}, -length(' Indok: ' || gp.withdrawal_reason)) = ' Indok: ' || gp.withdrawal_reason)`,
           guard,
         ),
       ),

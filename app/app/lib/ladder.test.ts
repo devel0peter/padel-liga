@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatSlot } from "./format";
-import { buildLadder, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
+import { buildLadder, groupTable, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
 const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játékos ${id}A`, `Játékos ${id}B`], elo });
 
@@ -201,5 +201,20 @@ describe("buildLadder: a pair withdrawn mid-phase (#34, rules 2)", () => {
     }
     expect(buildLadder([withdrawnGroup()], 1)[0]!.groups[0]!.withdrawn).toEqual([["Játékos 14A", "Játékos 14B"]]);
     expect(buildLadder([without()], 1)[0]!.groups[0]!.withdrawn).toEqual([]);
+  });
+});
+
+describe("groupTable: a pair withdrawn mid-phase (#34), for the ladder and Kezdőlap", () => {
+  it("leaves the pair and its matches out, as if it never played", () => {
+    const pairs = [pair(1), pair(2), pair(3), { ...pair(4), withdrawn: true }];
+    const matches = [
+      played(1, 1, 2, 1, [[4, 0], [4, 0]]),
+      played(2, 4, 3, 1, [[4, 0], [4, 0]]),
+      played(3, 3, 1, 2, [[4, 1], [4, 1]]),
+      played(4, 1, 4, 2, [[4, 2], [4, 2]]),
+    ];
+    const without = groupTable(pairs.slice(0, 3), matches.filter((m) => m.a !== 4 && m.b !== 4));
+    expect(groupTable(pairs, matches)).toEqual(without);
+    expect(groupTable(pairs, matches).map((r) => r.pairId)).not.toContain(4);
   });
 });

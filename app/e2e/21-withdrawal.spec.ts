@@ -9,17 +9,21 @@ import { expect, test, type Page } from "@playwright/test";
 import { GROUP_PAIRS, ORGANIZER, PAIRS, as, content, d1, visit, type Player } from "./support";
 
 const REASON = "Sérülés, a kör végéig nem tudnak játszani.";
+// "A – B" in the order the pair is stored, which may differ from the seed's.
+const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const pairText = (a: Player, b: Player) => `(?:${esc(a.name)} – ${esc(b.name)}|${esc(b.name)} – ${esc(a.name)})`;
 const row = (page: Page, a: Player, b: Player) =>
   page.getByRole("row").filter({ hasText: a.name }).filter({ hasText: b.name });
 
 test("Kivétel a szezonból mid-round: a reason, the table without the pair, Párom says who to ask", async ({ browser }) => {
   const [x, y] = PAIRS.p5;
-  // The other pairs of p5's group, from the suite's D1.
+  // The players of the other pairs in p5's group, from the suite's D1. A
+  // pair's two players are stored in either order, so both sides count.
   const mates = d1(`select u.email from group_pairs gp join group_pairs mine on mine.group_id = gp.group_id
-      join pairs p on p.id = mine.pair_id join users ux on ux.id = p.player_a
-      join pairs o on o.id = gp.pair_id join users u on u.id = o.player_a
+      join pairs p on p.id = mine.pair_id join users ux on ux.id in (p.player_a, p.player_b)
+      join pairs o on o.id = gp.pair_id join users u on u.id in (o.player_a, o.player_b)
       where ux.email = '${x.email}' and gp.pair_id <> mine.pair_id`).map((r) => r.email as string);
-  const others = GROUP_PAIRS.filter((p) => mates.includes(p[0].email));
+  const others = GROUP_PAIRS.filter((p) => p.some((pl) => mates.includes(pl.email)));
   expect(others.length).toBeGreaterThan(0);
   const emailsBefore = d1("select count(*) as n from email_messages")[0]!.n;
 
@@ -29,7 +33,7 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   await expect(pair).toContainText(/Nevezés \(.+\): Nevezett/);
   await pair.getByRole("button", { name: "Kivétel a szezonból" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText(`Visszaléptetés kör közben: ${x.name} – ${y.name}`);
+  await expect(dialog).toContainText(new RegExp(`Visszaléptetés kör közben: ${pairText(x, y)}`));
   await expect(dialog).toContainText("minden meccse kikerül a csoport tabellájából");
   await expect(dialog).toContainText("e-mailt nem");
   await expect(dialog.getByRole("button", { name: "Visszaléptetés" })).toBeDisabled();
@@ -60,13 +64,15 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
     await p.context.close();
   }
 
-  // A pair of the same group: the withdrawn pair struck through on Kezdőlap;
-  // the notice without the reason.
+  // A pair of the same group: on Kezdőlap the group's table leaves the
+  // withdrawn pair out and names it below; its week's match is off. The
+  // notice comes without the reason.
   const mate = await as(browser, others[0]![0]);
   await visit(mate.page, "/home");
-  const items = content(mate.page).getByRole("listitem").filter({ hasText: x.name });
-  await expect(items.filter({ hasText: "(visszalépett)" })).toHaveCount(1);
-  await expect(items.filter({ hasText: "visszalépett a körből: ez a meccs elmarad" })).toHaveCount(1);
+  const card = content(mate.page);
+  await expect(card).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
+  await expect(card.getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
+  await expect(card.getByRole("listitem").filter({ hasText: "visszalépett a körből: ez a meccs elmarad" })).toHaveCount(1);
   await visit(mate.page, "/notifications");
   await expect(content(mate.page)).toContainText("Visszalépett egy pár a csoportodból");
   await expect(content(mate.page)).not.toContainText(REASON);
@@ -75,7 +81,7 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   // The public table: the pair is named below its group, not in the table.
   const visitor = await browser.newPage();
   await visit(visitor, "/league/minta");
-  await expect(content(visitor)).toContainText(`Visszalépett: ${x.name} – ${y.name}. A meccseik nem számítanak.`);
+  await expect(content(visitor)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
   await expect(content(visitor).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
   await expect(content(visitor)).not.toContainText(REASON);
   await visitor.close();

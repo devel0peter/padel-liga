@@ -219,14 +219,18 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     await withdraw();
     expect(await M.currentGroups("g", NOW)).toEqual([]);
     const [mine] = await M.currentGroups("a", NOW);
-    expect(mine!.pairs.map((p) => [p.pairId, p.withdrawn])).toEqual([
-      [1, false],
-      [2, false],
-      [3, false],
-      [4, true],
-    ]);
+    // The group card's table (#201) leaves the pair and all its matches out,
+    // as if it never played, and names it below.
+    expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
+    expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
     expect(mine!.offWeeks).toEqual([{ week: 2, opponents: "Játékos G – Játékos H" }]);
+    const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
+    freshDb({ withPair4: false });
+    const [never] = await M.currentGroups("a", NOW);
+    expect(table).toEqual(never!.pairs.map(({ name: _, mine: __, ...r }) => r));
+    expect(table.map((r) => r.points)).toEqual([4, 4, 4]);
+    expect(never!.withdrawn).toEqual([]);
   });
 
   it("reminders: the pair's matches are not running any more", async () => {
@@ -265,6 +269,10 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     h.raw
       .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/pair')")
       .run();
+    // Another pair withdrawn with the same reason: its player's notice stays.
+    h.raw
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/pair')")
+      .run(`Más pár. Indok: ${REASON}`);
     expect(await A.deleteAccount("o", "g", NOW)).toEqual({ ok: true, mode: "anonymize" });
     expect(row("select withdrawn_at is not null as w, withdrawal_reason from group_pairs where pair_id = 4")).toEqual({
       w: 1,
@@ -275,6 +283,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(partner[0]).toMatch(/szóljatok a szervezőnek\.$/);
     expect(partner[1]).toBe("Más. Indok: Költözés");
     expect(rows("select id from notifications where user_id = 'g'")).toEqual([]);
+    expect(row("select body from notifications where user_id = 'i'").body).toBe(`Más pár. Indok: ${REASON}`);
     // The other pairs' notices had no reason and are untouched.
     expect(rows("select body from notifications where user_id = 'a'")[0].body).toContain("A csoport nélkülük folytatja.");
   });

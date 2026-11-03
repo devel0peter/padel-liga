@@ -6,6 +6,8 @@ import {
   ENTRY_REFUSALS,
   entryOpen,
   entryStatusText,
+  TAKEN_OUT_TEXT,
+  ENTRY_STATUS_LABELS,
   entryView,
   fromPhase,
   joinsPhase,
@@ -133,6 +135,19 @@ describe("status texts", () => {
     expect(entryStatusText({ status: "approved", joinsPhase: null })).toBe("Beneveztetek: a következő szezontól játszotok.");
     expect(entryStatusText({ status: "pending", joinsPhase: null })).not.toMatch(/jóváhagy/);
     expect(entryStatusText({ status: "rejected", joinsPhase: null })).toMatch(/nem fogadta el/);
+  });
+
+  it("#174: a taken-out pair reads that the organizer took it out and is the one to ask", () => {
+    expect(entryStatusText({ status: "withdrawn", joinsPhase: 1 })).toBe(TAKEN_OUT_TEXT);
+    expect(TAKEN_OUT_TEXT).toMatch(/A szervező kivett titeket a szezonból/);
+    expect(TAKEN_OUT_TEXT).toMatch(/szóljatok neki/);
+    expect(TAKEN_OUT_TEXT).not.toMatch(/Nevezünk/);
+  });
+});
+
+describe("ENTRY_STATUS_LABELS", () => {
+  it("#174: a withdrawn entry has one word", () => {
+    expect(ENTRY_STATUS_LABELS.withdrawn).toBe("Visszavonva");
   });
 });
 

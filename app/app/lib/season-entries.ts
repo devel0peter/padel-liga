@@ -95,9 +95,15 @@ export function entryStatusText(entry: { status: EntryStatus; joinsPhase: number
     case "rejected":
       return "A szervező nem fogadta el a nevezéseteket.";
     case "withdrawn":
-      return "A nevezés visszavonva.";
+      return TAKEN_OUT_TEXT;
   }
 }
+
+// A withdrawn entry on Párom and Kezdőlap (#174): the organizer took the pair
+// out (between rounds, or mid-round, #34); only they can enter it again. A
+// dissolved pair's withdrawn entry never shows (entryFor skips it).
+export const TAKEN_OUT_TEXT =
+  "A szervező kivett titeket a szezonból. Ha újra játszanátok, szóljatok neki: ő újra be tud nevezni titeket.";
 
 // What a player sees for one season: the entry's status, the "Nevezünk"
 // button, why they can't apply yet, or nothing (not open, no entry).
@@ -129,6 +135,7 @@ export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = {
   approved: "Nevezett",
   pending: "Függőben",
   rejected: "Elutasítva",
+  // Also Párok's filter option (#174): taken out, or dissolved before playing.
   withdrawn: "Visszavonva",
 };
 

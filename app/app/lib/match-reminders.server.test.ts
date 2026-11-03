@@ -76,7 +76,7 @@ const mails = (kind: string) => all("select to_email as \"to\", subject, status 
 const PLAYERS = (...pairs: number[]) => pairs.flatMap((p) => [`p${p}a`, `p${p}b`]);
 const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
-// The digest and "holnap meccs" emails are off for now (#191, D81); the
+// The digest and "holnap meccs" emails are off for now (#191, D83); the
 // tests below keep them working with both switched on, as turning them back
 // on would.
 const run = (now: Date) => R.runMatchReminders(now, { digest: true, tomorrow: true });
@@ -266,7 +266,7 @@ describe("holnap meccs (#31)", () => {
   });
 });
 
-describe("the emails switched off (#191, D81)", () => {
+describe("the emails switched off (#191, D83)", () => {
   beforeEach(freshDb);
 
   it("both are off by default", async () => {
@@ -274,9 +274,15 @@ describe("the emails switched off (#191, D81)", () => {
     expect(MATCH_REMINDER_EMAILS).toEqual({ digest: false, tomorrow: false });
   });
 
+  // Without VAPID keys the push step logs what it would push.
+  const pushed = (log: ReturnType<typeof vi.spyOn>) => log.mock.calls.map((c: unknown[]) => String(c[0]));
+
   it("the 07:00 run makes the reminder items (in the app, by push) and queues no digest email", async () => {
     await schedule14();
+    const log = vi.spyOn(console, "log");
     await R.runMatchReminders(at("2026-11-11", 7));
+    expect(pushed(log)).toContain("[push disabled] 4 × match_no_proposal");
+    log.mockRestore();
     // Pairs 2 and 3 have had no proposal by Wednesday: their reminder is in the app.
     expect(inbox("match_no_proposal").map((n: any) => n.user).sort()).toEqual(PLAYERS(2, 3).sort());
     expect(mails("match_digest")).toEqual([]);
@@ -288,7 +294,10 @@ describe("the emails switched off (#191, D81)", () => {
   it("the evening run gives 'holnap meccs' in the app and by push, and queues no email", async () => {
     await schedule14();
     h.raw.exec("delete from notifications");
+    const log = vi.spyOn(console, "log");
     await R.runMatchReminders(at("2026-11-11", 18));
+    expect(pushed(log)).toContain("[push disabled] 4 × match_tomorrow");
+    log.mockRestore();
     expect(inbox("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
     expect(mails("match_tomorrow")).toEqual([]);
     expect(h.sent).toEqual([]);

@@ -138,16 +138,20 @@ export default function Privacy() {
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
               is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük. A meccseid kevésbé sürgős híreit és az
-              emlékeztetőket naponta legfeljebb egy levélben, reggel kapod meg,
-              csak azt, amit az oldalon még nem nyitottál meg; a holnapi
-              meccsedről előző este szólunk.
+              mindig e-mailben küldjük. Ha időpontot ajánlanak a meccsedre vagy
+              meg kell erősítened egyet, egy meccsről naponta legfeljebb egy
+              levelet kapsz, a többit az oldalon és push értesítésben látod. A
+              meccseid kevésbé sürgős híreiről, az emlékeztetőkről és a holnapi
+              meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
+              nem.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
               regisztráltál; nem fejezted be a regisztrációt; nincs párod; vagy
               a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
-              egyszer küldünk egy emlékeztetőt a következő lépésről. Benne lehet
+              szezononként legfeljebb egy emlékeztetőt küldünk a következő
+              lépésről. Ehhez az e-mail-címeddel együtt feljegyezzük, melyik
+              szezonban kaptál; a fiókod törlésével ezt is töröljük. Benne lehet
               a párod neve, de más e-mail-címe vagy telefonszáma soha. Ha
               kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
             </p>

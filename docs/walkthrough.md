@@ -306,6 +306,7 @@ A player without a pair sends their own link; the partner registers and accepts 
   - The second goes through: "Elküldtük az időpontokat a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár". The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the link.
   - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, pick a time and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
   - Instead of accepting, the opponent can send their own times ("Új időpontok ajánlása"): it replaces the first proposal.
+  - Sending times again on the same match the same day: the opponents get it in "Értesítések" (and by push), but the terminal prints no second email; one scheduling email per match a day to each player (#191).
 
 ### 19. A pair records an agreed time, the other confirms
 
@@ -372,20 +373,21 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 
 - Page: none; the terminal of `npm run dev`, then "Értesítések"
 - Do: run the hourly job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/local/scheduled?time=<milliseconds since 1970 of 07:00 Budapest, within a day from now>`, then again with the time of 18:00 the day before a fixed match.
-- Expect:
-  - 07:00: every player with an unopened digest item (for example "Lefixálva a meccsetek" or "Lemondták a meccset" from steps 18, 19 and 24, or "Még nincs időpont-ajánlat" from Wednesday of a match's week) gets one "Napi összefoglaló" email in the terminal with every item and its link; the reminders are in "Értesítések" too. Running it again sends nothing.
-  - 18:00 the day before a fixed match: "Holnap meccs: <time>" to the match's four players, with the venue if recorded.
+- Expect (both emails are off for now, #191, D81; the in-app items and pushes stay):
+  - 07:00: the day's reminders (for example "Még nincs időpont-ajánlat" from Wednesday of a match's week) are in "Értesítések" of the match's four players. No "Napi összefoglaló" email in the terminal. Running it again adds nothing.
+  - 18:00 the day before a fixed match: "Holnap meccs" in "Értesítések" of the match's four players, with the time and the venue if recorded. No email.
   - Any other hour: nothing.
 
 ### 26. Szervező checks the automatic reminders (side path)
 
-People stuck before entering get one reminder per situation, once the league's switch is on (#155).
+People stuck before entering get at most one reminder per season, whatever the situation, once the league's switch is on (#155, #191).
 
 - Page: `/admin/leagues/minta/reminders` ("Emlékeztetők")
 - Account: Szervező
 - Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
 - Expect:
-  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0 unless the registration deadline is under 24 hours away.
+  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0; a registration deadline under 24 hours away shortens the 2 days to 24 hours, never less.
+  - The note under the previews lists who never gets one, ending with "és aki ebben a szezonban már kapott emlékeztetőt".
   - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
   - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
 

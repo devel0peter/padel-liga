@@ -163,13 +163,18 @@ describe("texts", () => {
     );
   });
 
-  it("holnap meccs: time and venue", () => {
+  it("holnap meccs: starts with Holnap, then day, time and venue (#184)", () => {
     expect(tomorrowMessage({ matchId: 7, slot: at("2026-11-12", 18), venue: "Ace Padel", court: "2-es pálya" })).toEqual({
       title: "Holnap meccs",
-      body: "nov. 12., csütörtök 18:00, Ace Padel, 2-es pálya. Jó játékot!",
+      body: "Holnap (nov. 12., csütörtök) 18:00, Ace Padel, 2-es pálya. Jó játékot!",
       url: "/matches/7",
     });
-    expect(tomorrowMessage({ matchId: 7, slot: at("2026-11-12", 18), venue: null, court: null }).body).toBe("nov. 12., csütörtök 18:00. Jó játékot!");
+    expect(tomorrowMessage({ matchId: 7, slot: at("2026-11-12", 18), venue: null, court: null }).body).toBe(
+      "Holnap (nov. 12., csütörtök) 18:00. Jó játékot!",
+    );
+    expect(tomorrowMessage({ matchId: 7, slot: at("2026-11-12", 9), venue: "Ace Padel", court: null }).body).toBe(
+      "Holnap (nov. 12., csütörtök) 09:00, Ace Padel. Jó játékot!",
+    );
   });
 });
 

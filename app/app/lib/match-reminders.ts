@@ -5,7 +5,7 @@
 
 import { addDays, budapestClock, budapestDay, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
 
-import { formatDeadline } from "./format";
+import { formatClockTime, formatDeadline, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
 import { venueLine } from "./matches";
 import type { Message } from "./notifications";
@@ -136,11 +136,12 @@ export function reminderMessage(kind: DigestReminder, input: { matchId: number; 
   }
 }
 
+// "Holnap (nov. 12., csütörtök) 18:00, Ace Padel, 2-es pálya. Jó játékot!" (#184)
 export function tomorrowMessage(input: { matchId: number; slot: Date; venue: string | null; court: string | null }): Message {
   const where = venueLine(input.venue, input.court);
   return {
     title: "Holnap meccs",
-    body: `${formatDeadline(input.slot)}${where ? `, ${where}` : ""}. Jó játékot!`,
+    body: `Holnap (${formatWeekdayDate(input.slot)}) ${formatClockTime(input.slot)}${where ? `, ${where}` : ""}. Jó játékot!`,
     url: matchUrl(input.matchId),
   };
 }

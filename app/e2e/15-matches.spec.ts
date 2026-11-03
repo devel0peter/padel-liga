@@ -237,7 +237,7 @@ test("25. the cron: 07:00 and holnap meccs the evening before, in the app only; 
   await cron(player.page, budapestTime(today, 19, 0));
   // Once, to the four players, in the app (and by push).
   expect(tomorrowNotices().sort()).toEqual([anna, PAIRS.p1[1], ...second!.opponents].map((p) => p.email).sort());
-  // Both emails are off for now (#191, D81).
+  // Both emails are off for now (#191, D83).
   expect(cronMail()).toBe(0);
   expect(emailsSince(first).filter((m) => isDigest(m) || m.subject.startsWith("Holnap meccs"))).toEqual([]);
   await visit(player.page, "/notifications");

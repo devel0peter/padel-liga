@@ -373,7 +373,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 
 - Page: none; the terminal of `npm run dev`, then "Értesítések"
 - Do: run the hourly job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/local/scheduled?time=<milliseconds since 1970 of 07:00 Budapest, within a day from now>`, then again with the time of 18:00 the day before a fixed match.
-- Expect (both emails are off for now, #191, D81; the in-app items and pushes stay):
+- Expect (both emails are off for now, #191, D83; the in-app items and pushes stay):
   - 07:00: the day's reminders (for example "Még nincs időpont-ajánlat" from Wednesday of a match's week) are in "Értesítések" of the match's four players. No "Napi összefoglaló" email in the terminal. Running it again adds nothing.
   - 18:00 the day before a fixed match: "Holnap meccs" in "Értesítések" of the match's four players, with the time and the venue if recorded. No email.
   - Any other hour: nothing.

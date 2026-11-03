@@ -17,7 +17,7 @@ export const DIGEST_HOUR = 7;
 // day before the slot.
 export const TOMORROW_FIRST_HOUR = 18;
 export const TOMORROW_LAST_HOUR = 21;
-// Which of the cron's match emails go out (#191, D81). Both are off before
+// Which of the cron's match emails go out (#191, D83). Both are off before
 // round 1: fewer automatic emails. The reminder items, their pushes and
 // "holnap meccs" in the app and by push stay. Set one to true to send that
 // email again; nothing else changes.

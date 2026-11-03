@@ -85,6 +85,7 @@ function freshDb() {
   // - 105: a pair intro with anna@x.hu, which merely ends in a@x.hu
   // - 106: a broadcast to another "Anna Teszt", her own name
   // - 107: group mail naming "Anna Tesztelő", a different name
+  // - 109: group mail to another "Anna Teszt", her own name only in the greeting
   h.raw.exec(`update users set name = 'Anna Teszt' where id = 'a'`);
   const mail = h.raw.prepare("insert into email_messages (id, kind, to_email, subject, text, status) values (?, ?, ?, ?, ?, ?)");
   mail.run(100, "partner_notice", "b@x.hu", partnerNoticeSubject("A"), null, "sent");
@@ -96,9 +97,10 @@ function freshDb() {
   mail.run(106, "broadcast", "anna.masik@x.hu", "Hírek", "Szia Anna Teszt!", "pending");
   mail.run(107, "groups_published", "d@x.hu", "Itt a csoportod", "1. hét: Anna Tesztelő és Béla ellen", "pending");
   mail.run(108, "match_proposal", "c@x.hu", "Időpontokat ajánlottak", "Anna Teszt és B időpontokat ajánlott.", "failed");
+  mail.run(109, "groups_published", "nagy2@x.hu", "Kint a csoportod", "Szia Anna Teszt!\n\n1. hét: Cili és Dóra ellen", "pending");
 }
 
-// What is left of other people's mail (ids 100 to 108 above).
+// What is left of other people's mail (ids 100 to 109 above).
 function otherPeoplesMailAfter() {
   expect(all("select id, subject from email_messages where id >= 100 order by id")).toEqual([
     { id: 100, subject: PARTNER_NOTICE_SUBJECT_REMOVED },
@@ -106,6 +108,7 @@ function otherPeoplesMailAfter() {
     { id: 105, subject: "Találtunk neked párt" },
     { id: 106, subject: "Hírek" },
     { id: 107, subject: "Itt a csoportod" },
+    { id: 109, subject: "Kint a csoportod" },
   ]);
 }
 
@@ -243,7 +246,7 @@ describe("deleting an account (#152)", () => {
     expect(one("select status from pairs where id = 1").status).toBe("active");
     expect(n("select count(*) from interest_signups")).toBe(4);
     expect(all("select subject from email_messages where id = 100")).toEqual([{ subject: partnerNoticeSubject("A") }]);
-    expect(n("select count(*) from email_messages where id >= 100")).toBe(9);
+    expect(n("select count(*) from email_messages where id >= 100")).toBe(10);
   });
 
   it("refuses the Admin's own account and another Admin's", async () => {

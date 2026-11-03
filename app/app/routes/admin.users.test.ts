@@ -89,10 +89,15 @@ describe("/admin/users", () => {
     expect((await R.loader(args(get(cookie)))).users.map((u) => u.id)).not.toContain("n");
   });
 
-  it("doesn't list an anonymized account", async () => {
+  it("doesn't list or count an anonymized account", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    const before = await R.loader(args(get(cookie)));
     h.raw.exec(`update users set name = 'Törölt játékos', deleted_at = 1 where id = 'b'`);
-    const page = await R.loader(args(get(await cookieFor("admin", "superadmin"))));
+    const page = await R.loader(args(get(cookie)));
     expect(page.users.map((u) => u.id)).not.toContain("b");
+    expect(page.total).toBe(before.total - 1);
+    const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
+    expect(sum(page.counts.role)).toBe(sum(before.counts.role) - 1);
   });
 
   it("finds a name that starts with an accented capital", async () => {

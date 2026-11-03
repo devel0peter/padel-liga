@@ -39,21 +39,29 @@ export const MAIL_KINDS_NAMING_OTHERS = [
   "groups_published",
   "match_proposal",
   "match_agreed_time",
+  "match_result",
+  "match_tomorrow",
+  "stuck_reminder",
 ] as const;
+
+// "Szia <recipient>!" opens every mail; a namesake recipient isn't the
+// deleted person, so their own greeting doesn't count.
+const GREETING = /^\s*Szia(?: [^!\n]*)?!/u;
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Whether an unsent mail's text has the deleted person in it (#152): their
 // address as a whole address (not the end of "anna@x.hu" for "a@x.hu"), or,
 // in a kind that names other people, their name as whole words (not
-// "Annamária" for "Anna"). Names under 3 letters are not matched.
+// "Annamária" for "Anna") after the greeting. Names under 3 letters are not
+// matched.
 export function mailNamesPerson(mail: { kind: string; text: string | null }, person: { email: string; name: string }): boolean {
   const text = mail.text ?? "";
   const email = person.email.trim().toLowerCase();
   if (email && new RegExp(`(^|[^a-z0-9._%+-])${escapeRegExp(email)}($|[^a-z0-9.-]|\\.(?![a-z0-9]))`, "i").test(text)) return true;
   const name = person.name.trim();
   if (name.length < 3 || !(MAIL_KINDS_NAMING_OTHERS as readonly string[]).includes(mail.kind)) return false;
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}($|[^\\p{L}\\p{N}])`, "u").test(text);
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}($|[^\\p{L}\\p{N}])`, "u").test(text.replace(GREETING, ""));
 }
 
 export type DeletionRefusal = "self" | "admin" | "playing" | "gone";

@@ -64,6 +64,16 @@ describe("mailNamesPerson", () => {
     expect(mailNamesPerson(mail("groups_published", null), anna)).toBe(false);
   });
 
+  it("skips the greeting: a namesake's own mail isn't about them", () => {
+    expect(mailNamesPerson(mail("groups_published", "Szia Anna Teszt!\n\n1. hét: Cili és Dóra ellen"), anna)).toBe(false);
+    expect(mailNamesPerson(mail("match_tomorrow", "Szia Anna Teszt!\n\nHolnap játszotok Cili és Dóra ellen"), anna)).toBe(false);
+    // The name after the greeting still counts, also in the same line.
+    expect(mailNamesPerson(mail("groups_published", "Szia Anna Teszt!\n\n1. hét: Anna Teszt és Béla ellen"), anna)).toBe(true);
+    expect(mailNamesPerson(mail("season_entry_decision", "Szia B! Anna Teszt és te nevezhettek."), anna)).toBe(true);
+    expect(mailNamesPerson(mail("match_result", "Szia B!\n\nAnna Teszt és Béla rögzítette"), anna)).toBe(true);
+    expect(mailNamesPerson(mail("stuck_reminder", "Szia!\n\nAnna Teszt már regisztrált, csak rád vár."), anna)).toBe(true);
+  });
+
   it("doesn't match a name under 3 letters, or regex characters as such", () => {
     expect(mailNamesPerson(mail("groups_published", "Al és Béla"), { email: "z@x.hu", name: "Al" })).toBe(false);
     expect(mailNamesPerson(mail("groups_published", "Kis Béla ellen"), { email: "z@x.hu", name: "K.s Béla" })).toBe(false);

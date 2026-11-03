@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoAcceptLine,
   decisionText,
+  MATCH_LOST_BOTH_TEXT,
   neutralDecisionText,
   neutralOutcomeText,
   outcomeText,
@@ -13,8 +14,20 @@ import {
   resultStatusView,
   resultTodo,
   scoreText,
+  versusText,
   winnerOf,
 } from "./results";
+
+describe("versusText (#202)", () => {
+  it("names a match 'X a Y ellen', never 'X ellen Y'", () => {
+    expect(versusText("Szabó Eszter – Tóth Gergő", "Farkas Lilla – Papp Ádám")).toBe("Szabó Eszter – Tóth Gergő a Farkas Lilla – Papp Ádám ellen");
+  });
+
+  it("uses 'az' before a vowel", () => {
+    expect(versusText("Kiss Anna – Nagy Béla", "Ács Cili – Dán Dóra")).toBe("Kiss Anna – Nagy Béla az Ács Cili – Dán Dóra ellen");
+    expect(versusText("Kiss Anna – Nagy Béla", "Őri Cili – Dán Dóra")).toBe("Kiss Anna – Nagy Béla az Őri Cili – Dán Dóra ellen");
+  });
+});
 
 const form = (fields: Record<string, string>) => {
   const f = new FormData();
@@ -85,6 +98,7 @@ describe("score and outcome texts (#28, #29)", () => {
     expect(neutralOutcomeText({ kind: "played", score: SPLIT }, names)).toBe("4:1, 2:4, szuper tie-break 10:8 (nyert: Anna – Béla)");
     expect(neutralOutcomeText({ kind: "walkover", winner: "b" }, names)).toBe("Játék nélküli győzelem: Cili – Dani (4:0, 4:0)");
     expect(neutralOutcomeText({ kind: "unplayed" }, names)).toBe("Elmaradt: nem számít a tabellába");
+    expect(neutralOutcomeText({ kind: "both-inactive" }, names)).toBe(MATCH_LOST_BOTH_TEXT);
   });
 });
 

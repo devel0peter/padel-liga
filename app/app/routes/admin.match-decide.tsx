@@ -13,7 +13,7 @@ import { decideMatch, decisionPage } from "~/lib/decisions.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
-import { neutralScoreText, parseOutcome, type OutcomeChoice } from "~/lib/results";
+import { MATCH_LOST_BOTH_TEXT, neutralScoreText, parseOutcome, versusText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
@@ -64,7 +64,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
     { value: "played", label: "Eredmény (lent add meg)" },
     { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (4:0, 4:0)` },
     { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (4:0, 4:0)` },
-    { value: "both-inactive", label: "Mindkét pár vereséget kap (0:4, 0:4)" },
+    { value: "both-inactive", label: MATCH_LOST_BOTH_TEXT },
     { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít a tabellába)" },
   ];
   const current: OutcomeChoice | undefined = !m.current
@@ -75,7 +75,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
   const score = m.current?.kind === "played" ? m.current.score : null;
   return (
     <AppPage
-      title={`${m.a} ellen ${m.b}`}
+      title={versusText(m.a, m.b)}
       description={`${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét · határidő: ${formatDeadline(m.deadline)}`}
       back={{ to: `/admin/leagues/${slug}/disputes`, label: "Viták" }}
     >

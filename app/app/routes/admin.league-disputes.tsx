@@ -7,6 +7,7 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { leagueMatches, type LeagueMatch } from "~/lib/decisions.server";
 import { formatDateTime } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
+import { versusText } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Viták (#29): the league's disputed results with both pairs' versions, and
@@ -43,7 +44,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={d.id} className="grid gap-1 rounded-lg border p-4 text-sm">
                 <p className="text-xs text-muted-foreground">{where(d)}</p>
                 <p className="font-medium break-words">
-                  {d.a} <span className="text-xs font-normal text-muted-foreground">ellen</span> {d.b}
+                  {versusText(d.a, d.b)}
                 </p>
                 <p className="break-words">
                   {d.recordedBy} szerint: <strong>{d.recorded}</strong>
@@ -74,7 +75,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={m.id} className="grid gap-0.5 rounded-md border p-3 text-sm">
                 <p className="text-xs text-muted-foreground">{where(m)}</p>
                 <p className="font-medium break-words">
-                  {m.a} <span className="text-xs font-normal text-muted-foreground">ellen</span> {m.b}
+                  {versusText(m.a, m.b)}
                 </p>
                 <p className="break-words">{m.label}</p>
                 <Link to={decide(m.id)} className="inline-flex w-fit items-center gap-1 underline">

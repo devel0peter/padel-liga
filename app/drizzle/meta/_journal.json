@@ -225,13 +225,6 @@
       "when": 1793649367719,
       "tag": "0031_entries_without_approval",
       "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "6",
-      "when": 1793650226179,
-      "tag": "0032_account_deleted_at",
-      "breakpoints": true
     }
   ]
 }

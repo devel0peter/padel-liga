@@ -15,6 +15,7 @@ import {
   dueReminders,
   isDigestRun,
   isTomorrowRun,
+  MATCH_REMINDER_EMAILS,
   reminderMessage,
   tomorrowDue,
   tomorrowMessage,
@@ -88,11 +89,11 @@ export async function queueDigestReminders(now: Date, list?: RunningMatch[]): Pr
 }
 
 /**
- * "Holnap meccs" (spec 13, instant): the evening before an accepted slot,
- * email, push and the app to the four players, once per slot. Returns how
- * many matches.
+ * "Holnap meccs" (spec 13): the evening before an accepted slot, push and the
+ * app to the four players, once per slot, and an email when `email` is on
+ * (off for now, MATCH_REMINDER_EMAILS, #191). Returns how many matches.
  */
-export async function queueTomorrowReminders(now: Date, list?: RunningMatch[]): Promise<number> {
+export async function queueTomorrowReminders(now: Date, list?: RunningMatch[], email = MATCH_REMINDER_EMAILS.tomorrow): Promise<number> {
   const running = (list ?? (await runningMatches(now))).filter((m) => tomorrowDue(m, now));
   if (running.length === 0) return 0;
   const slotOf = (m: RunningMatch) => (m.state.status === "scheduled" ? Math.floor(m.state.slot.getTime() / 1000) : 0);
@@ -119,6 +120,7 @@ export async function queueTomorrowReminders(now: Date, list?: RunningMatch[]): 
       }
   }
   await notifyPlayers("match_tomorrow", pushes, now);
+  if (!email) return claimed.length;
   try {
     await queueReminderEmails(emails);
   } catch (error) {
@@ -189,19 +191,22 @@ export async function sendDigests(now: Date): Promise<number> {
 /**
  * The cron's part (#31): at 07:00 Budapest the day's digest reminders, then
  * the digest; from 18:00 to 21:00 "holnap meccs". Other hours do nothing.
+ * `emails` says which of the two emails go out (MATCH_REMINDER_EMAILS: none
+ * for now, #191); the items and pushes go out either way. A digest left off
+ * takes nothing, so switched back on it starts from the last day's items.
  * A failure is logged and doesn't stop the email delivery after it.
  */
-export async function runMatchReminders(now = new Date()): Promise<void> {
+export async function runMatchReminders(now = new Date(), emails = MATCH_REMINDER_EMAILS): Promise<void> {
   if (!isDigestRun(now) && !isTomorrowRun(now)) return;
   try {
     const running = await runningMatches(now);
     if (isDigestRun(now)) {
       const reminders = await queueDigestReminders(now, running);
-      const digests = await sendDigests(now);
+      const digests = emails.digest ? await sendDigests(now) : 0;
       if (reminders || digests) console.log(`cron: ${reminders} match reminders, ${digests} digest emails`);
     }
     if (isTomorrowRun(now)) {
-      const tomorrow = await queueTomorrowReminders(now, running);
+      const tomorrow = await queueTomorrowReminders(now, running, emails.tomorrow);
       if (tomorrow) console.log(`cron: holnap meccs for ${tomorrow} matches`);
     }
   } catch (error) {

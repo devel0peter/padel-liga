@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 10. 28.";
+const EFFECTIVE_FROM = "2026. 11. 02.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -82,7 +82,7 @@ export default function Privacy() {
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
                 állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
-                alap), és amiből az induló értékszámod lesz,
+                alap), és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
@@ -105,8 +105,9 @@ export default function Privacy() {
                 is (kinek az e-mail-címére, mikor, és elfogadták-e),
               </li>
               <li>
-                a párotok nevezései a szezonokra (mikor neveztetek), és a szervező
-                döntése az üzenetével együtt,
+                a párotok nevezései a szezonokra (mikor neveztetek, melyik körtől
+                játszotok), és ha korábban a szervező döntött róluk, a döntése az
+                üzenetével együtt,
               </li>
               <li>
                 az értesítéseid listája, és hogy e-mailben, push értesítésben
@@ -137,7 +138,22 @@ export default function Privacy() {
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
               is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük.
+              mindig e-mailben küldjük. Ha időpontot ajánlanak a meccsedre vagy
+              meg kell erősítened egyet, egy meccsről naponta legfeljebb egy
+              levelet kapsz, a többit az oldalon és push értesítésben látod. A
+              meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
+              meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
+              nem.
+            </p>
+            <p>
+              Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
+              regisztráltál; nem fejezted be a regisztrációt; nincs párod; vagy
+              a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
+              szezononként legfeljebb egy emlékeztetőt küldünk a következő
+              lépésről. Ehhez az e-mail-címeddel együtt feljegyezzük, melyik
+              szezonban kaptál; a fiókod törlésével ezt is töröljük. Benne lehet
+              a párod neve, de más e-mail-címe vagy telefonszáma soha. Ha
+              kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
             </p>
             <p>
               Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
@@ -153,8 +169,9 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a liga indulása után): a neved, az
-                eredményeitek, a tabella és az értékszámok.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
+                és a csoportod tabellája a ligaoldalon; a liga indulása után az
+                eredményeitek és az értékszámok is.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
@@ -162,9 +179,26 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>A telefonszámodat</strong> csak azok látják, akikkel az
-                aktuális körben meccsed van, hogy egyeztetni tudjatok. Más
-                játékos nem látja, és a szervezői felületeken sem jelenik meg. Ezt a funkciót a liga
-                indulásával kapcsoljuk be; addig a számod sehol nem jelenik meg.
+                aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
+                ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
+                elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése
+                után az ellenfeleid a Kezdőlapjukon és a meccs oldalán, a
+                szervező és az admin a meccsek szervezői oldalán látja, a kör
+                határidejéig; utána már nem.
+              </li>
+              <li>
+                <strong>Az időpont-egyeztetést és az eredményt</strong> (ki,
+                mikor, milyen időpontot ajánlott, fogadott el, erősített meg vagy
+                mondott le, és hol lesz a meccs; ki rögzítette, erősítette meg
+                vagy vitatta az eredményt, a vitához írt megjegyzéssel együtt) a
+                meccs két párja látja a meccs oldalán, és a liga szervezője meg
+                az oldal adminja is (a nevekkel, telefonszám és e-mail-cím
+                nélkül), hogy lássák, melyik meccs akadt el, és dönthessenek a
+                vitás eredményekről. Megőrizzük, mert a határidőig le nem
+                játszott meccsekről ez alapján dönt a rendszer, a vitás
+                eredményekről pedig a szervező. Ha a szervező dönt egy meccsről,
+                a döntése a nevével, idejével és indoklásával bekerül a naplóba,
+                amit mindkét pár lát.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
@@ -234,6 +268,13 @@ export default function Privacy() {
               nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
               szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
+              Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
+              ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
+              e-mailben nem. Hogy ki és mikor tette, eltároljuk. A Párok oldalon
+              a regisztrált, még pár nélküli játékosok is szerepelnek: a nevük, a
+              szintjük és az, hogy párt keresnek-e. Az Admin innen körlevelet
+              írhat a listán látott játékosoknak (például akik még nem neveztek);
+              aki leiratkozott vagy kikapcsolta az e-mailt, nem kapja meg.
             </p>
             <p>
               A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a
@@ -308,10 +349,13 @@ export default function Privacy() {
                 töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
-                <strong>Fiókok:</strong> amíg nem kéred a törlést. Utána
-                anonimizáljuk, hogy a korábbi eredmények megmaradjanak, de ne
-                lehessen hozzád kötni őket. A telefonszámodat ilyenkor teljesen
-                töröljük.
+                <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem
+                játszottál kihirdetett csoportban, a fiókodat mindenestül
+                töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
+                játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
+                lehessen hozzád kötni őket. Az e-mail-címedet, a
+                telefonszámodat, a nemedet, a belépéseidet és az eszközeidet
+                ilyenkor teljesen töröljük.
               </li>
               <li>
                 <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
@@ -326,6 +370,18 @@ export default function Privacy() {
               Bármikor kérheted, hogy megmutassuk, javítsuk vagy töröljük az
               adataidat, és visszavonhatod a hozzájárulásodat. Ehhez elég egy
               e-mail a {mail} címre, és legkésőbb egy hónapon belül intézzük.
+            </p>
+            <p>
+              Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
+              neked szóló leveleket, és a neved meg a címed mások
+              jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
+              közben kéred, amikor a párod kihirdetett csoportban játszik, a
+              kör végén törlünk. A címedhez tartozó minden tárolt adatot
+              törlünk, a leiratkozásodat vagy a visszapattanó levelek
+              nyomát is. Csak a régi eredményekben marad meg a neved
+              névtelenítve („Törölt játékos”). Ha később újra regisztrálsz
+              ezzel a címmel, tiszta lappal indulsz. A törlésről nem
+              küldünk levelet.
             </p>
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti

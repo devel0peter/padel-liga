@@ -37,11 +37,11 @@ export function groupAverage(pairs: readonly { averageElo: number }[]): number |
   return pairs.length === 0 ? null : pairs.reduce((sum, p) => sum + p.averageElo, 0) / pairs.length;
 }
 
-// Why there is no draft: the approved pairs can't be split into groups of 3
+// Why there is no draft: the entered pairs can't be split into groups of 3
 // and 4 (0, 1, 2 or 5 pairs). Null when they can.
 export function cannotSplit(pairCount: number): string | null {
   if (groupSizes(pairCount)) return null;
-  const pairs = pairCount === 0 ? "Még nincs jóváhagyott pár" : `${pairCount} jóváhagyott pár van`;
+  const pairs = pairCount === 0 ? "Még nincs nevezett pár" : `${pairCount} nevezett pár van`;
   return `${pairs}. Csoportot 3, 4 vagy legalább 6 párból lehet összeállítani.`;
 }
 
@@ -51,7 +51,7 @@ export function sizeWarning(size: number): string | null {
 }
 
 // Whether the draft still holds exactly the pairs that should be in it: the
-// approved, active pairs. A pair approved, rejected or dissolved since the
+// entered, active pairs. A pair entered, taken out or dissolved since the
 // draft was made (or a pair in two groups) makes it stale.
 export function draftIsStale(draftPairIds: readonly number[], eligiblePairIds: readonly number[]): boolean {
   if (draftPairIds.length !== eligiblePairIds.length) return true;
@@ -59,7 +59,7 @@ export function draftIsStale(draftPairIds: readonly number[], eligiblePairIds: r
   return new Set(draftPairIds).size !== draftPairIds.length || draftPairIds.some((id) => !eligible.has(id));
 }
 
-export const STALE_DRAFT = "A jóváhagyott párok változtak a javaslat óta. Generáld újra.";
+export const STALE_DRAFT = "A nevezett párok változtak a javaslat óta. Generáld újra.";
 export const BAD_SIZES = "Minden csoportban 3 vagy 4 pár legyen. Helyezz át párokat, vagy generáld újra.";
 
 // What keeps a draft from being published, or null.

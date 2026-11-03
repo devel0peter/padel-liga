@@ -2,11 +2,12 @@ import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
+import { MyGroup, Todos, todos } from "~/components/my-group";
 import { PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { PartnerEmailBox } from "~/components/partner-email";
-import { ENTERED_NOTICE, SeasonEntry } from "~/components/season-entry";
+import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
@@ -14,6 +15,7 @@ import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate } from "~/lib/format";
 import { listedCities } from "~/lib/cities.server";
 import { listLeagues } from "~/lib/leagues.server";
+import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState } from "~/lib/partner-search.server";
 import { homeSeasons } from "~/lib/seasons";
@@ -22,9 +24,10 @@ import { listSeasons } from "~/lib/seasons.server";
 import { missingPartnerEmails, partnerEmailAction } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
 
-// The app's home (Kezdőlap): where the sidebar logo and a login lead. For now
-// a greeting and shortcuts; with the season it becomes "your group, your next
-// match". The public landing page stays at "/".
+// The app's home (Kezdőlap): where the sidebar logo and a login lead. Once the
+// groups are out it is "your group and your matches" (#25): the Teendők, the
+// group and its matches by week. Before that the season cards and entry
+// status. The public landing page stays at "/".
 
 // After the partner's address is saved (#96) the box stays to say so: no
 // reload, which would remove it before the notice shows.
@@ -62,7 +65,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // first thing after the first-login page, and "Párt keresek" (D59).
   const links = await pairLinkBoxes(user);
   const searching = await partnerSearchState(user, links.map((l) => l.league));
+  // The current phase's groups (#25): empty before they are published.
+  const groups = await currentGroups(user.id, now);
   return {
+    groups,
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
     // The signup named a partner without an email (#96): the box to add it.
@@ -89,12 +95,16 @@ export async function action({ request }: Route.ActionArgs): Promise<{ season: n
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
     throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
-  return result.ok ? { season, notice: ENTERED_NOTICE } : { season, error: result.error };
+  return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
 }
 
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
     <AppPage title="Kezdőlap">
+      {d.groups.length > 0 && <Todos items={todos(d.groups)} />}
+      {d.groups.map((g) => (
+        <MyGroup key={g.groupId} group={g} multiLeague={d.multiLeague} />
+      ))}
       {d.needsLevel && (
         <section role="status" className="grid max-w-2xl gap-2 rounded-lg border border-nav-active bg-nav-active-bg p-6">
           <h2 className="font-display text-lg font-bold">Add meg a szinted</h2>
@@ -141,8 +151,9 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </CardContent>
         </Card>
       ))}
-      <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
-        <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
+      {d.groups.length === 0 && (
+        <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
+          <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
         <p className="text-muted-foreground">
           Amint indul a szezon, itt látod a csoportodat, a következő meccsedet és az eredményeket. Addig a{" "}
           <Link to="/rules" className="underline">
@@ -150,7 +161,8 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </Link>{" "}
           érdemes átfutni.
         </p>
-      </section>
+        </section>
+      )}
       {d.shortcuts.map((s) => (
         <section key={s.label} className="grid gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">

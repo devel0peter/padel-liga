@@ -2,6 +2,7 @@ import { and, count, eq, gt, lt, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, emailMessages, emailSuppressions, loginCodes, users } from "~/db/schema";
+import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { dailyLimit, queueLoginCode } from "~/lib/email/outbox.server";
 
 import { createUser, findUserIdByEmail } from "./accounts.server";
@@ -63,11 +64,14 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
   const email = normalizeEmail(input);
   if (!isValidEmail(email)) return { ok: false, error: "Ez nem tűnik e-mail-címnek." };
   // Any address may log in; a new one gets an account at its first login
-  // (#113). The bot check (login route) and the code limits stay. No code and
+  // (#113). The bot check (login route) and the code limits stay. No email and
   // no error when the address may not get one (mayEmailCode): an error would
-  // tell anyone which addresses have an account.
+  // tell anyone which addresses have an account. Such an address still gets a
+  // code row (a code nobody knows) under the same limits, so a wrong code,
+  // a locked code and "too many codes" read the same as for a sent one (#123).
+  // A deleted account's placeholder address (#152) is never emailed either.
   const now = new Date();
-  if (!(await mayEmailCode(email, now))) return { ok: true, email };
+  const mayEmail = !isAnonymizedEmail(email) && (await mayEmailCode(email, now));
 
   const [existing] = await db.select().from(loginCodes).where(eq(loginCodes.email, email));
   const decision = codeSendDecision(existing ?? null, now);
@@ -82,7 +86,7 @@ export async function sendLoginCode(input: string): Promise<SendResult> {
     sentInWindow: decision.sentInWindow,
   };
   await db.insert(loginCodes).values({ email, ...row }).onConflictDoUpdate({ target: loginCodes.email, set: row });
-  await queueLoginCode(email, code);
+  if (mayEmail) await queueLoginCode(email, code);
   return { ok: true, email };
 }
 
@@ -107,7 +111,10 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
     const result = checkCode(row ?? null, false, now);
     return { ok: false, error: CODE_MESSAGES[result === "ok" || result === "wrong" ? "missing" : result] };
   }
-  if (!timingSafeEqual(record.codeHash, await codeHash(email, code))) return { ok: false, error: CODE_MESSAGES.wrong };
+  // A deleted account's placeholder address (#152) never logs in, not even
+  // with a guessed code: it reads as a wrong one.
+  if (isAnonymizedEmail(email) || !timingSafeEqual(record.codeHash, await codeHash(email, code)))
+    return { ok: false, error: CODE_MESSAGES.wrong };
 
   // Single use. Deleting by the hash we checked means a parallel request with
   // the same code can't also succeed.

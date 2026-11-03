@@ -26,6 +26,7 @@ const platformOnly: Permission[] = [
   { kind: "leagues.manage" },
   { kind: "cities.manage" },
   { kind: "users.view" },
+  { kind: "users.delete" },
   { kind: "clubs.manage" },
 ];
 
@@ -94,9 +95,12 @@ describe("sidebar", () => {
     expect(nav[1].items.map((i) => i.to)).toEqual([
       "/admin/leagues/gyor",
       "/admin/leagues/gyor/seasons",
+      "/admin/leagues/gyor/matches",
       "/admin/leagues/gyor/pairs",
       "/admin/leagues/gyor/solos",
+      "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
+      "/admin/leagues/gyor/disputes",
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -113,7 +117,7 @@ describe("sidebar", () => {
   it("follows the league in the URL", () => {
     const nav = appNav(superadmin, [gyor, debrecen], "debrecen");
     expect(nav[1].label).toBe("Padelpárbaj Debrecen");
-    expect(nav[1].items[4].to).toBe("/admin/leagues/debrecen/clubs");
+    expect(nav[1].items.find((i) => i.label === "Klubok")?.to).toBe("/admin/leagues/debrecen/clubs");
   });
 
   it("offers the Admin every league, a Szervező only their own", () => {
@@ -124,8 +128,16 @@ describe("sidebar", () => {
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
-    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Párok", "Párkeresők", "Klubok"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták"]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
+  });
+
+  it("Viták (#29): the league's Szervező and the Admin, not another league's Szervező or a player", () => {
+    const disputes = { kind: "league.manage", league: "gyor" } as const;
+    expect(can(organizer, disputes)).toBe(true);
+    expect(can(superadmin, disputes)).toBe(true);
+    expect(can({ ...organizer, leagues: [debrecen] }, disputes)).toBe(false);
+    expect(can({ ...organizer, leagues: [] }, disputes)).toBe(false);
   });
 
   it("ignores a URL league the Szervező doesn't organize", () => {

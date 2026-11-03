@@ -6,7 +6,7 @@ import type { LandingBlock } from "~/lib/landing-league";
 // Where a league city's league is today, when a new pair can join, and the
 // way in (#83, lib/landing-league.ts). The texts come ready from the loader.
 // Registration goes through an account: a logged-in visitor lands on the
-// Kezdőlap, where the pair enters the season.
+// Kezdőlap (the app's home), where the pair enters the season.
 export function LeagueStatus({ city, block }: { city: string; block: LandingBlock }) {
   return (
     <section aria-label={`${city}: a liga állása`} className="grid gap-4 rounded-2xl border-2 border-court bg-background p-5 sm:p-6">
@@ -32,6 +32,11 @@ export function LeagueStatus({ city, block }: { city: string; block: LandingBloc
         </Button>
         {block.ctaNote && <p className="text-sm text-muted-foreground">{block.ctaNote}</p>}
       </div>
+      {block.ladderPath && (
+        <Link to={block.ladderPath} className="justify-self-start font-bold underline">
+          Csoportok és tabella
+        </Link>
+      )}
     </section>
   );
 }

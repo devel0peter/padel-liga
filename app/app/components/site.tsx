@@ -34,8 +34,8 @@ export function Logo({ className = "" }: { className?: string }) {
 const headerLink = "rounded-full border-2 border-foreground px-4 py-2 font-bold no-underline sm:px-5";
 
 // `cta`: the "Nevezés" button to the landing's league card (landing and rules). "Belépés" is on every
-// public page; someone logged in gets "Kezdőlap" (the app's home) instead of
-// both. The login page itself has no link to itself.
+// public page; someone logged in gets "Saját oldalam" (the app's home, which the app
+// itself calls Kezdőlap) instead of both. The login page itself has no link to itself.
 export function SiteHeader({ cta = true }: { cta?: boolean }) {
   const signedIn = useRouteLoaderData<{ signedIn?: boolean }>("root")?.signedIn ?? false;
   const { pathname } = useLocation();
@@ -48,7 +48,7 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
         <nav className="flex items-center gap-2">
           {signedIn ? (
             <Link to="/home" className={headerLink}>
-              Kezdőlap
+              Saját oldalam
             </Link>
           ) : (
             <>

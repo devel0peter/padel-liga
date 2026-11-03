@@ -21,11 +21,18 @@ export type MessageKind =
   | "pair_answer"
   | "pair_dissolved"
   | "season_entry_decision"
-  | "groups_published";
+  | "groups_published"
+  | "match_proposal"
+  | "match_agreed_time"
+  | "match_result"
+  | "stuck_reminder"
+  | "match_digest"
+  | "match_tomorrow";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.
-export const BULK_KINDS = ["broadcast", "registration_invite"] as const satisfies readonly MessageKind[];
+// The automatic reminders (#155) go with them: after personal mail.
+export const BULK_KINDS = ["broadcast", "registration_invite", "stuck_reminder"] as const satisfies readonly MessageKind[];
 
 function isBulk(kind: MessageKind): boolean {
   return (BULK_KINDS as readonly MessageKind[]).includes(kind);

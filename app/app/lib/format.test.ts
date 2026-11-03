@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "./format";
+import { formatDate, formatDeadline, formatOnDate, formatShortDate, formatUntilDate, formatWeekdayDate } from "./format";
 
 describe("Hungarian dates in Budapest time", () => {
   // Sunday 14 Feb 2027, 23:59 Budapest (CET).
@@ -17,6 +17,7 @@ describe("Hungarian dates in Budapest time", () => {
   it("shows the Budapest day, not the UTC one", () => {
     // Monday 9 Nov 2026 00:00 Budapest is still Sunday in UTC.
     expect(formatShortDate(new Date("2026-11-08T23:00:00Z"))).toBe("nov. 9.");
+    expect(formatWeekdayDate(new Date("2026-11-08T23:00:00Z"))).toBe("nov. 9., hétfő");
   });
 });
 

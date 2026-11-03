@@ -71,7 +71,7 @@ test("another city leaves contact details, and can offer to organize", async ({ 
   await page.close();
 });
 
-test("Belépés is in the header of every public page; logged in it reads Kezdőlap", async ({ browser }) => {
+test("Belépés is in the header of every public page; logged in it reads Saját oldalam", async ({ browser }) => {
   const anon = await browser.newPage();
   for (const path of ["/", "/rules", "/privacy"]) {
     await visit(anon, path);
@@ -83,8 +83,9 @@ test("Belépés is in the header of every public page; logged in it reads Kezdő
   for (const path of ["/", "/rules", "/privacy"]) {
     await visit(admin.page, path);
     const header = admin.page.getByRole("banner");
-    await expect(header.getByRole("link", { name: "Kezdőlap" })).toHaveAttribute("href", "/home");
+    await expect(header.getByRole("link", { name: "Saját oldalam" })).toHaveAttribute("href", "/home");
     await expect(header.getByRole("link", { name: "Belépés" })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "Kezdőlap" })).toHaveCount(0);
   }
   await admin.context.close();
 });
@@ -98,5 +99,24 @@ test("the public pages do not scroll sideways at 360 px", async ({ browser }) =>
     const wide = await page.evaluate<number>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     expect(wide, `${path} is wider than the screen`).toBeLessThanOrEqual(0);
   }
+  await context.close();
+
+  // Logged in, the header button is longer ("Saját oldalam").
+  const admin = await as(browser, ADMIN.email);
+  await admin.page.setViewportSize({ width: 360, height: 740 });
+  for (const path of ["/", "/rules", "/privacy"]) {
+    await visit(admin.page, path);
+    const wide = await admin.page.evaluate<number>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    expect(wide, `${path} is wider than the screen when logged in`).toBeLessThanOrEqual(0);
+  }
+  await admin.context.close();
+});
+
+// The poster (#120) no longer ties the start to a number of pairs.
+test("the poster doesn't make the start depend on pairs", async ({ browser }) => {
+  const { context, page } = await as(browser, ADMIN.email);
+  await visit(page, "/admin/poster");
+  await expect(page.locator("article")).toContainText("Nevezz a pároddal, és már a következő körtől játszotok.");
+  await expect(page.locator("article")).not.toContainText(/12 pár|összegyűlik/);
   await context.close();
 });

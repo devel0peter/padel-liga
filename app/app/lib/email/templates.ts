@@ -2,7 +2,7 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate } from "../format";
+import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate, formatWeekdayDate } from "../format";
 import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
@@ -134,12 +134,16 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
   );
 }
 
+// The subject names the signer, and subjects stay in the outbox log: an
+// account deletion (#152) finds the rows by it.
+export const partnerNoticeSubject = (name1: string) => `${name1} jelentkeztetett titeket a ${SITE_NAME}ra`;
+
 // Spec section 17: the partner gets exactly one email, so they know about the
 // signup and can ask for deletion.
 export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
   if (!s.name2) throw new Error("partnerNotice needs a partner");
   return build(
-    `${s.name1} jelentkeztetett titeket a ${SITE_NAME}ra`,
+    partnerNoticeSubject(s.name1),
     [
       `Szia ${s.name2}!`,
       `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,
@@ -246,42 +250,32 @@ export function loginCode(code: string, validMinutes: number): Email {
   );
 }
 
-// Both players learn the Szervező's decision on their season entry (#23),
-// with the note if there is one. The note and the names stay plain text.
-export function seasonEntryDecision(input: {
+// Both players learn that their season entry counts (#153): one of them
+// clicked "Nevezünk". The names stay plain text.
+export function seasonEntered(input: {
   to: string;
   partnerName: string;
   league: string;
   season: string;
-  approved: boolean;
-  // Where an approved pair starts; null: the next season.
+  // Where the pair starts; null: the next season.
   joins: { phase: number; startsAt: Date } | null;
-  note: string | null;
 }): Email {
   const pairPage = `${SITE_URL}/pair`;
   const where = `${input.season}, ${input.league}`;
-  const start = !input.approved
-    ? null
-    : input.joins === null
+  const start =
+    input.joins === null
       ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok."
-      : input.joins.phase === 1
-        ? `Az 1. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`
-        : `A ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
+      : `${input.joins.phase === 1 ? "Az" : "A"} ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
   return buildPlain(
-    input.approved
-      ? `Jóváhagyták a nevezéseteket – ${SITE_NAME}`
-      : `Nem fogadták el a nevezéseteket – ${SITE_NAME}`,
+    `Beneveztetek – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      input.approved
-        ? `A szervező jóváhagyta a nevezéseteket ${input.partnerName} pároddal (${where}).`
-        : `A szervező most nem fogadta el a nevezéseteket ${input.partnerName} pároddal (${where}).`,
+      `Beneveztetek ${input.partnerName} pároddal (${where}).`,
       start,
-      input.note ? `A szervező üzenete:\n${input.note}` : null,
       `A nevezéseteket a Párom oldalon is látod:`,
       pairPage,
       SIGNATURE,
-    ].filter((p): p is string => p !== null),
+    ],
     [pairPage],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
@@ -313,11 +307,227 @@ export function groupsPublished(input: {
       `Kész ${withArticle(input.phase)} kör csoportbeosztása (${input.season}, ${input.league}). ${input.partnerName} pároddal ${withArticle(input.group)} csoportban játszotok.`,
       `A meccseitek:\n${schedule}`,
       `Határidő: ${formatDeadline(input.deadline)}. Addig bármikor lejátszhatjátok a meccseket, de érdemes a kiírt héten.`,
-      `Belépés:`,
+      // #26 requirement 7: the link leads to the matches, each with the
+      // short scheduling guide.
+      `Az időpontot az oldalon egyeztetitek:`,
       home,
       SIGNATURE,
     ],
     [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+type MatchEmailInput = {
+  to: string;
+  // The other pair's two names ("Kiss Anna és Nagy Béla").
+  opponents: string;
+  matchId: number;
+  week: number;
+  deadline: Date;
+  venue: string | null;
+};
+
+const matchFooter = () =>
+  footer(`Azért kaptad ezt a levelet, mert a pároddal játszol a ${SITE_URL.replace("https://", "")} ligájában. Az értesítéseket a profilodban állíthatod be.`);
+
+// A proposal or counter-proposal arrived (#26, spec 13): the slots and a
+// one-tap link to answer. Names stay plain text.
+export function matchProposal(input: MatchEmailInput & { counter: boolean; slots: Date[] }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `${input.counter ? "Új időpontokat" : "Időpontokat"} ajánlottak a meccsetekre – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre:\n${input.slots.map((s) => formatDeadline(s)).join("\n")}`,
+      input.venue ? `Helyszín: ${input.venue}` : null,
+      `Válassz egyet, vagy ajánlj másikat (határidő: ${formatDeadline(input.deadline)}):`,
+      link,
+      SIGNATURE,
+    ].filter((p): p is string => p !== null),
+    [link],
+    matchFooter(),
+  );
+}
+
+// A result waits for confirmation (#28, spec 7 and 13): the score from the
+// recipient's side and a one-tap link to the match page, where confirming is
+// the first button.
+export function matchResult(input: MatchEmailInput & { score: string; autoAcceptAt: Date }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}#eredmeny`;
+  return buildPlain(
+    `Erősítsd meg a meccs eredményét – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} rögzítette a ${input.week}. heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
+      `Erősítsd meg, vagy jelezd, ha nem így volt:`,
+      link,
+      `Ha ${formatDeadline(input.autoAcceptAt)}-ig nem válaszoltok, magától elfogadjuk.`,
+      SIGNATURE,
+    ],
+    [link],
+    matchFooter(),
+  );
+}
+
+// An agreed time waits for confirmation (#26, spec 6.3 and 13).
+export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `Erősítsd meg a meccs időpontját – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.opponents} rögzítette a ${input.week}. heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
+      input.venue ? `Helyszín: ${input.venue}` : null,
+      `Erősítsd meg, vagy jelezd, ha nem így beszéltétek:`,
+      link,
+      SIGNATURE,
+    ].filter((p): p is string => p !== null),
+    [link],
+    matchFooter(),
+  );
+}
+
+export type StuckReminderInput = {
+  // reminders.ts: A no account yet, B first login not finished, C no pair,
+  // D no entry.
+  situation: "A" | "B" | "C" | "D";
+  to: string;
+  // The recipient's own address, for A's registration link.
+  email: string;
+  // A: the partner who already registered; C: the one who hasn't; D: the
+  // other player. Names only.
+  partner: string | null;
+  league: string;
+  season: string;
+  deadline: Date;
+  // The next phase that hasn't started.
+  nextRound: { number: number; startsAt: Date } | null;
+  // C: the player's own pair link, in full.
+  pairLink: string | null;
+  now: Date;
+};
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// The dates every reminder gives (#155): the registration deadline and the
+// next round's start; after the deadline (late entry) only the round.
+function reminderDates(input: StuckReminderInput, plural: boolean): string {
+  const round = input.nextRound
+    ? `${withArticle(input.nextRound.number)} kör ${formatWeekdayDate(input.nextRound.startsAt)} indul`
+    : null;
+  if (input.deadline > input.now)
+    return `Nevezési határidő: ${formatDeadline(input.deadline)}.${round ? ` ${capitalize(round)}.` : ""}`;
+  return `A határidő lejárt, de még ${plural ? "beszállhattok" : "beszállhatsz"}${round ? `: ${round}` : ""}.`;
+}
+
+// One automatic reminder per situation for someone stuck before entering a
+// season (#155). Names stay plain text; another person's email or phone is
+// never in it. Like every mail to many, it has an unsubscribe link.
+export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string): Email {
+  const hi = input.to.trim() ? `Szia ${input.to.trim()}!` : "Szia!";
+  const pairPage = `${SITE_URL}/pair`;
+  const registered = `Azért kaptad ezt a levelet, mert regisztráltál a ${SITE_URL.replace("https://", "")} oldalon.`;
+  const parts = (() => {
+    switch (input.situation) {
+      case "A": {
+        const link = registrationLink(input.email);
+        return {
+          subject: `Még nem regisztráltál – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Kaptál tőlem meghívót a ${SITE_NAME}ra, de még nem regisztráltál. Egy perc az egész, jelszó sem kell:`,
+            link,
+            input.partner ? `${input.partner} már regisztrált, csak rád vár.` : null,
+            reminderDates(input, false),
+          ],
+          links: [link],
+          reason: `Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`,
+        };
+      }
+      case "B": {
+        const login = `${SITE_URL}/login`;
+        return {
+          subject: `Fejezd be a regisztrációt – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Elkezdted a regisztrációt a ${SITE_NAME}on, de még nem fejezted be. Lépj be, és add meg a neved, a szinted és a telefonszámod:`,
+            login,
+            reminderDates(input, false),
+          ],
+          links: [login],
+          reason: registered,
+        };
+      }
+      case "C": {
+        const link = input.pairLink ?? pairPage;
+        return {
+          subject: `Küldd el a párlinkedet – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `Még nincs párod (${input.league}). Küldd el a párlinkedet a párodnak: ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
+            link,
+            input.partner ? `${input.partner} még nem regisztrált: neki is küldd el.` : null,
+            `Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,
+            pairPage,
+            reminderDates(input, false),
+          ],
+          links: [link, pairPage],
+          reason: registered,
+        };
+      }
+      case "D":
+        return {
+          subject: `Nevezzetek a szezonra – ${SITE_NAME}`,
+          paragraphs: [
+            hi,
+            `${input.partner ?? "A"} pároddal még nem neveztetek (${input.season}, ${input.league}). Egyikőtök nyomja meg a „Nevezünk” gombot a Párom oldalon:`,
+            pairPage,
+            reminderDates(input, true),
+          ],
+          links: [pairPage],
+          reason: registered,
+        };
+    }
+  })();
+  return buildPlain(
+    parts.subject,
+    [...parts.paragraphs.filter((p): p is string => p !== null), SIGNATURE],
+    parts.links,
+    footer(parts.reason, unsubscribeUrl),
+  );
+}
+
+// The daily digest (#31, spec 13): one email in the morning with the match
+// news and reminders of the last day the player hasn't opened in the app yet,
+// each with its one-tap link. The items are the in-app notifications' own
+// texts (no names), so a new digest kind needs nothing here.
+export function dailyDigest(input: { to: string; items: { title: string; body: string; url: string }[] }): Email {
+  const links = input.items.map((i) => `${SITE_URL}${i.url}`);
+  const lines = input.items.flatMap((i, n) => [`${i.title}\n${i.body}`, links[n]!]);
+  return buildPlain(
+    `${input.items.length === 1 ? input.items[0]!.title : `Napi összefoglaló: ${input.items.length} újdonság`} – ${SITE_NAME}`,
+    [`Szia ${input.to}!`, "Ez történt a meccseiddel, és ez vár rád:", ...lines, SIGNATURE],
+    links,
+    matchFooter(),
+  );
+}
+
+// The evening before an accepted slot (#31, spec 13: instant): time, venue
+// and the opponents, with the match page.
+export function matchTomorrow(input: { to: string; opponents: string; matchId: number; slot: Date; venue: string | null }): Email {
+  const link = `${SITE_URL}/matches/${input.matchId}`;
+  return buildPlain(
+    `Holnap meccs: ${formatDeadline(input.slot)} – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Holnap játszotok ${input.opponents} ellen: ${formatDeadline(input.slot)}.`,
+      input.venue ? `Helyszín: ${input.venue}` : "A helyszínt még nem rögzítettétek: aki foglalt pályát, írja be az oldalon.",
+      `A meccs oldala:`,
+      link,
+      SIGNATURE,
+    ],
+    [link],
+    matchFooter(),
   );
 }

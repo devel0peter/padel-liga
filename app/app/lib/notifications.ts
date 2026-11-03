@@ -19,7 +19,42 @@ export const NOTIFICATION_KINDS = {
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
 // Player notifications have no per-kind switch (#115), only the channels.
-export type PlayerKind = "season_entry_decision" | "groups_published" | "pair_intro";
+export type PlayerKind =
+  | "season_entry_decision"
+  | "groups_published"
+  | "pair_intro"
+  // Scheduling (#26, spec 13). Instant: also by email.
+  | "match_proposal"
+  | "match_agreed_time"
+  // Daily-digest items (#31 builds the digest email from these): in the app
+  // and by push only for now.
+  | "match_scheduled"
+  | "match_declined"
+  | "match_cancelled"
+  // Reminders (#31): digest items, except "holnap meccs", which is instant.
+  | "match_no_proposal"
+  | "match_week_end"
+  | "match_deadline_soon"
+  | "match_tomorrow"
+  // Results (#28): waiting for confirmation is instant (also by email); a
+  // confirmed or auto-accepted result and an organizer's decision (#29) are
+  // digest items.
+  | "match_result"
+  | "match_result_confirmed"
+  | "match_decided";
+
+// The kinds the daily digest email (#31) collects; push sends them one by one.
+// The digest is built from this list alone, so a kind added here is in it.
+export const DIGEST_KINDS: readonly PlayerKind[] = [
+  "match_scheduled",
+  "match_declined",
+  "match_cancelled",
+  "match_no_proposal",
+  "match_week_end",
+  "match_deadline_soon",
+  "match_result_confirmed",
+  "match_decided",
+];
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -127,23 +162,28 @@ export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// A Szervező decided on the pair's season entry (#23). No names (a lock
-// screen is not a private place); the note is on the Párom page.
-export function seasonEntryDecisionMessage(input: {
-  league: string;
-  season: string;
-  approved: boolean;
-  // Where an approved pair starts; null: the next season.
-  joins: { phase: number; startsAt: Date } | null;
-}): Message {
-  const start = !input.approved
-    ? null
-    : input.joins === null
+// The pair's season entry counts (#153): one of them clicked "Nevezünk", or
+// the organizer entered them from Párok (#154); or the organizer took them
+// out of the season (#154). No names (a lock screen is not a private place).
+export function seasonEntryMessage(
+  input: {
+    league: string;
+    season: string;
+    // Where the pair starts; null: the next season. Not used for "removed".
+    joins: { phase: number; startsAt: Date } | null;
+  },
+  event: "entered" | "entered_by_organizer" | "removed" = "entered",
+): Message {
+  const where = `${input.season}, ${input.league}.`;
+  if (event === "removed")
+    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: "/pair" };
+  const start =
+    input.joins === null
       ? "A következő szezontól játszotok."
       : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
-    title: input.approved ? "Jóváhagyták a nevezéseteket" : "Nem fogadták el a nevezéseteket",
-    body: [`${input.season}, ${input.league}.`, start].filter(Boolean).join(" "),
+    title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
+    body: `${where} ${start}`,
     url: "/pair",
   };
 }
@@ -182,6 +222,91 @@ export function partnerFoundMessage(league: string): Message {
     title: "Párt találtunk neked",
     body: `A szervező párba tett valakivel (${league}). A Párom oldalon látod, ki az.`,
     url: "/pair",
+  };
+}
+
+// --- Scheduling a match (#26, spec 13) ---------------------------------------
+// No names (a lock screen is not a private place): the match page shows them.
+// Each links to the match page, where the action is.
+
+const matchUrl = (matchId: number) => `/matches/${matchId}`;
+
+// To the other pair: a proposal or counter-proposal arrived (instant).
+export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; slots: number }): Message {
+  return {
+    title: input.counter ? "Új időpontokat ajánlottak" : "Időpontokat ajánlottak",
+    body: `Az ellenfeletek ${input.slots} időpontot ajánlott a ${input.week}. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the other pair: an agreed time waits for confirmation (instant).
+export function matchAgreedTimeMessage(input: { matchId: number; slot: Date }): Message {
+  return {
+    title: "Erősítsd meg az időpontot",
+    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the pair that proposed or recorded: the match is scheduled (digest item).
+export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean }): Message {
+  return {
+    title: "Lefixálva a meccsetek",
+    body: `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the pair that recorded an agreed time the other pair declined (digest item).
+export function matchDeclinedMessage(input: { matchId: number; slot: Date }): Message {
+  return {
+    title: "Nem erősítették meg az időpontot",
+    body: `Az ellenfeletek szerint nem ${formatDeadline(input.slot)} a meccs. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the other pair: the scheduled slot was cancelled (#27, digest item). A
+// late cancellation says the cancelling pair proposes next (spec 6.6).
+export function matchCancelledMessage(input: { matchId: number; slot: Date; late: boolean }): Message {
+  return {
+    title: "Lemondták a meccset",
+    body: input.late
+      ? `Az ellenfeletek 24 órán belül lemondta a ${formatDeadline(input.slot)} időpontot. Nekik kell új időpontokat ajánlaniuk.`
+      : `Az ellenfeletek lemondta a ${formatDeadline(input.slot)} időpontot. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// --- Results (#28) and organizer decisions (#29, spec 13) --------------------
+// No names; the score from the recipient's side ("ti" first).
+
+// To the other pair: a result waits for confirmation (instant).
+export function matchResultMessage(input: { matchId: number; score: string }): Message {
+  return {
+    title: "Erősítsd meg az eredményt",
+    body: `Az ellenfeletek rögzítette az eredményt: ${input.score}. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To both pairs: the result counts (digest item).
+export function matchResultConfirmedMessage(input: { matchId: number; score: string; auto: boolean }): Message {
+  return {
+    title: "Végleges az eredmény",
+    body: input.auto ? `48 óra után magától elfogadtuk az eredményt: ${input.score}.` : `Megerősítették az eredményt: ${input.score}.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To both pairs: the organizer decided or overrode the outcome (digest item).
+// The reason is on the match page only.
+export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "A szervező döntött a meccsetekről",
+    body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
+    url: matchUrl(input.matchId),
   };
 }
 

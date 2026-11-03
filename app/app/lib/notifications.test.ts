@@ -5,12 +5,21 @@ import {
   channelKey,
   followsEmailSwitch,
   groupsPublishedMessage,
+  matchAgreedTimeMessage,
+  matchDecidedMessage,
+  matchCancelledMessage,
+  matchDeclinedMessage,
+  matchProposalMessage,
+  matchResultConfirmedMessage,
+  matchResultMessage,
+  matchScheduledMessage,
+  DIGEST_KINDS,
   isChannel,
   isEnabled,
   isNotificationKind,
   kindsFor,
   pairIntroMessage,
-  seasonEntryDecisionMessage,
+  seasonEntryMessage,
   newSignupMessage,
   parseSubscription,
   pushPayload,
@@ -204,28 +213,16 @@ describe("pairIntroMessage", () => {
 describe("player messages (#115)", () => {
   const base = { league: "Padelpárbaj Győr", season: "2026/27 tél" };
 
-  it("an approval says where the pair starts; no names", () => {
-    expect(
-      seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } }),
-    ).toEqual({
-      title: "Jóváhagyták a nevezéseteket",
+  it("#153: entered says where the pair starts; no names, no approval", () => {
+    expect(seasonEntryMessage({ ...base, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } })).toEqual({
+      title: "Beneveztetek",
       body: "2026/27 tél, Padelpárbaj Győr. Az 1. körtől játszotok (kezdés: nov. 9.).",
       url: "/pair",
     });
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
+    expect(seasonEntryMessage({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
       "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
     );
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: null }).body).toBe(
-      "2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.",
-    );
-  });
-
-  it("a rejection", () => {
-    expect(seasonEntryDecisionMessage({ ...base, approved: false, joins: null })).toEqual({
-      title: "Nem fogadták el a nevezéseteket",
-      body: "2026/27 tél, Padelpárbaj Győr.",
-      url: "/pair",
-    });
+    expect(seasonEntryMessage({ ...base, joins: null }).body).toBe("2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.");
   });
 
   it("the groups: group, phase and deadline in Budapest time", () => {
@@ -233,6 +230,85 @@ describe("player messages (#115)", () => {
       title: "Itt a csoportod: 3. csoport",
       body: "1. kör, 2026/27 tél, Padelpárbaj Győr. Határidő: nov. 29., vasárnap 23:59.",
       url: "/home",
+    });
+  });
+});
+
+describe("match scheduling notifications (#26, spec 13)", () => {
+  const slot = new Date("2026-11-17T17:00:00Z");
+
+  it("a proposal or counter-proposal links to the match, without names", () => {
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, slots: 3 })).toEqual({
+      title: "Időpontokat ajánlottak",
+      body: "Az ellenfeletek 3 időpontot ajánlott a 2. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.",
+      url: "/matches/7",
+    });
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, slots: 4 }).title).toBe("Új időpontokat ajánlottak");
+  });
+
+  it("an agreed time waiting for confirmation", () => {
+    expect(matchAgreedTimeMessage({ matchId: 7, slot })).toEqual({
+      title: "Erősítsd meg az időpontot",
+      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.",
+      url: "/matches/7",
+    });
+  });
+
+  it("scheduled: accepted or confirmed", () => {
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: false }).body).toBe("Az ellenfeletek elfogadta az időpontot: nov. 17., kedd 18:00.");
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: true }).body).toBe(
+      "Az ellenfeletek megerősítette a megbeszélt időpontot: nov. 17., kedd 18:00.",
+    );
+  });
+
+  it("declined", () => {
+    expect(matchDeclinedMessage({ matchId: 7, slot })).toEqual({
+      title: "Nem erősítették meg az időpontot",
+      body: "Az ellenfeletek szerint nem nov. 17., kedd 18:00 a meccs. Egyeztessetek újra.",
+      url: "/matches/7",
+    });
+  });
+
+  it("a cancellation (#27): late says the cancelling pair proposes next; no names", () => {
+    expect(matchCancelledMessage({ matchId: 7, slot, late: false })).toEqual({
+      title: "Lemondták a meccset",
+      body: "Az ellenfeletek lemondta a nov. 17., kedd 18:00 időpontot. Egyeztessetek újra.",
+      url: "/matches/7",
+    });
+    expect(matchCancelledMessage({ matchId: 7, slot, late: true }).body).toBe(
+      "Az ellenfeletek 24 órán belül lemondta a nov. 17., kedd 18:00 időpontot. Nekik kell új időpontokat ajánlaniuk.",
+    );
+  });
+
+  it("the digest kinds: scheduled, declined, cancelled, the reminders, confirmed and decided results; never an instant one (#31)", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon", "match_result_confirmed", "match_decided"]);
+    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow", "match_result"] as const) expect(DIGEST_KINDS).not.toContain(instant);
+  });
+});
+
+describe("result messages (#28, #29, spec 13)", () => {
+  it("waiting for confirmation: the score from the recipient's side and the 48 hours", () => {
+    expect(matchResultMessage({ matchId: 7, score: "1:4, 2:4" })).toEqual({
+      title: "Erősítsd meg az eredményt",
+      body: "Az ellenfeletek rögzítette az eredményt: 1:4, 2:4. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.",
+      url: "/matches/7",
+    });
+  });
+
+  it("confirmed or accepted after 48 hours", () => {
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: false }).body).toBe("Megerősítették az eredményt: 4:1, 4:2.");
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: true })).toEqual({
+      title: "Végleges az eredmény",
+      body: "48 óra után magától elfogadtuk az eredményt: 4:1, 4:2.",
+      url: "/matches/7",
+    });
+  });
+
+  it("an organizer's decision: the outcome, not the reason", () => {
+    expect(matchDecidedMessage({ matchId: 7, outcome: "Játék nélküli győzelem nektek (4:0, 4:0)" })).toEqual({
+      title: "A szervező döntött a meccsetekről",
+      body: "Játék nélküli győzelem nektek (4:0, 4:0). Az indoklást a meccs oldalán látod.",
+      url: "/matches/7",
     });
   });
 });

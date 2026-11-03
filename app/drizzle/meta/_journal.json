@@ -211,6 +211,55 @@
       "when": 1793622489516,
       "tag": "0029_partner_searches",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1793644391865,
+      "tag": "0030_match_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1793649367719,
+      "tag": "0031_entries_without_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1793651511385,
+      "tag": "0035_match_venue_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1793658890484,
+      "tag": "0036_stuck_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1793659921114,
+      "tag": "0037_match_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1793687593915,
+      "tag": "0038_account_deleted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1793695374309,
+      "tag": "0039_stuck_reminder_people",
+      "breakpoints": true
     }
   ]
 }

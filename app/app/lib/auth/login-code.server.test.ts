@@ -39,6 +39,34 @@ describe("open sign-up (#113)", () => {
     expect(h.codes.map((c) => c.to)).toEqual(["uj.jatekos@example.com"]);
   });
 
+  it("sends none to a deleted account's placeholder address, but looks the same (#152)", async () => {
+    run("insert into users (id, email, name, deleted_at) values ('x', 'deleted-x@deleted.invalid', 'Törölt játékos', 1)");
+    expect(await L.sendLoginCode("deleted-x@deleted.invalid")).toEqual({ ok: true, email: "deleted-x@deleted.invalid" });
+    expect(h.codes).toEqual([]);
+    expect(all("select count(*) as n from email_messages")).toEqual([{ n: 0 }]);
+    // As for any skipped address: a code row nobody knows (#123).
+    expect(all("select email from login_codes")).toEqual([{ email: "deleted-x@deleted.invalid" }]);
+  });
+
+  it("never logs into a deleted account's placeholder, even with the right code (#152)", async () => {
+    const email = "deleted-x@deleted.invalid";
+    run("insert into users (id, email, name, deleted_at) values ('x', ?, 'Törölt játékos', 1)", email);
+    const { sha256Hex } = await import("~/lib/auth/tokens");
+    const { CODE_MESSAGES } = await import("~/lib/auth/rules");
+    // A code row whose code is known (as if guessed), as login-code.server.ts hashes it.
+    run(
+      "insert into login_codes (email, code_hash, expires_at, window_start) values (?, ?, ?, ?)",
+      email,
+      await sha256Hex(`${email}:123456`),
+      Math.floor(Date.now() / 1000) + 600,
+      Math.floor(Date.now() / 1000),
+    );
+    expect(await L.verifyLoginCode(email, "123456")).toEqual({ ok: false, error: CODE_MESSAGES.wrong });
+    // The same code on a normal address logs in: the hash above is the real one.
+    run("update login_codes set email = 'uj@example.com', code_hash = ? where email = ?", await sha256Hex("uj@example.com:123456"), email);
+    expect((await L.verifyLoginCode("uj@example.com", "123456")).ok).toBe(true);
+  });
+
   it("creates the account when the code is right", async () => {
     await L.sendLoginCode("uj.jatekos@example.com");
     const result = await L.verifyLoginCode("uj.jatekos@example.com", h.codes[0]!.code);
@@ -63,7 +91,12 @@ describe("codes to new addresses (#113)", () => {
     expect(await L.sendLoginCode("bounced@example.com")).toEqual({ ok: true, email: "bounced@example.com" });
     expect(await L.sendLoginCode("spam@example.com")).toEqual({ ok: true, email: "spam@example.com" });
     expect(h.codes).toEqual([]);
-    expect(all("select email from login_codes")).toEqual([]);
+    // A code row nobody knows, under the same limits as a sent one (#123).
+    expect(all("select email, attempts, sent_in_window from login_codes order by email")).toEqual([
+      { email: "bounced@example.com", attempts: 0, sent_in_window: 1 },
+      { email: "spam@example.com", attempts: 0, sent_in_window: 1 },
+    ]);
+    expect(await L.verifyLoginCode("bounced@example.com", "123456")).toEqual({ ok: false, error: "Ez nem jó kód. Nézd meg újra a levelet." });
   });
 
   it("still sends to a new address that only unsubscribed from bulk mail", async () => {
@@ -83,7 +116,9 @@ describe("codes to new addresses (#113)", () => {
     h.limit = 20; // cap 5
     for (let i = 1; i <= 7; i++) await L.sendLoginCode(`bot${i}@example.com`);
     expect(h.codes.map((c) => c.to)).toEqual([1, 2, 3, 4, 5].map((i) => `bot${i}@example.com`));
-    expect(all("select count(*) as n from login_codes")).toEqual([{ n: 5 }]);
+    // The two past the cap get a code row nobody knows, and no email (#123).
+    expect(all("select count(*) as n from login_codes")).toEqual([{ n: 7 }]);
+    expect(all("select count(*) as n from email_messages")).toEqual([{ n: 5 }]);
   });
 
   it("past the cap still sends to accounts and invited addresses", async () => {

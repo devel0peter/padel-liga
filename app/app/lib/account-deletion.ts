@@ -99,8 +99,8 @@ export function deletionPlan(c: DeletionCheck): DeletionPlan {
 // What the confirmation dialog says will happen.
 export const DELETION_EFFECTS: Record<DeletionMode, string> = {
   remove:
-    "Nincs lejátszott múltja, ezért minden adata törlődik: a fiók, a párjai, a nevezései, a párkeresése, az értesítései és a jelentkezése. Ha volt párja, ő pár nélkül marad. Senki nem kap róla e-mailt.",
-  anonymize: `Volt már kihirdetett csoportban, ezért a fiók névtelen lesz: a neve „${DELETED_NAME}” lesz, az e-mail-címe, a telefonszáma, a belépései és az eszközei törlődnek, a csoportok és az eredmények nem változnak. Az aktív párja felbomlik. Senki nem kap róla e-mailt.`,
+    "Nincs lejátszott múltja, ezért minden adata törlődik: a fiók, a párjai, a nevezései, a párkeresése, az értesítései, a jelentkezése és a címéhez tartozó minden tárolt adat, a leiratkozás vagy visszapattanás nyoma is. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. Ha volt párja, ő pár nélkül marad. Senki nem kap róla e-mailt.",
+  anonymize: `Volt már kihirdetett csoportban, ezért a fiók névtelen lesz: a neve „${DELETED_NAME}” lesz, az e-mail-címe, a telefonszáma, a belépései, az eszközei és a címéhez tartozó minden tárolt adat (a leiratkozás vagy visszapattanás nyoma is) törlődik, a régi eredményekben csak a névtelen neve marad. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. A csoportok és az eredmények nem változnak. Az aktív párja felbomlik. Senki nem kap róla e-mailt.`,
 };
 
 export const DELETED = { remove: "A fiók törölve.", anonymize: "A fiók névtelen lett." } as const;

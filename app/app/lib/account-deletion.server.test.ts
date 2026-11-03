@@ -4,13 +4,16 @@
 // is a recorder: a deletion queues nothing.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
+const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[], codes: [] as string[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueSeasonEntryDecision: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
+  // A login code is recorded apart: it is the one mail the tests below expect.
+  dailyLimit: () => 100,
+  queueLoginCode: async (to: string) => h.codes.push(to),
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -20,6 +23,7 @@ const { partnerNoticeSubject } = await import("~/lib/email/templates");
 const { pairCandidates } = await import("~/lib/pairs.server");
 const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
+const { sendLoginCode } = await import("~/lib/auth/login-code.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 // During phase 1 (9–29 Nov) and after it.
@@ -32,6 +36,7 @@ const n = (q: string, ...p: any[]) => Object.values(one(q, ...p) as object)[0] a
 function freshDb() {
   h.raw = migratedDatabase();
   h.mails = [];
+  h.codes = [];
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
   h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
   h.raw.exec(`insert into users (id, email, name, platform_role, consent_at) values ('admin', 'admin@x.hu', 'Admin', 'superadmin', 1), ('admin2', 'admin2@x.hu', 'Admin2', 'superadmin', 1)`);
@@ -136,6 +141,7 @@ function personalRowsLeft() {
     mail: n("select count(*) from email_messages where to_email = 'a@x.hu'"),
     signups: n("select count(*) from interest_signups where lower(email1) = 'a@x.hu' or lower(email2) = 'a@x.hu'"),
     audit: n("select count(*) from audit_log where target like '%a@x.hu%'"),
+    suppressions: n("select count(*) from email_suppressions where email = 'a@x.hu'"),
   };
 }
 
@@ -153,6 +159,7 @@ const NONE = {
   mail: 0,
   signups: 0,
   audit: 0,
+  suppressions: 0,
 };
 
 function interestListAfter() {
@@ -169,10 +176,8 @@ function interestListAfter() {
   });
   expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and kind = 'login_code'")).toBe(1);
   otherPeoplesMailAfter();
-  // No row has a's address as a whole any more; the unsubscribe below stays.
+  // No row has a's address as a whole any more.
   expect(n("select count(*) from email_messages where instr(' ' || lower(coalesce(text, '') || ' ' || subject || ' ' || to_email), ' a@x.hu') > 0")).toBe(0);
-  // The unsubscribe stays, so the address is never mailed again.
-  expect(n("select count(*) from email_suppressions where email = 'a@x.hu'")).toBe(1);
 }
 
 describe("deleting an account (#152)", () => {
@@ -195,6 +200,40 @@ describe("deleting an account (#152)", () => {
     // The address is free: a login with it would make a new account.
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
   });
+
+  it("removes the address's unsubscribe, bounce and complaint, and nobody else's (#193)", async () => {
+    // a@x.hu has one row (the primary key is the address); the others stay.
+    h.raw.exec(`update email_suppressions set reason = 'bounced' where email = 'a@x.hu'`);
+    h.raw.exec(`insert into email_suppressions (email, reason) values ('b@x.hu', 'complained'), ('c@x.hu', 'unsubscribed')`);
+    expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(all("select email, reason from email_suppressions order by email")).toEqual([
+      { email: "b@x.hu", reason: "complained" },
+      { email: "c@x.hu", reason: "unsubscribed" },
+    ]);
+  });
+
+  it("removes the unsubscribe of an anonymized account too (#193)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into email_suppressions (email, reason) values ('b@x.hu', 'unsubscribed')`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(all("select email from email_suppressions")).toEqual([{ email: "b@x.hu" }]);
+  });
+
+  it("keeps the unsubscribe when the deletion is refused (#193)", async () => {
+    publishPairOne();
+    expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.playing });
+    expect(n("select count(*) from email_suppressions where email = 'a@x.hu'")).toBe(1);
+  });
+
+  it.each(["unsubscribed", "bounced", "complained"])(
+    "sends a login code to a deleted address that was %s, as to a new player (#193)",
+    async (reason) => {
+      h.raw.exec(`update email_suppressions set reason = '${reason}' where email = 'a@x.hu'`);
+      expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: true, mode: "remove" });
+      expect(await sendLoginCode("A@x.hu")).toEqual({ ok: true, email: "a@x.hu" });
+      expect(h.codes).toEqual(["a@x.hu"]);
+    },
+  );
 
   it("takes a pair out of a draft group and bumps the draft's revision", async () => {
     h.raw.exec(`insert into groups (id, season_id, phase, number) values (1, 1, 1, 1)`);

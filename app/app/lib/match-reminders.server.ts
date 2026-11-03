@@ -167,9 +167,14 @@ export async function sendDigests(now: Date): Promise<number> {
       .select({ id: users.id, email: users.email, name: users.name })
       .from(users)
       .where(
-        inArray(
-          users.id,
-          wanted.slice(i, i + ID_CHUNK).map((w) => w.userId),
+        and(
+          inArray(
+            users.id,
+            wanted.slice(i, i + ID_CHUNK).map((w) => w.userId),
+          ),
+          // An organizer decision on an old match still notifies a deleted
+          // account (#152); it gets no digest.
+          isNull(users.deletedAt),
         ),
       ))
       people.set(u.id, { email: u.email, name: u.name || "" });

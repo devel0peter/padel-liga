@@ -76,6 +76,11 @@ const mails = (kind: string) => all("select to_email as \"to\", subject, status 
 const PLAYERS = (...pairs: number[]) => pairs.flatMap((p) => [`p${p}a`, `p${p}b`]);
 const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
+// The digest and "holnap meccs" emails are off for now (#191, D83); the
+// tests below keep them working with both switched on, as turning them back
+// on would.
+const run = (now: Date) => R.runMatchReminders(now, { digest: true, tomorrow: true });
+
 // Pair 1 proposes on Tue 10 Nov, pair 4 accepts Thu 12 Nov 18:00.
 async function schedule14(): Promise<number> {
   const id = matchOf(1, 4);
@@ -92,7 +97,7 @@ describe("digest reminders (#31)", () => {
   beforeEach(freshDb);
 
   it("no proposal on Wednesday of week 1: one reminder to each of the four players of each week-1 match, and their digest", async () => {
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     const items = inbox("match_no_proposal");
     expect(items.map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 2, 3, 4).sort());
     expect(new Set(items.map((n: any) => n.url))).toEqual(new Set([`/matches/${matchOf(1, 4)}`, `/matches/${matchOf(2, 3)}`]));
@@ -102,16 +107,16 @@ describe("digest reminders (#31)", () => {
   });
 
   it("the same reminder never goes twice; a later run that morning sends nothing", async () => {
-    await R.runMatchReminders(at("2026-11-11", 7));
-    await R.runMatchReminders(at("2026-11-11", 7, 30));
-    await R.runMatchReminders(at("2026-11-12", 7));
+    await run(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7, 30));
+    await run(at("2026-11-12", 7));
     expect(inbox("match_no_proposal")).toHaveLength(8);
     expect(mails("match_digest")).toHaveLength(8);
   });
 
   it("only at 07:00 Budapest; Tuesday has nothing, so no email", async () => {
-    await R.runMatchReminders(at("2026-11-11", 9));
-    await R.runMatchReminders(at("2026-11-10", 7));
+    await run(at("2026-11-11", 9));
+    await run(at("2026-11-10", 7));
     expect(inbox()).toEqual([]);
     expect(mails("match_digest")).toEqual([]);
   });
@@ -121,27 +126,27 @@ describe("digest reminders (#31)", () => {
     await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", slots: SLOTS, clubId: null }, at("2026-11-10", 11));
     h.raw.exec(`update matches set status = 'final' where id = ${matchOf(1, 3)}`);
     h.raw.exec("delete from notifications");
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     expect(inbox("match_no_proposal")).toEqual([]);
     // Week 2, Wednesday: 1–3 is played (no reminder), 2–4 isn't.
-    await R.runMatchReminders(at("2026-11-18", 7));
+    await run(at("2026-11-18", 7));
     expect(new Set(inbox("match_no_proposal").map((n: any) => n.url))).toEqual(new Set([`/matches/${matchOf(2, 4)}`]));
     expect(id).toBeGreaterThan(0);
   });
 
   it("end of week 1, still unscheduled: 'pótoljátok' on Monday; a missed Wednesday sends only that one", async () => {
-    await R.runMatchReminders(at("2026-11-16", 7));
+    await run(at("2026-11-16", 7));
     expect(inbox("match_week_end")).toHaveLength(8);
     // The Wednesday reminder was due too but is not sent, now or later.
     expect(inbox("match_no_proposal")).toEqual([]);
-    await R.runMatchReminders(at("2026-11-17", 7));
+    await run(at("2026-11-17", 7));
     expect(inbox("match_no_proposal")).toEqual([]);
   });
 
   it("3 days before the deadline: every unscheduled match", async () => {
     await schedule14();
     h.raw.exec("delete from notifications");
-    await R.runMatchReminders(at("2026-11-26", 7));
+    await run(at("2026-11-26", 7));
     // 1–4 is scheduled; the other 5 matches aren't.
     expect(inbox("match_deadline_soon")).toHaveLength(5 * 4);
     expect(inbox().filter((n: any) => n.kind !== "match_deadline_soon")).toEqual([]);
@@ -158,7 +163,7 @@ describe("the daily digest (#31)", () => {
     h.raw.exec(
       `insert into notifications (user_id, kind, title, body, url, created_at) values ('p2a', 'match_cancelled', 'Lemondták a meccset', 'x', '/matches/1', ${sec("2026-11-10T18:00:00Z")})`,
     );
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     const toP2a = h.sent.filter((m) => m.to === "p2a@x.hu");
     expect(toP2a).toHaveLength(1);
     expect(toP2a[0].subject).toBe("Napi összefoglaló: 2 újdonság – Padelpárbaj");
@@ -171,7 +176,7 @@ describe("the daily digest (#31)", () => {
   it("only items not opened in the app; nothing left, no email", async () => {
     await schedule14();
     h.raw.exec("update notifications set read_at = unixepoch() where user_id = 'p1a'");
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     expect(h.sent.filter((m) => m.to === "p1a@x.hu")).toEqual([]);
     // The partner didn't open it.
     expect(h.sent.filter((m) => m.to === "p1b@x.hu")).toHaveLength(1);
@@ -179,7 +184,7 @@ describe("the daily digest (#31)", () => {
 
   it("email switched off: no digest email, the items still in the app", async () => {
     h.raw.exec("insert into notification_opt_outs (user_id, kind) values ('p1a', 'channel:email')");
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     expect(inbox("match_no_proposal").filter((n: any) => n.user === "p1a")).toHaveLength(1);
     expect(mails("match_digest").map((m: any) => m.to)).not.toContain("p1a@x.hu");
     expect(mails("match_digest")).toHaveLength(7);
@@ -187,7 +192,7 @@ describe("the daily digest (#31)", () => {
 
   it("a deleted account (#152) gets no digest, even with an item left", async () => {
     h.raw.exec("update users set deleted_at = unixepoch() where id = 'p1a'");
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     expect(mails("match_digest").map((m: any) => m.to)).not.toContain("p1a@x.hu");
     expect(mails("match_digest")).toHaveLength(7);
   });
@@ -203,13 +208,13 @@ describe("the daily digest (#31)", () => {
     h.raw.exec(
       `insert into notifications (user_id, kind, title, body, url, created_at) values ('p1a', 'match_proposal', 'Időpontokat ajánlottak', 'x', '/matches/1', ${sec("2026-11-10T18:00:00Z")})`,
     );
-    await R.runMatchReminders(at("2026-11-11", 7));
+    await run(at("2026-11-11", 7));
     const toP1a = h.sent.filter((m) => m.to === "p1a@x.hu");
     expect(toP1a).toHaveLength(1);
     expect(toP1a[0].text).toContain("Lemondták a meccset");
     expect(toP1a[0].text).not.toContain("Régi");
     expect(toP1a[0].text).not.toContain("Időpontokat ajánlottak");
-    await R.runMatchReminders(at("2026-11-12", 7));
+    await run(at("2026-11-12", 7));
     expect(h.sent.filter((m) => m.to === "p1a@x.hu")).toHaveLength(1);
   });
 });
@@ -221,10 +226,10 @@ describe("holnap meccs (#31)", () => {
     const id = await schedule14();
     await M.matchStep("p4b", id, { kind: "venue", clubId: 1, court: "2-es pálya" }, at("2026-11-10", 13));
     h.raw.exec("delete from notifications");
-    await R.runMatchReminders(at("2026-11-11", 17));
+    await run(at("2026-11-11", 17));
     expect(mails("match_tomorrow")).toEqual([]);
-    await R.runMatchReminders(at("2026-11-11", 18));
-    await R.runMatchReminders(at("2026-11-11", 19));
+    await run(at("2026-11-11", 18));
+    await run(at("2026-11-11", 19));
     expect(mails("match_tomorrow").map((m: any) => m.to).sort()).toEqual(PLAYERS(1, 4).map((p) => `${p}@x.hu`).sort());
     expect(inbox("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
     const toP1a = h.sent.find((m) => m.to === "p1a@x.hu");
@@ -233,7 +238,7 @@ describe("holnap meccs (#31)", () => {
     expect(toP1a.text).toContain("Helyszín: Ace Padel, 2-es pálya");
     // "Holnap meccs" isn't a digest item: the next morning's digest (pairs 2
     // and 3 get one for their own match) has nothing for these four.
-    await R.runMatchReminders(at("2026-11-12", 7));
+    await run(at("2026-11-12", 7));
     const digests = mails("match_digest").map((m: any) => m.to);
     expect(digests.length).toBeGreaterThan(0);
     for (const p of PLAYERS(1, 4)) expect(digests).not.toContain(`${p}@x.hu`);
@@ -241,13 +246,13 @@ describe("holnap meccs (#31)", () => {
 
   it("rescheduled to another day: the new slot gets its own reminder", async () => {
     const id = await schedule14();
-    await R.runMatchReminders(at("2026-11-11", 18));
+    await run(at("2026-11-11", 18));
     expect(mails("match_tomorrow")).toHaveLength(4);
     // Cancelled on Thursday morning (late), then a time on Saturday is agreed and confirmed.
     await M.matchStep("p1a", id, { kind: "cancel" }, at("2026-11-12", 9));
     await M.matchStep("p1a", id, { kind: "agreed", slot: at("2026-11-14", 10), clubId: null }, at("2026-11-12", 9, 5));
     await M.matchStep("p4a", id, { kind: "confirm" }, at("2026-11-12", 9, 10));
-    await R.runMatchReminders(at("2026-11-13", 20));
+    await run(at("2026-11-13", 20));
     expect(mails("match_tomorrow")).toHaveLength(8);
   });
 
@@ -255,8 +260,49 @@ describe("holnap meccs (#31)", () => {
     await schedule14();
     h.raw.exec("insert into notification_opt_outs (user_id, kind) values ('p4a', 'channel:email')");
     h.raw.exec("delete from notifications");
-    await R.runMatchReminders(at("2026-11-11", 18));
+    await run(at("2026-11-11", 18));
     expect(mails("match_tomorrow").map((m: any) => m.to)).not.toContain("p4a@x.hu");
     expect(inbox("match_tomorrow").map((n: any) => n.user)).toContain("p4a");
+  });
+});
+
+describe("the emails switched off (#191, D83)", () => {
+  beforeEach(freshDb);
+
+  it("both are off by default", async () => {
+    const { MATCH_REMINDER_EMAILS } = await import("~/lib/match-reminders");
+    expect(MATCH_REMINDER_EMAILS).toEqual({ digest: false, tomorrow: false });
+  });
+
+  // Without VAPID keys the push step logs what it would push.
+  const pushed = (log: ReturnType<typeof vi.spyOn>) => log.mock.calls.map((c: unknown[]) => String(c[0]));
+
+  it("the 07:00 run makes the reminder items (in the app, by push) and queues no digest email", async () => {
+    await schedule14();
+    const log = vi.spyOn(console, "log");
+    await R.runMatchReminders(at("2026-11-11", 7));
+    expect(pushed(log)).toContain("[push disabled] 4 × match_no_proposal");
+    log.mockRestore();
+    // Pairs 2 and 3 have had no proposal by Wednesday: their reminder is in the app.
+    expect(inbox("match_no_proposal").map((n: any) => n.user).sort()).toEqual(PLAYERS(2, 3).sort());
+    expect(mails("match_digest")).toEqual([]);
+    expect(h.sent).toEqual([]);
+    // The items stay untaken; a digest switched back on takes only the last day's.
+    expect(all("select count(*) as n from notifications where digested_at is not null")[0].n).toBe(0);
+  });
+
+  it("the evening run gives 'holnap meccs' in the app and by push, and queues no email", async () => {
+    await schedule14();
+    h.raw.exec("delete from notifications");
+    const log = vi.spyOn(console, "log");
+    await R.runMatchReminders(at("2026-11-11", 18));
+    expect(pushed(log)).toContain("[push disabled] 4 × match_tomorrow");
+    log.mockRestore();
+    expect(inbox("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
+    expect(mails("match_tomorrow")).toEqual([]);
+    expect(h.sent).toEqual([]);
+    // Still claimed once: a later evening run tells nobody again.
+    await R.runMatchReminders(at("2026-11-11", 19));
+    expect(inbox("match_tomorrow")).toHaveLength(4);
   });
 });

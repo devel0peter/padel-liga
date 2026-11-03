@@ -253,6 +253,13 @@
       "when": 1793687593915,
       "tag": "0038_account_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1793695374309,
+      "tag": "0039_stuck_reminder_people",
+      "breakpoints": true
     }
   ]
 }

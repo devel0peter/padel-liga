@@ -34,7 +34,7 @@ import {
 } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
-import { eventText } from "./matches";
+import { eventText, schedulingEmailDue } from "./matches";
 import { pairName } from "./groups";
 import { COURT_MAX } from "./matches";
 import { formatPhone } from "./phone";
@@ -698,13 +698,21 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
 }
 
 // The other pair learns about the step (spec 13): a proposal or an agreed
-// time instantly (email, push, the app); a scheduled match, a declined agreed
+// time instantly (push, the app, and an email for the first such step of the
+// Budapest day from this pair, #191); a scheduled match, a declined agreed
 // time or a cancellation in the app and by push (the daily digest email is
 // #31). Recording the venue tells nobody (#27).
 async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, before: SchedulingState, now: Date): Promise<void> {
   if (event.kind === "venue") return;
   const [ours, theirs] = side === "a" ? [ctx.pairs.a, ctx.pairs.b] : [ctx.pairs.b, ctx.pairs.a];
   const matchId = ctx.match.id;
+  // ctx.events is the log before this step.
+  const emailed = schedulingEmailDue(
+    ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)),
+    side,
+    now,
+  );
+  const mail = (messages: Parameters<typeof queueMatchEmails>[0]) => (emailed ? queueMatchEmails(messages) : undefined);
   const send = (kind: PlayerKind, message: Message) =>
     notifyPlayers(
       kind,
@@ -725,12 +733,12 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
       case "counter_proposal": {
         const slots = (event.slots ?? []).map((s) => new Date(s * 1000));
         const counter = event.kind === "counter_proposal";
-        await queueMatchEmails(theirs.players.map((p) => ({ kind: "match_proposal", toEmail: p.email, input: { ...base(p), counter, slots } })));
+        await mail(theirs.players.map((p) => ({ kind: "match_proposal", toEmail: p.email, input: { ...base(p), counter, slots } })));
         await send("match_proposal", matchProposalMessage({ matchId, week: ctx.match.week, counter, slots: slots.length }));
         break;
       }
       case "agreed_time":
-        await queueMatchEmails(theirs.players.map((p) => ({ kind: "match_agreed_time", toEmail: p.email, input: { ...base(p), slot: event.slot! } })));
+        await mail(theirs.players.map((p) => ({ kind: "match_agreed_time", toEmail: p.email, input: { ...base(p), slot: event.slot! } })));
         await send("match_agreed_time", matchAgreedTimeMessage({ matchId, slot: event.slot! }));
         break;
       case "accepted":

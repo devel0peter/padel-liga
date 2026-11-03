@@ -7,6 +7,7 @@ import {
   entrySeason,
   isDue,
   nextPhase,
+  personKey,
   reminderKey,
   type ReminderAccount,
   type ReminderInput,
@@ -88,6 +89,7 @@ function input(v: Partial<ReminderInput> = {}): ReminderInput {
     partnerSearches: [],
     suppressed: new Set(),
     sent: new Set(),
+    reminded: new Set(),
     ...v,
   };
 }
@@ -132,22 +134,28 @@ describe("the waiting time and the deadline rule", () => {
     }
   });
 
-  it("goes out right away when the deadline is under 24 hours away", () => {
+  it("waits only 24 hours when the deadline is under 24 hours away (#191)", () => {
     const eve = new Date("2026-11-06T08:00:00Z");
-    expect(isDue("C", new Date(eve.getTime() - HOUR), s, eve)).toBe(true);
-    // 25 hours before the deadline: still waits.
+    expect(isDue("C", new Date(eve.getTime() - DAY), s, eve)).toBe(true);
+    // Never under 24 hours after getting stuck, deadline or not.
+    expect(isDue("C", new Date(eve.getTime() - 23 * HOUR), s, eve)).toBe(false);
+    expect(isDue("C", new Date(eve.getTime() - HOUR), s, eve)).toBe(false);
+    // 25 hours before the deadline: still the full 2 days.
     const before = new Date("2026-11-05T21:59:00Z");
-    expect(isDue("C", new Date(before.getTime() - HOUR), s, before)).toBe(false);
+    expect(isDue("C", new Date(before.getTime() - DAY), s, before)).toBe(false);
     // After the deadline the waiting time counts again.
     const after = new Date("2026-11-07T08:00:00Z");
-    expect(isDue("C", new Date(after.getTime() - HOUR), s, after)).toBe(false);
+    expect(isDue("C", new Date(after.getTime() - DAY), s, after)).toBe(false);
     expect(isDue("C", new Date(after.getTime() - 2 * DAY), s, after)).toBe(true);
   });
 
-  it("the deadline rule sends a fresh situation at once", () => {
+  it("the deadline rule sends a situation 24 hours old, not a fresh one (#191)", () => {
     const eve = new Date("2026-11-06T08:00:00Z");
-    const a = account("anna", { consentAt: new Date(eve.getTime() - HOUR), createdAt: new Date(eve.getTime() - HOUR) });
-    expect(dueReminders(input({ now: eve, accounts: [a] }), [1]).map((r) => r.situation)).toEqual(["C"]);
+    const since = (ms: number) => new Date(eve.getTime() - ms);
+    const fresh = account("anna", { consentAt: since(HOUR), createdAt: since(HOUR) });
+    expect(dueReminders(input({ now: eve, accounts: [fresh] }), [1])).toEqual([]);
+    const dayOld = account("anna", { consentAt: since(DAY), createdAt: since(DAY) });
+    expect(dueReminders(input({ now: eve, accounts: [dayOld] }), [1]).map((r) => r.situation)).toEqual(["C"]);
   });
 });
 
@@ -322,5 +330,40 @@ describe("once only, one per person, and the switch", () => {
 
   it("sends nothing in a league with the switch off", () => {
     expect(who({ accounts: [account("cili")] }, [])).toEqual([]);
+  });
+});
+
+describe("one reminder per person per league season (#191)", () => {
+  it("someone who got A is not reminded again in C in the same season; in a new season they can be", () => {
+    // Cili got A (invited, no account) in season 7, then registered and has no pair.
+    const v = { accounts: [account("cili")] };
+    expect(who({ ...v, reminded: new Set([personKey(7, "cili@x.hu")]) })).toEqual([]);
+    // Another season of the league: C again.
+    expect(who({ ...v, reminded: new Set([personKey(6, "cili@x.hu")]) })).toEqual(["C cili@x.hu"]);
+  });
+
+  it("holds for every situation, matched by address", () => {
+    const reminded = new Set(["eva@x.hu", "bela@x.hu", "cili@x.hu"].map((e) => personKey(7, e)));
+    expect(
+      who({
+        reminded,
+        signups: [signup({ email1: "Eva@x.hu", invitedAt: ago(3 * DAY) })],
+        accounts: [account("bela", { consentAt: null }), account("cili")],
+      }),
+    ).toEqual([]);
+  });
+
+  it("D goes only to the player not reminded this season", () => {
+    const p = pair("dani", "erik");
+    const accounts = [account("dani"), account("erik")];
+    expect(who({ accounts, pairs: [p], reminded: new Set([personKey(7, "dani@x.hu")]) })).toEqual(["D erik@x.hu"]);
+    expect(who({ accounts, pairs: [p], reminded: new Set([personKey(7, "dani@x.hu"), personKey(7, "erik@x.hu")]) })).toEqual([]);
+  });
+
+  it("someone who got C and later forms a pair gets no D in the same season; the partner does", () => {
+    // Cili got C this season, then paired with Erik; Dani still has no pair.
+    const accounts = [account("cili"), account("dani"), account("erik")];
+    const pairs = [pair("cili", "erik")];
+    expect(who({ accounts, pairs, reminded: new Set([personKey(7, "cili@x.hu")]) })).toEqual(["C dani@x.hu", "D erik@x.hu"]);
   });
 });

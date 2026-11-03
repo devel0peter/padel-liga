@@ -249,6 +249,57 @@ describe("matchStep (#26)", () => {
     expect(closed).toEqual({ ok: false, error: "A meccs időpontja már le van fixálva." });
   });
 
+  it("scheduling emails: one per match per recipient a Budapest day; every step still in the app and the log (#191, #171)", async () => {
+    const id = matchOf(2, 4);
+    const later = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000);
+    const mailsTo = () => h.mails.map((m) => [m.kind, m.toEmail]);
+    const proposalsTo = (user: string) => inbox().filter((n: any) => n.kind === "match_proposal" && n.user === user).length;
+
+    // Two proposals from pair 2 on Tuesday: pair 4 gets one email each, and both in the app.
+    expect((await M.matchStep("p2a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).ok).toBe(true);
+    const second = [at("2026-11-12", 19), at("2026-11-13", 20), at("2026-11-14", 11)];
+    expect((await M.matchStep("p2b", id, { kind: "propose", slots: second, clubId: null }, later(2))).ok).toBe(true);
+    expect(mailsTo()).toEqual([
+      ["match_proposal", "p4a@x.hu"],
+      ["match_proposal", "p4b@x.hu"],
+    ]);
+    expect([proposalsTo("p4a"), proposalsTo("p4b")]).toEqual([2, 2]);
+
+    // Pair 4 answers the same day: pair 2 hasn't had an email from it yet, so it gets one.
+    h.mails = [];
+    const counter = [at("2026-11-17", 18), at("2026-11-18", 18), at("2026-11-19", 18)];
+    expect((await M.matchStep("p4a", id, { kind: "propose", slots: counter, clubId: null }, later(3))).ok).toBe(true);
+    expect(mailsTo()).toEqual([
+      ["match_proposal", "p2a@x.hu"],
+      ["match_proposal", "p2b@x.hu"],
+    ]);
+    // Pair 2 records an agreed time that day too: in the app, no email.
+    h.mails = [];
+    expect((await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 20), clubId: null }, later(4))).ok).toBe(true);
+    expect(h.mails).toEqual([]);
+    expect(inbox().filter((n: any) => n.kind === "match_agreed_time").map((n: any) => n.user)).toEqual(["p4a", "p4b"]);
+
+    // Wednesday: a new proposal from pair 2 is emailed again, with its own (newest) slots.
+    const wednesday = [at("2026-11-13", 18), at("2026-11-14", 10), at("2026-11-15", 10)];
+    expect((await M.matchStep("p2b", id, { kind: "propose", slots: wednesday, clubId: null }, at("2026-11-11", 9))).ok).toBe(true);
+    expect(mailsTo()).toEqual([
+      ["match_proposal", "p4a@x.hu"],
+      ["match_proposal", "p4b@x.hu"],
+    ]);
+    expect(h.mails[0].input.slots).toEqual(wednesday);
+
+    // Every step is in the log.
+    expect(events(id).map((e: any) => e.kind)).toEqual(["proposal", "proposal", "counter_proposal", "agreed_time", "proposal"]);
+
+    // Another match isn't held back: pair 2's own week-2 match the same Wednesday.
+    h.mails = [];
+    expect((await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", slots: wednesday, clubId: null }, at("2026-11-11", 10))).ok).toBe(true);
+    expect(mailsTo()).toEqual([
+      ["match_proposal", "p3a@x.hu"],
+      ["match_proposal", "p3b@x.hu"],
+    ]);
+  });
+
   it("an agreed time 1 hour ahead at 23:00 is recorded, then confirmed: scheduled", async () => {
     const id = matchOf(2, 4);
     const late = at("2026-11-10", 23);

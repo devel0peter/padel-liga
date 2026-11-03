@@ -207,5 +207,47 @@ describe("automatic reminders (#155)", () => {
     await R.queueDueReminders(NOW);
     await O.deleteMessagesTo(["EVA@x.hu"]);
     expect(all("select key from stuck_reminders where situation = 'A'")).toEqual([]);
+    expect(all("select email from stuck_reminder_people where email = 'eva@x.hu'")).toEqual([]);
+  });
+
+  it("one reminder per person per season (#191): A, then C in the same season sends no second email; a new season can", async () => {
+    await R.setReminders("admin", league, true, NOW);
+    expect(await R.queueDueReminders(NOW)).toBe(5);
+    expect(all("select season_id, email, situation from stuck_reminder_people order by email")).toEqual([
+      { season_id: 1, email: "bela@x.hu", situation: "B" },
+      { season_id: 1, email: "cili@x.hu", situation: "C" },
+      { season_id: 1, email: "eva@x.hu", situation: "A" },
+      { season_id: 1, email: "gabi@x.hu", situation: "D" },
+      { season_id: 1, email: "hedi@x.hu", situation: "D" },
+    ]);
+    // Éva (got A) registers, has no pair and switched "Párt keresek" off;
+    // Béla (got B) finishes the first-login page. Both are in C now.
+    user("eva", { created: T });
+    h.raw.prepare("insert into partner_searches (league_id, user_id, seeking, updated_at) values (1, 'eva', 0, ?)").run(T);
+    h.raw.prepare("update users set consent_at = ? where id = 'bela'").run(T);
+    const later = new Date(NOW.getTime() + 3 * DAY * 1000);
+    const view = await R.reminderOverview(league, later);
+    // Neither is in the backlog or a preview: both got one this season.
+    expect(view.due).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    expect(view.previews).toEqual([]);
+    expect(await R.queueDueReminders(later)).toBe(0);
+    expect(reminderMail().filter((m: any) => m.to_email === "eva@x.hu")).toHaveLength(1);
+
+    // Season 1 has started its last phase; the league's next season accepts
+    // entries: Éva and Béla can get C there (Cili had C already, once ever).
+    h.raw.prepare("update season_phases set starts_at = ? where season_id = 1").run(T);
+    h.raw
+      .prepare(
+        "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (2, 1, '2027 tavasz', ?, ?, '2027-03-01')",
+      )
+      .run(T, T + 30 * DAY);
+    h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (2, 1, ?, ?)").run(T + 40 * DAY, T + 60 * DAY);
+    const next = await R.reminderOverview(league, later);
+    expect(next).toMatchObject({ season: "2027 tavasz" });
+    expect(next.due.C).toBe(2);
+    await R.queueDueReminders(later);
+    const c = reminderMail().filter((m: any) => m.subject === "Küldd el a párlinkedet – Padelpárbaj");
+    expect(c.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu", "eva@x.hu"]);
+    expect(reminderMail().filter((m: any) => m.to_email === "eva@x.hu")).toHaveLength(2);
   });
 });

@@ -628,6 +628,25 @@ export const stuckReminders = sqliteTable(
   (t) => [index("stuck_reminders_league_idx").on(t.leagueId, t.situation)],
 );
 
+// Who got a stuck reminder in which season, any situation (#191): at most
+// one each per league season. Written in the same batch as stuck_reminders
+// and the emails; the key makes an overlapping run fail as a whole.
+export const stuckReminderPeople = sqliteTable(
+  "stuck_reminder_people",
+  {
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    // Lowercase.
+    email: text("email").notNull(),
+    situation: text("situation", { enum: ["A", "B", "C", "D"] }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.seasonId, t.email] })],
+);
+
 // A phase's groups (#24, D21), 1. csoport the strongest. Until published_at
 // is set they are the Szervező's draft: regenerated or adjusted at will, and
 // stored so moves persist. Publishing creates the matches and the emails;

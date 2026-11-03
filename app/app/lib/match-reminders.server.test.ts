@@ -24,6 +24,7 @@ const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 const R = await import("~/lib/match-reminders.server");
+const O = await import("~/lib/email/outbox.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
@@ -79,7 +80,13 @@ const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)]
 // The digest and "holnap meccs" emails are off for now (#191, D83); the
 // tests below keep them working with both switched on, as turning them back
 // on would.
-const run = (now: Date) => R.runMatchReminders(now, { digest: true, tomorrow: true });
+// Like the cron: the step, then the delivery step sends the queued emails.
+const run = async (now: Date) => {
+  await R.runMatchReminders(now, undefined, { digest: true, tomorrow: true });
+  await O.deliver(undefined, now);
+};
+// The items whose push waits for the cron's push step (#183).
+const pushQueue = (kind: string) => all("select user_id as user from notifications where kind = ? and push_due_at is not null order by id", kind);
 
 // Pair 1 proposes on Tue 10 Nov, pair 4 accepts Thu 12 Nov 18:00.
 async function schedule14(): Promise<number> {
@@ -114,11 +121,33 @@ describe("digest reminders (#31)", () => {
     expect(mails("match_digest")).toHaveLength(8);
   });
 
-  it("only at 07:00 Budapest; Tuesday has nothing, so no email", async () => {
-    await run(at("2026-11-11", 9));
+  it("only from 07:00 Budapest until noon; Tuesday has nothing, so no email", async () => {
+    await run(at("2026-11-11", 6, 50));
+    await run(at("2026-11-11", 12));
     await run(at("2026-11-10", 7));
     expect(inbox()).toEqual([]);
     expect(mails("match_digest")).toEqual([]);
+  });
+
+  it("a morning no run finished yet is made by the next run before noon, once (#183)", async () => {
+    await run(at("2026-11-11", 9));
+    expect(inbox("match_no_proposal")).toHaveLength(8);
+    expect(mails("match_digest")).toHaveLength(8);
+    await run(at("2026-11-11", 9, 10));
+    await run(at("2026-11-11", 11, 50));
+    expect(inbox("match_no_proposal")).toHaveLength(8);
+    expect(mails("match_digest")).toHaveLength(8);
+  });
+
+  it("the 07:00 run marks the morning done even with nothing due, so a later item waits for the next day's digest", async () => {
+    await run(at("2026-11-10", 7));
+    h.raw.exec(
+      `insert into notifications (user_id, kind, title, body, url, created_at) values ('p1a', 'match_cancelled', 'Lemondták a meccset', 'x', '/matches/1', ${sec("2026-11-10T07:30:00Z")})`,
+    );
+    await run(at("2026-11-10", 9));
+    expect(mails("match_digest")).toEqual([]);
+    await run(at("2026-11-11", 7));
+    expect(mails("match_digest").map((m: any) => m.to)).toContain("p1a@x.hu");
   });
 
   it("a match with a proposal, a scheduled match or a played one gets none", async () => {
@@ -274,15 +303,10 @@ describe("the emails switched off (#191, D83)", () => {
     expect(MATCH_REMINDER_EMAILS).toEqual({ digest: false, tomorrow: false });
   });
 
-  // Without VAPID keys the push step logs what it would push.
-  const pushed = (log: ReturnType<typeof vi.spyOn>) => log.mock.calls.map((c: unknown[]) => String(c[0]));
-
   it("the 07:00 run makes the reminder items (in the app, by push) and queues no digest email", async () => {
     await schedule14();
-    const log = vi.spyOn(console, "log");
     await R.runMatchReminders(at("2026-11-11", 7));
-    expect(pushed(log)).toContain("[push disabled] 4 × match_no_proposal");
-    log.mockRestore();
+    expect(pushQueue("match_no_proposal").map((n: any) => n.user).sort()).toEqual(PLAYERS(2, 3).sort());
     // Pairs 2 and 3 have had no proposal by Wednesday: their reminder is in the app.
     expect(inbox("match_no_proposal").map((n: any) => n.user).sort()).toEqual(PLAYERS(2, 3).sort());
     expect(mails("match_digest")).toEqual([]);
@@ -294,10 +318,8 @@ describe("the emails switched off (#191, D83)", () => {
   it("the evening run gives 'holnap meccs' in the app and by push, and queues no email", async () => {
     await schedule14();
     h.raw.exec("delete from notifications");
-    const log = vi.spyOn(console, "log");
     await R.runMatchReminders(at("2026-11-11", 18));
-    expect(pushed(log)).toContain("[push disabled] 4 × match_tomorrow");
-    log.mockRestore();
+    expect(pushQueue("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
     expect(inbox("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
     expect(mails("match_tomorrow")).toEqual([]);
     expect(h.sent).toEqual([]);

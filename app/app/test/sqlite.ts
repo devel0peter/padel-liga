@@ -11,6 +11,7 @@ import { entityKind } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 
 import * as schema from "~/db/schema";
+import { countQuery } from "~/lib/run-usage";
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs or node:sqlite.
@@ -49,9 +50,15 @@ export function mockClient(h: { raw: any }) {
     if (method === "get") return { rows: st.get(...params) ?? undefined };
     return { rows: st.all(...params) };
   };
+  // Each statement counts as one query of the run, a batch once, as on D1
+  // (lib/run-usage.ts, #183).
   const db = drizzle(
-    async (sql, params, method) => exec(sql, params, method),
+    async (sql, params, method) => {
+      countQuery();
+      return exec(sql, params, method);
+    },
     async (queries) => {
+      countQuery();
       h.raw.exec("BEGIN");
       try {
         const out = queries.map((q) => exec(q.sql, q.params, q.method));

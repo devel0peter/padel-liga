@@ -37,9 +37,11 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import { eventText, schedulingEmailDue } from "./matches";
 import { pairName } from "./groups";
 import { COURT_MAX } from "./matches";
+import { groupTable } from "./ladder";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
+import { averageStartingElo } from "./season-entries";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
@@ -47,9 +49,10 @@ import { decisionText, resultEventText } from "./results";
 // opponents (spec 3), email addresses never (they go to the outbox).
 
 export type Person = { id: string; name: string; email: string; phone: string | null };
+// `elo`: the pair's rating, the last tiebreak of the table (D20).
 // `withdrawn`: taken out of the group mid-phase (#34); its matches there
 // don't count and can't be played.
-export type PairPlayers = { pairId: number; seed: number; players: [Person, Person]; withdrawn: boolean };
+export type PairPlayers = { pairId: number; seed: number; elo: number; players: [Person, Person]; withdrawn: boolean };
 
 const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
@@ -60,6 +63,8 @@ const pairPlayerColumns = {
   aName: playerA.name,
   aEmail: playerA.email,
   aPhone: playerA.phone,
+  aLevel: playerA.level,
+  bLevel: playerB.level,
   bId: playerB.id,
   bName: playerB.name,
   bEmail: playerB.email,
@@ -87,7 +92,13 @@ export async function groupMembers(groupIds: number[]): Promise<Map<number, Pair
     .orderBy(asc(groupPairs.groupId), asc(groupPairs.seed));
   for (const r of rows) {
     const list = out.get(r.groupId) ?? out.set(r.groupId, []).get(r.groupId)!;
-    list.push({ pairId: r.pairId, seed: r.seed, players: toPlayers(r), withdrawn: r.withdrawnAt !== null });
+    list.push({
+      pairId: r.pairId,
+      seed: r.seed,
+      elo: averageStartingElo(r.aLevel, r.bLevel) ?? 0,
+      players: toPlayers(r),
+      withdrawn: r.withdrawnAt !== null,
+    });
   }
   return out;
 }
@@ -184,9 +195,13 @@ export type HomeGroup = {
   groupCount: number;
   phaseStartsAt: Date;
   deadline: Date;
-  // Every pair of the group by seed, names only; `mine` marks the player's,
-  // `withdrawn` one taken out mid-phase (#34).
-  pairs: { pairId: number; name: string; mine: boolean; withdrawn: boolean }[];
+  // Every pair of the group in table order (#201), names only; `mine` marks
+  // the player's. The table is the public league page's, from final results
+  // only; before any result it is the seed order (every `matches` is 0). A
+  // pair withdrawn mid-phase (#34) is not in it, with all of its matches.
+  pairs: { pairId: number; name: string; mine: boolean; rank: number; matches: number; points: number; setDiff: number; gameDiff: number }[];
+  // The pairs withdrawn mid-phase (#34), by name, shown below the table.
+  withdrawn: string[];
   matches: HomeMatch[];
   // The weeks whose match is off because the opponents withdrew (#34).
   offWeeks: { week: number; opponents: string }[];
@@ -261,7 +276,16 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
         groupCount: await groupCount(g.seasonId, g.phase),
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
-        pairs: pairsOf.map((p) => ({ pairId: p.pairId, name: pairName(p.players), mine: p.pairId === g.pairId, withdrawn: p.withdrawn })),
+        pairs: groupTable(
+          pairsOf.map((p) => ({ id: p.pairId, elo: p.elo, withdrawn: p.withdrawn })),
+          // Only a final outcome counts (#186, #201): a waiting or disputed
+          // result has none on the match yet.
+          matchRows.filter((m) => m.groupId === g.groupId).map((m) => ({ a: m.pairA, b: m.pairB, outcome: m.status === "final" ? m.outcome : null })),
+        ).map((row) => {
+          const p = byId.get(row.pairId)!;
+          return { ...row, name: pairName(p.players), mine: p.pairId === g.pairId };
+        }),
+        withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
         offWeeks: ours
           .filter((m) => voided(m, byId))
           .map((m) => ({ week: m.week, opponents: pairName(other(m)?.players ?? []) })),
@@ -361,6 +385,8 @@ export type MatchContext = {
   groupNumber: number;
   groupCount: number;
   league: string;
+  leagueId: number;
+  leagueSlug: string;
   city: string;
   season: string;
   phase: number;
@@ -381,6 +407,8 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
       phase: groups.phase,
       season: seasons.name,
       league: leagues.name,
+      leagueId: leagues.id,
+      leagueSlug: leagues.slug,
       city: leagues.city,
       phaseStartsAt: seasonPhases.startsAt,
     })
@@ -400,6 +428,8 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     groupNumber: row.groupNumber,
     groupCount: await groupCount(row.seasonId, row.phase),
     league: row.league,
+    leagueId: row.leagueId,
+    leagueSlug: row.leagueSlug,
     city: row.city,
     season: row.season,
     phase: row.phase,

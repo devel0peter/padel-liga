@@ -82,8 +82,8 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
           </div>
           <CardDescription className="text-foreground">
             {shownOn
-              ? `Óránként megnézzük, kinek jár emlékeztető, és kiküldjük.${onSince ? ` Bekapcsolva: ${formatDateTime(new Date(onSince))}.` : ""}`
-              : "Bekapcsolás után a következő óránkénti futás kiküldi annak, akinek most jár."}{" "}
+              ? `Tízpercenként megnézzük, kinek jár emlékeztető, és kiküldjük.${onSince ? ` Bekapcsolva: ${formatDateTime(new Date(onSince))}.` : ""}`
+              : "Bekapcsolás után a következő futás (10 percen belül) kiküldi annak, akinek most jár."}{" "}
             {season ? `Szezon: ${season}.` : "Most nincs nevezhető szezon, ezért nem megy ki semmi."}
           </CardDescription>
         </CardHeader>
@@ -95,7 +95,7 @@ export default function AdminLeagueReminders({ loaderData }: Route.ComponentProp
             <AlertDialogTitle>Bekapcsolod az emlékeztetőket?</AlertDialogTitle>
             <AlertDialogDescription>
               {backlog > 0
-                ? `A következő óránkénti futás ${backlog} embernek küld emlékeztetőt, utána mindenkinek, aki elakad.`
+                ? `A következő futás (10 percen belül) ${backlog} embernek küld emlékeztetőt, utána mindenkinek, aki elakad.`
                 : "Most senkinek nem jár emlékeztető; aki elakad, a következő futásoknál kap."}{" "}
               Elküldött levelet nem lehet visszavonni.
             </AlertDialogDescription>

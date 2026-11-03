@@ -191,7 +191,7 @@ describe("ladderPage", () => {
       const { rows, group } = await tableOf();
       expect(rows["1014"]).toEqual([0, 0]);
       expect(rows["1011"]).toEqual([4, 2]);
-      expect(group.results.map((m) => m.result)).toEqual(["4-1 4-2", "1-4 2-4", "kontumác"]);
+      expect(group.results.map((m) => m.result)).toEqual(["4:1, 4:2", "kontumác"]); // week 2 is shown above, not listed again
     });
 
     it("a disputed result counts as soon as the organizer decides it", async () => {
@@ -208,8 +208,8 @@ describe("ladderPage", () => {
       const { rows, group } = await tableOf();
       expect(rows).toEqual({ "1011": [4, 3], "1012": [4, 2], "1013": [3, 2], "1014": [0, 1] });
       // The unplayed match has no score to show; both-inactive says so.
-      expect(group.results.map((m) => m.result)).toContain("egyik fél sem játszott");
-      expect(group.results).toHaveLength(4);
+      expect(group.results.map((m) => m.result)).toContain("Mindkét pár vereséget kap (0:4, 0:4)");
+      expect(group.results).toHaveLength(3);
     });
 
     it("the played matches show their scores for the week and in the results list", async () => {
@@ -217,8 +217,8 @@ describe("ladderPage", () => {
       const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z")); // week 1
       if (page?.kind !== "ladder") throw new Error("no ladder");
       const group = page.bands[0]!.groups[0]!;
-      expect(group.weekMatches.map((m) => m.result)).toEqual(["4-1 4-2", null]);
-      expect(group.results.map((m) => m.result)).toEqual(["4-1 4-2", "1-4 2-4", "kontumác"]);
+      expect(group.weekMatches.map((m) => m.result)).toEqual(["4:1, 4:2", null]);
+      expect(group.results.map((m) => m.result)).toEqual(["1:4, 2:4", "kontumác"]); // the week-1 result is under the week, not listed twice (#202)
     });
   });
 

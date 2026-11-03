@@ -17,8 +17,8 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { matchDecisions, matchEvents, matches, pairs } from "~/db/schema";
 import { queueMatchEmails } from "~/lib/email/outbox.server";
-import { matchResultConfirmedMessage, matchResultMessage, type Message } from "~/lib/notifications";
-import { notifyPlayers } from "~/lib/notifications.server";
+import { matchResultConfirmedMessage, matchResultDisputedMessage, matchResultMessage, type Message } from "~/lib/notifications";
+import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server";
 
 import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
@@ -136,8 +136,8 @@ const playersOf = (ctx: MatchContext, side: Side) => (side === "a" ? ctx.pairs.a
 
 // spec 13: a result waiting for confirmation instantly to the other pair
 // (email, push, the app); a confirmed result to both pairs in the app and by
-// push (a digest item, #31). A dispute tells nobody yet: it shows in the
-// organizer's list (#29).
+// push (a digest item, #31). A dispute is told at once, in the app and by
+// push only (#178, D83): to the recording pair and to the league's organizers.
 async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, after: ResultState): Promise<void> {
   const matchId = ctx.match.id;
   try {
@@ -167,6 +167,19 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
         playersOf(ctx, them).map((p) => ({ userId: p.id, message: matchResultMessage({ matchId, score }) })),
       );
     }
+    if (kind === "result_disputed" && after.status === "disputed") {
+      await notifyPlayers(
+        "match_result_disputed",
+        playersOf(ctx, other(side)).map((p) => ({ userId: p.id, message: matchResultDisputedMessage({ matchId }) })),
+      );
+      await notifyResultDisputed({
+        matchId,
+        leagueId: ctx.leagueId,
+        leagueSlug: ctx.leagueSlug,
+        leagueName: ctx.league,
+        week: ctx.match.week,
+      });
+    }
     if (kind === "result_confirmed" && after.status === "final" && after.outcome.kind === "played") {
       const score = after.outcome.score;
       await notifyPlayers(
@@ -186,7 +199,7 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
 
 // At most this many results per cron run, so a run stays well inside a
 // Workers Free invocation's D1 queries (one batch each, plus a few lookups);
-// the rest go on the next hourly run.
+// the rest go on the next run.
 export const AUTO_ACCEPT_BATCH = 10;
 
 /**
@@ -250,7 +263,8 @@ async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number
         for (const userId of players.get(pairId) ?? [])
           messages.push({ userId, message: matchResultConfirmedMessage({ matchId: m.id, score: scoreText(score, side), auto: true }) });
     }
-    await notifyPlayers("match_result_confirmed", messages);
+    // From the hourly job: the pushes wait for its push step (#183).
+    await notifyPlayers("match_result_confirmed", messages, undefined, true);
   } catch (error) {
     console.error("auto-accept notification failed", error);
   }

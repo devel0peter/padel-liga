@@ -21,6 +21,7 @@ const { migratedDatabase } = await import("~/test/sqlite");
 const R = await import("~/lib/reminders.server");
 const { anonymizedEmail } = await import("~/lib/account-deletion");
 const O = await import("~/lib/email/outbox.server");
+const { RunBudget } = await import("~/lib/run-usage");
 
 // Monday 2 Nov 2026, 13:00 Budapest; registration until Fri 6 Nov 23:59.
 const NOW = new Date("2026-11-02T12:00:00Z");
@@ -115,7 +116,10 @@ describe("automatic reminders (#155)", () => {
     expect(all("select action from audit_log")).toEqual([{ action: "reminders.on" }]);
     const view = await R.reminderOverview(league, NOW);
     expect(view.on).toBe(true);
+    const budget = new RunBudget();
     expect(await R.queueDueReminders(NOW)).toBe(5);
+    // Within what the cron keeps for this step (#183).
+    expect(budget.used().queries).toBeLessThanOrEqual(R.STUCK_QUERIES);
     const mail = reminderMail();
     expect(mail.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu", "eva@x.hu", "gabi@x.hu", "hedi@x.hu"]);
     expect(all("select situation, recipients from stuck_reminders order by situation")).toEqual([

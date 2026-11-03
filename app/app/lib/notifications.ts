@@ -15,6 +15,10 @@ export const NOTIFICATION_KINDS = {
     label: "Új jelentkező",
     description: "Ha valaki jelentkezik a ligádba.",
   },
+  result_disputed: {
+    label: "Vitatott eredmény",
+    description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -42,6 +46,9 @@ export type PlayerKind =
   | "match_result"
   | "match_result_confirmed"
   | "match_decided"
+  // A dispute (#178): the recording pair is told at once, in the app and by
+  // push, not in the digest (D83). The organizers' kind is `result_disputed`.
+  | "match_result_disputed"
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
   | "pair_withdrawn";
@@ -66,7 +73,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -321,6 +328,32 @@ export function matchResultConfirmedMessage(input: { matchId: number; score: str
     title: "Végleges az eredmény",
     body: input.auto ? `48 óra után magától elfogadtuk az eredményt: ${input.score}.` : `Megerősítették az eredményt: ${input.score}.`,
     url: matchUrl(input.matchId),
+  };
+}
+
+// To the pair that recorded the result: the other pair disputes it (instant,
+// #178). No names and no score: the match page has both versions.
+export function matchResultDisputedMessage(input: { matchId: number }): Message {
+  return {
+    title: "Vitatják az eredményt",
+    body: "Az ellenfeletek nem ért egyet a rögzített eredménnyel. A szervező dönt, szólunk, ha megvan.",
+    url: matchUrl(input.matchId),
+  };
+}
+
+// A dispute goes to the league's Szervezők and to every Admin, once each
+// (#178). All of them open the league's decision page.
+export function disputeRecipients(organizerIds: readonly string[], adminIds: readonly string[]): string[] {
+  return [...new Set([...adminIds, ...organizerIds])];
+}
+
+// To the organizers and Admins (app and push, never email). No names: the
+// decision page shows both versions.
+export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Vitatott eredmény · ${input.leagueName}`,
+    body: `A ${input.week}. forduló egyik meccsének eredményét vitatják. A döntés rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
 

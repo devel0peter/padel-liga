@@ -97,10 +97,16 @@ describe("buildLadder: this week's matches and results", () => {
     expect(buildLadder([g], 3)[0]!.groups[0]!.weekMatches.map((m) => [m.a[0], m.when])).toEqual([["Játékos 12A", null]]);
   });
 
-  it("lists the played results of the whole phase in week order", () => {
-    for (const week of [1, 2, 3]) {
-      expect(buildLadder([g], week)[0]!.groups[0]!.results.map((m) => [m.a[0], m.result])).toEqual([["Játékos 11A", "4-2 4-1"]]);
+  it("lists the played results of the other weeks in week order", () => {
+    for (const week of [2, 3]) {
+      expect(buildLadder([g], week)[0]!.groups[0]!.results.map((m) => [m.a[0], m.result])).toEqual([["Játékos 11A", "4:2, 4:1"]]);
     }
+  });
+
+  it("lists a result once: the week shown has it under its matches, not again under the results (#202)", () => {
+    const [group1] = buildLadder([g], 1)[0]!.groups;
+    expect(group1!.weekMatches.map((m) => m.result)).toEqual(["4:2, 4:1"]);
+    expect(group1!.results).toEqual([]);
   });
 
   it("writes a super tie-break after the sets and calls a walkover a kontumác", () => {
@@ -113,8 +119,13 @@ describe("buildLadder: this week's matches and results", () => {
       outcome: { kind: "played", score: { sets: [[4, 2], [1, 4]], superTieBreak: [10, 7] } },
     };
     const wo: LadderMatch = { id: 2, a: 11, b: 13, week: 2, scheduledAt: null, outcome: { kind: "walkover", winner: "b" } };
-    const results = buildLadder([group(1, [stb, wo])], 1)[0]!.groups[0]!.results;
-    expect(results.map((m) => m.result)).toEqual(["4-2 1-4 10-7", "kontumác"]);
+    const results = buildLadder([group(1, [stb, wo])], 3)[0]!.groups[0]!.results;
+    expect(results.map((m) => m.result)).toEqual(["4:2, 1:4, szuper tie-break 10:7", "kontumác"]);
+  });
+
+  it("words the organizer's both-lose decision as the rules and the organizer screen do (#202)", () => {
+    const both: LadderMatch = { id: 1, a: 11, b: 12, week: 1, scheduledAt: null, outcome: { kind: "both-inactive" } };
+    expect(buildLadder([group(1, [both])], 2)[0]!.groups[0]!.results.map((m) => m.result)).toEqual(["Mindkét pár vereséget kap (0:4, 0:4)"]);
   });
 
   it("does not list an unplayed match as a result", () => {

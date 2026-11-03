@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { connect } from "cloudflare:sockets";
 
+import { countCall } from "~/lib/run-usage";
+
 import { buildMessage, isSafeAddress, smtpData } from "./mime";
 import { REPLY_TO, SENDER, SENDER_DOMAIN, type OutgoingEmail } from "./sender";
 import { ReplyParser, smtpSend, type SmtpReply, type SmtpResult, type SmtpTransport } from "./smtp";
@@ -36,6 +38,8 @@ function withTimeout<T>(promise: Promise<T>, what: string): Promise<T> {
 
 // A Cloudflare TCP socket as an SmtpTransport.
 async function openSocket(): Promise<SmtpTransport> {
+  // Not a subrequest by Cloudflare's list, but counted as one to be safe (#183).
+  countCall();
   let socket = connect({ hostname: RELAY_HOST, port: RELAY_PORT }, { secureTransport: "starttls", allowHalfOpen: false });
   let reader = socket.readable.getReader();
   let writer = socket.writable.getWriter();

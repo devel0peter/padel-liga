@@ -18,6 +18,7 @@ const D = await import("~/lib/account-deletion.server");
 const { DELETED_NAME, DELETION_REFUSALS, PARTNER_NOTICE_SUBJECT_REMOVED } = await import("~/lib/account-deletion");
 const { partnerNoticeSubject } = await import("~/lib/email/templates");
 const { pairCandidates } = await import("~/lib/pairs.server");
+const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -230,6 +231,10 @@ describe("deleting an account (#152)", () => {
     interestListAfter();
     expect((await pairCandidates(1)).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
+    // Párok still lists the dissolved pair, but "Levél nekik" doesn't write to them.
+    const audience = (await leaguePairsAudience({ id: 1, city: "gyor", name: "Padelpárbaj Győr" }, { entry: null, q: "" })).people;
+    expect(audience.map((p) => p.email)).toContain("b@x.hu");
+    expect(audience.map((p) => p.email).filter((e) => e.endsWith("@deleted.invalid"))).toEqual([]);
     expect(all("select action, target, detail from audit_log where action like 'account.%' or action like 'pair.%' order by id")).toEqual([
       { action: "pair.dissolve", target: "pair:1", detail: "league:1; account deleted" },
       { action: "account.anonymize", target: "user:a", detail: null },

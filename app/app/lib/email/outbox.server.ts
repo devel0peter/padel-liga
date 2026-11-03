@@ -599,8 +599,9 @@ export async function sentLast24h(now = Date.now()): Promise<number> {
 
 // Sends pending emails within the daily budget: login codes first, then
 // signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
-export async function deliver(ids?: number[]): Promise<{ sent: number }> {
-  const now = Date.now();
+// `at`: the cron run's scheduled time (#188); the time of the call otherwise.
+export async function deliver(ids?: number[], at = new Date()): Promise<{ sent: number }> {
+  const now = at.getTime();
   const runStart = new Date(now);
   await db
     .update(emailMessages)

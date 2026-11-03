@@ -308,6 +308,15 @@ describe("automatic outbox", () => {
     expect(h.sent).toEqual([]);
   });
 
+  it("works from the time it is given (the cron run's scheduled time, #188), not the clock", async () => {
+    // Claimed 5 minutes ago: fresh by the clock, but 11 minutes old for a run
+    // scheduled 6 minutes from now.
+    insert("pair_intro", 1, "sending");
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() - 300").run();
+    expect(await O.deliver(undefined, new Date(Date.now() + 6 * 60 * 1000))).toEqual({ sent: 0 });
+    expect(h.raw.prepare("select status, last_error from email_messages").get()).toEqual({ status: "failed", last_error: O.INTERRUPTED });
+  });
+
   it("registration invites go out right after the response, only the ones just queued", async () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
     h.raw

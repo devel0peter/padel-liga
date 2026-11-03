@@ -18,12 +18,18 @@ vi.mock("~/lib/results.server", () => ({
   autoAcceptResults: async (now?: Date) => (step("auto-accept", now), h.result["auto-accept"]),
 }));
 vi.mock("~/lib/match-reminders.server", () => ({
-  runMatchReminders: async (now?: Date) => step("match", now),
+  runMatchReminders: async (now?: Date) => (step("match", now), null),
 }));
 vi.mock("~/lib/reminders.server", () => ({
+  STUCK_QUERIES: 20,
   queueDueReminders: async (now?: Date) => (step("stuck", now), h.result.stuck),
 }));
+vi.mock("~/lib/notifications.server", () => ({
+  // Pushes have no time of their own: they go out as soon as there is room.
+  pushQueued: async () => (step("push", RUN), { pushed: h.result.pushed ?? 0, left: 0 }),
+}));
 vi.mock("~/lib/email/outbox.server", () => ({
+  DELIVER_MIN: { queries: 5, calls: 3 },
   deliver: async (ids?: number[], now?: Date) => (step("deliver", ids ? undefined : now), { sent: h.result.sent }),
 }));
 
@@ -32,7 +38,7 @@ const { runHourlyJob } = await import("~/lib/hourly-job.server");
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["auto-accept", "match", "stuck", "deliver"];
+const ALL = ["auto-accept", "match", "stuck", "push", "deliver"];
 
 let log: { mock: { calls: unknown[][] } };
 let error: { mock: { calls: unknown[][] } };
@@ -50,7 +56,7 @@ const steps = () => h.calls.map((c) => c.step);
 const errorLines = () => error.mock.calls.map((c) => String(c[0]));
 
 describe("runHourlyJob", () => {
-  it("runs the steps in order: auto-accept, match reminders, stuck reminders, email delivery", async () => {
+  it("runs the steps in order: auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
     expect(error).not.toHaveBeenCalled();
@@ -64,9 +70,9 @@ describe("runHourlyJob", () => {
   it("logs what each step did, and nothing when there was nothing to do", async () => {
     await runHourlyJob(RUN);
     expect(log).not.toHaveBeenCalled();
-    h.result = { "auto-accept": 2, stuck: 3, sent: 5 };
+    h.result = { "auto-accept": 2, stuck: 3, pushed: 4, sent: 5 };
     await runHourlyJob(RUN);
-    expect(log.mock.calls.map((c) => c[0])).toEqual(["cron: auto-accepted 2 results", "cron: queued 3 reminders", "cron: sent 5 emails"]);
+    expect(log.mock.calls.map((c) => c[0])).toEqual(["cron: auto-accepted 2 results", "cron: queued 3 reminders", "cron: pushed 4 notifications", "cron: sent 5 emails"]);
   });
 
   it("still sends the reminders and the email when auto-accept fails, and logs it as auto-accept", async () => {
@@ -93,13 +99,14 @@ describe("runHourlyJob", () => {
   });
 
   it("logs each failure under its own step when several fail", async () => {
-    for (const s of ["auto-accept", "match", "stuck", "deliver"]) h.fail.add(s);
+    for (const s of ["auto-accept", "match", "stuck", "push", "deliver"]) h.fail.add(s);
     await expect(runHourlyJob(RUN)).resolves.toBeUndefined();
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([
       "cron: auto-accept failed",
       "cron: match reminders failed",
       "cron: stuck reminders failed",
+      "cron: push delivery failed",
       "cron: email delivery failed",
     ]);
   });

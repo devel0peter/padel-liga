@@ -185,7 +185,7 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
 
 // At most this many results per cron run, so a run stays well inside a
 // Workers Free invocation's D1 queries (one batch each, plus a few lookups);
-// the rest go on the next hourly run.
+// the rest go on the next run.
 export const AUTO_ACCEPT_BATCH = 10;
 
 /**
@@ -248,7 +248,8 @@ async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number
         for (const userId of players.get(pairId) ?? [])
           messages.push({ userId, message: matchResultConfirmedMessage({ matchId: m.id, score: scoreText(score, side), auto: true }) });
     }
-    await notifyPlayers("match_result_confirmed", messages);
+    // From the hourly job: the pushes wait for its push step (#183).
+    await notifyPlayers("match_result_confirmed", messages, undefined, true);
   } catch (error) {
     console.error("auto-accept notification failed", error);
   }

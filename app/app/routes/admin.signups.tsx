@@ -378,7 +378,7 @@ function InviteButton({ pending }: { pending: number }) {
               <AlertDialogDescription>
                 {queued <= SEND_NOW_MAX
                   ? `${queued} levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
-                  : `${queued} levél a háttérben indul: az első ${SEND_NOW_MAX} most, a többi óránként, a napi limit szerint.`}{" "}
+                  : `${queued} levél a háttérben indul: az első ${SEND_NOW_MAX} most, a többi tízpercenként, a napi limit szerint.`}{" "}
                 Hogy hol tart, a{" "}
                 <Link to="/admin/outbox" className="underline">
                   Kimenő levelek

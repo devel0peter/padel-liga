@@ -140,9 +140,11 @@ describe("a deleted account's placeholder address", () => {
       { toEmail: "anna@x.hu", input: group("Anna", "Béla") },
       { toEmail: "Deleted-u1@deleted.invalid", input: group("Törölt játékos", "Anna") },
     ]);
-    await O.queueReminderEmails([
-      { kind: "match_digest", toEmail: "deleted-u1@deleted.invalid", input: { to: "Törölt játékos", items: [{ title: "x", body: "y", url: "/matches/1" }] } },
-    ]);
+    expect(
+      await O.reminderEmailInserts([
+        [{ kind: "match_digest", toEmail: "deleted-u1@deleted.invalid", input: { to: "Törölt játékos", items: [{ title: "x", body: "y", url: "/matches/1" }] } }],
+      ]),
+    ).toEqual([[]]);
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
   });
 

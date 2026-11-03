@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 
+import { countCall } from "~/lib/run-usage";
+
 import { REPLY_TO, SENDER, type OutgoingEmail } from "./sender";
 
 // Minimal Resend client (plain fetch, no SDK), the fallback behind the SMTP
@@ -27,6 +29,7 @@ export async function sendBatch(emails: OutgoingEmail[]): Promise<BatchResult> {
 
   let res: Response;
   try {
+    countCall();
     res = await fetch("https://api.resend.com/emails/batch", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

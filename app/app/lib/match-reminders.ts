@@ -32,10 +32,23 @@ export function budapestHour(now: Date): number {
 }
 
 export const isDigestRun = (now: Date) => budapestHour(now) === DIGEST_HOUR;
+// The cron runs every 10 minutes (#183, D84), so "the 21:00 run" is the last
+// one that sends "holnap meccs": from 18:00 to 21:00 sharp, as with the
+// hourly cron before.
 export const isTomorrowRun = (now: Date) => {
-  const h = budapestHour(now);
-  return h >= TOMORROW_FIRST_HOUR && h <= TOMORROW_LAST_HOUR;
+  const m = budapestClock(now).minutes;
+  return m >= TOMORROW_FIRST_HOUR * 60 && m <= TOMORROW_LAST_HOUR * 60;
 };
+
+// The day's digest reminders and digest are made in the first run from 07:00;
+// a run that couldn't finish them within its limits (#183) leaves them to the
+// next ones, until noon. Done once per Budapest day (job_runs, morningKey).
+export const MORNING_LAST_HOUR = 11;
+export const isMorningRun = (now: Date) => {
+  const h = budapestHour(now);
+  return h >= DIGEST_HOUR && h <= MORNING_LAST_HOUR;
+};
+export const morningKey = (now: Date) => `morning:${budapestDay(now)}`;
 
 // The digest reminders (spec 13), latest first: when several are due at once
 // (a missed run), only the latest goes out and the others count as sent.

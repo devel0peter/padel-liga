@@ -395,6 +395,8 @@ export const notifications = sqliteTable(
         "match_result",
         "match_result_confirmed",
         "match_decided",
+        "match_result_disputed",
+        "result_disputed",
         "test",
       ],
     }).notNull(),

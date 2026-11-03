@@ -17,8 +17,8 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { matchDecisions, matchEvents, matches, pairs } from "~/db/schema";
 import { queueMatchEmails } from "~/lib/email/outbox.server";
-import { matchResultConfirmedMessage, matchResultMessage, type Message } from "~/lib/notifications";
-import { notifyPlayers } from "~/lib/notifications.server";
+import { matchResultConfirmedMessage, matchResultDisputedMessage, matchResultMessage, type Message } from "~/lib/notifications";
+import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server";
 
 import { CHANGED, loadMatch, NOT_FOUND, sideOf, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
@@ -135,8 +135,8 @@ const playersOf = (ctx: MatchContext, side: Side) => (side === "a" ? ctx.pairs.a
 
 // spec 13: a result waiting for confirmation instantly to the other pair
 // (email, push, the app); a confirmed result to both pairs in the app and by
-// push (a digest item, #31). A dispute tells nobody yet: it shows in the
-// organizer's list (#29).
+// push (a digest item, #31). A dispute is told at once, in the app and by
+// push only (#178, D83): to the recording pair and to the league's organizers.
 async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, after: ResultState): Promise<void> {
   const matchId = ctx.match.id;
   try {
@@ -165,6 +165,19 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
         "match_result",
         playersOf(ctx, them).map((p) => ({ userId: p.id, message: matchResultMessage({ matchId, score }) })),
       );
+    }
+    if (kind === "result_disputed" && after.status === "disputed") {
+      await notifyPlayers(
+        "match_result_disputed",
+        playersOf(ctx, other(side)).map((p) => ({ userId: p.id, message: matchResultDisputedMessage({ matchId }) })),
+      );
+      await notifyResultDisputed({
+        matchId,
+        leagueId: ctx.leagueId,
+        leagueSlug: ctx.leagueSlug,
+        leagueName: ctx.league,
+        week: ctx.match.week,
+      });
     }
     if (kind === "result_confirmed" && after.status === "final" && after.outcome.kind === "played") {
       const score = after.outcome.score;

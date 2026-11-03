@@ -10,7 +10,9 @@ import type { InterestSignup } from "./interest";
 import {
   channelEnabled,
   channelKey,
+  disputeRecipients,
   isEnabled,
+  resultDisputedMessage,
   newSignupMessage,
   pushPayload,
   signupRecipients,
@@ -197,6 +199,27 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
     organize: signup.wantsToOrganize,
   };
   await notify("new_signup", recipients.map((r) => ({ userId: r.userId, message: newSignupMessage(summary, r) })));
+}
+
+// A result was disputed (#178): tell the league's Szervezők and the Admins,
+// in the app and by push, never by email. Accounts being deleted are skipped.
+export async function notifyResultDisputed(input: { matchId: number; leagueId: number; leagueSlug: string; leagueName: string; week: number }): Promise<void> {
+  const [organizers, admins] = await Promise.all([
+    db
+      .select({ id: users.id })
+      .from(leagueAdmins)
+      .innerJoin(users, eq(users.id, leagueAdmins.userId))
+      .where(and(eq(leagueAdmins.leagueId, input.leagueId), isNull(users.deletedAt))),
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.platformRole, "superadmin"), isNull(users.deletedAt))),
+  ]);
+  const message = resultDisputedMessage(input);
+  await notify(
+    "result_disputed",
+    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id)).map((userId) => ({ userId, message })),
+  );
 }
 
 // The profile's "Próba" button. Returns how many devices got the push (none

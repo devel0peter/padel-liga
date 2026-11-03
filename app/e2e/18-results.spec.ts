@@ -126,8 +126,17 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   expect(refusedDecide?.status()).toBe(403);
   await other.context.close();
 
-  // The Szervező: Viták lists it with both versions, then decides.
+  // The recording pair is told at once, in the app (#178); no names in the text.
+  await visit(player.page, "/notifications");
+  await expect(content(player.page)).toContainText("Vitatják az eredményt");
+
+  // The Szervező is told too, and the notice opens the decision page (#178).
   const org = await as(browser, ORGANIZER.email);
+  await visit(org.page, "/notifications");
+  await content(org.page).getByText("Vitatott eredmény · ").first().click();
+  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
+
+  // Viták lists it with both versions, then the Szervező decides.
   await visit(org.page, "/admin/leagues/minta/disputes");
   const main = content(org.page);
   await expect(main.getByRole("heading", { name: "Vitatott eredmények (1)" })).toBeVisible();

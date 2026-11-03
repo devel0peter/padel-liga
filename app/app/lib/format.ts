@@ -114,3 +114,10 @@ const weekdayDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, mont
 export function formatWeekdayDate(date: Date): string {
   return weekdayDate.format(date);
 }
+
+const clockTime = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+// The time of an instant, in Budapest: "18:00" (00:00 at midnight, never 24:00)
+export function formatClockTime(date: Date): string {
+  return clockTime.format(date);
+}

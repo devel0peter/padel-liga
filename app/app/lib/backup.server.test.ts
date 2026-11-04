@@ -270,7 +270,7 @@ describe("exportStep", () => {
     const { files, bucket } = fakeBucket(c, ["work/2026-11-01/state.json", "work/2026-11-01/part-0001.sql"]);
     await runAll(raw, c, bucket);
     expect([...files.keys()]).toEqual([FILE]);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("never finished"));
+    expect(error).toHaveBeenCalledWith(expect.objectContaining({ level: "error", event: "backup unfinished day dropped" }));
   });
 
   it("deletes the files beyond the newest 35 once the new one is written", async () => {
@@ -303,7 +303,7 @@ describe("exportStep", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const c = new Counter();
     expect(await exportStep({ DB: fakeD1(migratedDatabase(), c) }, NOW)).toEqual({ status: "skipped" });
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ level: "warn", event: "backup skipped" }));
     expect(c.n).toBe(0);
   });
 });

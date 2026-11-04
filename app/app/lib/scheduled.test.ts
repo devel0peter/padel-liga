@@ -35,15 +35,26 @@ describe("runScheduled", () => {
     await run(BACKUP_CRON, async () => ({ status: "done" }) as any).done;
     expect(log).not.toHaveBeenCalled();
     await run(BACKUP_CRON, async () => ({ status: "progress", parts: 2, table: "users", ops: 9 }) as any).done;
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("step done, 2 pieces"));
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", event: "backup step", pieces: 2, table: "users", calls: 9 }));
     await run(BACKUP_CRON, async () => ({ status: "finished", key: "daily/x.sql", bytes: 5, parts: 2, deleted: 0, ops: 7 }) as any).done;
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("daily/x.sql"));
+    expect(log).toHaveBeenLastCalledWith(
+      expect.objectContaining({ event: "backup finished", file: "daily/x.sql", bytes: 5, pieces: 2, deletedFiles: 0 }),
+    );
+    // Both lines carry the run's own request id.
+    expect(log.mock.calls.map((c) => (c[0] as { requestId: string }).requestId)).toEqual([
+      expect.stringMatching(/^backup-/),
+      expect.stringMatching(/^backup-/),
+    ]);
   });
 
-  it("lets a failed export reach the runtime, so the cron run shows as failed", async () => {
+  it("logs a failed export as an error and lets it reach the runtime, so the cron run shows as failed", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const { done } = run(BACKUP_CRON, async () => {
       throw new Error("R2 down");
     });
     await expect(done).rejects.toThrow("R2 down");
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "error", event: "backup failed", error: expect.objectContaining({ message: "R2 down" }) }),
+    );
   });
 });

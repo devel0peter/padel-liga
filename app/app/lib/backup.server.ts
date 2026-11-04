@@ -16,6 +16,7 @@ import {
   type SequenceRow,
   type SqlValue,
 } from "./backup";
+import { logError, logWarn } from "./log";
 
 // The daily export (#32): the whole database as one SQL file in R2, built by
 // the cron in workers/app.ts. Runs inside the Worker with the DB and BACKUPS
@@ -73,7 +74,7 @@ export async function exportStep(
 ): Promise<StepResult> {
   const bucket = env.BACKUPS;
   if (!bucket) {
-    console.warn("backup: no BACKUPS binding, skipped");
+    logWarn("backup skipped", { reason: "no BACKUPS binding" });
     return { status: "skipped" };
   }
   let ops = 0;
@@ -206,7 +207,7 @@ async function dropOtherDays(bucket: R2Bucket, day: string, count: () => void) {
   const listed = await bucket.list({ prefix: WORK_PREFIX });
   const stale = listed.objects.map((o) => o.key).filter((k) => !k.startsWith(`${WORK_PREFIX}${day}/`));
   if (!stale.length) return;
-  console.error(`backup: an earlier export never finished, dropping ${stale.length} pieces (${stale[0]})`);
+  logError("backup unfinished day dropped", { pieces: stale.length, first: stale[0] });
   count();
   await bucket.delete(stale);
 }

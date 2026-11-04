@@ -34,7 +34,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   await expect(row("Van párja, nem nevezett").getByRole("cell").nth(1)).toHaveText("0");
 
   // A preview with Cili's own data, but no address, phone or pair link token.
-  await expect(content(page)).toContainText("Küldd el a párlinkedet – Padelpárbaj");
+  await expect(content(page)).toContainText("Hívd meg a párodat – Padelpárbaj");
   await expect(content(page)).toContainText(`Szia ${CILI.name}!`);
   await expect(content(page)).toContainText("/pair/join/…");
   await expect(content(page)).not.toContainText("@example.test");
@@ -43,7 +43,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   // Switching on asks first and queues nothing by itself.
   await toggle.click();
   const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toContainText("A következő óránkénti futás 2 embernek küld emlékeztetőt");
+  await expect(dialog).toContainText("A következő futás (10 percen belül) 2 embernek küld emlékeztetőt");
   await dialog.getByRole("button", { name: "Bekapcsolom" }).click();
   await expect(content(page).getByRole("switch", { name: "Bekapcsolva" })).toBeChecked();
   await visit(page, "/admin/leagues/minta/reminders");
@@ -56,7 +56,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   const sent = await waitForEmails(offset, 2, (e) => e.to.startsWith("emlek."));
   expect(sent.map((e) => e.to).sort()).toEqual([UNFINISHED, CILI.email]);
   const cili = sent.find((e) => e.to === CILI.email)!;
-  expect(cili.subject).toBe("Küldd el a párlinkedet – Padelpárbaj");
+  expect(cili.subject).toBe("Hívd meg a párodat – Padelpárbaj");
   expect(cili.text).toMatch(/\/pair\/join\/[A-Za-z0-9_-]{20,}/);
 
   // A second run sends nothing more; the page shows what went out.

@@ -4,7 +4,7 @@
 // live in the address (?entry=, ?q=), so a reload or a shared link shows the
 // same list.
 
-import type { EntryStatus } from "./season-entries";
+import { ENTRY_STATUS_LABELS, type EntryStatus } from "./season-entries";
 import { matchesSearch } from "./search";
 
 // The options, in the order the page shows them. "not_in_league" is the
@@ -14,7 +14,8 @@ export const PAIRS_FILTERS = {
   entered: "Nevezett",
   not_entered: "Nem nevezett",
   rejected: "Elutasítva",
-  withdrawn: "Visszalépett",
+  // The same word as the entry badge (ENTRY_STATUS_LABELS, #174).
+  withdrawn: ENTRY_STATUS_LABELS.withdrawn,
   no_pair: "Nincs párja",
   dissolved: "Felbontott párok",
   not_in_league: "Nincs a ligában",

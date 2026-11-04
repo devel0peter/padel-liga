@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -80,6 +80,9 @@ export type LeaguePairRow = {
   status: "active" | "dissolved";
   // In a published group whose round hasn't ended: can't be dissolved or changed.
   locked: boolean;
+  // The seasons of those groups: taking the pair out of one of them is a
+  // mid-round withdrawal (#34).
+  lockedIn: number[];
   // The entry in the league's current (or next) season, if any.
   entry: { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null;
   // "Benevezés" or "Kivétel a szezonból" for an active pair (#154), or none.
@@ -93,17 +96,28 @@ const playerA = alias(users, "pair_player_a");
 const playerB = alias(users, "pair_player_b");
 
 // The league's active pairs that are in a published group before its round's
-// deadline. Filtered by league, not by a list of ids (D1: at most 100 bound
-// parameters per statement).
-async function lockedPairs(leagueId: number, now: Date): Promise<Set<number>> {
+// deadline, with the seasons of those groups. Filtered by league, not by a
+// list of ids (D1: at most 100 bound parameters per statement).
+async function lockedPairs(leagueId: number, now: Date): Promise<Map<number, number[]>> {
   const rows = await db
-    .selectDistinct({ id: groupPairs.pairId })
+    .selectDistinct({ id: groupPairs.pairId, seasonId: groups.seasonId })
     .from(groupPairs)
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
-  return new Set(rows.map((r) => r.id));
+    .where(
+      and(
+        eq(pairs.leagueId, leagueId),
+        eq(pairs.status, "active"),
+        // A pair withdrawn from its group (#34) plays there no more.
+        isNull(groupPairs.withdrawnAt),
+        isNotNull(groups.publishedAt),
+        gte(seasonPhases.deadline, now),
+      ),
+    );
+  const out = new Map<number, number[]>();
+  for (const r of rows) out.set(r.id, [...(out.get(r.id) ?? []), r.seasonId]);
+  return out;
 }
 
 // Every pair of the league, active ones first, newest first.
@@ -160,6 +174,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       source: r.source,
       status: r.status,
       locked: locked.has(r.id),
+      lockedIn: locked.get(r.id) ?? [],
       entry,
       entryAction: r.status === "active" ? organizerEntryAction(seasons, entry, now) : null,
       season: seasons[0]?.name ?? null,

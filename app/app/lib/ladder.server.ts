@@ -61,6 +61,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
     .select({
       groupId: groupPairs.groupId,
       pairId: pairs.id,
+      withdrawnAt: groupPairs.withdrawnAt,
       nameA: playerA.name,
       levelA: playerA.level,
       nameB: playerB.name,
@@ -96,6 +97,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         names: [m.nameA || "Névtelen", m.nameB || "Névtelen"] as [string, string],
         // Until Elo is kept the rating is the average starting Elo (D20).
         elo: averageStartingElo(m.levelA, m.levelB) ?? 0,
+        // Withdrawn mid-phase (#34): buildLadder drops it and its matches.
+        withdrawn: m.withdrawnAt !== null,
       })),
     // Only a final outcome counts (#186): confirmed, auto-accepted or decided
     // by the organizer. A waiting or disputed result has no outcome on the

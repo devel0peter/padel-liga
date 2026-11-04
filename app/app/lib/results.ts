@@ -57,6 +57,17 @@ export function winnerOf(outcome: MatchOutcome): Side | null {
   return outcome.score.superTieBreak ? won(outcome.score.superTieBreak) : won(s1 ?? s2);
 }
 
+/** The organizer's "both lose" decision, worded the same everywhere (rules, organizer screen, public page). */
+export const MATCH_LOST_BOTH_TEXT = "Mindkét pár vereséget kap (0:4, 0:4)";
+
+/**
+ * "X a Y ellen": a match named for the organizer, in one order everywhere
+ * (#202). The article is "az" before a vowel.
+ */
+export function versusText(a: string, b: string): string {
+  return `${a} ${/^[aáeéiíoóöőuúüű]/i.test(b) ? "az" : "a"} ${b} ellen`;
+}
+
 /** An outcome as a player of `side` sees it (#28, #29). */
 export function outcomeText(outcome: MatchOutcome, side: Side): string {
   switch (outcome.kind) {
@@ -65,7 +76,7 @@ export function outcomeText(outcome: MatchOutcome, side: Side): string {
     case "walkover":
       return outcome.winner === side ? "Játék nélküli győzelem nektek (4:0, 4:0)" : "Játék nélküli vereség (0:4, 0:4)";
     case "both-inactive":
-      return "Mindkét pár vereséget kap (0:4, 0:4)";
+      return MATCH_LOST_BOTH_TEXT;
     case "unplayed":
       return "Elmaradt: nem számít a tabellába";
   }
@@ -79,7 +90,7 @@ export function neutralOutcomeText(outcome: MatchOutcome, names: { a: string; b:
     case "walkover":
       return `Játék nélküli győzelem: ${names[outcome.winner]} (4:0, 4:0)`;
     case "both-inactive":
-      return "Mindkét pár vereséget kap (0:4, 0:4)";
+      return MATCH_LOST_BOTH_TEXT;
     case "unplayed":
       return "Elmaradt: nem számít a tabellába";
   }

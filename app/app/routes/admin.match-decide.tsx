@@ -13,7 +13,7 @@ import { decideMatch, decisionPage } from "~/lib/decisions.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
-import { neutralScoreText, parseOutcome, type OutcomeChoice } from "~/lib/results";
+import { MATCH_LOST_BOTH_TEXT, neutralScoreText, parseOutcome, versusText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
@@ -64,7 +64,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
     { value: "played", label: "Eredmény (lent add meg)" },
     { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (4:0, 4:0)` },
     { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (4:0, 4:0)` },
-    { value: "both-inactive", label: "Mindkét pár vereséget kap (0:4, 0:4)" },
+    { value: "both-inactive", label: MATCH_LOST_BOTH_TEXT },
     { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít a tabellába)" },
   ];
   const current: OutcomeChoice | undefined = !m.current
@@ -75,7 +75,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
   const score = m.current?.kind === "played" ? m.current.score : null;
   return (
     <AppPage
-      title={`${m.a} ellen ${m.b}`}
+      title={versusText(m.a, m.b)}
       description={`${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét · határidő: ${formatDeadline(m.deadline)}`}
       back={{ to: `/admin/leagues/${slug}/disputes`, label: "Viták" }}
     >
@@ -101,43 +101,49 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
         )}
       </section>
 
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="font-display text-lg">{r.status === "disputed" ? "Döntés a vitában" : "Kimenetel felülbírálása"}</CardTitle>
-          <CardDescription>
-            A döntésed végleges, és mindkét pár értesítést kap róla. Az indoklás kötelező: a meccs naplójába kerül, a párok is látják.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Keyed by the log, so the form resets after a decision. */}
-          <Form key={m.log.length} method="post" className="grid gap-4">
-            <RadioGroup name="outcome" defaultValue={current} required aria-label="Kimenetel">
-              {choices.map((c) => (
-                <div key={c.value} className="flex items-start gap-2">
-                  <RadioGroupItem value={c.value} id={`outcome-${c.value}`} className="mt-0.5" />
-                  <Label htmlFor={`outcome-${c.value}`} className="font-normal break-words">
-                    {c.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-            <div className="grid gap-1">
-              <p className="text-sm font-medium">Eredmény (csak „Eredmény” esetén)</p>
-              <ScoreFields id="decide" columns={["1. pár", "2. pár"]} values={score} required={false} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="reason">Indoklás</Label>
-              <Textarea id="reason" name="reason" maxLength={REASON_MAX} rows={3} required />
-            </div>
-            <FormFeedback result={actionData as ActionResult | undefined} intent="decide" />
-            <div>
-              <Button type="submit" disabled={busy}>
-                Döntés mentése
-              </Button>
-            </div>
-          </Form>
-        </CardContent>
-      </Card>
+      {m.voided ? (
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Az egyik pár visszalépett a körből: ez a meccs nem számít a tabellában, nincs miről dönteni.
+        </p>
+      ) : (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">{r.status === "disputed" ? "Döntés a vitában" : "Kimenetel felülbírálása"}</CardTitle>
+            <CardDescription>
+              A döntésed végleges, és mindkét pár értesítést kap róla. Az indoklás kötelező: a meccs naplójába kerül, a párok is látják.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Keyed by the log, so the form resets after a decision. */}
+            <Form key={m.log.length} method="post" className="grid gap-4">
+              <RadioGroup name="outcome" defaultValue={current} required aria-label="Kimenetel">
+                {choices.map((c) => (
+                  <div key={c.value} className="flex items-start gap-2">
+                    <RadioGroupItem value={c.value} id={`outcome-${c.value}`} className="mt-0.5" />
+                    <Label htmlFor={`outcome-${c.value}`} className="font-normal break-words">
+                      {c.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+              <div className="grid gap-1">
+                <p className="text-sm font-medium">Eredmény (csak „Eredmény” esetén)</p>
+                <ScoreFields id="decide" columns={["1. pár", "2. pár"]} values={score} required={false} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="reason">Indoklás</Label>
+                <Textarea id="reason" name="reason" maxLength={REASON_MAX} rows={3} required />
+              </div>
+              <FormFeedback result={actionData as ActionResult | undefined} intent="decide" />
+              <div>
+                <Button type="submit" disabled={busy}>
+                  Döntés mentése
+                </Button>
+              </div>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
 
       <section className="grid max-w-2xl gap-2" aria-labelledby="naplo">
         <h2 id="naplo" className="font-display text-lg font-bold">

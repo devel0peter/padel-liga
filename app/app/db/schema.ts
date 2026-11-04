@@ -395,6 +395,9 @@ export const notifications = sqliteTable(
         "match_result",
         "match_result_confirmed",
         "match_decided",
+        "match_result_disputed",
+        "result_disputed",
+        "pair_withdrawn",
         "test",
       ],
     }).notNull(),
@@ -406,11 +409,15 @@ export const notifications = sqliteTable(
     // When the daily digest (#31) took this item, whether or not it went into
     // an email; each item is taken once.
     digestedAt: integer("digested_at", { mode: "timestamp" }),
+    // Set while the push of an item the hourly job made waits to go out
+    // (#183): the job pushes as many as fit its run and the next run goes on.
+    // Null: pushed, nothing to push, or pushed at once (any other item).
+    pushDueAt: integer("push_due_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (t) => [index("notifications_user_idx").on(t.userId, t.id)],
+  (t) => [index("notifications_user_idx").on(t.userId, t.id), index("notifications_push_due_idx").on(t.pushDueAt)],
 );
 
 // One row per browser that allowed push (Push API subscription). Removed when
@@ -683,6 +690,13 @@ export const groupPairs = sqliteTable(
       .notNull()
       .references(() => pairs.id, { onDelete: "cascade" }),
     seed: integer("seed").notNull(),
+    // Withdrawn mid-phase by the organizer (#34, D87): the pair and every
+    // match it has in this group leave the table, played or not, and the
+    // group goes on without it (withdrawPairMidPhase, season-entries.server.ts).
+    // The reason is for the organizer and the pair itself, never shown to
+    // other players; anonymizing an account clears it.
+    withdrawnAt: integer("withdrawn_at", { mode: "timestamp" }),
+    withdrawalReason: text("withdrawal_reason"),
   },
   (t) => [primaryKey({ columns: [t.groupId, t.pairId] }), index("group_pairs_pair_idx").on(t.pairId)],
 );
@@ -804,6 +818,15 @@ export const matchDecisions = sqliteTable(
 // digest reminders once per match, "holnap meccs" once per scheduled slot
 // (`slot`, seconds; 0 for the others). The hourly cron claims a row before
 // it notifies the four players.
+// Work of the hourly job that is done for a period (#183): "morning:<day>"
+// once the day's digest reminders and digest are made. A morning run that
+// couldn't finish within its limits leaves no row, and the next morning run
+// goes on.
+export const jobRuns = sqliteTable("job_runs", {
+  key: text("key").primaryKey(),
+  doneAt: integer("done_at", { mode: "timestamp" }).notNull(),
+});
+
 export const matchReminders = sqliteTable(
   "match_reminders",
   {

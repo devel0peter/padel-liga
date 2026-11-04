@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterPairsRows,
   isFiltered,
+  PAIRS_FILTERS,
   pairsFilterCounts,
   pairsQueryString,
   parsePairsQuery,
@@ -10,6 +11,7 @@ import {
   rowFilters,
   type PairsRow,
 } from "./league-pairs-view";
+import { ENTRY_STATUS_LABELS } from "./season-entries";
 
 const pair = (id: string, names: [string, string], status: "active" | "dissolved", entry: string | null): PairsRow => ({
   kind: "pair",
@@ -110,5 +112,11 @@ describe("the query in the address", () => {
 describe("rowAccounts", () => {
   it("each player of the rows, once", () => {
     expect(rowAccounts([ROWS[0]!, ROWS[0]!, ROWS[5]!])).toEqual(["e0", "e1", "s1"]);
+  });
+});
+
+describe("the withdrawn entry's word (#174)", () => {
+  it("is the same in the filter option and in the entry badge", () => {
+    expect(PAIRS_FILTERS.withdrawn).toBe(ENTRY_STATUS_LABELS.withdrawn);
   });
 });

@@ -195,7 +195,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. A levelek a háttérben mennek ki: az első {SEND_NOW_MAX} most, a többi óránként, a napi
+                    „{subject}” · {label}. A levelek a háttérben mennek ki: az első {SEND_NOW_MAX} most, a többi tízpercenként, a napi
                     limit szerint. Hogy hol tart, a Kimenő levelek oldalon látod. Nem lehet visszavonni.
                   </AlertDialogDescription>
                 </AlertDialogHeader>

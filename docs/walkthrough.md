@@ -139,7 +139,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
   - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
-  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest hourly, within the daily limit.)
+  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest with the cron every 10 minutes, within the daily limit.)
   - The button is now disabled (everyone is invited once).
   - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
 
@@ -249,13 +249,13 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
   4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
-  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again.
+  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again. Pick "Visszavonva" in the filter: the rows' badge uses the same word. Both players' Párom reads "A szervező kivett titeket a szezonból. Ha újra játszanátok, szóljatok neki…", with no "Nevezünk" button.
   6. Type a name in "Keresés" without accents (for example "kovacs"): only the matching rows stay, and the address has `?q=`. "Szűrők törlése" brings every row back.
   7. Press "Nincs a ligában (N)": exactly N rows, the players without a pair ("Nincs párja", "Párt keres" where the switch is on) and the pairs without an entry. A reload keeps it. As `admin@example.test`, "Levél nekik" opens "Új körlevél" with those players as recipients ("Lista"); don't send.
 - Expect:
   - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change or an entry change.
   - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
-  - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" is refused with the reason until the round's deadline.
+  - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" opens "Visszaléptetés kör közben" (#34): it needs a reason, and says the pair's matches leave the table and the pair leaves the season. After it the pair reads "Visszavonva", its pair buttons work again, and "Benevezés" enters it for the next round. The group's table on `/league/minta` no longer lists it (it is named below the table, "Visszalépett: …"), its matches there are gone, its players' Kezdőlap shows no group, and the other pairs' group table on Kezdőlap leaves it out, names it below ("Visszalépett: …") and shows its week's match as off. Értesítések: the pair got "A szervező visszaléptetett titeket a körből" with the reason; the others "Visszalépett egy pár a csoportodból" with no reason. No email.
 
 ### 15. A new player without a signup registers (side path)
 
@@ -291,7 +291,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Account: any player in a published group, for example the first pair's first player
 - Expect:
   - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match.
-  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours, then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
+  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours (without numbers until a result is final; then the same table as on the public league page: place, pair, M, P, Szett, Játék, #201), then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
   - Each match: the opponents, "Egyeztetésre vár", their two phone numbers (tap to call) and "Egyeztetés és részletek". No email address anywhere.
   - "Hamarosan itt lesz a csoportod" is gone.
 
@@ -372,11 +372,11 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 ### 25. The morning digest and "holnap meccs" (cron)
 
 - Page: none; the terminal of `npm run dev`, then "Értesítések"
-- Do: run the hourly job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/local/scheduled?time=<milliseconds since 1970 of 07:00 Budapest, within a day from now>`, then again with the time of 18:00 the day before a fixed match.
+- Do: run the cron job as if it were 07:00 Budapest, then 18:00: open `http://localhost:5173/cdn-cgi/local/scheduled?time=<milliseconds since 1970 of 07:00 Budapest, within a day from now>`, then again with the time of 18:00 the day before a fixed match.
 - Expect (both emails are off for now, #191, D83; the in-app items and pushes stay):
   - 07:00: the day's reminders (for example "Még nincs időpont-ajánlat" from Wednesday of a match's week) are in "Értesítések" of the match's four players. No "Napi összefoglaló" email in the terminal. Running it again adds nothing.
   - 18:00 the day before a fixed match: "Holnap meccs" in "Értesítések" of the match's four players, with the time and the venue if recorded. No email.
-  - Any other hour: nothing.
+  - Any other time: no new reminders (a run before noon makes the morning's only if no run did yet, #183). Every run pushes what waits in the push queue, within its limits.
 
 ### 26. Szervező checks the automatic reminders (side path)
 
@@ -384,7 +384,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 
 - Page: `/admin/leagues/minta/reminders` ("Emlékeztetők")
 - Account: Szervező
-- Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the hourly job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
+- Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the cron job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
 - Expect:
   - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0; a registration deadline under 24 hours away shortens the 2 days to 24 hours, never less.
   - The note under the previews lists who never gets one, ending with "és aki ebben a szezonban már kapott emlékeztetőt".
@@ -402,7 +402,7 @@ People stuck before entering get at most one reminder per season, whatever the s
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
   - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések".
   - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 28).
-  - A result nobody answers is accepted by the hourly cron 48 hours after it was recorded; locally the cron doesn't run.
+  - A result nobody answers is accepted by the cron (every 10 minutes) 48 hours after it was recorded; locally the cron doesn't run.
 
 ### 28. The other pair disputes a result, the Szervező decides
 
@@ -411,6 +411,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Do: record 4:2, 5:3; as the opponent, under "Nem így volt?" fill 4:2, 3:5, 10:7 with a note and press "Vitatom az eredményt". As the Szervező, open Viták, press "Döntök", pick an outcome, write a reason and press "Döntés mentése".
 - Expect:
   - The opponent: "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt". The match doesn't count; nobody takes more steps on it.
+  - Told at once, in "Értesítések" (and by push, never by email, #178): the recording pair gets "Vitatják az eredményt" (link: the match); the league's Szervezők and the Admins get "Vitatott eredmény · <liga>" (link: the decide page). No names, scores or contact details in the text. A Szervező or Admin who switched "Vitatott eredmény" off on the profile gets nothing.
   - As a player, `/admin/leagues/minta/disputes` and the decide page answer 403.
   - Viták: "Vitatott eredmények (1)" with both pairs' versions (from the 1. pár's side), then "Minden meccs" with every match of the published groups, each with "Felülbírálom". No email address or phone.
   - The decide page shows both versions, the note and the full log (1. pár / 2. pár). Without a reason the form doesn't send (the server refuses it too). After saving: "Elmentettük a döntést. Mindkét pár értesítést kap.", the decision in the log with the Szervező's name, time and reason, and Viták shows "Vitatott eredmények (0)".
@@ -426,7 +427,7 @@ The public ladder counts final results (README decision log, 2026-11-03, #186).
 - Do: open the league page after the confirmation of step 27 and the decision of step 28.
 - Expect:
   - In the player's group the table is no longer at zero: the player's pair has 3 points in 2 matches (the confirmed win of step 27 and the "both lose" decision of step 28, 0 points), the step 27 opponent 1 point in 1 match, the step 28 opponent 0 points in 1 match. Szett and Játék follow the rules (spec 9).
-  - "Lejátszott meccsek" under the table lists both: the score from the 1. pár's side ("4-1 2-4 10-8" or "1-4 4-2 8-10") and "egyik fél sem játszott".
+  - Both results are listed once (#202): under "<n>. hét meccsei" when they belong to the week shown, else under "Lejátszott meccsek". Scores read as in the app, from the 1. pár's side ("4:1, 2:4, szuper tie-break 10:8" or "1:4, 4:2, szuper tie-break 8:10"), and the decision as "Mindkét pár vereséget kap (0:4, 0:4)".
   - Before the confirmation (a result still waiting) and while a result is disputed (step 28, before the decision) the table does not change; it changes when the result is confirmed, accepted after 48 hours, or decided.
   - Still no email address or phone number on the page.
 
@@ -452,4 +453,4 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
 - Milestone 2 and later: standings.
-- The 48-hour auto-accept of a result (#28): the hourly cron doesn't run on its own in local dev; the unit tests cover it.
+- The 48-hour auto-accept of a result (#28): the cron doesn't run on its own in local dev; the unit tests cover it.

@@ -213,6 +213,11 @@ export default function Privacy() {
                 telefonszámotokat nem.
               </li>
               <li>
+                Ha a szervező kör közben visszaléptet egy párt, az indokát csak a
+                szervező, az admin és a pár két tagja látja. A csoport többi
+                párja és a nyilvános tabella csak azt, hogy a pár visszalépett.
+              </li>
+              <li>
                 A csoportok összeállításakor a szervező a pár két tagjának nevét
                 és az értékszámotokat látja. A csoportbeosztásról mindenki
                 értesítést kap (e-mailben is, ha nem kapcsolta ki), benne az
@@ -345,8 +350,8 @@ export default function Privacy() {
           <Section title="Meddig őrizzük?">
             <ul className={list}>
               <li>
-                <strong>Jelentkezési lista:</strong> az első szezon indulása után
-                töröljük, kivéve, ha regisztráltál.
+                <strong>Jelentkezési lista:</strong> az első szezon első körének
+                végén töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
                 <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem

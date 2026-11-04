@@ -212,6 +212,7 @@ describe("pairs.server on real SQLite (#97)", () => {
         source: "manual",
         status: "active",
         locked: false,
+        lockedIn: [],
         entry: { seasonId: 1, season: "Tél", status: "pending", joinsPhase: null },
         // #154: an entered pair can be taken out.
         entryAction: { kind: "remove", seasonId: 1, season: "Tél" },
@@ -227,6 +228,7 @@ describe("pairs.server on real SQLite (#97)", () => {
         source: "signup",
         status: "dissolved",
         locked: false,
+        lockedIn: [],
         entry: null,
         entryAction: null,
         season: "Tél",

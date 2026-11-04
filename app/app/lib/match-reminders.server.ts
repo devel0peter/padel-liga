@@ -1,11 +1,13 @@
-import { and, gt, inArray, isNull } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { matchReminders, notifications, users } from "~/db/schema";
-import { queueReminderEmails } from "~/lib/email/outbox.server";
+import { jobRuns, matches, matchReminders, notifications, users } from "~/db/schema";
+import { reminderEmailInserts, type ReminderEmail } from "~/lib/email/outbox.server";
 import { runningMatches, type RunningMatch } from "~/lib/matches.server";
-import { DIGEST_KINDS, type Message } from "~/lib/notifications";
-import { notifyPlayers } from "~/lib/notifications.server";
+import { DIGEST_KINDS, type Message, type StoredKind } from "~/lib/notifications";
+import { queuedNotifications } from "~/lib/notifications.server";
+import { RunBudget, type Usage } from "~/lib/run-usage";
 
 import { venueLine } from "./matches";
 import {
@@ -13,9 +15,10 @@ import {
   DIGEST_WINDOW_MS,
   digestItems,
   dueReminders,
-  isDigestRun,
+  isMorningRun,
   isTomorrowRun,
   MATCH_REMINDER_EMAILS,
+  morningKey,
   reminderMessage,
   tomorrowDue,
   tomorrowMessage,
@@ -23,121 +26,176 @@ import {
   type DigestReminder,
 } from "./match-reminders";
 
-// Match reminders and the daily digest in D1 (#31, spec 13). The hourly cron
-// (workers/app.ts) calls runMatchReminders; the rules and texts are in
-// match-reminders.ts. Each reminder is claimed in match_reminders before the
-// players are told, so it goes once even if two runs overlap; each digest
-// item is claimed on notifications.digested_at the same way.
+// Match reminders and the daily digest in D1 (#31, spec 13). The cron
+// (lib/hourly-job.server.ts) calls runMatchReminders; the rules and texts are
+// in match-reminders.ts.
+//
+// Within the run limits (#183): each reminder is claimed in match_reminders
+// in the same D1 batch that stores its items in the app (push queued, sent
+// by the job's push step) and its emails in the outbox (sent by the job's
+// delivery step), so a reminder is either fully made or not at all. A run
+// works in batches of matches while its budget lasts; what's left is made by
+// the next run of the same morning or evening. A run overlapping another
+// fails that batch on the claim's key and makes nothing twice.
 
 type Kind = DigestReminder | "match_tomorrow";
 type Claim = { matchId: number; kind: Kind; slot: number };
+type Items = { kind: StoredKind; messages: { userId: string; message: Message }[] };
+type Work = { claims: Claim[]; items: Items[]; emails: ReminderEmail[]; sends: boolean };
 
-// match_reminders binds 4 parameters per row (D1: 100 per statement).
-const CLAIM_CHUNK = 20;
+// The run's budget and what to keep of it for the job's later steps.
+export type Budget = { run: RunBudget; keep: Usage };
+const fits = (b: Budget, queries: number) => b.run.fits({ queries: b.keep.queries + queries, calls: b.keep.calls });
+
+// Matches per D1 batch: their claims (4 parameters a row, D1 allows 100 per
+// statement), the four players' items and emails each.
+const MATCH_CHUNK = 20;
 const ID_CHUNK = 90;
-
-// Inserts the claims; returns the ones this run got (not sent before).
-async function claim(claims: Claim[], now: Date): Promise<Set<string>> {
-  const got = new Set<string>();
-  for (let i = 0; i < claims.length; i += CLAIM_CHUNK) {
-    const rows = await db
-      .insert(matchReminders)
-      .values(claims.slice(i, i + CLAIM_CHUNK).map((c) => ({ ...c, sentAt: now })))
-      .onConflictDoNothing()
-      .returning({ matchId: matchReminders.matchId, kind: matchReminders.kind, slot: matchReminders.slot });
-    for (const r of rows) got.add(key(r));
-  }
-  return got;
-}
 
 const key = (c: Claim) => `${c.matchId}:${c.kind}:${c.slot}`;
 const players = (m: RunningMatch) => [...m.pairs.a, ...m.pairs.b];
 
-/**
- * The digest reminders due today (spec 13), to the four players of each
- * match, in the app and by push; the digest email that follows in the same
- * run collects them. When several are due for one match at once, only the
- * latest goes out; the others are claimed too, so they never follow later.
- * Returns how many reminders (matches × kinds) went out.
- */
-export async function queueDigestReminders(now: Date, list?: RunningMatch[]): Promise<number> {
-  const running = list ?? (await runningMatches(now));
-  const due = running.flatMap((m) => dueReminders(m, now).map((kind) => ({ m, kind })));
-  if (due.length === 0) return 0;
-  const got = await claim(
-    due.map(({ m, kind }) => ({ matchId: m.id, kind, slot: 0 })),
+// The reminders of these kinds already made for matches not past their
+// deadline (the only ones running). One query, no list of ids bound.
+async function claimedOf(kinds: readonly Kind[], now: Date): Promise<Set<string>> {
+  const rows = await db
+    .select({ matchId: matchReminders.matchId, kind: matchReminders.kind, slot: matchReminders.slot })
+    .from(matchReminders)
+    .where(
+      and(
+        inArray(matchReminders.kind, [...kinds]),
+        inArray(matchReminders.matchId, db.select({ id: matches.id }).from(matches).where(gte(matches.deadline, now))),
+      ),
+    );
+  return new Set(rows.map(key));
+}
+
+// Commits the work in batches of MATCH_CHUNK matches while the budget lasts.
+// Two queries first (opt-outs; the suppressed addresses and email switch
+// when there are emails), then one per batch. Returns how many reminders
+// went out and how many matches are left for the next run.
+async function commit(work: Work[], kinds: readonly StoredKind[], now: Date, budget: Budget): Promise<{ sent: number; left: number }> {
+  if (work.length === 0) return { sent: 0, left: 0 };
+  const hasEmails = work.some((w) => w.emails.length > 0);
+  if (!fits(budget, 1 + (hasEmails ? 2 : 0) + 1)) return { sent: 0, left: work.length };
+  const chunks: Work[][] = [];
+  for (let i = 0; i < work.length; i += MATCH_CHUNK) chunks.push(work.slice(i, i + MATCH_CHUNK));
+  const items = await queuedNotifications(
+    kinds,
+    chunks.map((c) => c.flatMap((w) => w.items)),
     now,
   );
-  // Per match, the latest kind this run claimed, only if no later kind went
-  // out before (DIGEST_REMINDERS is latest first).
-  const byKind = new Map<DigestReminder, { userId: string; message: Message }[]>();
+  const emails = await reminderEmailInserts(chunks.map((c) => c.flatMap((w) => w.emails)));
   let sent = 0;
-  for (const m of running) {
-    const kinds = dueReminders(m, now);
+  let left = 0;
+  for (const [i, chunk] of chunks.entries()) {
+    if (!fits(budget, 1)) {
+      left += chunk.length;
+      continue;
+    }
+    const statements: BatchItem<"sqlite">[] = [];
+    const claims = chunk.flatMap((w) => w.claims);
+    for (let k = 0; k < claims.length; k += MATCH_CHUNK)
+      statements.push(db.insert(matchReminders).values(claims.slice(k, k + MATCH_CHUNK).map((c) => ({ ...c, sentAt: now }))));
+    statements.push(...items[i], ...emails[i]);
+    const [first, ...rest] = statements;
+    try {
+      await db.batch([first!, ...rest]);
+      sent += chunk.filter((w) => w.sends).length;
+    } catch (e) {
+      if (!String(e).includes("UNIQUE constraint failed")) throw e;
+      console.warn("match reminders: another run made some of these; left to the next run");
+      left += chunk.length;
+    }
+  }
+  return { sent, left };
+}
+
+/**
+ * The digest reminders due today (spec 13), to the four players of each
+ * match, in the app and by push (queued); the digest email collects them.
+ * When several are due for one match at once, only the latest goes out; the
+ * others are claimed too, so they never follow later. Returns how many
+ * reminders (matches) went out and how many matches are left for the next
+ * run.
+ */
+export async function queueDigestReminders(now: Date, running: RunningMatch[], budget: Budget): Promise<{ sent: number; left: number }> {
+  const due = running.map((m) => ({ m, kinds: dueReminders(m, now) })).filter((d) => d.kinds.length > 0);
+  if (due.length === 0) return { sent: 0, left: 0 };
+  if (!fits(budget, 1)) return { sent: 0, left: due.length };
+  const claimed = await claimedOf(DIGEST_REMINDERS, now);
+  const work = due.flatMap(({ m, kinds }): Work[] => {
+    const fresh = kinds.filter((kind) => !claimed.has(key({ matchId: m.id, kind, slot: 0 })));
+    if (fresh.length === 0) return [];
+    // The latest kind due, only if it didn't go out before (DIGEST_REMINDERS
+    // is latest first).
     const first = kinds[0];
-    if (!first || !got.has(key({ matchId: m.id, kind: first, slot: 0 }))) continue;
+    const sends = fresh.includes(first);
     const message = reminderMessage(first, { matchId: m.id, week: m.week, deadline: m.deadline });
-    const list = byKind.get(first) ?? byKind.set(first, []).get(first)!;
-    list.push(...players(m).map((p) => ({ userId: p.id, message })));
-    sent++;
-  }
-  for (const kind of DIGEST_REMINDERS) {
-    const messages = byKind.get(kind);
-    if (messages) await notifyPlayers(kind, messages, now);
-  }
-  return sent;
+    return [
+      {
+        claims: fresh.map((kind) => ({ matchId: m.id, kind, slot: 0 })),
+        items: sends ? [{ kind: first, messages: players(m).map((p) => ({ userId: p.id, message })) }] : [],
+        emails: [],
+        sends,
+      },
+    ];
+  });
+  return commit(work, DIGEST_REMINDERS, now, budget);
 }
 
 /**
  * "Holnap meccs" (spec 13): the evening before an accepted slot, push and the
  * app to the four players, once per slot, and an email when `email` is on
- * (off for now, MATCH_REMINDER_EMAILS, #191). Returns how many matches.
+ * (off for now, MATCH_REMINDER_EMAILS, #191). Returns how many matches got it
+ * and how many are left for the next run.
  */
-export async function queueTomorrowReminders(now: Date, list?: RunningMatch[], email = MATCH_REMINDER_EMAILS.tomorrow): Promise<number> {
-  const running = (list ?? (await runningMatches(now))).filter((m) => tomorrowDue(m, now));
-  if (running.length === 0) return 0;
-  const slotOf = (m: RunningMatch) => (m.state.status === "scheduled" ? Math.floor(m.state.slot.getTime() / 1000) : 0);
-  const got = await claim(
-    running.map((m) => ({ matchId: m.id, kind: "match_tomorrow", slot: slotOf(m) })),
-    now,
-  );
-  const claimed = running.filter((m) => got.has(key({ matchId: m.id, kind: "match_tomorrow", slot: slotOf(m) })));
-  const emails: Parameters<typeof queueReminderEmails>[0] = [];
-  const pushes: { userId: string; message: Message }[] = [];
-  for (const m of claimed) {
-    if (m.state.status !== "scheduled") continue;
+export async function queueTomorrowReminders(
+  now: Date,
+  running: RunningMatch[],
+  budget: Budget,
+  email = MATCH_REMINDER_EMAILS.tomorrow,
+): Promise<{ sent: number; left: number }> {
+  const due = running.filter((m) => tomorrowDue(m, now));
+  if (due.length === 0) return { sent: 0, left: 0 };
+  if (!fits(budget, 1)) return { sent: 0, left: due.length };
+  const claimed = await claimedOf(["match_tomorrow"], now);
+  const work = due.flatMap((m): Work[] => {
+    if (m.state.status !== "scheduled") return [];
     const slot = m.state.slot;
+    const claim: Claim = { matchId: m.id, kind: "match_tomorrow", slot: Math.floor(slot.getTime() / 1000) };
+    if (claimed.has(key(claim))) return [];
     const court = m.state.court ?? null;
     const message = tomorrowMessage({ matchId: m.id, slot, venue: m.venue, court });
     const venue = venueLine(m.venue, court);
-    for (const [ours, theirs] of [
-      [m.pairs.a, m.pairs.b],
-      [m.pairs.b, m.pairs.a],
-    ] as const)
-      for (const p of ours) {
-        emails.push({ kind: "match_tomorrow", toEmail: p.email, input: { to: p.name, opponents: theirs.map((t) => t.name).join(" és "), matchId: m.id, slot, venue } });
-        pushes.push({ userId: p.id, message });
-      }
-  }
-  await notifyPlayers("match_tomorrow", pushes, now);
-  if (!email) return claimed.length;
-  try {
-    await queueReminderEmails(emails);
-  } catch (error) {
-    // The reminder is claimed and in the app; a failed email must not stop the run.
-    console.error("holnap meccs emails failed", error);
-  }
-  return claimed.length;
+    const emails: ReminderEmail[] = [];
+    if (email)
+      for (const [ours, theirs] of [
+        [m.pairs.a, m.pairs.b],
+        [m.pairs.b, m.pairs.a],
+      ] as const)
+        for (const p of ours)
+          emails.push({ kind: "match_tomorrow", toEmail: p.email, input: { to: p.name, opponents: theirs.map((t) => t.name).join(" és "), matchId: m.id, slot, venue } });
+    return [{ claims: [claim], items: [{ kind: "match_tomorrow", messages: players(m).map((p) => ({ userId: p.id, message })) }], emails, sends: true }];
+  });
+  return commit(work, ["match_tomorrow"], now, budget);
 }
+
+// What sendDigests needs: the take, the players, the suppressed addresses and
+// email switch, and the batch.
+const DIGEST_QUERIES = 5;
 
 /**
  * The daily digest (spec 13): takes every digest-kind notification of the
  * last day not taken yet (DIGEST_KINDS, so kinds added later are in it), and
- * sends each player one email with the items they haven't opened in the app.
- * A player with none gets nothing. The email switch and suppressions apply in
- * the outbox. Returns how many emails were queued.
+ * queues each player one email with the items they haven't opened in the
+ * app. A player with none gets nothing. The email switch and suppressions
+ * apply in the outbox. The emails and the morning's done mark (job_runs)
+ * commit together, so the digest goes once a day. Returns how many emails
+ * were queued, or null when the run has no room for it.
  */
-export async function sendDigests(now: Date): Promise<number> {
+export async function sendDigests(now: Date, budget: Budget): Promise<number | null> {
+  if (!fits(budget, DIGEST_QUERIES)) return null;
   const taken = await db
     .update(notifications)
     .set({ digestedAt: now })
@@ -162,54 +220,79 @@ export async function sendDigests(now: Date): Promise<number> {
     const list = digestItems(items);
     return list ? [{ userId, items: list }] : [];
   });
-  if (wanted.length === 0) return 0;
   const people = new Map<string, { email: string; name: string }>();
-  for (let i = 0; i < wanted.length; i += ID_CHUNK)
+  if (wanted.length > 0)
     for (const u of await db
       .select({ id: users.id, email: users.email, name: users.name })
       .from(users)
       .where(
         and(
-          inArray(
-            users.id,
-            wanted.slice(i, i + ID_CHUNK).map((w) => w.userId),
-          ),
+          // The players whose items this run took (no list of ids bound).
+          inArray(users.id, db.select({ id: notifications.userId }).from(notifications).where(eq(notifications.digestedAt, now))),
           // An organizer decision on an old match still notifies a deleted
           // account (#152); it gets no digest.
           isNull(users.deletedAt),
         ),
       ))
       people.set(u.id, { email: u.email, name: u.name || "" });
-  const emails = wanted.flatMap((w) => {
+  const emails = wanted.flatMap((w): ReminderEmail[] => {
     const p = people.get(w.userId);
-    return p ? [{ kind: "match_digest" as const, toEmail: p.email, input: { to: p.name || "Játékos", items: w.items } }] : [];
+    return p ? [{ kind: "match_digest", toEmail: p.email, input: { to: p.name || "Játékos", items: w.items } }] : [];
   });
-  await queueReminderEmails(emails);
+  const [inserts] = await reminderEmailInserts([emails]);
+  await db.batch([morningDone(now), ...inserts]);
   return emails.length;
 }
 
+const morningDone = (now: Date) => db.insert(jobRuns).values({ key: morningKey(now), doneAt: now }).onConflictDoNothing();
+
+async function morningFinished(now: Date): Promise<boolean> {
+  const [row] = await db.select({ key: jobRuns.key }).from(jobRuns).where(eq(jobRuns.key, morningKey(now)));
+  return !!row;
+}
+
+// What a run needs to read the running matches (the matches, their groups'
+// players, their logs and venues; more for a large league, so it is only a
+// floor: the steps after it check again).
+const RUNNING_QUERIES = 5;
+
 /**
- * The cron's part (#31): at 07:00 Budapest the day's digest reminders, then
- * the digest; from 18:00 to 21:00 "holnap meccs". Other hours do nothing.
- * `emails` says which of the two emails go out (MATCH_REMINDER_EMAILS: none
- * for now, #191); the items and pushes go out either way. A digest left off
- * takes nothing, so switched back on it starts from the last day's items.
- * A failure is logged and doesn't stop the email delivery after it.
+ * The cron's part (#31): from 07:00 Budapest the day's digest reminders, then
+ * the digest, once a day (in the first run that finishes them, until noon);
+ * from 18:00 to 21:00 "holnap meccs". Other runs do nothing. `emails` says
+ * which of the two emails go out (MATCH_REMINDER_EMAILS: none for now,
+ * #191); the items and pushes go out either way. A digest left off takes
+ * nothing, so switched back on it starts from the last day's items.
+ * Returns the log line, also when the run left work for the next one (#183).
  */
-export async function runMatchReminders(now = new Date(), emails = MATCH_REMINDER_EMAILS): Promise<void> {
-  if (!isDigestRun(now) && !isTomorrowRun(now)) return;
-  try {
-    const running = await runningMatches(now);
-    if (isDigestRun(now)) {
-      const reminders = await queueDigestReminders(now, running);
-      const digests = emails.digest ? await sendDigests(now) : 0;
-      if (reminders || digests) console.log(`cron: ${reminders} match reminders, ${digests} digest emails`);
-    }
-    if (isTomorrowRun(now)) {
-      const tomorrow = await queueTomorrowReminders(now, running, emails.tomorrow);
-      if (tomorrow) console.log(`cron: holnap meccs for ${tomorrow} matches`);
-    }
-  } catch (error) {
-    console.error("cron: match reminders failed", error);
+export async function runMatchReminders(
+  now = new Date(),
+  budget: Budget = { run: new RunBudget(), keep: { queries: 0, calls: 0 } },
+  emails = MATCH_REMINDER_EMAILS,
+): Promise<string | null> {
+  const tomorrow = isTomorrowRun(now);
+  if (!isMorningRun(now) && !tomorrow) return null;
+  const morning = isMorningRun(now) && fits(budget, 1) && !(await morningFinished(now));
+  if (!morning && !tomorrow) return null;
+  const done: string[] = [];
+  const left: string[] = [];
+  if (!fits(budget, RUNNING_QUERIES)) return "match reminders: no room in this run; left for the next one";
+  const running = await runningMatches(now);
+  if (morning) {
+    const reminders = await queueDigestReminders(now, running, budget);
+    if (reminders.sent) done.push(`${reminders.sent} match reminders`);
+    if (reminders.left) left.push(`${reminders.left} matches' reminders`);
+    else if (emails.digest) {
+      const digests = await sendDigests(now, budget);
+      if (digests === null) left.push("the digest");
+      else done.push(`${digests} digest emails`);
+    } else if (fits(budget, 1)) await morningDone(now);
   }
+  if (tomorrow) {
+    const t = await queueTomorrowReminders(now, running, budget, emails.tomorrow);
+    if (t.sent) done.push(`holnap meccs for ${t.sent} matches`);
+    if (t.left) left.push(`holnap meccs for ${t.left} matches`);
+  }
+  const parts = [done.join(", "), left.length ? `left for the next run (run limits): ${left.join(", ")}` : ""].filter(Boolean);
+  return parts.length ? parts.join("; ") : null;
 }

@@ -2,7 +2,8 @@ import { ChevronRight, Phone } from "lucide-react";
 import { Link } from "react-router";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { formatDeadline } from "~/lib/format";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { formatDeadline, signed } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { groupLine, statusView, telHref, todoFor, type Tone } from "~/lib/matches";
 import type { HomeGroup, Opponent } from "~/lib/matches.server";
@@ -83,8 +84,67 @@ export function Todos({ items }: { items: Todo[] }) {
   );
 }
 
+// The group's standing (#201): the public league page's table (rank, matches,
+// points, set and game difference), from final results only. Before any
+// result there is no ranking to show, so the pairs are listed without numbers.
+function GroupTable({ pairs }: { pairs: HomeGroup["pairs"] }) {
+  if (pairs.every((p) => p.matches === 0)) {
+    return (
+      <ul className="grid gap-1" aria-label="Párok">
+        {pairs.map((p) => (
+          <li key={p.pairId} className={cn("break-words", p.mine && "font-semibold")}>
+            {p.name}
+            {p.mine && " (ti)"}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <Table className="table-fixed" aria-label="Tabella">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-7 px-1">#</TableHead>
+          <TableHead className="px-1">Pár</TableHead>
+          <TableHead className="w-9 px-1 text-right" title="Lejátszott meccsek">
+            M
+          </TableHead>
+          <TableHead className="w-9 px-1 text-right" title="Pont">
+            P
+          </TableHead>
+          <TableHead className="w-11 px-1 text-right" title="Szettkülönbség">
+            Szett
+          </TableHead>
+          <TableHead className="w-12 px-1 text-right" title="Játékkülönbség">
+            Játék
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {pairs.map((p) => (
+          <TableRow key={p.pairId} className={cn(p.mine && "font-semibold")}>
+            <TableCell className="px-1 font-bold">{p.rank}.</TableCell>
+            <TableCell className="px-1 break-words whitespace-normal">
+              {p.name}
+              {p.mine && " (ti)"}
+            </TableCell>
+            <TableCell className="px-1 text-right">{p.matches}</TableCell>
+            <TableCell className="px-1 text-right font-bold">{p.points}</TableCell>
+            <TableCell className="px-1 text-right">{signed(p.setDiff)}</TableCell>
+            <TableCell className="px-1 text-right">{signed(p.gameDiff)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
-  const weeks = [1, 2, 3].map((week) => ({ week, match: g.matches.find((m) => m.week === week) ?? null }));
+  const weeks = [1, 2, 3].map((week) => ({
+    week,
+    match: g.matches.find((m) => m.week === week) ?? null,
+    off: g.offWeeks.find((o) => o.week === week) ?? null,
+  }));
   return (
     <Card className="max-w-2xl" aria-label={groupLine(g.number, g.groupCount)}>
       <CardHeader>
@@ -95,16 +155,12 @@ export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeag
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
-        <ol className="grid gap-1">
-          {g.pairs.map((p, i) => (
-            <li key={p.pairId} className={cn("break-words", p.mine && "font-semibold")}>
-              {i + 1}. {p.name}
-              {p.mine && " (ti)"}
-            </li>
-          ))}
-        </ol>
+        <GroupTable pairs={g.pairs} />
+        {g.withdrawn.length > 0 && (
+          <p className="text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>
+        )}
         <ul className="grid gap-3" aria-label="Meccseitek">
-          {weeks.map(({ week, match: m }) => (
+          {weeks.map(({ week, match: m, off }) => (
             <li key={week} className="grid gap-1.5 rounded-md border p-3">
               <p className="text-xs font-semibold text-muted-foreground">
                 {week}. hét · {weekRange(g.phaseStartsAt, week)}
@@ -121,6 +177,10 @@ export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeag
                     <ChevronRight className="size-4" />
                   </Link>
                 </>
+              ) : off ? (
+                <p className="text-muted-foreground">
+                  {off.opponents} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.
+                </p>
               ) : (
                 <p className="text-muted-foreground">Pihenőhét: ezen a héten nem játszotok.</p>
               )}

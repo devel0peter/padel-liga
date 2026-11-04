@@ -13,6 +13,7 @@ import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matche
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
+import { logError } from "~/lib/log";
 
 // The organizer's side of results (#29): the league's disputes and matches,
 // one match with both pairs' versions and its log, and a decision or override
@@ -287,7 +288,7 @@ export async function decideMatch(
       ),
     );
   } catch (error) {
-    console.error(`match ${matchId} decision notification failed`, error);
+    logError("decision notification failed", { matchId, error });
   }
   return { ok: true, notice: "Elmentettük a döntést. Mindkét pár értesítést kap." };
 }

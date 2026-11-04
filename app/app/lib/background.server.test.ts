@@ -26,7 +26,9 @@ describe("runAfterResponse", () => {
       throw new Error("relay down");
     });
     await expect(h.handed[0]).resolves.toBeUndefined();
-    expect(error).toHaveBeenCalledWith("bulk send failed", expect.any(Error));
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "error", event: "background task failed", task: "bulk send", error: expect.objectContaining({ message: "relay down" }) }),
+    );
     error.mockRestore();
   });
 });

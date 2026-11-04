@@ -25,6 +25,7 @@ import {
   type DigestItem,
   type DigestReminder,
 } from "./match-reminders";
+import { logWarn } from "~/lib/log";
 
 // Match reminders and the daily digest in D1 (#31, spec 13). The cron
 // (lib/hourly-job.server.ts) calls runMatchReminders; the rules and texts are
@@ -104,7 +105,7 @@ async function commit(work: Work[], kinds: readonly StoredKind[], now: Date, bud
       sent += chunk.filter((w) => w.sends).length;
     } catch (e) {
       if (!String(e).includes("UNIQUE constraint failed")) throw e;
-      console.warn("match reminders: another run made some of these; left to the next run");
+      logWarn("match reminders deferred", { reason: "another run made some of these; left to the next run" });
       left += chunk.length;
     }
   }

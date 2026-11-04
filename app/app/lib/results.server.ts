@@ -23,6 +23,7 @@ import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server"
 import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { NOTE_MAX, scoreText } from "./results";
+import { logError } from "~/lib/log";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
 // auto-accept run by the hourly cron. The rules are in packages/rules
@@ -193,7 +194,7 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
     }
   } catch (error) {
     // The step is saved; a failed notice must not undo or hide it.
-    console.error(`match ${matchId} result notification failed`, error);
+    logError("result notification failed", { matchId, error });
   }
 }
 
@@ -268,6 +269,6 @@ async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number
     // From the hourly job: the pushes wait for its push step (#183).
     await notifyPlayers("match_result_confirmed", messages, undefined, true);
   } catch (error) {
-    console.error("auto-accept notification failed", error);
+    logError("auto-accept notification failed", { error });
   }
 }

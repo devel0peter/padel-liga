@@ -81,7 +81,8 @@ describe("login code cleanup (#168)", () => {
   it("keeps a still valid code, a code expired under an hour ago, and a record inside its hourly window", async () => {
     insert("ervenyes@example.test", at(5), at(-90));
     insert("frissen.lejart@example.test", at(-50), at(-120));
-    insert("ablakban@example.test", at(-70), at(-59));
+    // Window started 59 minutes ago, its last code sent 50 minutes ago.
+    insert("ablakban@example.test", at(-40), at(-59));
     insert("regi@example.test", at(-61), at(-120));
     await cronRun(T0);
     expect(emails()).toEqual(["ablakban@example.test", "ervenyes@example.test", "frissen.lejart@example.test"]);
@@ -109,7 +110,7 @@ describe("login code cleanup (#168)", () => {
     expect(emails()).toEqual([]);
   });
 
-  it("keeps the hourly code limit and the tries per code across runs", async () => {
+  it("keeps the hourly code limit across runs", async () => {
     const email = "sok@example.test";
     for (let i = 0; i < 5; i++) {
       vi.setSystemTime(at(i * 10));
@@ -121,14 +122,20 @@ describe("login code cleanup (#168)", () => {
     await cronRun(at(55));
     vi.setSystemTime(at(55));
     expect(await L.sendLoginCode(email)).toEqual({ ok: false, error: "Túl sok kódot kértél. Próbáld újra egy óra múlva." });
+  });
 
-    // Five wrong tries lock the valid code; a run in between changes nothing.
-    vi.setSystemTime(at(41));
-    for (let i = 0; i < 5; i++) {
-      await L.verifyLoginCode(email, "000000");
-      await cronRun(at(41));
+  it("keeps the tries per code across runs", async () => {
+    const email = "tipp@example.test";
+    await L.sendLoginCode(email);
+    const wrong = h.codes[0].code === "000000" ? "111111" : "000000";
+    // Five wrong tries lock the valid code; a run after each changes nothing.
+    for (let i = 1; i <= 5; i++) {
+      vi.setSystemTime(at(i));
+      await L.verifyLoginCode(email, wrong);
+      await cronRun(at(i));
     }
-    expect(await L.verifyLoginCode(email, h.codes[4].code)).toMatchObject({ ok: false, error: "Túl sok hibás próbálkozás. Kérj új kódot." });
+    vi.setSystemTime(at(6));
+    expect(await L.verifyLoginCode(email, h.codes[0].code)).toEqual({ ok: false, error: "Túl sok hibás próbálkozás. Kérj új kódot." });
   });
 
   it("with 10,000 stale records stays within the run's query limit and leaves the rest for later runs", async () => {

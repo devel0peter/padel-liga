@@ -369,8 +369,8 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>Belépési kód:</strong> magát a kódot nem tároljuk,
-                csak egy visszafejthetetlen lenyomatát, az e-mail-címeddel,
-                a próbálkozásaid és a kért kódok számával együtt. Belépéskor
+                csak egy lenyomatát, az e-mail-címeddel, a próbálkozásaid és a
+                kért kódok számával együtt. Belépéskor
                 azonnal töröljük, különben a kód lejárta után nagyjából egy
                 órával magától törlődik.
               </li>

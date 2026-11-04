@@ -89,7 +89,10 @@ export function codeSendDecision(existing: Pick<CodeRecord, "windowStart" | "sen
 // STALE_CODE_GRACE_MS ago and its hour-long window ended, so a new request
 // starts a fresh window and a fresh code either way (codeSendDecision of it
 // equals that of no record). The cron deletes these. The grace hour keeps
-// "Ez a kód lejárt" for a late try instead of "nincs érvényes kód".
+// "Ez a kód lejárt" for a late try instead of "nincs érvényes kód". The
+// window check is implied (a window starts no later than its last code,
+// which expires CODE_TTL_MS after it, so an hour past expiry is past the
+// window too); it stays as a safeguard should the TTL or the window change.
 export const STALE_CODE_GRACE_MS = HOUR;
 
 export function staleCodeCutoffs(now: Date): { expiredBy: Date; windowStartedBy: Date } {

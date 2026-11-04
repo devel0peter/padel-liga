@@ -182,10 +182,22 @@ describe("stale code records (#168)", () => {
   });
 
   it("is kept inside its hourly window, so the hourly code limit holds", () => {
-    // Window started 59 minutes ago, its code expired long enough ago.
-    const record = { ...sentAt(ago(CODE_TTL_MS + hour)), windowStart: ago(59 * min) };
-    expect(codeSendDecision(record, now)).toEqual({ ok: false });
-    expect(isStaleCode(record, now)).toBe(false);
+    // Any record still inside its window: its last code was sent after the
+    // window started, so it expired under an hour ago and is kept.
+    for (let windowAgo = 0; windowAgo < 60; windowAgo++)
+      for (let sentAgo = 0; sentAgo <= windowAgo; sentAgo++) {
+        const record = sentAt(ago(sentAgo * min), ago(windowAgo * min));
+        expect(isStaleCode(record, now), `window ${windowAgo} min, sent ${sentAgo} min ago`).toBe(false);
+      }
+    // A record whose window started 59 minutes ago and is full still refuses a code.
+    const full = sentAt(ago(50 * min), ago(59 * min));
+    expect(codeSendDecision(full, now)).toEqual({ ok: false });
+    expect(isStaleCode(full, now)).toBe(false);
+  });
+
+  it("checks the window too, should a record ever outlive it (safeguard)", () => {
+    // Not possible with today's TTL and window: an expiry before the window start.
+    expect(isStaleCode({ expiresAt: ago(2 * hour), windowStart: ago(59 * min) }, now)).toBe(false);
   });
 
   it("weakens no limit when deleted: a stale record decides like no record", () => {

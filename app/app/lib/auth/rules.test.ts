@@ -9,6 +9,7 @@ import {
   DEFAULT_RETURN_TO,
   googlePicture,
   initials,
+  isStaleCode,
   isValidEmail,
   loginEmailParam,
   MAX_CODE_ATTEMPTS,
@@ -26,6 +27,7 @@ import {
   SEXES,
   sessionExpiry,
   SESSION_TTL_MS,
+  STALE_CODE_GRACE_MS,
   SUPERADMIN_SESSION_TTL_MS,
   validateProfile,
   type CodeRecord,
@@ -148,6 +150,52 @@ describe("checking codes", () => {
   it(`locks after ${MAX_CODE_ATTEMPTS} wrong tries, even the right code`, () => {
     expect(checkCode(record({ attempts: MAX_CODE_ATTEMPTS - 1 }), true, now)).toBe("ok");
     expect(checkCode(record({ attempts: MAX_CODE_ATTEMPTS }), true, now)).toBe("locked");
+  });
+});
+
+describe("stale code records (#168)", () => {
+  const hour = 60 * min;
+  // A code sent at `sent`, the window started at `windowStart`.
+  const sentAt = (sent: Date, windowStart = sent): CodeRecord => ({
+    codeHash: "h",
+    expiresAt: new Date(sent.getTime() + CODE_TTL_MS),
+    attempts: MAX_CODE_ATTEMPTS,
+    windowStart,
+    sentInWindow: MAX_CODES_PER_WINDOW,
+  });
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+
+  it("is stale once its code expired an hour ago and its window ended", () => {
+    expect(STALE_CODE_GRACE_MS).toBe(hour);
+    expect(isStaleCode(sentAt(ago(CODE_TTL_MS + hour)), now)).toBe(true);
+    expect(isStaleCode(sentAt(ago(3 * day)), now)).toBe(true);
+  });
+
+  it("is kept while its code is valid", () => {
+    expect(isStaleCode(sentAt(ago(min), ago(2 * hour)), now)).toBe(false);
+  });
+
+  it("is kept for an hour after its code expired, so a late try still reads as expired", () => {
+    const record = { ...sentAt(ago(CODE_TTL_MS + hour - min), ago(2 * hour)), attempts: 0 };
+    expect(checkCode(record, true, now)).toBe("expired");
+    expect(isStaleCode(record, now)).toBe(false);
+  });
+
+  it("is kept inside its hourly window, so the hourly code limit holds", () => {
+    // Window started 59 minutes ago, its code expired long enough ago.
+    const record = { ...sentAt(ago(CODE_TTL_MS + hour)), windowStart: ago(59 * min) };
+    expect(codeSendDecision(record, now)).toEqual({ ok: false });
+    expect(isStaleCode(record, now)).toBe(false);
+  });
+
+  it("weakens no limit when deleted: a stale record decides like no record", () => {
+    for (const record of [sentAt(ago(CODE_TTL_MS + hour)), sentAt(ago(day), ago(day + 30 * min)), sentAt(ago(7 * day))]) {
+      expect(isStaleCode(record, now)).toBe(true);
+      expect(codeSendDecision(record, now)).toEqual(codeSendDecision(null, now));
+      // Neither a right code nor a wrong one gets in, with or without it.
+      expect(checkCode(record, true, now)).not.toBe("ok");
+      expect(checkCode(null, true, now)).not.toBe("ok");
+    }
   });
 });
 

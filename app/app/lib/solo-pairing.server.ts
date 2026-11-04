@@ -36,7 +36,7 @@ export async function pairSolos(aId: number, bId: number, city: string, cityName
   }
 
   // The pair is saved; an email problem must not undo it. Anything not sent
-  // now stays queued for the hourly cron.
+  // now stays queued for the cron.
   try {
     await deliver(
       await queuePairIntros(

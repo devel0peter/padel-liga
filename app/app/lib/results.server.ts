@@ -26,7 +26,7 @@ import { NOTE_MAX, scoreText } from "./results";
 import { logError } from "~/lib/log";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
-// auto-accept run by the hourly cron. The rules are in packages/rules
+// auto-accept run by the cron. The rules are in packages/rules
 // (results.ts, reporting.ts); the texts in results.ts. Every step goes into
 // the match log (match_events; the auto-accept into match_decisions) and is
 // mirrored on the match (status, outcome) for lists and the standings.

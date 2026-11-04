@@ -1,4 +1,4 @@
-// The hourly job's push queue (#183, notifications.server.ts pushQueued) on a
+// The cron's push queue (#183, notifications.server.ts pushQueued) on a
 // real SQLite: oldest first, an item only when all its devices fit the run,
 // each push once, gone devices forgotten. Push is stubbed; nothing leaves the
 // process.
@@ -41,7 +41,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const queued = () => h.raw.prepare("select user_id as user, title from notifications where push_due_at is not null order by id").all();
 
-// The queue as the hourly job fills it (notifyPlayers with queuePush).
+// The queue as the cron fills it (notifyPlayers with queuePush).
 async function queue(...users: string[]) {
   await N.notifyPlayers(
     "match_no_proposal",

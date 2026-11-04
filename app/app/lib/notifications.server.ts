@@ -126,7 +126,7 @@ const NONE: ReadonlySet<string> = new Set();
 // Stores one message per user, skipping users who switched the kind off, and
 // pushes it to those who didn't switch push off (#115). D1 queries: one
 // opt-out lookup, one insert per INSERT_CHUNK messages, one subscription
-// lookup (per ID_CHUNK users each). With `queuePush` (the hourly job, #183)
+// lookup (per ID_CHUNK users each). With `queuePush` (the cron, #183)
 // the pushes wait in the queue for pushQueued() instead of going out here.
 async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date, queuePush = false): Promise<void> {
   const disabled = await disabledKinds(messages.map((m) => m.userId));
@@ -184,7 +184,7 @@ export async function notifyPlayers(
   }
 }
 
-// --- The hourly job's notifications (#183) ----------------------------------
+// --- The cron's notifications (#183) -----------------------------------------
 // The job stores its items in the app with their push waiting in the queue
 // (notifications.push_due_at), in the same D1 batch as its own records of
 // what it sent, so both commit or neither does. pushQueued() then pushes as
@@ -228,7 +228,7 @@ async function optOutsOf(kinds: readonly StoredKind[]): Promise<(userId: string)
 }
 
 /**
- * The insert statements of the hourly job's items, push queued, for the
+ * The insert statements of the cron's items, push queued, for the
  * caller's batch. One query (the opt-outs); `batches` is one list of
  * statements per batch the caller makes, the messages split the same way.
  */

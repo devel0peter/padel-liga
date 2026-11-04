@@ -2,7 +2,7 @@
 // sees their group and matches on Kezdőlap, pairs propose and accept a slot,
 // record and confirm an agreed time, nobody else can open the match, and a
 // booked match gets its venue and is cancelled, once in time and once late;
-// the hourly cron gives the morning reminders and "holnap meccs" in the app (their emails are off, #191).
+// the cron gives the morning reminders and "holnap meccs" in the app (their emails are off, #191).
 import { addDays, budapestClock, budapestDay, budapestTime } from "@padel-liga/rules";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -204,7 +204,7 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   await player.context.close();
 });
 
-// Runs the hourly cron as if it were `at` (#31).
+// Runs the cron as if it were `at` (#31).
 async function cron(page: Page, at: Date) {
   const response = await page.request.get(`/cdn-cgi/local/scheduled?time=${at.getTime()}`);
   expect(response.ok()).toBe(true);

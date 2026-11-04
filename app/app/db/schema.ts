@@ -409,7 +409,7 @@ export const notifications = sqliteTable(
     // When the daily digest (#31) took this item, whether or not it went into
     // an email; each item is taken once.
     digestedAt: integer("digested_at", { mode: "timestamp" }),
-    // Set while the push of an item the hourly job made waits to go out
+    // Set while the push of an item the cron made waits to go out
     // (#183): the job pushes as many as fit its run and the next run goes on.
     // Null: pushed, nothing to push, or pushed at once (any other item).
     pushDueAt: integer("push_due_at", { mode: "timestamp" }),
@@ -816,9 +816,9 @@ export const matchDecisions = sqliteTable(
 
 // The reminders that went out for a match (#31), so each goes once: the
 // digest reminders once per match, "holnap meccs" once per scheduled slot
-// (`slot`, seconds; 0 for the others). The hourly cron claims a row before
+// (`slot`, seconds; 0 for the others). The cron claims a row before
 // it notifies the four players.
-// Work of the hourly job that is done for a period (#183): "morning:<day>"
+// Work of the cron that is done for a period (#183): "morning:<day>"
 // once the day's digest reminders and digest are made. A morning run that
 // couldn't finish within its limits leaves no row, and the next morning run
 // goes on.

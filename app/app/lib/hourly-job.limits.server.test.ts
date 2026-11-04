@@ -42,7 +42,7 @@ const { RunBudget, RUN_LIMITS } = await import("~/lib/run-usage");
 const G = await import("~/lib/groups.server");
 const { MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
 const { DELIVER_MIN } = await import("~/lib/email/outbox.server");
-const { runHourlyJob } = await import("~/lib/hourly-job.server");
+const { runCron } = await import("~/lib/hourly-job.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const PAIRS = 100;
@@ -115,7 +115,7 @@ describe("the cron within the run limits (#183)", () => {
       const at = budapestTime("2026-11-18", 7 + Math.floor(minutes / 60), minutes % 60);
       const budget = new RunBudget();
       const pushesBefore = h.pushes.length;
-      await runHourlyJob(at);
+      await runCron(at);
       runs.push({ at: at.toISOString(), ...budget.used(), pushes: h.pushes.length - pushesBefore });
     }
 
@@ -155,10 +155,10 @@ describe("the cron within the run limits (#183)", () => {
   });
 
   it("a second morning run makes nothing again", async () => {
-    await runHourlyJob(budapestTime("2026-11-18", 7, 0));
+    await runCron(budapestTime("2026-11-18", 7, 0));
     const items = count("select count(*) as n from notifications");
     const claims = count("select count(*) as n from match_reminders");
-    await runHourlyJob(budapestTime("2026-11-18", 7, 10));
+    await runCron(budapestTime("2026-11-18", 7, 10));
     expect(count("select count(*) as n from notifications")).toBe(items);
     expect(count("select count(*) as n from match_reminders")).toBe(claims);
     expect(count("select count(*) as n from email_messages where kind = 'match_digest'")).toBe(200);

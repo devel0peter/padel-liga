@@ -53,7 +53,7 @@ import {
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
-// by deliver(), right away and again by the hourly cron (workers/app.ts).
+// by deliver(), right away and again by the cron (workers/app.ts).
 // deliver() stays under the daily limit; whatever doesn't fit waits for the
 // next run. Nothing waits for an Admin (#112, replaces the held outbox of
 // #88); /admin/outbox only shows the log (outboxLog).
@@ -277,7 +277,7 @@ export type ReminderEmail =
   | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
   | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] };
 
-// Returned as insert statements for the hourly job's own D1 batch (#183):
+// Returned as insert statements for the cron's own D1 batch (#183):
 // stored together with the job's records of what it sent, and sent by the
 // job's delivery step within the run's limits. Two queries at most (the
 // suppressed addresses and the email switch).

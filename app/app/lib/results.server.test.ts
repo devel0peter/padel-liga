@@ -372,6 +372,9 @@ describe("auto-accept after 48 hours (#28)", () => {
     const rows = h.raw.prepare("select created_at as at, push_due_at as due from notifications").all();
     expect(rows).toHaveLength(4);
     for (const r of rows) expect(r).toEqual({ at: run.getTime() / 1000, due: run.getTime() / 1000 });
+    // So do its decision and its audit entry (#225).
+    expect(h.raw.prepare("select at from match_decisions where match_id = ?").all(id)).toEqual([{ at: run.getTime() / 1000 }]);
+    expect(h.raw.prepare("select at from audit_log where action = 'result.auto_accept'").all()).toEqual([{ at: run.getTime() / 1000 }]);
   });
 
   it("a confirmed result is never auto-accepted again; several due results go in one run", async () => {

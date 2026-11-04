@@ -243,6 +243,7 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
           action: "result.auto_accept",
           target: `match:${m.id}`,
           detail: neutralScoreText(m.results.state.score),
+          at: now,
           leagueId: sql`(select ${seasons.leagueId} from ${matches} join ${groups} on ${groups.id} = ${matches.groupId}
             join ${seasons} on ${seasons.id} = ${groups.seasonId} where ${matches.id} = ${m.id})`,
         }),

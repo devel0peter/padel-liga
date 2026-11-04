@@ -34,12 +34,12 @@ import { formatDateTime } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { statusChips } from "~/lib/player-status";
 import { playerStatuses, type PlayerStatuses } from "~/lib/player-status.server";
-import { cn } from "~/lib/utils";
 import { levelLabel, type SignupRow } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 import { soloPairs, waitingSolos } from "~/lib/solo-pairing";
 import { pairSolos, unpairSolo } from "~/lib/solo-pairing.server";
 import { leagueSeekers, pairSeekers } from "~/lib/partner-search.server";
+import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up players who look for a partner. Registered
 // players who switched on "Párt keresek" (or whose solo signup still waits,
@@ -265,7 +265,7 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                       onCheckedChange={(on) => toggle(row.id, on === true)}
                     />
                   </TableCell>
-                  <TableCell className="min-w-48">
+                  <TableCell className="min-w-48 max-sm:whitespace-normal">
                     <div className="font-medium">{row.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {row.level || "Nincs szintje"}
@@ -385,7 +385,7 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                         onCheckedChange={(on) => toggle(row.id, on === true)}
                       />
                     </TableCell>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={row} />
                       <Folded note={row.note} label="Jelentkezett" at={row.createdAt} />
                     </TableCell>
@@ -409,7 +409,7 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
               <TableBody>
                 {pairs.map(([a, b]) => (
                   <TableRow key={a.id}>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={a} />
                       <div className="mt-3 sm:hidden">
                         <Who row={b} />

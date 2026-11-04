@@ -45,7 +45,6 @@ import { LEVELS } from "~/lib/interest";
 import { listLeagues } from "~/lib/leagues.server";
 import { statusChips, type StatusChip } from "~/lib/player-status";
 import { playerStatuses } from "~/lib/player-status.server";
-import { cn } from "~/lib/utils";
 import {
   cityLabel,
   countSignups,
@@ -72,6 +71,7 @@ import {
   type Stage,
 } from "~/lib/signup-progress";
 import { deleteSignup, listSignups, updateSignup } from "~/lib/signups-admin.server";
+import { cn } from "~/lib/utils";
 
 const MAX_ADMIN_NOTE = 2000;
 

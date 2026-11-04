@@ -27,7 +27,7 @@ const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const NOW = new Date("2026-11-03T12:00:00Z");
 const GYOR = { id: 1, city: "gyor" };
 const DEB = { id: 2, city: "deb" };
-const one =(q: string) => h.raw.prepare(q).get();
+const one = (q: string) => h.raw.prepare(q).get();
 const all = (q: string) => h.raw.prepare(q).all();
 const audits = () => all("select actor_id, action, target from audit_log where action like 'pair.%' order by id");
 

@@ -244,6 +244,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 - Page: `/admin/leagues/minta/pairs` ("Párok")
 - Account: `szervezo@example.test`
 - Expect: every pair of the league with both names and levels, the average starting Elo, the source ("jelentkezésből" or "kézzel"), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
+- Expect, above the filter (#237): a small table, "Párok" and "Játékosok" per state (Nevezett, Nem nevezett, Elutasítva, Visszavonva, "Nincs párja" with players only, "Felbontott párok" with pairs only) and "Összesen". A label opens the list with that filter, and its number is the rows (or their players) shown; a search or a filter doesn't change the table. At 390px it fits without sideways scrolling.
 - Do:
   1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".

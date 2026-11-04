@@ -39,6 +39,7 @@ import { listSignups } from "~/lib/signups-admin.server";
 import { soloPairs, waitingSolos } from "~/lib/solo-pairing";
 import { pairSolos, unpairSolo } from "~/lib/solo-pairing.server";
 import { leagueSeekers, pairSeekers } from "~/lib/partner-search.server";
+import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up players who look for a partner. Registered
 // players who switched on "Párt keresek" (or whose solo signup still waits,
@@ -123,6 +124,21 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 type Row = Route.ComponentProps["loaderData"]["waiting"][number];
+
+// Below sm the note and the date go under the name and their columns hide
+// (#146), so nothing is cut at 390px; the desktop table is unchanged.
+const WIDE = "hidden sm:table-cell";
+
+function Folded({ note, label, at }: { note: string | null; label: string; at: Date | string }) {
+  return (
+    <div className="grid gap-0.5 text-xs whitespace-normal text-muted-foreground sm:hidden">
+      {note && <div>{note}</div>}
+      <div>
+        {label}: {formatDateTime(new Date(at))}
+      </div>
+    </div>
+  );
+}
 
 function Who({ row }: { row: Row }) {
   return (
@@ -234,8 +250,8 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                   <span className="sr-only">Kijelölés</span>
                 </TableHead>
                 <TableHead>Játékos</TableHead>
-                <TableHead>Megjegyzés</TableHead>
-                <TableHead>Párt keres</TableHead>
+                <TableHead className={WIDE}>Megjegyzés</TableHead>
+                <TableHead className={WIDE}>Párt keres</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -248,16 +264,17 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                       onCheckedChange={(on) => toggle(row.id, on === true)}
                     />
                   </TableCell>
-                  <TableCell className="min-w-48">
+                  <TableCell className="min-w-48 max-sm:whitespace-normal">
                     <div className="font-medium">{row.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {row.level || "Nincs szintje"}
                       {row.plays && ` · ${row.plays}`}
                       {row.fromSignup && " · egyedül jelentkezett"}
                     </div>
+                    <Folded note={row.note} label="Párt keres" at={row.since} />
                   </TableCell>
-                  <TableCell className="max-w-72 text-sm whitespace-normal">{row.note}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                  <TableCell className={cn("max-w-72 text-sm whitespace-normal", WIDE)}>{row.note}</TableCell>
+                  <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", WIDE)}>
                     {formatDateTime(new Date(row.since))}
                   </TableCell>
                 </TableRow>
@@ -353,8 +370,8 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                     <span className="sr-only">Kijelölés</span>
                   </TableHead>
                   <TableHead>Játékos</TableHead>
-                  <TableHead>Megjegyzés</TableHead>
-                  <TableHead>Jelentkezett</TableHead>
+                  <TableHead className={WIDE}>Megjegyzés</TableHead>
+                  <TableHead className={WIDE}>Jelentkezett</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -367,11 +384,12 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                         onCheckedChange={(on) => toggle(row.id, on === true)}
                       />
                     </TableCell>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={row} />
+                      <Folded note={row.note} label="Jelentkezett" at={row.createdAt} />
                     </TableCell>
-                    <TableCell className="max-w-72 text-sm whitespace-normal">{row.note}</TableCell>
-                    <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                    <TableCell className={cn("max-w-72 text-sm whitespace-normal", WIDE)}>{row.note}</TableCell>
+                    <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", WIDE)}>
                       {formatDateTime(new Date(row.createdAt))}
                     </TableCell>
                   </TableRow>
@@ -390,10 +408,13 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
               <TableBody>
                 {pairs.map(([a, b]) => (
                   <TableRow key={a.id}>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={a} />
+                      <div className="mt-3 sm:hidden">
+                        <Who row={b} />
+                      </div>
                     </TableCell>
-                    <TableCell className="min-w-48">
+                    <TableCell className={cn("min-w-48", WIDE)}>
                       <Who row={b} />
                     </TableCell>
                     <TableCell className="text-right">

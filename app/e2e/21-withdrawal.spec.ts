@@ -47,7 +47,7 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
 
   // #174: the filter option and the badge use the same word.
   await visit(page, "/admin/leagues/minta/pairs?entry=withdrawn");
-  await expect(content(page).getByRole("link", { name: /^Visszavonva/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Nevezés szerint" }).getByRole("link", { name: /^Visszavonva/ })).toBeVisible();
   await expect(row(page, x, y)).toContainText("Visszavonva");
   await context.close();
 

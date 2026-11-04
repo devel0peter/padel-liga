@@ -17,6 +17,7 @@
 // before D) and never the other that season; D then goes to the other player
 // only.
 
+import { inLeagueCity, signupCities } from "./league-players";
 import { defaultSeekers, isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
 import { homeSeasons, type Season } from "./seasons";
@@ -172,16 +173,13 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   const registered = (email: string | null) => !!email && !!accountByEmail.get(email.toLowerCase())?.consentAt;
   const live = input.signups.filter((s) => s.status !== "withdrawn");
   const leaguesInCity = (city: string) => enabled.filter((l) => l.city === city && seasonOf.has(l.id));
-  // An account's leagues: those of its signups' cities, or, without a
-  // signup, every league (open sign-up happens on a league city's page).
-  // Signups only in cities without a league: none. A withdrawn signup still
-  // says where: the account counts over the signup (signup-progress.ts).
-  const accountLeagues = (email: string): ReminderLeague[] => {
-    const own = input.signups.filter((s) => s.email1.toLowerCase() === email || s.email2?.toLowerCase() === email);
-    if (own.length === 0) return enabled.filter((l) => seasonOf.has(l.id));
-    const cities = new Set(own.map((s) => s.city));
-    return enabled.filter((l) => cities.has(l.city) && seasonOf.has(l.id));
-  };
+  // An account's leagues (league-players.ts, D73, D93): those of its signups'
+  // cities, or, without a signup, every league. Signups only in cities
+  // without a league: none. A withdrawn signup still says where: the account
+  // counts over the signup (signup-progress.ts).
+  const cities = signupCities(input.signups);
+  const accountLeagues = (email: string): ReminderLeague[] =>
+    enabled.filter((l) => inLeagueCity(cities, email, l.city) && seasonOf.has(l.id));
   const mailable = (email: string, account?: ReminderAccount) =>
     !input.suppressed.has(email) && !account?.admin && !account?.emailOff;
 

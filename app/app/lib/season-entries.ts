@@ -206,4 +206,4 @@ export function withdrawalReasonError(reason: string): string | null {
   return null;
 }
 
-export const NOT_IN_RUNNING_PHASE = "Ez a pár most nem játszik futó körben. Frissítsd az oldalt.";
+export const NOT_IN_RUNNING_PHASE = "Ez a pár most nem játszik kihirdetett csoportban. Frissítsd az oldalt.";

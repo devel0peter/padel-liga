@@ -33,7 +33,7 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   await expect(pair).toContainText(/Nevezés \(.+\): Nevezett/);
   await pair.getByRole("button", { name: "Kivétel a szezonból" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText(new RegExp(`Visszaléptetés kör közben: ${pairText(x, y)}`));
+  await expect(dialog).toContainText(new RegExp(`Visszaléptetés a csoportból: ${pairText(x, y)}`));
   await expect(dialog).toContainText("minden meccse kikerül a csoport tabellájából");
   await expect(dialog).toContainText("e-mailt nem");
   await expect(dialog.getByRole("button", { name: "Visszaléptetés" })).toBeDisabled();

@@ -199,7 +199,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 
 **Szervezők and Admins** (in the app and by push, no email):
 - A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
-- A disputed result in their league (Admins: any league), at once, linking to the match's decision page; the league's Szervezők and every Admin, once each, accounts being deleted left out. No names, scores or contact details in the text. They can switch this kind ("Vitatott eredmény") off on the profile (README decision log, 2026-11-03, #178, D86).
+- A disputed result in their league (Admins: any league), at once, linking to the match's decision page; the league's Szervezők and every Admin, once each, accounts being deleted and the player who disputed left out (D96, #221). No names, scores or contact details in the text. They can switch this kind ("Vitatott eredmény") off on the profile (README decision log, 2026-11-03, #178, D86).
 
 **A pair withdrawn mid-phase** (section 4, D87; in the app and by push, no email): its players, with the organizer's reason; the group's other pairs, with no names and no reason.
 

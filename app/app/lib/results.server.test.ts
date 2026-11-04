@@ -305,6 +305,22 @@ describe("disputing a result (#28)", () => {
     expect(all("select 1 from email_messages")).toEqual([]);
   });
 
+  it("a Szervező or Admin who disputes gets no notice about their own dispute; the other organizers do (#221)", async () => {
+    const { id, rec, opp } = setup();
+    // The disputing player is a Szervező of the league and an Admin; 'o' is
+    // another Szervező, 'adm' another Admin.
+    h.raw.exec(`insert into users (id, email, name, level, consent_at, platform_role) values ('adm', 'adm@x.hu', 'Admin', 'halado', 1, 'superadmin')`);
+    h.raw.exec(`update users set platform_role = 'superadmin' where id = '${opp}'`);
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o'), (1, '${opp}')`);
+    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    h.raw.exec("delete from notifications");
+
+    await R.resultStep(opp, id, { kind: "dispute", score: score([[1, 4], [1, 4]]), note: "" }, PLAYED);
+
+    const told = all("select user_id from notifications where kind = 'result_disputed' order by user_id").map((r: any) => r.user_id);
+    expect(told).toEqual(["adm", "o"]);
+  });
+
   it("a failed notice never undoes the dispute", async () => {
     const { id, rec, opp } = setup();
     h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`);

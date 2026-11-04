@@ -158,6 +158,8 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   // The Szervező is told too, and the notice opens the decision page (#178).
   const org = await as(browser, ORGANIZER.email);
   await visit(org.page, "/notifications");
+  // The week the app's way, "hét" (#221).
+  await expect(content(org.page)).toContainText(`A ${second!.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`);
   await content(org.page).getByText("Vitatott eredmény · ").first().click();
   await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
 

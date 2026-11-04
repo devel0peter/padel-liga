@@ -357,8 +357,16 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
 }
 
 // A result was disputed (#178): tell the league's Szervezők and the Admins,
-// in the app and by push, never by email. Accounts being deleted are skipped.
-export async function notifyResultDisputed(input: { matchId: number; leagueId: number; leagueSlug: string; leagueName: string; week: number }): Promise<void> {
+// in the app and by push, never by email. Accounts being deleted are skipped,
+// and so is the player who disputed (#221).
+export async function notifyResultDisputed(input: {
+  matchId: number;
+  leagueId: number;
+  leagueSlug: string;
+  leagueName: string;
+  week: number;
+  disputedBy: string;
+}): Promise<void> {
   const [organizers, admins] = await Promise.all([
     db
       .select({ id: users.id })
@@ -373,7 +381,7 @@ export async function notifyResultDisputed(input: { matchId: number; leagueId: n
   const message = resultDisputedMessage(input);
   await notify(
     "result_disputed",
-    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id)).map((userId) => ({ userId, message })),
+    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), input.disputedBy).map((userId) => ({ userId, message })),
   );
 }
 

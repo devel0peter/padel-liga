@@ -319,13 +319,18 @@ describe("result messages (#28, #29, spec 13)", () => {
   });
 
   it("a dispute: the organizers and Admins get the decision page link, once each (#178)", () => {
-    expect(disputeRecipients(["o", "adm", "o2"], ["adm", "adm2"])).toEqual(["adm", "adm2", "o", "o2"]);
-    expect(disputeRecipients([], [])).toEqual([]);
+    expect(disputeRecipients(["o", "adm", "o2"], ["adm", "adm2"], "p1")).toEqual(["adm", "adm2", "o", "o2"]);
+    expect(disputeRecipients([], [], "p1")).toEqual([]);
     expect(resultDisputedMessage({ matchId: 7, leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 2 })).toEqual({
       title: "Vitatott eredmény · Padelpárbaj Győr",
-      body: "A 2. forduló egyik meccsének eredményét vitatják. A döntés rád vár.",
+      body: "A 2. heti meccsek egyikének eredményét vitatják. A döntés rád vár.",
       url: "/admin/leagues/gyor/matches/7/decide",
     });
+  });
+
+  it("a dispute: the organizer or Admin who disputed is left out, the others are not (#221)", () => {
+    expect(disputeRecipients(["o", "p1"], ["adm"], "p1")).toEqual(["adm", "o"]);
+    expect(disputeRecipients(["o"], ["p1", "adm"], "p1")).toEqual(["adm", "o"]);
   });
 
   it("an organizer's decision: the outcome, not the reason", () => {

@@ -130,7 +130,7 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
     throw e;
   }
 
-  await tellPairs(ctx, side, kind, after);
+  await tellPairs(ctx, side, kind, after, userId);
   return { ok: true, notice };
 }
 
@@ -140,7 +140,8 @@ const playersOf = (ctx: MatchContext, side: Side) => (side === "a" ? ctx.pairs.a
 // (email, push, the app); a confirmed result to both pairs in the app and by
 // push (a digest item, #31). A dispute is told at once, in the app and by
 // push only (#178, D83): to the recording pair and to the league's organizers.
-async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, after: ResultState): Promise<void> {
+// `actorId` took the step; an organizer who disputed is not told (#221).
+async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, after: ResultState, actorId: string): Promise<void> {
   const matchId = ctx.match.id;
   try {
     if (kind === "result_recorded" && after.status === "recorded") {
@@ -180,6 +181,7 @@ async function tellPairs(ctx: MatchContext, side: Side, kind: ResultEventKind, a
         leagueSlug: ctx.leagueSlug,
         leagueName: ctx.league,
         week: ctx.match.week,
+        disputedBy: actorId,
       });
     }
     if (kind === "result_confirmed" && after.status === "final" && after.outcome.kind === "played") {

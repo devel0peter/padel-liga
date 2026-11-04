@@ -85,6 +85,16 @@ function scoreText(outcome: MatchOutcome): string | null {
 }
 
 /**
+ * The outcome a match counts with (#186, #220): only a `final` match's, so a
+ * result waiting for the other pair or disputed stays out of every table
+ * whatever outcome is stored on the match. The one rule for both callers of
+ * groupTable: the public league page and the Kezdőlap card.
+ */
+export function countedOutcome(m: { status: string; outcome: MatchOutcome | null }): MatchOutcome | null {
+  return m.status === "final" ? m.outcome : null;
+}
+
+/**
  * One group's table, from the final outcomes only (matches without an outcome
  * are left out). The one standing computation of the public ladder and of the
  * player's own group card on Kezdőlap (#201): same order, same numbers. A pair

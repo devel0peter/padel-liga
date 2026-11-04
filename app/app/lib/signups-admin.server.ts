@@ -2,6 +2,7 @@ import { and, count, desc, eq, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, interestSignups } from "~/db/schema";
+import { auditIfChanged } from "~/lib/audit.server";
 import { INTEREST_INVITE_NOTE } from "~/lib/email/audience";
 import { cancelUnsentSignupMail, deleteMessagesTo } from "~/lib/email/outbox.server";
 
@@ -19,6 +20,7 @@ export async function listSignups(): Promise<SignupRow[]> {
 export async function updateSignup(
   id: number,
   changes: { status?: Status; adminNote?: string | null },
+  actorId: string,
 ): Promise<void> {
   const now = new Date();
   const [row] = changes.status === "withdrawn"
@@ -31,8 +33,11 @@ export async function updateSignup(
     .update(interestSignups)
     .set(changes.status === "withdrawn" ? { ...changes, pairedWith: null, updatedAt: now } : { ...changes, updatedAt: now })
     .where(eq(interestSignups.id, id));
+  // What changed, never the note's text (#225).
+  const detail = [changes.status && `status:${changes.status}`, changes.adminNote !== undefined && "note"].filter(Boolean).join("; ") || null;
+  const logged = auditIfChanged({ actorId, action: "signup.update", target: `signup:${id}`, detail });
   if (changes.status !== "withdrawn") {
-    await update;
+    await db.batch([update, logged]);
     return;
   }
   // One batch (a transaction): the partner is freed together with the status
@@ -47,6 +52,7 @@ export async function updateSignup(
       })
       .where(eq(interestSignups.pairedWith, id)),
     update,
+    logged,
   ]);
   // No invite or pair introduction may still go out to them, or tell their
   // partner about them (also once mail is no longer held, #112). Runs on
@@ -59,15 +65,15 @@ export async function updateSignup(
 // registration invite added (unless the address has another signup); an
 // unsubscribe is kept. A solo paired with them
 // goes back to the waiting list.
-export async function deleteSignup(id: number): Promise<void> {
-  const [row] = await db
-    .delete(interestSignups)
-    .where(eq(interestSignups.id, id))
-    .returning({ email1: interestSignups.email1, email2: interestSignups.email2 });
-  await db
-    .update(interestSignups)
-    .set({ pairedWith: null, status: "new", updatedAt: new Date() })
-    .where(eq(interestSignups.pairedWith, id));
+export async function deleteSignup(id: number, actorId: string): Promise<void> {
+  const [[row]] = await db.batch([
+    db.delete(interestSignups).where(eq(interestSignups.id, id)).returning({ email1: interestSignups.email1, email2: interestSignups.email2 }),
+    auditIfChanged({ actorId, action: "signup.delete", target: `signup:${id}` }),
+    db
+      .update(interestSignups)
+      .set({ pairedWith: null, status: "new", updatedAt: new Date() })
+      .where(eq(interestSignups.pairedWith, id)),
+  ]);
   if (!row) return;
   await deleteMessagesTo([row.email1, row.email2].filter((e): e is string => !!e));
   // The invite stays while another signup names the same address (as the

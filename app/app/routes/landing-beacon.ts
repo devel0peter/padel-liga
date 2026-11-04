@@ -5,6 +5,7 @@ import { getActor } from "~/lib/auth/admin.server";
 import { roleLabel } from "~/lib/auth/permissions";
 import { landingSource } from "~/lib/traffic";
 import { recordLanding } from "~/lib/traffic.server";
+import { logError } from "~/lib/log";
 
 // Counts one landing page view (app/lib/traffic.ts). Sent by the landing page
 // from the browser, so crawlers that don't run scripts aren't counted. The page
@@ -18,7 +19,7 @@ export async function action({ request }: Route.ActionArgs) {
       const actor = await getActor(request);
       if (!actor || roleLabel(actor) === "Játékos") await recordLanding(landingSource(query));
     } catch (error) {
-      console.error("landing count failed", error);
+      logError("landing count failed", { error });
     }
   }
   return new Response(null, { status: 204 });

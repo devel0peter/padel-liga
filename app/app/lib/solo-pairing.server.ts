@@ -1,16 +1,25 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { interestSignups } from "~/db/schema";
+import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { deliver, queuePairIntros } from "~/lib/email/outbox.server";
 import { pairIntroMessage } from "~/lib/notifications";
 import { notifyAccounts } from "~/lib/notifications.server";
 
 import { pairError } from "./solo-pairing";
+import { logError } from "~/lib/log";
 
 // Pairs two solo signups of the city and emails both (pairIntro). Returns an
 // error message (Hungarian) instead when they can't be paired.
-export async function pairSolos(aId: number, bId: number, city: string, cityName: string): Promise<string | null> {
+export async function pairSolos(
+  actorId: string,
+  leagueId: number,
+  aId: number,
+  bId: number,
+  city: string,
+  cityName: string,
+): Promise<string | null> {
   const rows = await db.select().from(interestSignups).where(inArray(interestSignups.id, [aId, bId]));
   const a = rows.find((r) => r.id === aId);
   const b = rows.find((r) => r.id === bId);
@@ -26,7 +35,14 @@ export async function pairSolos(aId: number, bId: number, city: string, cityName
       .set({ pairedWith: partner, status: "paired", updatedAt: now })
       .where(and(eq(interestSignups.id, id), isNull(interestSignups.pairedWith)))
       .returning({ id: interestSignups.id });
-  const [first, second] = await db.batch([pair(a.id, b.id), pair(b.id, a.id)]);
+  // The audit entry only if both halves went through (#225).
+  const both = sql`(select count(*) from ${interestSignups} where (${interestSignups.id} = ${a.id} and ${interestSignups.pairedWith} = ${b.id})
+    or (${interestSignups.id} = ${b.id} and ${interestSignups.pairedWith} = ${a.id})) = 2`;
+  const [first, second] = await db.batch([
+    pair(a.id, b.id),
+    pair(b.id, a.id),
+    auditWhen(both, { actorId, action: "solo.pair", target: `signup:${a.id}`, detail: `signup:${b.id}`, leagueId }),
+  ]);
   if (first.length === 0 || second.length === 0) {
     // Lost the race for one of them: undo our half.
     for (const [done, id, partner] of [[first, a.id, b.id], [second, b.id, a.id]] as const)
@@ -45,7 +61,7 @@ export async function pairSolos(aId: number, bId: number, city: string, cityName
       ),
     );
   } catch (e) {
-    console.error("pair intro email failed", e);
+    logError("pair intro email failed", { error: e });
   }
   // In the app too, for whoever has an account (#115): the email skips an
   // account that switched email off.
@@ -54,17 +70,25 @@ export async function pairSolos(aId: number, bId: number, city: string, cityName
   return null;
 }
 
-async function unpairRow(id: number, partner: number): Promise<void> {
-  await db
+function unpairStatement(id: number, partner: number) {
+  return db
     .update(interestSignups)
     .set({ pairedWith: null, status: "new", updatedAt: new Date() })
     .where(and(eq(interestSignups.id, id), eq(interestSignups.pairedWith, partner)));
 }
 
-// Undoes a pairing (no email). Both go back to the waiting list.
-export async function unpairSolo(id: number, city: string): Promise<void> {
+async function unpairRow(id: number, partner: number): Promise<void> {
+  await unpairStatement(id, partner);
+}
+
+// Undoes a pairing (no email). Both go back to the waiting list, in one batch
+// with the audit entry (#225).
+export async function unpairSolo(actorId: string, leagueId: number, id: number, city: string): Promise<void> {
   const [row] = await db.select().from(interestSignups).where(eq(interestSignups.id, id));
   if (!row || row.city !== city || row.pairedWith == null) return;
-  await unpairRow(row.id, row.pairedWith);
-  await unpairRow(row.pairedWith, row.id);
+  await db.batch([
+    unpairStatement(row.id, row.pairedWith),
+    auditIfChanged({ actorId, action: "solo.unpair", target: `signup:${row.id}`, detail: `signup:${row.pairedWith}`, leagueId }),
+    unpairStatement(row.pairedWith, row.id),
+  ]);
 }

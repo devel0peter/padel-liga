@@ -9,7 +9,7 @@ import { queueGroupsPublished } from "~/lib/email/outbox.server";
 import { groupsPublishedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
-import { audit } from "./leagues.server";
+import { auditEntry, auditWhen, leagueOfSeason } from "./audit.server";
 import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
 import { averageStartingElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
@@ -230,6 +230,7 @@ export async function generateDraft(seasonId: number, actorId: string): Promise<
       .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, FIRST_PHASE), isNull(groups.publishedAt))),
     ...chunks(groupRows, GROUP_CHUNK).map((rows) => db.insert(groups).values(rows)),
     ...chunks(pairRows, PAIR_CHUNK).map((rows) => db.insert(groupPairs).values(rows)),
+    auditEntry({ actorId, action: "groups.draft", target: `season:${seasonId}`, detail: `${eligible.length} pairs`, leagueId: leagueOfSeason(seasonId) }),
   ];
   try {
     const [first, ...rest] = statements;
@@ -238,7 +239,6 @@ export async function generateDraft(seasonId: number, actorId: string): Promise<
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
     throw e;
   }
-  await audit(actorId, "groups.draft", `season:${seasonId}`, `${eligible.length} pairs`);
   return { ok: true };
 }
 
@@ -285,6 +285,7 @@ export async function moveDraftPair(seasonId: number, pairId: number, toNumber: 
         ),
       ),
     ...chunks(rows, PAIR_CHUNK).map((r) => db.insert(groupPairs).values(r)),
+    auditEntry({ actorId, action: "groups.move", target: `season:${seasonId}`, detail: `pair:${pairId} -> ${toNumber}`, leagueId: leagueOfSeason(seasonId) }),
   ];
   try {
     await db.batch([first, ...rest]);
@@ -292,7 +293,6 @@ export async function moveDraftPair(seasonId: number, pairId: number, toNumber: 
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
     throw e;
   }
-  await audit(actorId, "groups.move", `season:${seasonId}`, `pair:${pairId} -> ${toNumber}`);
   return { ok: true };
 }
 
@@ -352,6 +352,13 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     await db.batch([
       db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged, pairsStillIn)),
       ...chunks(matchRows, MATCH_CHUNK).map((rows) => db.insert(matches).values(rows)),
+      auditWhen(claimed, {
+        actorId,
+        action: "groups.publish",
+        target: `season:${seasonId}`,
+        detail: `${draft.length} groups, ${fixtures.length} matches`,
+        leagueId: season.leagueId,
+      }),
     ]);
   } catch (e) {
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
@@ -363,7 +370,6 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     .from(groups)
     .where(and(inArray(groups.id, ids), eq(groups.publishedAt, now)));
   if ((done?.n ?? 0) !== ids.length) return { ok: false, error: (await groupsPublished(seasonId)) ? LOCKED : CHANGED };
-  await audit(actorId, "groups.publish", `season:${seasonId}`, `${draft.length} groups, ${fixtures.length} matches`);
 
   const [league] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, season.leagueId));
   const name = (p: Player) => p.name || "Névtelen";

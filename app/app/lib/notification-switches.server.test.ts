@@ -168,7 +168,7 @@ describe("notification switches (#115)", () => {
         .prepare("insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'X', ?, 'gyor', 'kezdo', 1) returning id")
         .get(email).id as number;
     // Anna has an account (email off); z@x.hu has none.
-    expect(await SOLO.pairSolos(solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
+    expect(await SOLO.pairSolos("o", 1, solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
     expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "pair_intro", to_email: "z@x.hu" }]);
     expect(inbox("a")).toEqual([{ kind: "pair_intro", title: "Párt találtunk neked", url: "/pair" }]);
     expect(all("select count(*) n from notifications")[0].n).toBe(1);
@@ -186,6 +186,7 @@ describe("notification switches (#115)", () => {
         { email: "z@x.hu", name: "Zoli" },
       ],
       createdBy: "o@x.hu",
+      actorId: "o",
     });
     await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);

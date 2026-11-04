@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a185cd71-89b7-4ac6-987c-01719825216b",
+  "id": "7a828b95-cc47-40f7-b5fe-dd549c93ee6f",
   "prevId": "ee29623e-c141-413d-8449-6a02d1fd1d86",
   "tables": {
     "account_invites": {
@@ -81,9 +81,31 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
+        },
+        "league_id": {
+          "name": "league_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "audit_log_at_idx": {
+          "name": "audit_log_at_idx",
+          "columns": [
+            "at"
+          ],
+          "isUnique": false
+        },
+        "audit_log_league_idx": {
+          "name": "audit_log_league_idx",
+          "columns": [
+            "league_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "audit_log_actor_id_users_id_fk": {
           "name": "audit_log_actor_id_users_id_fk",
@@ -91,6 +113,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "audit_log_league_id_leagues_id_fk": {
+          "name": "audit_log_league_id_leagues_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "leagues",
+          "columnsFrom": [
+            "league_id"
           ],
           "columnsTo": [
             "id"
@@ -2342,44 +2377,6 @@
           "name": "partner_searches_league_id_user_id_pk"
         }
       },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "push_stats_daily": {
-      "name": "push_stats_daily",
-      "columns": {
-        "day": {
-          "name": "day",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "players": {
-          "name": "players",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "push_users": {
-          "name": "push_users",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "devices": {
-          "name": "devices",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

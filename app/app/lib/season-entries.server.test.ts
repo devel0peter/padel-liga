@@ -326,11 +326,28 @@ describe("#154: the organizer enters a pair or takes it out, from Párok", () =>
     h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1)`);
     expect(await E.removePairFromSeason(org, 1, 1, 1, IN_PHASE_1)).toEqual({
       ok: false,
-      error: expect.stringContaining("a futó kör csoportjában játszik"),
+      error: expect.stringContaining("már kihirdetett csoportja van"),
     });
     expect(entry()).toMatchObject({ status: "approved" });
     // After phase 1's deadline: between phases.
     expect(await E.removePairFromSeason(org, 1, 1, 1, at("2026-11-30T12:00:00Z"))).toEqual({ ok: true });
+  });
+
+  it("D88: before the phase starts, a pair in a published group can't be taken out, but can be withdrawn", async () => {
+    await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
+    h.raw.exec(`insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, ${sec("2026-11-07T10:00:00Z")})`);
+    h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1)`);
+    // Published on 7 Nov, round 1 starts on 9 Nov (PHASES[0] is 23:00 UTC on 8 Nov).
+    const BEFORE_START = at("2026-11-08T12:00:00Z");
+    expect(BEFORE_START.getTime()).toBeLessThan(at(PHASES[0]).getTime());
+    expect(await E.removePairFromSeason(org, 1, 1, 1, BEFORE_START)).toEqual({
+      ok: false,
+      error: expect.stringContaining("már kihirdetett csoportja van"),
+    });
+    expect(entry()).toMatchObject({ status: "approved" });
+    expect(await E.withdrawPairMidPhase(org, 1, 1, 1, "Sérülés", BEFORE_START)).toEqual({ ok: true });
+    expect(entry()).toMatchObject({ status: "withdrawn" });
+    expect(one("select withdrawal_reason from group_pairs where pair_id = 1")).toEqual({ withdrawal_reason: "Sérülés" });
   });
 
   it("refuses another league's season or pair", async () => {

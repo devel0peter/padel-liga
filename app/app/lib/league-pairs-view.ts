@@ -99,3 +99,31 @@ export function rowAccounts(rows: readonly PairsRow[]): string[] {
   const ids = rows.flatMap((r) => (r.kind === "solo" ? [r.player.id] : r.pair.players.map((p) => p.id)));
   return [...new Set(ids)];
 }
+
+// The counts table at the top of Párok (#237): per state, the pairs and the
+// players in them, over the whole league (no search, no filter), so each
+// number is what picking that filter with an empty search lists. "Nincs
+// párja" has players only; "Felbontott párok" pairs only (those players are
+// counted where they are now). Összesen: the active pairs, and the league's
+// players in an active pair or without one, each once.
+export const SUMMARY_FILTERS = ["entered", "not_entered", "rejected", "withdrawn", "no_pair", "dissolved"] as const satisfies readonly PairsFilter[];
+
+export type PairsSummaryRow = { filter: (typeof SUMMARY_FILTERS)[number]; pairs: number | null; players: number | null };
+export type PairsSummary = { rows: PairsSummaryRow[]; total: { pairs: number; players: number } };
+
+export function pairsSummary(rows: readonly PairsRow[]): PairsSummary {
+  const inFilter = (f: PairsFilter) => rows.filter((r) => rowFilters(r).includes(f));
+  const out = SUMMARY_FILTERS.map((filter) => {
+    const shown = inFilter(filter);
+    return {
+      filter,
+      pairs: filter === "no_pair" ? null : shown.length,
+      players: filter === "dissolved" ? null : rowAccounts(shown).length,
+    };
+  });
+  const current = rows.filter((r) => r.kind === "solo" || r.pair.status === "active");
+  return {
+    rows: out,
+    total: { pairs: current.filter((r) => r.kind === "pair").length, players: rowAccounts(current).length },
+  };
+}

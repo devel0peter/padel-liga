@@ -37,11 +37,12 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import { eventText, schedulingEmailDue } from "./matches";
 import { pairName } from "./groups";
 import { COURT_MAX } from "./matches";
-import { groupTable } from "./ladder";
+import { countedOutcome, groupTable } from "./ladder";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
 import { averageStartingElo } from "./season-entries";
+import { logError } from "~/lib/log";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
@@ -197,7 +198,8 @@ export type HomeGroup = {
   deadline: Date;
   // Every pair of the group in table order (#201), names only; `mine` marks
   // the player's. The table is the public league page's, from final results
-  // only; before any result it is the seed order (every `matches` is 0). A
+  // only; before any result every `matches` is 0 and the order is the table's
+  // tiebreak alone: Elo, then seed (groupStandings). A
   // pair withdrawn mid-phase (#34) is not in it, with all of its matches.
   pairs: { pairId: number; name: string; mine: boolean; rank: number; matches: number; points: number; setDiff: number; gameDiff: number }[];
   // The pairs withdrawn mid-phase (#34), by name, shown below the table.
@@ -278,9 +280,8 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
         deadline: g.deadline,
         pairs: groupTable(
           pairsOf.map((p) => ({ id: p.pairId, elo: p.elo, withdrawn: p.withdrawn })),
-          // Only a final outcome counts (#186, #201): a waiting or disputed
-          // result has none on the match yet.
-          matchRows.filter((m) => m.groupId === g.groupId).map((m) => ({ a: m.pairA, b: m.pairB, outcome: m.status === "final" ? m.outcome : null })),
+          // Only a final outcome counts (#186, #201): the public page's rule.
+          matchRows.filter((m) => m.groupId === g.groupId).map((m) => ({ a: m.pairA, b: m.pairB, outcome: countedOutcome(m) })),
         ).map((row) => {
           const p = byId.get(row.pairId)!;
           return { ...row, name: pairName(p.players), mine: p.pairId === g.pairId };
@@ -835,6 +836,6 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
     }
   } catch (error) {
     // The step is saved; a failed notice must not undo or hide it.
-    console.error(`match ${matchId} notification failed`, error);
+    logError("match notification failed", { matchId, error });
   }
 }

@@ -1,9 +1,10 @@
 // End-to-end suite (#101): `npm run e2e` from the repo root. It starts its
 // own dev server on a fresh local D1 (server.ts) and walks through milestone 1
-// as docs/walkthrough.md describes it, in Chromium.
+// as docs/walkthrough.md describes it, in Chromium. Its port is E2E_PORT or a
+// free one (env.ts, #169), so several worktrees can run it at the same time.
 import { defineConfig, devices } from "@playwright/test";
 
-import { BASE_URL, E2E_DIR, assertSafeEnvironment } from "./env";
+import { BASE_URL, E2E_DIR, READY_PATTERN, assertSafeEnvironment } from "./env";
 
 assertSafeEnvironment(process.argv.slice(2), process.env);
 
@@ -31,8 +32,10 @@ export default defineConfig({
   webServer: {
     command: "npx --no-install tsx e2e/server.ts",
     cwd: `${E2E_DIR}/..`,
-    url: `${BASE_URL}/login`,
-    // Never someone else's server on the port: the suite needs its own D1.
+    // Ready only when server.ts says its own dev server answers, never when
+    // something answers on the port: the suite needs its own server and D1
+    // (#169). server.ts refuses a busy port before it starts anything.
+    wait: { stdout: READY_PATTERN },
     reuseExistingServer: false,
     timeout: 180_000,
     stdout: "ignore",

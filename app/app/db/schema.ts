@@ -377,6 +377,17 @@ export const landingViews = sqliteTable(
   (t) => [primaryKey({ columns: [t.day, t.ref] })],
 );
 
+// How many players had push on, once per Budapest day: the
+// cron overwrites the day's row on every run, so a day shows its last count.
+// Players: consented, not deleted, not Admin or Szervező. Push users: players
+// with at least one subscribed device and the push channel on. Counts only.
+export const pushStatsDaily = sqliteTable("push_stats_daily", {
+  day: text("day").primaryKey(), // "2026-11-04"
+  players: integer("players").notNull(),
+  pushUsers: integer("push_users").notNull(),
+  devices: integer("devices").notNull(),
+});
+
 // In-app notifications, newest first at /notifications; also sent as web push
 // to the user's subscribed devices (app/lib/notifications.server.ts).
 // Personal data: deleted with the account.

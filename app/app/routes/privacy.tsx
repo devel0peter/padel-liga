@@ -384,6 +384,12 @@ export default function Privacy() {
                 telefonszámod nincs benne. A Cloudflare 3 napig őrzi, utána
                 magától törlődik.
               </li>
+              <li>
+                <strong>Biztonsági mentés:</strong> naponta másolat készül az
+                egész adatbázisról, a Cloudflare EU-s tárhelyén. A mentéseket 35
+                napig őrizzük, ezért a törölt vagy anonimizált adataid a
+                mentésekből is legfeljebb 35 nap alatt tűnnek el.
+              </li>
             </ul>
           </Section>
 

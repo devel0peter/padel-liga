@@ -27,6 +27,7 @@ import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 import { notifyNewSignup } from "~/lib/notifications.server";
+import { turnstileError } from "~/lib/turnstile";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 import { logError } from "~/lib/log";
 
@@ -86,12 +87,8 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   if (!result.ok) return result;
 
   // After the field checks, so a typo doesn't use up the single-use token.
-  if (!(await verifyTurnstile(form, request, "signup"))) {
-    return {
-      ok: false,
-      formError: "Nem sikerült ellenőrizni, hogy nem vagy robot. Várj pár másodpercet, és próbáld újra.",
-    };
-  }
+  const check = await verifyTurnstile(form, request, "signup");
+  if (check !== "ok") return { ok: false, formError: turnstileError(check) };
 
   try {
     await saveInterest(result.data);

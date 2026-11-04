@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAccepted, isPlausibleToken, parseHostnames } from "./turnstile";
+import { isAccepted, isPlausibleToken, parseHostnames, TURNSTILE_HINT, turnstileError } from "./turnstile";
 
 describe("turnstile", () => {
   const hosts = parseHostnames(" padelparbaj.hu , Localhost,");
@@ -26,5 +26,16 @@ describe("turnstile", () => {
     expect(isPlausibleToken("")).toBe(false);
     expect(isPlausibleToken(null)).toBe(false);
     expect(isPlausibleToken("x".repeat(2049))).toBe(false);
+  });
+
+  it("tells a missing token from a rejected one, both with what to try (#255)", () => {
+    expect(turnstileError("missing")).not.toBe(turnstileError("rejected"));
+    for (const outcome of ["missing", "rejected"] as const) {
+      expect(turnstileError(outcome)).toContain(TURNSTILE_HINT);
+      expect(turnstileError(outcome)).not.toMatch(/próbáld újra/);
+    }
+    expect(TURNSTILE_HINT).toMatch(/wifi/);
+    expect(TURNSTILE_HINT).toMatch(/böngész/);
+    expect(TURNSTILE_HINT).toMatch(/VPN/);
   });
 });

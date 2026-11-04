@@ -1,6 +1,13 @@
 import { env } from "cloudflare:workers";
 
-import { isAccepted, isPlausibleToken, parseHostnames, TURNSTILE_FIELD, type SiteverifyResult } from "./turnstile";
+import {
+  isAccepted,
+  isPlausibleToken,
+  parseHostnames,
+  TURNSTILE_FIELD,
+  type SiteverifyResult,
+  type TurnstileOutcome,
+} from "./turnstile";
 import { logError, logWarn } from "~/lib/log";
 
 // The site key is public (it ships in the page). Empty: no widget and no check,
@@ -11,14 +18,20 @@ export function turnstileSiteKey(): string | null {
 
 // Checks the form's Turnstile token with Cloudflare. Fails closed: no token,
 // a missing secret or Cloudflare not answering all count as "no".
-export async function verifyTurnstile(form: FormData, request: Request, action: string): Promise<boolean> {
-  if (!turnstileSiteKey()) return true;
+export async function verifyTurnstile(form: FormData, request: Request, action: string): Promise<TurnstileOutcome> {
+  if (!turnstileSiteKey()) return "ok";
 
   const token = form.get(TURNSTILE_FIELD);
+  if (!isPlausibleToken(token)) {
+    // The widget never produced a token: hung, blocked or not loaded (#255).
+    // No email or IP here, the browser is enough to spot a pattern.
+    logWarn("turnstile no token", { action, userAgent: request.headers.get("User-Agent") });
+    return "missing";
+  }
   const hostnames = parseHostnames(env.TURNSTILE_HOSTNAMES);
-  if (!isPlausibleToken(token) || hostnames.size === 0 || !env.TURNSTILE_SECRET) {
-    if (!env.TURNSTILE_SECRET || hostnames.size === 0) logError("turnstile not configured");
-    return false;
+  if (hostnames.size === 0 || !env.TURNSTILE_SECRET) {
+    logError("turnstile not configured");
+    return "rejected";
   }
 
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token });
@@ -36,13 +49,13 @@ export async function verifyTurnstile(form: FormData, request: Request, action: 
     result = await res.json();
   } catch (error) {
     logError("turnstile siteverify failed", { error });
-    return false;
+    return "rejected";
   }
 
   // Local dev with Cloudflare's test keys (.dev.vars.example).
-  if (import.meta.env.DEV && result.metadata?.result_with_testing_key) return result.success === true;
+  if (import.meta.env.DEV && result.metadata?.result_with_testing_key) return result.success === true ? "ok" : "rejected";
 
-  const accepted = isAccepted(result, action, hostnames);
-  if (!accepted) logWarn("turnstile rejected", { errors: result["error-codes"], action: result.action, host: result.hostname });
-  return accepted;
+  if (isAccepted(result, action, hostnames)) return "ok";
+  logWarn("turnstile rejected", { errors: result["error-codes"], action: result.action, host: result.hostname });
+  return "rejected";
 }

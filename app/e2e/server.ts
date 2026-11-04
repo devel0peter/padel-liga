@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { seedSql } from "../app/lib/seed";
 import {
   APP_DIR,
+  BASE_URL,
   CLOUDFLARE_ENV,
   DEV_VARS_FILE,
   PERSIST_DIR,
@@ -18,12 +19,16 @@ import {
   SEED_ONLY_MARKER,
   SERVER_LOG,
   STATE_DIR,
+  assertPortFree,
   assertSafeEnvironment,
   devVarsText,
+  readyLine,
   wranglerLocal,
 } from "./env";
 
 assertSafeEnvironment(process.argv.slice(2), process.env);
+// Before anything is wiped or started: a busy port stops the run at once (#169).
+await assertPortFree(PORT);
 
 // --keep (npm run e2e:shots --data walked, #103): start on the state the last
 // run left, without wiping or seeding it. Everything else is the same.
@@ -66,8 +71,25 @@ const stop = () => dev.kill("SIGTERM");
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
 process.on("exit", stop);
+let exited = false;
 dev.on("exit", (code) => {
+  exited = true;
   // A dev server that didn't start says why only in the log: show its end.
   if (code) console.error(readFileSync(SERVER_LOG, "utf8").split("\n").slice(-30).join("\n"));
   process.exit(code ?? 0);
 });
+
+// Ready once our own dev server answers: it holds the port (--strictPort, and
+// the port was free above), so whatever answers while it runs is ours. The
+// suite and e2e:shots wait for this line, not for the port (#169).
+while (!exited) {
+  const ok = await fetch(`${BASE_URL}/login`).then(
+    (r) => r.ok,
+    () => false,
+  );
+  if (ok && !exited) {
+    console.log(readyLine(PORT));
+    break;
+  }
+  await new Promise((r) => setTimeout(r, 500));
+}

@@ -1,7 +1,7 @@
 // `npm run e2e:shots -- [--data seed|walked] [--as admin|organizer|player|anon]...
 //   [--click "Name"] [--label name] <path>...` (#103). What the e2e-tester agent
 // uses to look at changed pages: it starts the suite's own dev server (the same
-// local D1, port and guards as `npm run e2e`), logs in as seeded accounts with
+// local D1 and guards as `npm run e2e`, E2E_PORT or a free port: #169), logs in as seeded accounts with
 // the code the server prints, opens every path as every role, notes the
 // status, the final URL, script errors and a sideways scroll at phone width,
 // and saves a desktop and a 390px screenshot of each into
@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Page } from "@playwright/test";
 
-import { APP_DIR, BASE_URL, E2E_DIR, SEED_ONLY_MARKER, assertSafeEnvironment } from "./env";
+import { APP_DIR, BASE_URL, E2E_DIR, READY_PATTERN, SEED_ONLY_MARKER, assertSafeEnvironment } from "./env";
 import { WIDTHS, parseShotsArgs, shotName, type Role, type ShotsArgs, type Size } from "./shots-args";
 import { ADMIN, ORGANIZER, PAIRS, as } from "./support";
 
@@ -44,32 +44,26 @@ type PageResult = {
 
 async function startServer(a: ShotsArgs): Promise<ChildProcess> {
   // Never reuse a server that is already there: a leftover one would serve
-  // the wrong state, and a new one wipes the state under it.
-  const taken = await fetch(`${BASE_URL}/login`).then(
-    () => true,
-    () => false,
-  );
-  if (taken) throw new Error(`Something already answers on ${BASE_URL}. Stop that server first (a leftover of an earlier run?).`);
+  // the wrong state, and a new one wipes the state under it. server.ts refuses
+  // a busy port, and only its own ready line counts as started (#169).
   const child = spawn("npx", ["--no-install", "tsx", "e2e/server.ts", ...(a.data === "walked" ? ["--keep"] : [])], {
     cwd: APP_DIR,
     env: process.env,
     // Its own process group, so one signal stops vite and workerd too.
     detached: true,
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  let out = "";
   let err = "";
+  child.stdout?.on("data", (d) => (out += d));
   child.stderr?.on("data", (d) => (err += d));
   let exited: number | null = null;
   child.on("exit", (code) => (exited = code ?? 0));
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (exited !== null) throw new Error(`The e2e server stopped (exit ${exited}).\n${err.split("\n").slice(-20).join("\n")}`);
-    try {
-      if ((await fetch(`${BASE_URL}/login`)).ok) return child;
-    } catch {
-      // not up yet
-    }
-    await new Promise((r) => setTimeout(r, 1000));
+    if (READY_PATTERN.test(out)) return child;
+    await new Promise((r) => setTimeout(r, 500));
   }
   stopServer(child);
   throw new Error("The e2e server did not start within 3 minutes.");

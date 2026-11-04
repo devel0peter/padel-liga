@@ -5,7 +5,7 @@ import {
   budapestHour,
   digestItems,
   dueReminders,
-  isDigestRun,
+  isMorningRun,
   isTomorrowRun,
   reminderMessage,
   tomorrowDue,
@@ -31,12 +31,17 @@ const match = (week: number, over: Partial<ReminderMatch> = {}): ReminderMatch =
 const morning = (day: string) => at(day, 7);
 
 describe("when the cron sends what (D75)", () => {
-  it("the digest runs at 07:00 Budapest, in winter and in summer time", () => {
+  it("the morning starts at 07:00 Budapest, in winter and in summer time", () => {
     // Winter: 07:00 Budapest is 06:00 UTC; summer: 05:00 UTC.
-    expect(isDigestRun(new Date("2026-11-11T06:00:00Z"))).toBe(true);
-    expect(isDigestRun(new Date("2026-11-11T05:00:00Z"))).toBe(false);
-    expect(isDigestRun(new Date("2027-04-07T05:00:00Z"))).toBe(true);
-    expect(isDigestRun(new Date("2027-04-07T06:00:00Z"))).toBe(false);
+    expect(isMorningRun(new Date("2026-11-11T06:00:00Z"))).toBe(true);
+    expect(isMorningRun(new Date("2026-11-11T05:50:00Z"))).toBe(false);
+    expect(isMorningRun(new Date("2027-04-07T05:00:00Z"))).toBe(true);
+    expect(isMorningRun(new Date("2027-04-07T04:50:00Z"))).toBe(false);
+  });
+
+  it("the morning's runs go on until noon: 11:50 is one, 12:00 is not", () => {
+    expect(isMorningRun(at("2026-11-11", 11, 50))).toBe(true);
+    expect(isMorningRun(at("2026-11-11", 12))).toBe(false);
   });
 
   it("across both daylight-saving changes the hour follows the Budapest clock", () => {
@@ -49,8 +54,9 @@ describe("when the cron sends what (D75)", () => {
     expect(budapestHour(new Date("2027-03-29T05:00:00Z"))).toBe(7);
   });
 
-  it("holnap meccs runs from 18:00 to 21:00 Budapest", () => {
-    expect([17, 18, 21, 22].map((h) => isTomorrowRun(at("2026-11-11", h)))).toEqual([false, true, true, false]);
+  it("holnap meccs runs from 18:00 to 21:00 sharp Budapest (D84): not at 17:50 or 21:10", () => {
+    const runs = [at("2026-11-11", 17, 50), at("2026-11-11", 18), at("2026-11-11", 21), at("2026-11-11", 21, 10)];
+    expect(runs.map(isTomorrowRun)).toEqual([false, true, true, false]);
   });
 });
 
@@ -122,6 +128,9 @@ describe("tomorrowDue: the evening before an accepted slot", () => {
     expect(tomorrowDue(scheduled, at("2026-11-11", 18))).toBe(true);
     expect(tomorrowDue(scheduled, at("2026-11-11", 21))).toBe(true);
     expect(tomorrowDue(scheduled, at("2026-11-11", 17))).toBe(false);
+    // The 10-minute runs at the edges (#222).
+    expect(tomorrowDue(scheduled, at("2026-11-11", 17, 50))).toBe(false);
+    expect(tomorrowDue(scheduled, at("2026-11-11", 21, 10))).toBe(false);
     expect(tomorrowDue(scheduled, at("2026-11-10", 18))).toBe(false);
     expect(tomorrowDue(scheduled, at("2026-11-12", 18))).toBe(false);
   });

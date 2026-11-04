@@ -23,6 +23,9 @@ export type AuditInput = {
   target: Value;
   detail?: Value;
   leagueId?: number | SQL | null;
+  // When it happened; the database clock when left out. The cron passes its
+  // run's scheduled time, like everything else it writes (#188, #222).
+  at?: Date;
 };
 
 // The league of a season, worked out inside the batch.
@@ -53,7 +56,7 @@ export function auditWhen(condition: SQL, e: AuditInput) {
         action: sql`${e.action}`,
         target: sql`${e.target}`,
         detail: sql`${e.detail ?? null}`,
-        at: sql`unixepoch()`,
+        at: e.at ? sql`${Math.floor(e.at.getTime() / 1000)}` : sql`unixepoch()`,
         leagueId: sql`${e.leagueId ?? null}`,
       },
       sql`where ${condition}`,

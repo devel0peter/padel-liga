@@ -29,7 +29,7 @@ import {
 import { logWarn } from "~/lib/log";
 
 // The automatic reminders in D1 (#155). The rules are in reminders.ts. The
-// hourly cron (workers/app.ts) queues what is due in the leagues whose
+// cron (workers/app.ts) queues what is due in the leagues whose
 // switch is on, then the same run sends it. Whole tables, filtered in
 // reminders.ts, never a long list of ids (D1: at most 100 bound parameters);
 // the volumes are small. A run takes about 20 D1 queries.

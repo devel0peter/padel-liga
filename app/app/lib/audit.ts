@@ -66,6 +66,14 @@ export function actionLabel(code: string): string {
 
 export const SYSTEM_ACTOR = "Rendszer";
 
+// The actions written without an account: the cron and the command line.
+// Any other entry without an actor lost it when its account was deleted.
+export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
+
+export function isSystemAction(code: string): boolean {
+  return SYSTEM_ACTIONS.includes(code);
+}
+
 // "pair:12" -> { kind: "pair", id: "12" }. Anything else (an older row's
 // email address, say): kind null.
 export function parseRef(ref: string): { kind: string | null; id: string } {

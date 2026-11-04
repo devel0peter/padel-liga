@@ -96,7 +96,7 @@ export async function acceptPairLink(user: Pick<User, "id" | "consentAt">, token
       actorId: user.id,
       action: "pair.link",
       target: sql`'pair:' || ${activePairIdOf(link.leagueId, link.ownerId, user.id)}`,
-      detail: `league:${link.leagueId}; link:${link.id}; ${link.ownerId} + ${user.id}`,
+      detail: `league:${link.leagueId}; link:${link.id}; user:${link.ownerId} + user:${user.id}`,
       leagueId: link.leagueId,
     }),
   ]);

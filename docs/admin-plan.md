@@ -120,7 +120,7 @@ The sidebar is one app shell for every logged-in user (2026-10-05). Sections are
 - **Top:** logo and the collapse button, then the profile button (Google picture or initials, name, role), which opens `/profile`.
 - **League switcher** (later, only with 2+ leagues).
 - **Liga:** Áttekintés, Klubok. Seasons and the rest are added here by later tickets.
-- **Platform** (tagged "Admin"): Ligák, Városok, Felhasználók, Jelentkezők, Körlevelek, Forgalom. The league section is tagged "Szervező"; players see neither.
+- **Platform** (tagged "Admin"): Ligák, Városok, Felhasználók, Jelentkezők, Körlevelek, Kimenő levelek, Forgalom, Napló (the audit log, #226). The league section is tagged "Szervező"; players see neither.
 - **Bottom:** Kilépés.
 - Collapsed (desktop): a narrow icon strip with tooltips; the collapse button stays at its top. Phones: a slide-in panel opened from the page header.
 - The current page is marked with a brand-blue tint (`--nav-active`, `--nav-active-bg`), in light and dark mode.

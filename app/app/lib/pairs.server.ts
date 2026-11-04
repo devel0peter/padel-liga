@@ -272,7 +272,7 @@ export async function createPair(actorId: string, leagueId: number, a: string, b
       actorId,
       action: "pair.create",
       target: sql`'pair:' || ${activePairIdOf(leagueId, a, b)}`,
-      detail: `league:${leagueId}; ${a} + ${b}`,
+      detail: `league:${leagueId}; user:${a} + user:${b}`,
       leagueId,
     }),
   ]);
@@ -372,7 +372,7 @@ export async function changePartner(
         actorId,
         action: "pair.change",
         target: sql`'pair:' || ${activePairIdOf(leagueId, values.playerA, values.playerB)}`,
-        detail: `league:${leagueId}; from pair:${pairId}; ${leaving} -> ${partner}`,
+        detail: `league:${leagueId}; from pair:${pairId}; user:${leaving} -> user:${partner}`,
         leagueId,
       }),
     ]);

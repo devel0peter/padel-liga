@@ -8,7 +8,7 @@
 import { phaseCalendar } from "@padel-liga/rules";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { AUDIT_ACTIONS, type AuditAction } from "~/lib/audit";
+import { AUDIT_ACTIONS, isSystemAction, type AuditAction } from "~/lib/audit";
 
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
@@ -223,6 +223,8 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
       const own = entries.filter((e) => e.action === step.action);
       expect(own, `${step.action} wrote ${own.length} entries`).toHaveLength(1);
       expect(own[0]!.actor_id).toBe(step.actor);
+      // Napló shows an entry without an actor as "Rendszer" only for these (#226).
+      expect(isSystemAction(step.action), "actor null needs SYSTEM_ACTIONS").toBe(step.actor === null);
       expect(entries.map((e) => e.action).sort()).toEqual([step.action, ...(step.also ?? [])].sort());
     });
 

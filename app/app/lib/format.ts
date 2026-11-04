@@ -20,6 +20,9 @@ export function formatDateTime(date: Date): string {
 const percent = new Intl.NumberFormat("hu-HU", { style: "percent", maximumFractionDigits: 1 });
 
 // 0.125 -> "12,5%"
+/** A set or game difference with its sign: "+3", "−2", "0" (a real minus). */
+export const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
+
 export function formatPercent(ratio: number): string {
   return percent.format(ratio);
 }
@@ -41,6 +44,14 @@ export function formatShortDay(day: string): string {
 // "2026-10-05" -> "okt. 5., hétfő"
 export function formatDay(day: string): string {
   return shortDay.format(new Date(`${day}T00:00:00Z`));
+}
+
+const slotDay = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric", weekday: "long" });
+const slotTime = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false });
+
+// "nov. 10., kedd 18:30" (24-hour, Budapest time)
+export function formatSlot(date: Date): string {
+  return `${slotDay.format(date)} ${slotTime.format(date)}`;
 }
 
 const shortDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric" });
@@ -95,4 +106,18 @@ const dayAndTime = new Intl.DateTimeFormat("hu-HU", {
 // A deadline: "nov. 29., vasárnap 23:59"
 export function formatDeadline(date: Date): string {
   return dayAndTime.format(date);
+}
+
+const weekdayDate = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, month: "short", day: "numeric", weekday: "long" });
+
+// A day from an instant, in Budapest: "nov. 9., hétfő"
+export function formatWeekdayDate(date: Date): string {
+  return weekdayDate.format(date);
+}
+
+const clockTime = new Intl.DateTimeFormat("hu-HU", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+// The time of an instant, in Budapest: "18:00" (00:00 at midnight, never 24:00)
+export function formatClockTime(date: Date): string {
+  return clockTime.format(date);
 }

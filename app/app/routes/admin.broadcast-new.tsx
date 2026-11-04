@@ -32,7 +32,9 @@ import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
 import { filterSignups, parseFilters } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 import { listCities } from "~/lib/cities.server";
-import { listLeagues } from "~/lib/leagues.server";
+import { getLeague, listLeagues } from "~/lib/leagues.server";
+import { pairsQueryString, parsePairsQuery } from "~/lib/league-pairs-view";
+import { leaguePairsAudience } from "~/lib/league-pairs-view.server";
 import { playerStatuses } from "~/lib/player-status.server";
 import { NO_MAIL_STAGES, parseStage, progressContext, stageRecipients, STAGES } from "~/lib/signup-progress";
 
@@ -40,6 +42,8 @@ const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 async function audience(params: URLSearchParams) {
+  // "Levél nekik" on Párok (#148, D64): the players of the rows it shows.
+  if (params.has("pairs")) return pairsAudience(params);
   const filters = parseFilters(params);
   const stage = params.has("stage") ? parseStage(params) : null;
   if (params.has("stage") && (!stage || NO_MAIL_STAGES.includes(stage)))
@@ -61,10 +65,28 @@ async function audience(params: URLSearchParams) {
   };
 }
 
+async function pairsAudience(params: URLSearchParams) {
+  const league = await getLeague(params.get("pairs") ?? "");
+  if (!league) throw new Response("Nincs ilyen liga.", { status: 404 });
+  const query = parsePairsQuery(params);
+  const [{ label, people }, suppressed, off] = await Promise.all([leaguePairsAudience(league, query), suppressedSet(), emailSwitchedOff()]);
+  // Unsubscribed or bounced addresses, and accounts that switched email off, get nothing (#115).
+  const recipients = people.filter((p) => !suppressed.has(p.email) && !off.has(p.email));
+  const back = pairsQueryString(query);
+  return {
+    label,
+    recipients,
+    suppressed: people.length - recipients.length,
+    back: { to: `/admin/leagues/${league.slug}/pairs${back ? `?${back}` : ""}`, note: "A Párok oldalon látott játékosok kapják, mindenki egyszer." },
+  };
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const actor = await requirePermission(request, { kind: "broadcasts.send" });
-  const { label, recipients, suppressed } = await audience(new URL(request.url).searchParams);
-  return { label, recipients, suppressed, adminEmail: actor.email, limit: dailyLimit() };
+  const found = await audience(new URL(request.url).searchParams);
+  const { label, recipients, suppressed } = found;
+  const back = "back" in found ? found.back : null;
+  return { label, recipients, suppressed, back, adminEmail: actor.email, limit: dailyLimit() };
 }
 
 type ActionData = { error?: string; tested?: string };
@@ -86,12 +108,12 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   const { label, recipients } = await audience(new URL(request.url).searchParams);
   if (recipients.length === 0) return { error: "Nincs címzett." };
   // Sent right away, within the daily limit (#112); the rest by the cron.
-  await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email });
+  await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email, actorId: actor.id });
   return redirect("/admin/broadcasts");
 }
 
 export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) {
-  const { label, recipients, suppressed, adminEmail, limit } = loaderData;
+  const { label, recipients, suppressed, back, adminEmail, limit } = loaderData;
   const [params] = useSearchParams();
   const fetcher = useFetcher<ActionData>();
   const [subject, setSubject] = useState("");
@@ -114,11 +136,11 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             {suppressed > 0 && ` (${suppressed} címet kihagyunk: leiratkozott, nem kézbesíthető, vagy kikapcsolta az e-mailt)`}
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>
+            <Link to={back?.to ?? `/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>
           </Button>
         </div>
         <p className="mt-2 text-muted-foreground">
-          Csak a jelentkezőnek megy, a megadott párnak nem (adatkezelési tájékoztató).
+          {back?.note ?? "Csak a jelentkezőnek megy, a megadott párnak nem (adatkezelési tájékoztató)."}
           {recipients.length > perDay &&
             ` Naponta legfeljebb ${perDay} körlevél megy ki, a többi a következő napokon.`}
         </p>
@@ -173,8 +195,8 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Elküldöd {recipients.length} címzettnek?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    „{subject}” · {label}. Az első {SEND_NOW_MAX} levél most megy ki, a többi óránként, a napi limit szerint. Nem lehet
-                    visszavonni.
+                    „{subject}” · {label}. A levelek a háttérben mennek ki: az első {SEND_NOW_MAX} most, a többi tízpercenként, a napi
+                    limit szerint. Hogy hol tart, a Kimenő levelek oldalon látod. Nem lehet visszavonni.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

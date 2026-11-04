@@ -53,12 +53,55 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await expect(locked.getByRole("button", { name: "Felbontás" })).toBeDisabled();
   await expect(locked.getByRole("button", { name: "Partner cseréje" })).toBeDisabled();
   await expect(locked).toContainText("Kör közben nem bontható fel");
-  await context.close();
 
-  // No email for a pair change; the players see it on Párom.
-  expect(d1("select count(*) as n from email_messages")).toEqual(emailsBefore);
+  // #154: the organizer enters the new pair, takes it out and enters it again.
+  // Round 1's groups are out (step 11): it plays from round 2.
+  const fresh = row(page, torok, boglarka);
+  const confirm = async (button: string, title: RegExp, action: string) => {
+    await fresh.getByRole("button", { name: button }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText(title);
+    await expect(dialog).toContainText("e-mailt nem");
+    await dialog.getByRole("button", { name: action, exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  };
+  await expect(fresh).toContainText("Nem nevezett");
+  await confirm("Benevezés", new RegExp(`Benevezed: ${torok.name} – ${boglarka.name}\\?`), "Benevezés");
+  await expect(fresh).toContainText(/Nevezés \(.+\): Nevezett/);
+  await expect(fresh).toContainText("a 2. körtől");
+  await confirm("Kivétel a szezonból", new RegExp(`Kiveszed a szezonból: ${torok.name} – ${boglarka.name}\\?`), "Kivétel");
+  await expect(fresh).toContainText(/Nevezés \(.+\): Visszavonva/);
+  await expect(fresh).toContainText("Aktív");
+  await confirm("Benevezés", /Benevezed/, "Benevezés");
+  await expect(fresh).toContainText(/Nevezés \(.+\): Nevezett/);
+
+  // A pair that plays in the running round: taking it out is a mid-round
+  // withdrawal, which needs a reason (#34; done in 21-withdrawal). Cancelled
+  // here, it stays entered.
+  await locked.getByRole("button", { name: "Kivétel a szezonból" }).click();
+  const withdraw = page.getByRole("dialog");
+  await expect(withdraw).toContainText("Visszaléptetés kör közben");
+  await expect(withdraw.getByRole("button", { name: "Visszaléptetés" })).toBeDisabled();
+  await withdraw.getByRole("button", { name: "Mégse" }).click();
+  await expect(withdraw).toHaveCount(0);
+  await expect(locked).toContainText(/Nevezés \(.+\): Nevezett/);
+  await expect(content(page)).not.toContainText("@example.test");
+
+  // The players see the entry on Párom and both changes on Értesítések.
   const player = await as(browser, torok);
   await visit(player.page, "/pair");
   await expect(content(player.page)).toContainText(boglarka.name);
+  await expect(content(player.page)).toContainText("Beneveztetek: a 2. körtől játszotok.");
+  await visit(player.page, "/notifications");
+  await expect(content(player.page)).toContainText("A szervező kivett titeket a szezonból");
+  await expect(content(player.page)).toContainText("A szervező benevezett titeket");
   await player.context.close();
+
+  // Out again, so the later specs see this pair as not entered.
+  await confirm("Kivétel a szezonból", /Kiveszed a szezonból/, "Kivétel");
+  await expect(fresh).toContainText(/Nevezés \(.+\): Visszavonva/);
+  await context.close();
+
+  // No email for a pair change or an entry change.
+  expect(d1("select count(*) as n from email_messages")).toEqual(emailsBefore);
 });

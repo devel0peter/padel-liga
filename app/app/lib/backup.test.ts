@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BACKUP_CRON,
-  EMAIL_CRON,
+  HOURLY_CRON,
   KEEP_BACKUPS,
   backupKey,
   cronJob,
@@ -136,16 +136,16 @@ describe("retention", () => {
 });
 
 describe("which job a cron runs", () => {
-  it("sends the export cron to the export and everything else to the email run", () => {
+  it("sends the export cron to the export and everything else to the 10-minute job", () => {
     expect(cronJob(BACKUP_CRON)).toBe("backup");
-    expect(cronJob(EMAIL_CRON)).toBe("email");
-    expect(cronJob("17 3 * * *")).toBe("email");
-    expect(cronJob("")).toBe("email");
+    expect(cronJob(HOURLY_CRON)).toBe("hourly");
+    expect(cronJob("17 3 * * *")).toBe("hourly");
+    expect(cronJob("")).toBe("hourly");
   });
   it("is the pair of crons in wrangler.jsonc, with the bucket bound", async () => {
     const { readFileSync } = await import(/* @vite-ignore */ `node:${"fs"}`);
     const text = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8") as string;
-    expect(text).toContain(`"crons": ["${EMAIL_CRON}", "${BACKUP_CRON}"]`);
+    expect(text).toContain(`"crons": ["${HOURLY_CRON}", "${BACKUP_CRON}"]`);
     expect(text).toMatch(/"binding": "BACKUPS"/);
   });
 });

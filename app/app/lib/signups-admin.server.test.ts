@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -17,6 +18,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const S = await import("~/lib/signups-admin.server");
 const O = await import("~/lib/email/outbox.server");
 const SP = await import("~/lib/signup-partners.server");
@@ -62,6 +64,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     h.raw = migratedDatabase();
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
   });
 
   it("frees the partner: they wait for a partner again, and the pair is gone", async () => {
@@ -71,7 +74,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     pairUp(c, d);
     expect(await waitingNames()).toEqual(["Ede"]);
 
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
 
     expect(await waitingNames()).toEqual(["Dani", "Ede"]);
     expect(soloPairs(await S.listSignups(), "gyor")).toEqual([]);
@@ -84,7 +87,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
-    await S.updateSignup(d, { status: "withdrawn" });
+    await S.updateSignup(d, { status: "withdrawn" }, "admin");
     expect(row(c)).toEqual({ status: "new", paired_with: null });
     expect(await waitingNames()).toEqual(["Cili"]);
   });
@@ -93,8 +96,8 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
-    await S.updateSignup(c, { adminNote: "hívjuk fel" });
-    await S.updateSignup(c, { status: "contacted" });
+    await S.updateSignup(c, { adminNote: "hívjuk fel" }, "admin");
+    await S.updateSignup(c, { status: "contacted" }, "admin");
     expect(row(c)).toEqual({ status: "contacted", paired_with: d });
     expect(row(d)).toEqual({ status: "paired", paired_with: c });
   });
@@ -104,7 +107,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
     h.raw.prepare("update interest_signups set status = 'withdrawn' where id = ?").run(d);
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(row(c)).toEqual({ status: "withdrawn", paired_with: null });
     expect(row(d)).toEqual({ status: "withdrawn", paired_with: null });
     expect(await waitingNames()).toEqual([]);
@@ -114,7 +117,7 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     for (const [id, name] of [["c", "Cili"], ["d", "Dani"]] as const) {
       h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, name);
       await SP.formSignupPairs(id);
@@ -126,8 +129,9 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await settleBackground();
     expect(queued()).toEqual(["d@x.hu"]);
     expect(mail("to_email = 'c@x.hu'")).toEqual([]);
   });
@@ -137,8 +141,9 @@ describe("withdrawing a paired solo signup (#114)", () => {
   async function pairedAndInvited() {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
-    expect(await SOLO.pairSolos(c, d, "gyor", "Győr")).toBeNull();
+    expect(await SOLO.pairSolos("admin", 1, c, d, "gyor", "Győr")).toBeNull();
     expect(await O.queueRegistrationInvites()).toBe(2);
+    await settleBackground();
     expect(mail().map((m: any) => `${m.kind} ${m.to_email}`)).toEqual([
       "pair_intro c@x.hu",
       "pair_intro d@x.hu",
@@ -150,30 +155,31 @@ describe("withdrawing a paired solo signup (#114)", () => {
 
   it("deletes the unsent invite and pair intros: nothing goes to her, nothing about her to the partner", async () => {
     const { c } = await pairedAndInvited();
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(mail()).toEqual([{ kind: "registration_invite", to_email: "d@x.hu", status: "pending" }]);
   });
 
   it("leaves mail being sent right now alone", async () => {
     const { c } = await pairedAndInvited();
     h.raw.exec("update email_messages set status = 'sending'");
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(mail()).toHaveLength(4);
   });
 
   it("keeps mail already sent", async () => {
     const { c } = await pairedAndInvited();
     h.raw.exec("update email_messages set status = 'sent'");
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(mail()).toHaveLength(4);
   });
 
   it("clears the invited mark with the invite, so undoing the withdrawal offers her the invite again", async () => {
     const { c } = await pairedAndInvited();
-    await S.updateSignup(c, { status: "withdrawn" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(h.raw.prepare("select invited_at from interest_signups where id = ?").get(c)).toEqual({ invited_at: null });
-    await S.updateSignup(c, { status: "new" });
+    await S.updateSignup(c, { status: "new" }, "admin");
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await settleBackground();
     expect(mail("to_email = 'c@x.hu'")).toEqual([{ kind: "registration_invite", to_email: "c@x.hu", status: "pending" }]);
     expect(row(c)).toEqual({ status: "new", paired_with: null });
   });
@@ -183,10 +189,11 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const b = solo("Bea", "bea@x.hu");
     const h2 = solo("Hanna", "hanna@x.hu");
     const z = solo("Zoli", "zoli@x.hu");
-    await SOLO.pairSolos(a, b, "gyor", "Győr");
-    await SOLO.pairSolos(h2, z, "gyor", "Győr");
+    await SOLO.pairSolos("admin", 1, a, b, "gyor", "Győr");
+    await SOLO.pairSolos("admin", 1, h2, z, "gyor", "Győr");
     await O.queueRegistrationInvites();
-    await S.updateSignup(a, { status: "withdrawn" });
+    await settleBackground();
+    await S.updateSignup(a, { status: "withdrawn" }, "admin");
     expect(mail("kind = 'pair_intro'").map((m: any) => m.to_email)).toEqual(["hanna@x.hu", "zoli@x.hu"]);
     expect(mail("kind = 'registration_invite'").map((m: any) => m.to_email)).toEqual([
       "bea@x.hu",
@@ -199,8 +206,8 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const { c } = await pairedAndInvited();
     const e = solo("Ede", "e@x.hu");
     const f = solo("Fanni", "f@x.hu");
-    await SOLO.pairSolos(e, f, "gyor", "Győr");
-    await S.updateSignup(c, { status: "withdrawn" });
+    await SOLO.pairSolos("admin", 1, e, f, "gyor", "Győr");
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
     expect(mail("kind = 'pair_intro'").map((m: any) => m.to_email)).toEqual(["e@x.hu", "f@x.hu"]);
   });
 
@@ -208,8 +215,8 @@ describe("withdrawing a paired solo signup (#114)", () => {
     const c = solo("Cili", "c@x.hu");
     const d = solo("Dani", "d@x.hu");
     pairUp(c, d);
-    await S.updateSignup(c, { status: "withdrawn" });
-    await S.updateSignup(c, { status: "new" });
+    await S.updateSignup(c, { status: "withdrawn" }, "admin");
+    await S.updateSignup(c, { status: "new" }, "admin");
     expect(row(c)).toEqual({ status: "new", paired_with: null });
     expect(row(d)).toEqual({ status: "new", paired_with: null });
     expect(await waitingNames()).toEqual(["Cili", "Dani"]);

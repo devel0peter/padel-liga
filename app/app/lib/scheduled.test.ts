@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BACKUP_CRON, EMAIL_CRON } from "./backup";
+import { BACKUP_CRON, HOURLY_CRON } from "./backup";
 import { runScheduled } from "./scheduled";
 
-function run(cron: string, backup = async () => ({ status: "done" }) as any, email = async () => ({ sent: 0 })) {
+const AT = Date.UTC(2026, 10, 5, 3, 10);
+
+function run(cron: string, backup = async () => ({ status: "done" }) as any, hourly = async (_now: Date) => {}) {
   const waited: Promise<unknown>[] = [];
-  const jobs = { backup: vi.fn(backup), email: vi.fn(email) };
-  runScheduled(cron, { waitUntil: (p) => void waited.push(p) }, jobs);
+  const jobs = { backup: vi.fn(backup), hourly: vi.fn(hourly) };
+  runScheduled({ cron, scheduledTime: AT }, { waitUntil: (p) => void waited.push(p) }, jobs);
   return { jobs, done: Promise.all(waited) };
 }
 
@@ -17,13 +19,14 @@ describe("runScheduled", () => {
     const { jobs, done } = run(BACKUP_CRON);
     await done;
     expect(jobs.backup).toHaveBeenCalledTimes(1);
-    expect(jobs.email).not.toHaveBeenCalled();
+    expect(jobs.hourly).not.toHaveBeenCalled();
   });
 
-  it("runs only the email job on the hourly cron", async () => {
-    const { jobs, done } = run(EMAIL_CRON);
+  it("runs only the 10-minute job on its cron, from the scheduled time", async () => {
+    const { jobs, done } = run(HOURLY_CRON);
     await done;
-    expect(jobs.email).toHaveBeenCalledTimes(1);
+    expect(jobs.hourly).toHaveBeenCalledTimes(1);
+    expect(jobs.hourly).toHaveBeenCalledWith(new Date(AT));
     expect(jobs.backup).not.toHaveBeenCalled();
   });
 

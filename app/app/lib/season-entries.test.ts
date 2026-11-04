@@ -2,18 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   averageStartingElo,
-  canDecide,
   checkEntry,
   ENTRY_REFUSALS,
   entryOpen,
   entryStatusText,
+  TAKEN_OUT_TEXT,
+  WITHDRAWAL_REASON_MAX,
+  withdrawalReasonError,
+  ENTRY_STATUS_LABELS,
   entryView,
   fromPhase,
   joinsPhase,
   lateEntry,
-  parseEntryFilter,
-  parseNote,
-  MAX_NOTE,
+  organizerEntryAction,
 } from "./season-entries";
 
 // The first season (README decision log 2026-10-21): registration 2–5 Nov,
@@ -81,34 +82,6 @@ describe("joinsPhase (D18, spec section 4)", () => {
   });
 });
 
-describe("canDecide (D17)", () => {
-  it("decides a pending entry either way", () => {
-    expect(canDecide("pending", "approve", true)).toBe(true);
-    expect(canDecide("pending", "reject", true)).toBe(true);
-  });
-
-  it("lets the organizer flip a decision", () => {
-    expect(canDecide("rejected", "approve", true)).toBe(true);
-    expect(canDecide("approved", "reject", true)).toBe(true);
-  });
-
-  it("doesn't decide the same thing twice", () => {
-    expect(canDecide("approved", "approve", true)).toBe(false);
-    expect(canDecide("rejected", "reject", true)).toBe(false);
-  });
-
-  it("never changes a withdrawn entry", () => {
-    expect(canDecide("withdrawn", "approve", true)).toBe(false);
-    expect(canDecide("withdrawn", "reject", true)).toBe(false);
-  });
-
-  it("doesn't approve a dissolved pair, but can reject its leftover entry", () => {
-    expect(canDecide("pending", "approve", false)).toBe(false);
-    expect(canDecide("rejected", "approve", false)).toBe(false);
-    expect(canDecide("pending", "reject", false)).toBe(true);
-  });
-});
-
 describe("checkEntry (D18)", () => {
   const ok = { hasPair: true, open: true, entered: false, myLevel: "halado", partnerLevel: "kezdo" };
 
@@ -139,19 +112,6 @@ describe("checkEntry (D18)", () => {
   });
 });
 
-describe("parseNote", () => {
-  it("trims, and an empty note is none", () => {
-    expect(parseNote("  Jó játékot!  ")).toEqual({ ok: true, note: "Jó játékot!" });
-    expect(parseNote("   ")).toEqual({ ok: true, note: null });
-    expect(parseNote(null)).toEqual({ ok: true, note: null });
-  });
-
-  it("caps the length", () => {
-    expect(parseNote("x".repeat(MAX_NOTE))).toMatchObject({ ok: true });
-    expect(parseNote("x".repeat(MAX_NOTE + 1))).toMatchObject({ ok: false });
-  });
-});
-
 describe("averageStartingElo (spec section 11)", () => {
   it("averages the two players' starting Elo", () => {
     expect(averageStartingElo("kezdo", "kozephalado")).toBe(1100);
@@ -171,12 +131,38 @@ describe("status texts", () => {
     expect(fromPhase(5)).toBe("az 5. körtől");
   });
 
-  it("says where an approved pair starts", () => {
-    expect(entryStatusText({ status: "approved", joinsPhase: 1 })).toBe("Jóváhagyva: az 1. körtől játszotok.");
-    expect(entryStatusText({ status: "approved", joinsPhase: 3 })).toBe("Jóváhagyva: a 3. körtől játszotok.");
-    expect(entryStatusText({ status: "approved", joinsPhase: null })).toBe("Jóváhagyva: a következő szezontól játszotok.");
-    expect(entryStatusText({ status: "pending", joinsPhase: null })).toMatch(/jóváhagyására vár/);
+  it("#153: says where an entered pair starts, with no word of an approval", () => {
+    expect(entryStatusText({ status: "approved", joinsPhase: 1 })).toBe("Beneveztetek: az 1. körtől játszotok.");
+    expect(entryStatusText({ status: "approved", joinsPhase: 3 })).toBe("Beneveztetek: a 3. körtől játszotok.");
+    expect(entryStatusText({ status: "approved", joinsPhase: null })).toBe("Beneveztetek: a következő szezontól játszotok.");
+    expect(entryStatusText({ status: "pending", joinsPhase: null })).not.toMatch(/jóváhagy/);
     expect(entryStatusText({ status: "rejected", joinsPhase: null })).toMatch(/nem fogadta el/);
+  });
+
+  it("#174: a taken-out pair reads that the organizer took it out and is the one to ask", () => {
+    expect(entryStatusText({ status: "withdrawn", joinsPhase: 1 })).toBe(TAKEN_OUT_TEXT);
+    expect(TAKEN_OUT_TEXT).toMatch(/A szervező kivett titeket a szezonból/);
+    expect(TAKEN_OUT_TEXT).toMatch(/szóljatok neki/);
+    expect(TAKEN_OUT_TEXT).not.toMatch(/Nevezünk/);
+  });
+});
+
+describe("withdrawalReasonError (#34)", () => {
+  it("needs a reason", () => {
+    expect(withdrawalReasonError("")).toMatch(/miért/);
+    expect(withdrawalReasonError("   ")).toMatch(/miért/);
+  });
+
+  it("takes at most the limit, counted without the spaces around it", () => {
+    expect(withdrawalReasonError("Sérülés")).toBeNull();
+    expect(withdrawalReasonError(` ${"x".repeat(WITHDRAWAL_REASON_MAX)} `)).toBeNull();
+    expect(withdrawalReasonError("x".repeat(WITHDRAWAL_REASON_MAX + 1))).toMatch(/300/);
+  });
+});
+
+describe("ENTRY_STATUS_LABELS", () => {
+  it("#174: a withdrawn entry has one word", () => {
+    expect(ENTRY_STATUS_LABELS.withdrawn).toBe("Visszavonva");
   });
 });
 
@@ -214,11 +200,31 @@ describe("entryView", () => {
   });
 });
 
-describe("parseEntryFilter", () => {
-  it("defaults to pending and ignores unknown values", () => {
-    expect(parseEntryFilter(null)).toBe("pending");
-    expect(parseEntryFilter("approved")).toBe("approved");
-    expect(parseEntryFilter("withdrawn")).toBe("pending");
-    expect(parseEntryFilter("toString")).toBe("pending");
+describe("organizerEntryAction (#154)", () => {
+  const winter = { ...season, id: 1, name: "Tél" };
+  const spring = {
+    ...season,
+    id: 2,
+    name: "Tavasz",
+    registrationOpensAt: at("2027-02-01T12:00:00Z"),
+    registrationClosesAt: at("2027-02-10T12:00:00Z"),
+  };
+  const now = at("2026-11-03T12:00:00Z");
+
+  it("offers to take an entered pair out", () => {
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "approved" }, now)).toEqual({ kind: "remove", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "pending" }, now)).toMatchObject({ kind: "remove" });
+  });
+
+  it("offers to enter a pair without an entry, for the first season open for entries", () => {
+    expect(organizerEntryAction([winter, spring], null, now)).toEqual({ kind: "enter", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([spring], null, now)).toBeNull();
+    expect(organizerEntryAction([winter], null, at("2027-01-26T12:00:00Z"))).toBeNull();
+  });
+
+  it("offers to enter a taken-out pair again while its season is open, nothing for a rejected one", () => {
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, now)).toEqual({ kind: "enter", seasonId: 1, season: "Tél" });
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, at("2027-01-26T12:00:00Z"))).toBeNull();
+    expect(organizerEntryAction([winter], { seasonId: 1, status: "rejected" }, now)).toBeNull();
   });
 });

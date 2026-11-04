@@ -1,10 +1,12 @@
-// Walkthrough steps 17 to 19 (#25, #26): after Közzététel (step 11) a player
+// Walkthrough steps 17 to 19, 24 and 25 (#25, #26, #27, #31): after Közzététel (step 11) a player
 // sees their group and matches on Kezdőlap, pairs propose and accept a slot,
-// record and confirm an agreed time, and nobody else can open the match.
-import { addDays, budapestDay } from "@padel-liga/rules";
+// record and confirm an agreed time, nobody else can open the match, and a
+// booked match gets its venue and is cancelled, once in time and once late;
+// the hourly cron gives the morning reminders and "holnap meccs" in the app (their emails are off, #191).
+import { addDays, budapestClock, budapestDay, budapestTime } from "@padel-liga/rules";
 import { expect, test, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
+import { PAIRS, as, content, d1, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
 
 // A datetime-local value `days` from today at hh:mm, Budapest time.
 const slot = (days: number, time: string) => `${addDays(budapestDay(new Date()), days)}T${time}`;
@@ -140,5 +142,105 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   expect(response?.status()).toBe(404);
   await expect(stranger.page.getByText("Ez az oldal nem létezik.")).toBeVisible();
   await stranger.context.close();
+  await player.context.close();
+});
+
+// A datetime-local value about `hours` from now, on the hour, Budapest time.
+function hoursAhead(hours: number): string {
+  const { day, minutes } = budapestClock(new Date(Date.now() + hours * 3_600_000));
+  return `${day}T${String(Math.floor(minutes / 60)).padStart(2, "0")}:00`;
+}
+
+test("24. venue, then a cancellation 4 days ahead and a late one: the log says who and that it was late (#27)", async ({ browser }) => {
+  const [first] = annasMatches();
+  const [opponent] = first!.opponents;
+  const player = await as(browser, anna);
+  await visit(player.page, `/matches/${first!.id}`);
+  const main = content(player.page);
+
+  // The venue: only the city's active clubs; both pairs see it.
+  await player.page.getByLabel("Helyszín").click();
+  await player.page.getByRole("option", { name: "Minta Padel Aréna" }).click();
+  await player.page.getByLabel("Pálya (nem kötelező)").fill("2-es pálya");
+  await player.page.getByRole("button", { name: "Mentem a helyszínt" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Rögzítettük a helyszínt." })).toBeVisible();
+  await expect(status(player.page)).toContainText("Minta Padel Aréna, 2-es pálya");
+  const other = await as(browser, opponent!);
+  await visit(other.page, `/matches/${first!.id}`);
+  await expect(status(other.page)).toContainText("Minta Padel Aréna, 2-es pálya");
+
+  // Days ahead: not late, back to scheduling for both.
+  await main.getByRole("button", { name: "Lemondom a meccset" }).click();
+  await expect(player.page.getByRole("alertdialog", { name: "Lemondod a meccset?" })).toBeVisible();
+  await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Lemondtátok. Egyeztessetek új időpontot." })).toBeVisible();
+  await expect(status(player.page)).toContainText("Egyeztetésre vár");
+
+  // The other pair records a time 3 hours from now, anna confirms, then cancels: late.
+  await visit(other.page, `/matches/${first!.id}`);
+  await other.page.getByLabel("Megbeszélt időpont").fill(hoursAhead(3));
+  await other.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
+  await expect(content(other.page).getByRole("status").filter({ hasText: "Rögzítettük." })).toBeVisible();
+  await visit(player.page, `/matches/${first!.id}`);
+  await player.page.getByRole("button", { name: "Megerősítem" }).click();
+  await expect(status(player.page)).toContainText("Lefixálva");
+  await expect(main).toContainText("ez késői lemondás");
+  await main.getByRole("button", { name: "Lemondom a meccset" }).click();
+  await expect(player.page.getByRole("alertdialog", { name: "Késői lemondás. Biztosan lemondod?" })).toBeVisible();
+  await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();
+  await expect(main.getByRole("status").filter({ hasText: "nektek kell új időpontokat ajánlani" })).toBeVisible();
+  await expect(status(player.page)).toContainText("Későn mondtátok le, nektek kell új időpontokat ajánlani");
+  const log = main.getByRole("region", { name: "Napló" });
+  await expect(log.getByRole("listitem").filter({ hasText: "Késői lemondás" })).toContainText(`${anna.name} (ti)`);
+  await expect(log.getByRole("listitem").filter({ hasText: "Lemondta a meccset" })).toHaveCount(2);
+
+  // The other pair: told it's on anna's pair, no Teendő for this match.
+  await visit(other.page, `/matches/${first!.id}`);
+  await expect(status(other.page)).toContainText("Későn mondták le, nekik kell új időpontokat ajánlaniuk");
+  await expect(content(other.page).getByRole("region", { name: "Napló" })).toContainText(`${anna.name} (ellenfél)`);
+  await visit(other.page, "/home");
+  await expect(content(other.page).getByRole("link", { name: new RegExp(`^Ajánlj időpontot \\(.*${anna.name}`) })).toHaveCount(0);
+  await other.context.close();
+  await player.context.close();
+});
+
+// Runs the hourly cron as if it were `at` (#31).
+async function cron(page: Page, at: Date) {
+  const response = await page.request.get(`/cdn-cgi/local/scheduled?time=${at.getTime()}`);
+  expect(response.ok()).toBe(true);
+}
+
+const isDigest = (m: { text: string }) => m.text.includes("Ez történt a meccseiddel");
+
+test("25. the cron: 07:00 and holnap meccs the evening before, in the app only; no digest or holnap email (#31, #191)", async ({ browser }) => {
+  const [, second] = annasMatches();
+  const player = await as(browser, anna);
+  const today = budapestDay(new Date());
+  // The next 07:00 Budapest: within a day, so this run's items are in its window.
+  const sevenToday = budapestTime(today, 7, 0);
+  const seven = sevenToday.getTime() > Date.now() ? sevenToday : budapestTime(addDays(today, 1), 7, 0);
+  const cronMail = () => Number(d1(`select count(*) as n from email_messages where kind in ('match_digest', 'match_tomorrow')`)[0]!.n);
+  const tomorrowNotices = () =>
+    d1(`select u.email from notifications n join users u on u.id = n.user_id where n.kind = 'match_tomorrow' and n.url = '/matches/${second!.id}'`).map(
+      (r) => r.email as string,
+    );
+
+  // 07:00 (steps 18–20 left anna an unread digest item), again that morning
+  // and at noon; then 18:00 today: the second match is fixed for tomorrow
+  // 23:00 (step 19), so "holnap meccs", then 19:00.
+  const first = logOffset();
+  await cron(player.page, seven);
+  await cron(player.page, new Date(seven.getTime() + 30 * 60_000));
+  await cron(player.page, budapestTime(today, 12, 0));
+  await cron(player.page, budapestTime(today, 18, 0));
+  await expect.poll(() => tomorrowNotices().length, { timeout: 20_000 }).toBe(4);
+  await cron(player.page, budapestTime(today, 19, 0));
+  // Once, to the four players, in the app (and by push).
+  expect(tomorrowNotices().sort()).toEqual([anna, PAIRS.p1[1], ...second!.opponents].map((p) => p.email).sort());
+  // Both emails are off for now (#191, D83).
+  expect(cronMail()).toBe(0);
+  expect(emailsSince(first).filter((m) => isDigest(m) || m.subject.startsWith("Holnap meccs"))).toEqual([]);
+  await visit(player.page, "/notifications");
+  await expect(content(player.page)).toContainText("Holnap meccs");
   await player.context.close();
 });

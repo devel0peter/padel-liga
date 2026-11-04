@@ -85,7 +85,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         number: g.number,
         average: average === null ? null : formatElo(average),
         warning: sizeWarning(g.pairs.length),
-        pairs: g.pairs.map((p) => ({ id: p.pairId, name: pairName(p.players), elo: formatElo(p.averageElo), active: p.active })),
+        pairs: g.pairs.map((p) => ({ id: p.pairId, name: pairName(p.players), elo: formatElo(p.averageElo), active: p.active, withdrawn: p.withdrawn, withdrawalReason: p.withdrawalReason })),
       };
     }),
   };
@@ -178,8 +178,16 @@ function GroupCard({ group, groups, editable }: { group: Group; groups: Group[];
                         megszűnt
                       </Badge>
                     )}
+                    {p.withdrawn && (
+                      <Badge variant="outline" className="ml-2">
+                        visszalépett
+                      </Badge>
+                    )}
                   </span>
                   <span className="text-xs text-muted-foreground">Elo: {p.elo}</span>
+                  {p.withdrawalReason && (
+                    <span className="text-xs break-words text-muted-foreground">Indok: {p.withdrawalReason}</span>
+                  )}
                 </div>
                 {editable && groups.length > 1 && <MovePair key={`${p.id}-${group.number}`} pair={p} from={group.number} groups={groups} />}
               </li>
@@ -280,7 +288,7 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
       ) : empty ? (
         <p className="py-6 text-center text-muted-foreground">
           {d.splitProblem ??
-            `${d.eligibleCount} jóváhagyott pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`}
+            `${d.eligibleCount} nevezett pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`}
         </p>
       ) : (
         d.blocker && (

@@ -7,6 +7,8 @@ import {
   proposalKind,
   schedulingActions,
   schedulingState,
+  isLateCancel,
+  lateCancellers,
   waitingFor,
   type SchedulingEvent,
 } from "./scheduling";
@@ -103,7 +105,7 @@ describe("schedulingState (spec 6, #26)", () => {
     });
   });
 
-  it("nothing reopens a scheduled match here (cancelling is #27)", () => {
+  it("no proposal or agreed time reopens a scheduled match (only cancelling does, #27)", () => {
     const log: SchedulingEvent[] = [proposal("a"), { kind: "accepted", side: "b", at: now, slot: SLOTS[0] }];
     const later: SchedulingEvent[] = [
       proposal("b", now),
@@ -122,14 +124,16 @@ describe("schedulingActions (spec 6, #26)", () => {
         accept: [],
         confirm: false,
         decline: false,
+        venue: false,
+        cancel: false,
       });
   });
 
   it("the other pair accepts one of the open slots or counter-proposes; no plain rejection", () => {
     const state = schedulingState([proposal("a")], now);
-    expect(schedulingActions(state, "b", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: SLOTS, confirm: false, decline: false });
+    expect(schedulingActions(state, "b", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: SLOTS, confirm: false, decline: false, venue: false, cancel: false });
     // The proposing pair doesn't wait: it can propose again.
-    expect(schedulingActions(state, "a", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: [], confirm: false, decline: false });
+    expect(schedulingActions(state, "a", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: [], confirm: false, decline: false, venue: false, cancel: false });
   });
 
   it("the other pair confirms or declines an agreed time", () => {
@@ -138,9 +142,13 @@ describe("schedulingActions (spec 6, #26)", () => {
     expect(schedulingActions(state, "b", now, deadline)).toMatchObject({ confirm: false, decline: false });
   });
 
-  it("nothing once scheduled or after the deadline", () => {
-    const none = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false };
-    expect(schedulingActions({ status: "scheduled", slot: SLOTS[0]!, clubId: null }, "a", now, deadline)).toEqual(none);
+  it("once scheduled only the venue and cancelling (#27); nothing after the deadline", () => {
+    const none = { propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false };
+    const scheduled = { status: "scheduled", slot: SLOTS[0]!, clubId: null } as const;
+    for (const side of ["a", "b"] as const) expect(schedulingActions(scheduled, side, now, deadline)).toEqual({ ...none, venue: true, cancel: true });
+    // Once the slot has started it can't be cancelled; the venue can still be recorded.
+    expect(schedulingActions(scheduled, "a", SLOTS[0]!, deadline)).toEqual({ ...none, venue: true });
+    expect(schedulingActions(scheduled, "a", deadline, deadline)).toEqual(none);
     expect(schedulingActions({ status: "to_schedule" }, "a", deadline, deadline)).toEqual(none);
   });
 });
@@ -192,5 +200,93 @@ describe("valid activity (spec 8)", () => {
       { kind: "agreed_declined", side: "b", at: now },
     ];
     expect(activeSides(log, deadline)).toEqual(["a"]);
+  });
+});
+
+describe("venue and cancellation (spec 6.4 and 6.6, #27)", () => {
+  // Scheduled by b accepting a's slot on Thu 12 Nov 18:00, venue 7 offered with it.
+  const SLOT = SLOTS[0]!;
+  const booked: SchedulingEvent[] = [proposal("a", undefined, SLOTS, 7), { kind: "accepted", side: "b", at: now, slot: SLOT }];
+  const cancel = (side: "a" | "b", when: Date): SchedulingEvent => ({ kind: "cancelled", side, at: when, slot: SLOT });
+  const hours = (n: number) => new Date(SLOT.getTime() - n * 3_600_000);
+  const LATER = [at("2026-11-20", 18), at("2026-11-21", 9), at("2026-11-21", 12)];
+
+  it("either pair records the venue and the court; the latest wins and the match stays scheduled", () => {
+    const log: SchedulingEvent[] = [...booked, { kind: "venue", side: "b", at: now, clubId: 9, court: "2-es pálya" }];
+    expect(schedulingState(log, now)).toEqual({ status: "scheduled", slot: SLOT, clubId: 9, court: "2-es pálya" });
+    const changed: SchedulingEvent[] = [...log, { kind: "venue", side: "a", at: now, clubId: 4 }];
+    expect(schedulingState(changed, now)).toEqual({ status: "scheduled", slot: SLOT, clubId: 4, court: null });
+  });
+
+  it("a venue before the match is scheduled changes nothing", () => {
+    expect(schedulingState([{ kind: "venue", side: "a", at: now, clubId: 9 }], now)).toEqual({ status: "to_schedule" });
+  });
+
+  it("late means under 24 hours before the slot: 23 hours is late, exactly 24 and 25 are not", () => {
+    expect(isLateCancel(SLOT, hours(23))).toBe(true);
+    expect(isLateCancel(SLOT, hours(24))).toBe(false);
+    expect(isLateCancel(SLOT, hours(25))).toBe(false);
+  });
+
+  it("cancelling 25 hours before goes back to scheduling, for both pairs", () => {
+    const state = schedulingState([...booked, cancel("a", hours(25))], hours(25));
+    expect(state).toEqual({ status: "to_schedule" });
+    expect(waitingFor(state)).toEqual(["a", "b"]);
+  });
+
+  it("cancelling 23 hours before is late: the cancelling pair must propose next", () => {
+    const state = schedulingState([...booked, cancel("b", hours(23))], hours(23));
+    expect(state).toEqual({ status: "to_schedule", nextBy: "b" });
+    expect(waitingFor(state)).toEqual(["b"]);
+    // The other pair isn't blocked (D74).
+    expect(schedulingActions(state, "a", hours(23), deadline)).toMatchObject({ propose: true, recordAgreed: true });
+    // A new proposal ends it.
+    expect(schedulingState([...booked, cancel("b", hours(23)), proposal("b", hours(22), LATER)], hours(22))).toMatchObject({
+      status: "proposed",
+      by: "b",
+    });
+  });
+
+  it("a cancellation once the slot started, or without a scheduled match, changes nothing", () => {
+    expect(schedulingState([...booked, cancel("a", SLOT)], SLOT)).toMatchObject({ status: "scheduled" });
+    expect(schedulingState([proposal("a"), cancel("b", now)], now)).toMatchObject({ status: "proposed" });
+  });
+
+  it("after a cancellation the match can be scheduled again", () => {
+    const again: SchedulingEvent[] = [
+      ...booked,
+      cancel("a", hours(30)),
+      { kind: "agreed_time", side: "b", at: hours(29), slot: at("2026-11-20", 18) },
+      { kind: "agreed_confirmed", side: "a", at: hours(28) },
+    ];
+    expect(schedulingState(again, hours(28))).toEqual({ status: "scheduled", slot: at("2026-11-20", 18), clubId: null });
+  });
+
+  it("neither cancelling nor the venue is valid activity (spec 8)", () => {
+    expect(isValidActivity("cancelled")).toBe(false);
+    expect(isValidActivity("venue")).toBe(false);
+  });
+
+  describe("lateCancellers (spec 6.6 and 8, for #11)", () => {
+    it("names the pair that cancelled late, whatever its earlier activity", () => {
+      expect(lateCancellers([...booked, cancel("a", hours(23))], deadline)).toEqual(["a"]);
+      expect(lateCancellers([...booked, cancel("a", hours(25))], deadline)).toEqual([]);
+    });
+
+    it("keeps a late cancellation after the match was scheduled again", () => {
+      const log: SchedulingEvent[] = [
+        ...booked,
+        cancel("b", hours(2)),
+        { kind: "agreed_time", side: "a", at: hours(1), slot: at("2026-11-20", 18) },
+        { kind: "agreed_confirmed", side: "b", at: hours(1) },
+        { kind: "cancelled", side: "a", at: at("2026-11-15", 10), slot: at("2026-11-20", 18) },
+      ];
+      // b was late; a cancelled days ahead.
+      expect(lateCancellers(log, deadline)).toEqual(["b"]);
+    });
+
+    it("ignores cancellations that changed nothing", () => {
+      expect(lateCancellers([proposal("a"), cancel("b", now)], deadline)).toEqual([]);
+    });
   });
 });

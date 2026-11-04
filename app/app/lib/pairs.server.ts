@@ -1,12 +1,13 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
+import { rowSelect } from "~/db/insert-select";
 import { groupPairs, groups, leagues, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
-import { audit } from "~/lib/leagues.server";
-import { averageStartingElo, homeEntry, type EntryStatus } from "~/lib/season-entries";
+import { auditEntry, auditIfChanged } from "~/lib/audit.server";
+import { averageStartingElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
 import { withdrawEntries } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
@@ -80,8 +81,13 @@ export type LeaguePairRow = {
   status: "active" | "dissolved";
   // In a published group whose round hasn't ended: can't be dissolved or changed.
   locked: boolean;
+  // The seasons of those groups: taking the pair out of one of them is a
+  // mid-round withdrawal (#34).
+  lockedIn: number[];
   // The entry in the league's current (or next) season, if any.
-  entry: { season: string; status: EntryStatus } | null;
+  entry: { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null;
+  // "Benevezés" or "Kivétel a szezonból" for an active pair (#154), or none.
+  entryAction: OrganizerEntryAction | null;
   // The league's first home season (current or next), so "not entered" can
   // say which; null when there is none.
   season: string | null;
@@ -91,17 +97,28 @@ const playerA = alias(users, "pair_player_a");
 const playerB = alias(users, "pair_player_b");
 
 // The league's active pairs that are in a published group before its round's
-// deadline. Filtered by league, not by a list of ids (D1: at most 100 bound
-// parameters per statement).
-async function lockedPairs(leagueId: number, now: Date): Promise<Set<number>> {
+// deadline, with the seasons of those groups. Filtered by league, not by a
+// list of ids (D1: at most 100 bound parameters per statement).
+async function lockedPairs(leagueId: number, now: Date): Promise<Map<number, number[]>> {
   const rows = await db
-    .selectDistinct({ id: groupPairs.pairId })
+    .selectDistinct({ id: groupPairs.pairId, seasonId: groups.seasonId })
     .from(groupPairs)
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)));
-  return new Set(rows.map((r) => r.id));
+    .where(
+      and(
+        eq(pairs.leagueId, leagueId),
+        eq(pairs.status, "active"),
+        // A pair withdrawn from its group (#34) plays there no more.
+        isNull(groupPairs.withdrawnAt),
+        isNotNull(groups.publishedAt),
+        gte(seasonPhases.deadline, now),
+      ),
+    );
+  const out = new Map<number, number[]>();
+  for (const r of rows) out.set(r.id, [...(out.get(r.id) ?? []), r.seasonId]);
+  return out;
 }
 
 // Every pair of the league, active ones first, newest first.
@@ -131,7 +148,12 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
     lockedPairs(leagueId, now),
     seasons.length
       ? db
-          .select({ pairId: seasonEntries.pairId, seasonId: seasonEntries.seasonId, status: seasonEntries.status })
+          .select({
+            pairId: seasonEntries.pairId,
+            seasonId: seasonEntries.seasonId,
+            status: seasonEntries.status,
+            joinsPhase: seasonEntries.joinsPhase,
+          })
           .from(seasonEntries)
           .where(
             inArray(
@@ -153,7 +175,9 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       source: r.source,
       status: r.status,
       locked: locked.has(r.id),
+      lockedIn: locked.get(r.id) ?? [],
       entry,
+      entryAction: r.status === "active" ? organizerEntryAction(seasons, entry, now) : null,
       season: seasons[0]?.name ?? null,
     };
   });
@@ -208,24 +232,52 @@ async function activePairOf(leagueId: number, a: string, b: string): Promise<num
   return row?.id ?? null;
 }
 
-// The insert of a manual pair: only if neither player is in an active pair
-// of the league by then (checked inside the statement, so two organizers at
-// once can't put a player in two pairs). `also`: an extra condition.
-function insertManualPair(leagueId: number, a: string, b: string, also = sql`1`) {
-  return db.run(sql`insert into ${pairs} (league_id, player_a, player_b, source)
-    select ${leagueId}, ${a}, ${b}, 'manual'
-    where not ${activePairWith(leagueId, [a, b])} and ${also}`);
+// The insert of a new pair: only if neither player is in an active pair of
+// the league by then (checked inside the statement, so two organizers or two
+// accepts at once can't put a player in two pairs). A builder, not a raw
+// db.run(), so it can go in a D1 batch with its audit entry.
+export function insertPairIfFree(leagueId: number, a: string, b: string, source: "manual" | "link") {
+  return db.insert(pairs).select(
+    rowSelect(
+      pairs,
+      {
+        id: sql`null`,
+        leagueId: sql`${leagueId}`,
+        playerA: sql`${a}`,
+        playerB: sql`${b}`,
+        inviteId: sql`null`,
+        status: sql`'active'`,
+        source: sql`${source}`,
+        dissolvedAt: sql`null`,
+        dissolvedBy: sql`null`,
+        createdAt: sql`unixepoch()`,
+      },
+      sql`where not ${activePairWith(leagueId, [a, b])}`,
+    ),
+  );
 }
+
+// The active pair of these two players in the league, inside a batch.
+export const activePairIdOf = (leagueId: number, a: string, b: string) =>
+  sql`(select ${pairs.id} from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
+    and ${pairs.playerA} = ${a} and ${pairs.playerB} = ${b})`;
 
 // "Pár létrehozása": two registered players without a pair in the league.
 export async function createPair(actorId: string, leagueId: number, a: string, b: string): Promise<Result> {
   const refused = await newPairRefusal(leagueId, a, b);
   if (refused) return { ok: false, error: refused };
-  await insertManualPair(leagueId, a, b);
-  const id = await activePairOf(leagueId, a, b);
+  await db.batch([
+    insertPairIfFree(leagueId, a, b, "manual"),
+    auditIfChanged({
+      actorId,
+      action: "pair.create",
+      target: sql`'pair:' || ${activePairIdOf(leagueId, a, b)}`,
+      detail: `league:${leagueId}; user:${a} + user:${b}`,
+      leagueId,
+    }),
+  ]);
   // Someone was quicker with one of them.
-  if (!id) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
-  await audit(actorId, "pair.create", `pair:${id}`, `league:${leagueId}; ${a} + ${b}`);
+  if (!(await activePairOf(leagueId, a, b))) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
   return { ok: true };
 }
 
@@ -247,14 +299,25 @@ export const NEW_PARTNER_REFUSED = "Válassz új partnert.";
 // hasn't played in yet (D19), in one batch with whatever follows. The
 // running-group check is repeated in the update, so a group published in the
 // meantime wins; the withdrawal only runs once the pair is dissolved.
-// `also`: an extra condition for the update.
-function dissolveStatements(actorId: string, pairId: number, now: Date, also = sql`1`) {
+// `also`: an extra condition for the update. `logged`: write a pair.dissolve
+// audit entry if the update dissolved it (#225), in the same batch.
+export function dissolveStatements(
+  actorId: string,
+  pairId: number,
+  now: Date,
+  also = sql`1`,
+  logged?: { leagueId: number; detail?: string },
+) {
+  const update = db
+    .update(pairs)
+    .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: actorId })
+    .where(and(eq(pairs.id, pairId), eq(pairs.status, "active"), notInRunningGroup(pairId, now), also))
+    .returning({ id: pairs.id });
+  if (!logged) return [update, withdrawEntries(pairId, now)] as const;
+  const detail = `league:${logged.leagueId}${logged.detail ? `; ${logged.detail}` : ""}`;
   return [
-    db
-      .update(pairs)
-      .set({ status: "dissolved", dissolvedAt: now, dissolvedBy: actorId })
-      .where(and(eq(pairs.id, pairId), eq(pairs.status, "active"), notInRunningGroup(pairId, now), also))
-      .returning({ id: pairs.id }),
+    update,
+    auditIfChanged({ actorId, action: "pair.dissolve", target: `pair:${pairId}`, detail, leagueId: logged.leagueId }),
     withdrawEntries(pairId, now),
   ] as const;
 }
@@ -271,9 +334,8 @@ export async function dissolvePair(actorId: string, leagueId: number, pairId: nu
   const pair = await pairInLeague(leagueId, pairId);
   if (!pair || pair.status !== "active") return { ok: false, error: GONE };
   if (!canDissolve(pair, await pairInRunningGroup(pairId, now))) return { ok: false, error: DISSOLVE_REFUSED };
-  const [dissolved] = await db.batch(dissolveStatements(actorId, pairId, now));
+  const [dissolved] = await db.batch(dissolveStatements(actorId, pairId, now, sql`1`, { leagueId }));
   if (dissolved.length === 0) return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
-  await audit(actorId, "pair.dissolve", `pair:${pairId}`, `league:${leagueId}`);
   return { ok: true };
 }
 
@@ -305,12 +367,18 @@ export async function changePartner(
     await db.batch([
       ...dissolveStatements(actorId, pairId, now, sql`not ${activePairWith(leagueId, [partner])}`),
       db.insert(pairs).values({ leagueId, ...values, source: "manual" }),
+      // The insert either happened or failed the batch.
+      auditEntry({
+        actorId,
+        action: "pair.change",
+        target: sql`'pair:' || ${activePairIdOf(leagueId, values.playerA, values.playerB)}`,
+        detail: `league:${leagueId}; from pair:${pairId}; user:${leaving} -> user:${partner}`,
+        leagueId,
+      }),
     ]);
   } catch (e) {
     if (!/UNIQUE/i.test(String(e))) throw e;
     return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
   }
-  const id = await activePairOf(leagueId, keep, partner);
-  await audit(actorId, "pair.change", `pair:${id ?? "?"}`, `league:${leagueId}; from pair:${pairId}; ${leaving} -> ${partner}`);
   return { ok: true };
 }

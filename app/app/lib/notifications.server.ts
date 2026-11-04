@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { and, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
 import { interestSignups, leagueAdmins, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
@@ -10,7 +11,9 @@ import type { InterestSignup } from "./interest";
 import {
   channelEnabled,
   channelKey,
+  disputeRecipients,
   isEnabled,
+  resultDisputedMessage,
   newSignupMessage,
   pushPayload,
   signupRecipients,
@@ -23,6 +26,8 @@ import {
   type SubscriptionInput,
 } from "./notifications";
 import { pushOutcome, pushRequest, type VapidKeys } from "./push/webpush";
+import { countCall, type RunBudget, type Usage } from "./run-usage";
+import { logError, logInfo, logWarn } from "~/lib/log";
 
 // Notifications are stored first (the /notifications list), then pushed to
 // every device the user subscribed. A push failure never fails the caller.
@@ -42,9 +47,9 @@ export function vapidPublicKey(): string | null {
 // A fan-out (e.g. the groups published to every player) must stay within a
 // Workers Free request's D1 queries, so lookups and inserts go in a few
 // multi-row statements, not one per user (#115). D1 allows 100 bound
-// parameters per statement; a notification row binds 5.
+// parameters per statement; a notification row binds up to 7.
 const ID_CHUNK = 90;
-const INSERT_CHUNK = 15;
+const INSERT_CHUNK = 14;
 
 function chunks<T>(list: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -84,22 +89,36 @@ async function pushTo(userId: string, id: number, message: Message): Promise<num
 
 // Forgets devices the push service no longer knows. Returns how many got it.
 async function pushToDevices(subs: Subscription[], id: number, message: Message, vapid: VapidKeys): Promise<number> {
-  const payload = JSON.stringify(pushPayload(id, message));
+  const { sent, gone } = await sendPushes(
+    subs.map((s) => ({ s, id, message })),
+    vapid,
+  );
+  for (const endpoint of gone) await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  return sent;
+}
+
+// One push per device; each is an outgoing call of the run (#183). Returns
+// how many went out and the devices the push service no longer knows.
+async function sendPushes(list: { s: Subscription; id: number; message: Message }[], vapid: VapidKeys): Promise<{ sent: number; gone: string[] }> {
+  const gone: string[] = [];
   const results = await Promise.all(
-    subs.map(async (s) => {
+    list.map(async ({ s, id, message }) => {
       try {
-        const res = await fetch(await pushRequest(s, payload, vapid));
+        countCall();
+        const res = await fetch(await pushRequest(s, JSON.stringify(pushPayload(id, message)), vapid));
         const outcome = pushOutcome(res.status);
-        if (outcome === "gone") await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, s.endpoint));
-        if (outcome === "failed") console.error(`push failed: ${res.status} ${new URL(s.endpoint).host}`);
+        if (outcome === "gone") gone.push(s.endpoint);
+        if (outcome === "failed") logWarn("push failed", { status: res.status, host: new URL(s.endpoint).host });
         return outcome === "sent";
       } catch (error) {
-        console.error("push error", error);
+        logError("push failed", { error });
         return false;
       }
     }),
   );
-  return results.filter(Boolean).length;
+  const sent = results.filter(Boolean).length;
+  if (list.length > 0) logInfo("push", { sent, failed: list.length - sent, gone: new Set(gone).size });
+  return { sent, gone: [...new Set(gone)] };
 }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -107,9 +126,17 @@ const NONE: ReadonlySet<string> = new Set();
 // Stores one message per user, skipping users who switched the kind off, and
 // pushes it to those who didn't switch push off (#115). D1 queries: one
 // opt-out lookup, one insert per INSERT_CHUNK messages, one subscription
-// lookup (per ID_CHUNK users each).
-async function notify(kind: StoredKind, messages: { userId: string; message: Message }[]): Promise<void> {
+// lookup (per ID_CHUNK users each). With `queuePush` (the hourly job, #183)
+// the pushes wait in the queue for pushQueued() instead of going out here.
+async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date, queuePush = false): Promise<void> {
   const disabled = await disabledKinds(messages.map((m) => m.userId));
+  if (queuePush) {
+    const at = createdAt ?? new Date();
+    const rows = notificationRows(kind, messages, at, (userId) => disabled.get(userId) ?? NONE);
+    const [first, ...rest] = notificationInserts(rows);
+    if (first) await db.batch([first, ...rest]);
+    return;
+  }
   const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? NONE, kind));
   // Each returned row carries its own message: RETURNING has no set order.
   const stored: ({ id: number; userId: string } & Message)[] = [];
@@ -117,7 +144,7 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
     stored.push(
       ...(await db
         .insert(notifications)
-        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message })))
+        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message, ...(createdAt ? { createdAt } : {}) })))
         .returning({
           id: notifications.id,
           userId: notifications.userId,
@@ -141,12 +168,144 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
 // player switched push off. The email goes through the outbox, which checks
 // the email switch. A push failure never fails the caller; neither does a
 // failure here, since the decision it reports is already saved.
-export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[]): Promise<void> {
+// `createdAt`: the time of a scheduled job (the reminders, #31), so the daily
+// digest reads the same clock; the database time otherwise. `queuePush`: the
+// hourly job, whose pushes go out within its run limits (#183, pushQueued).
+export async function notifyPlayers(
+  kind: PlayerKind,
+  messages: { userId: string; message: Message }[],
+  createdAt?: Date,
+  queuePush = false,
+): Promise<void> {
   try {
-    await notify(kind, messages);
+    await notify(kind, messages, createdAt, queuePush);
   } catch (error) {
-    console.error(`${kind} notification failed`, error);
+    logError("notification failed", { kind, error });
   }
+}
+
+// --- The hourly job's notifications (#183) ----------------------------------
+// The job stores its items in the app with their push waiting in the queue
+// (notifications.push_due_at), in the same D1 batch as its own records of
+// what it sent, so both commit or neither does. pushQueued() then pushes as
+// many as the run's limits allow, oldest first; the next run goes on.
+
+type NotificationRow = typeof notifications.$inferInsert;
+
+// One row per message, without the users who switched the kind off; the push
+// waits for those who didn't switch push off.
+function notificationRows(
+  kind: StoredKind,
+  messages: { userId: string; message: Message }[],
+  at: Date,
+  disabled: (userId: string) => ReadonlySet<string>,
+): NotificationRow[] {
+  return messages
+    .filter((m) => isEnabled(disabled(m.userId), kind))
+    .map(({ userId, message }) => ({
+      userId,
+      kind,
+      ...message,
+      createdAt: at,
+      pushDueAt: channelEnabled(disabled(userId), "push") ? at : null,
+    }));
+}
+
+function notificationInserts(rows: NotificationRow[]): BatchItem<"sqlite">[] {
+  return chunks(rows, INSERT_CHUNK).map((chunk) => db.insert(notifications).values(chunk));
+}
+
+// The opt-outs of the given kinds and of push, in one query: few people
+// switch anything off, so no list of users is bound.
+async function optOutsOf(kinds: readonly StoredKind[]): Promise<(userId: string) => ReadonlySet<string>> {
+  const rows = await db
+    .select()
+    .from(notificationOptOuts)
+    .where(inArray(notificationOptOuts.kind, [...kinds, channelKey("push")]));
+  const out = new Map<string, Set<string>>();
+  for (const r of rows) (out.get(r.userId) ?? out.set(r.userId, new Set()).get(r.userId)!).add(r.kind);
+  return (userId) => out.get(userId) ?? NONE;
+}
+
+/**
+ * The insert statements of the hourly job's items, push queued, for the
+ * caller's batch. One query (the opt-outs); `batches` is one list of
+ * statements per batch the caller makes, the messages split the same way.
+ */
+export async function queuedNotifications(
+  kinds: readonly StoredKind[],
+  batches: { kind: StoredKind; messages: { userId: string; message: Message }[] }[][],
+  at: Date,
+): Promise<BatchItem<"sqlite">[][]> {
+  const disabled = await optOutsOf(kinds);
+  return batches.map((parts) => notificationInserts(parts.flatMap((p) => notificationRows(p.kind, p.messages, at, disabled))));
+}
+
+// Rows looked at per round of pushQueued (one subscription lookup each).
+const PUSH_ROUND = ID_CHUNK;
+// What one round costs at most besides the pushes: the queue, the devices,
+// the claim and forgetting gone devices.
+const PUSH_ROUND_QUERIES = 4;
+
+/**
+ * Pushes the queued items, oldest first, as many as fit the run (`budget`)
+ * while keeping `keep` for the steps after it. Each item is taken off the
+ * queue (claimed) before its push goes out, so an overlapping run can't push
+ * it twice; an item goes only when all its devices fit. Returns how many
+ * items were pushed and how many still wait.
+ */
+export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, calls: 0 }): Promise<{ pushed: number; left: number }> {
+  const vapid = vapidKeys();
+  let pushed = 0;
+  // One more query at the end: what is left.
+  while (budget.fits({ queries: keep.queries + PUSH_ROUND_QUERIES + 1, calls: keep.calls })) {
+    const queue = await db
+      .select({ id: notifications.id, userId: notifications.userId, title: notifications.title, body: notifications.body, url: notifications.url })
+      .from(notifications)
+      .where(isNotNull(notifications.pushDueAt))
+      .orderBy(asc(notifications.pushDueAt), asc(notifications.id))
+      .limit(PUSH_ROUND);
+    if (queue.length === 0) break;
+    const subs = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
+    let calls = budget.left().calls - keep.calls;
+    const taken: typeof queue = [];
+    for (const n of queue) {
+      const devices = subs.get(n.userId)?.length ?? 0;
+      if (devices > calls) break;
+      calls -= devices;
+      taken.push(n);
+    }
+    if (taken.length === 0) break;
+    const claimed = new Set(
+      (
+        await db
+          .update(notifications)
+          .set({ pushDueAt: null })
+          .where(
+            and(
+              isNotNull(notifications.pushDueAt),
+              inArray(
+                notifications.id,
+                taken.map((n) => n.id),
+              ),
+            ),
+          )
+          .returning({ id: notifications.id })
+      ).map((r) => r.id),
+    );
+    const sending = taken.filter((n) => claimed.has(n.id));
+    if (vapid) {
+      const { gone } = await sendPushes(
+        sending.flatMap((n) => (subs.get(n.userId) ?? []).map((s) => ({ s, id: n.id, message: n }))),
+        vapid,
+      );
+      if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, gone));
+    } else if (import.meta.env.DEV && sending.length > 0) console.log(`[push disabled] ${sending.length} queued pushes`);
+    pushed += sending.length;
+    if (taken.length < queue.length) break;
+  }
+  const [{ n }] = await db.select({ n: count() }).from(notifications).where(isNotNull(notifications.pushDueAt));
+  return { pushed, left: n };
 }
 
 // The same, addressed by email (signup-list mail): only the addresses that
@@ -166,7 +325,7 @@ export async function notifyAccounts(kind: PlayerKind, messages: { email: string
       }),
     );
   } catch (error) {
-    console.error(`${kind} notification failed`, error);
+    logError("notification failed", { kind, error });
   }
 }
 
@@ -195,6 +354,35 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
     organize: signup.wantsToOrganize,
   };
   await notify("new_signup", recipients.map((r) => ({ userId: r.userId, message: newSignupMessage(summary, r) })));
+}
+
+// A result was disputed (#178): tell the league's Szervezők and the Admins,
+// in the app and by push, never by email. Accounts being deleted are skipped,
+// and so is the player who disputed (#221).
+export async function notifyResultDisputed(input: {
+  matchId: number;
+  leagueId: number;
+  leagueSlug: string;
+  leagueName: string;
+  week: number;
+  disputedBy: string;
+}): Promise<void> {
+  const [organizers, admins] = await Promise.all([
+    db
+      .select({ id: users.id })
+      .from(leagueAdmins)
+      .innerJoin(users, eq(users.id, leagueAdmins.userId))
+      .where(and(eq(leagueAdmins.leagueId, input.leagueId), isNull(users.deletedAt))),
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.platformRole, "superadmin"), isNull(users.deletedAt))),
+  ]);
+  const message = resultDisputedMessage(input);
+  await notify(
+    "result_disputed",
+    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), input.disputedBy).map((userId) => ({ userId, message })),
+  );
 }
 
 // The profile's "Próba" button. Returns how many devices got the push (none

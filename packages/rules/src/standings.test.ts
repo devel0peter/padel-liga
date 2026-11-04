@@ -274,6 +274,30 @@ describe("withdrawn pairs (rules 2: all their matches leave the table)", () => {
     expect(order(pairs, withD)).not.toContain("D");
   });
 
+  it("a three-way tie stays a three-way tie when the pair that would have broken it withdraws", () => {
+    // A, B and C each win once (3 + 1 points each); D beat C and lost to A
+    // and B, which would have put C last. Without D: set difference decides.
+    const tie = [beat("A", "B", S20), beat("B", "C", S20close), beat("C", "A", S20mid)];
+    const withD = [...tie, beat("D", "C"), beat("A", "D", S21), beat("B", "D", S21)];
+    const pairs = [pair("A"), pair("B"), pair("C"), pair("D", 1200, true)];
+    const rows = groupStandings(pairs, withD);
+    expect(rows.map((r) => r.points)).toEqual([4, 4, 4]);
+    expect(rows).toEqual(groupStandings(ABC, tie));
+    // With D still in, C drops below A and B.
+    expect(order(ABCD, withD).indexOf("C")).toBeGreaterThan(order(ABCD, withD).indexOf("B"));
+  });
+
+  it("a pair withdrawn with played and unplayed matches: only the others' played ones count", () => {
+    const m = [beat("A", "B"), beat("D", "A"), unplayed("B", "D"), unplayed("A", "C"), walkover("D", "C")];
+    const pairs = [pair("A"), pair("B"), pair("C"), pair("D", 1200, true)];
+    const rows = groupStandings(pairs, m);
+    expect(rows.map((r) => [r.id, r.points, r.matches])).toEqual([
+      ["A", 3, 1],
+      ["B", 1, 1],
+      ["C", 0, 0],
+    ]);
+  });
+
   it("also drops its unplayed and both-inactive matches", () => {
     const withD = [...base, unplayed("D", "A"), bothInactive("B", "D")];
     const pairs = [pair("A"), pair("B"), pair("C"), pair("D", 1200, true)];

@@ -15,6 +15,10 @@ export const NOTIFICATION_KINDS = {
     label: "Új jelentkező",
     description: "Ha valaki jelentkezik a ligádba.",
   },
+  result_disputed: {
+    label: "Vitatott eredmény",
+    description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -29,10 +33,38 @@ export type PlayerKind =
   // Daily-digest items (#31 builds the digest email from these): in the app
   // and by push only for now.
   | "match_scheduled"
-  | "match_declined";
+  | "match_declined"
+  | "match_cancelled"
+  // Reminders (#31): digest items, except "holnap meccs", which is instant.
+  | "match_no_proposal"
+  | "match_week_end"
+  | "match_deadline_soon"
+  | "match_tomorrow"
+  // Results (#28): waiting for confirmation is instant (also by email); a
+  // confirmed or auto-accepted result and an organizer's decision (#29) are
+  // digest items.
+  | "match_result"
+  | "match_result_confirmed"
+  | "match_decided"
+  // A dispute (#178): the recording pair is told at once, in the app and by
+  // push, not in the digest (D83). The organizers' kind is `result_disputed`.
+  | "match_result_disputed"
+  // A pair withdrawn mid-phase (#34): to its players and the group's other
+  // pairs, in the app and by push only, never by email.
+  | "pair_withdrawn";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
-export const DIGEST_KINDS: readonly PlayerKind[] = ["match_scheduled", "match_declined"];
+// The digest is built from this list alone, so a kind added here is in it.
+export const DIGEST_KINDS: readonly PlayerKind[] = [
+  "match_scheduled",
+  "match_declined",
+  "match_cancelled",
+  "match_no_proposal",
+  "match_week_end",
+  "match_deadline_soon",
+  "match_result_confirmed",
+  "match_decided",
+];
 export type StoredKind = NotificationKind | PlayerKind | "test";
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -41,7 +73,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -140,24 +172,50 @@ export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// A Szervező decided on the pair's season entry (#23). No names (a lock
-// screen is not a private place); the note is on the Párom page.
-export function seasonEntryDecisionMessage(input: {
-  league: string;
-  season: string;
-  approved: boolean;
-  // Where an approved pair starts; null: the next season.
-  joins: { phase: number; startsAt: Date } | null;
-}): Message {
-  const start = !input.approved
-    ? null
-    : input.joins === null
+// The pair's season entry counts (#153): one of them clicked "Nevezünk", or
+// the organizer entered them from Párok (#154); or the organizer took them
+// out of the season (#154). No names (a lock screen is not a private place).
+export function seasonEntryMessage(
+  input: {
+    league: string;
+    season: string;
+    // Where the pair starts; null: the next season. Not used for "removed".
+    joins: { phase: number; startsAt: Date } | null;
+  },
+  event: "entered" | "entered_by_organizer" | "removed" = "entered",
+): Message {
+  const where = `${input.season}, ${input.league}.`;
+  if (event === "removed")
+    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: "/pair" };
+  const start =
+    input.joins === null
       ? "A következő szezontól játszotok."
       : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
-    title: input.approved ? "Jóváhagyták a nevezéseteket" : "Nem fogadták el a nevezéseteket",
-    body: [`${input.season}, ${input.league}.`, start].filter(Boolean).join(" "),
+    title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
+    body: `${where} ${start}`,
     url: "/pair",
+  };
+}
+
+// A pair withdrawn mid-phase (#34). To its own players, with the
+// organizer's reason; to the group's other pairs, no names (a lock screen is
+// not a private place) and no reason (it may be about someone's health).
+export function pairWithdrawnMessage(
+  input: { league: string; season: string; phase: number; group: number; reason: string },
+  to: "pair" | "group",
+): Message {
+  const where = `${input.group}. csoport, ${input.phase}. kör, ${input.season}, ${input.league}.`;
+  if (to === "pair")
+    return {
+      title: "A szervező visszaléptetett titeket a körből",
+      body: `${where} A meccseitek nem számítanak, és a szezonból is kikerültetek. Ha újra játszanátok, szóljatok a szervezőnek. Indok: ${input.reason}`,
+      url: "/pair",
+    };
+  return {
+    title: "Visszalépett egy pár a csoportodból",
+    body: `${where} A meccseik kikerültek a tabellából, a lejátszottak is. A csoport nélkülük folytatja.`,
+    url: "/home",
   };
 }
 
@@ -236,6 +294,76 @@ export function matchDeclinedMessage(input: { matchId: number; slot: Date }): Me
   return {
     title: "Nem erősítették meg az időpontot",
     body: `Az ellenfeletek szerint nem ${formatDeadline(input.slot)} a meccs. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the other pair: the scheduled slot was cancelled (#27, digest item). A
+// late cancellation says the cancelling pair proposes next (spec 6.6).
+export function matchCancelledMessage(input: { matchId: number; slot: Date; late: boolean }): Message {
+  return {
+    title: "Lemondták a meccset",
+    body: input.late
+      ? `Az ellenfeletek 24 órán belül lemondta a ${formatDeadline(input.slot)} időpontot. Nekik kell új időpontokat ajánlaniuk.`
+      : `Az ellenfeletek lemondta a ${formatDeadline(input.slot)} időpontot. Egyeztessetek újra.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// --- Results (#28) and organizer decisions (#29, spec 13) --------------------
+// No names; the score from the recipient's side ("ti" first).
+
+// To the other pair: a result waits for confirmation (instant).
+export function matchResultMessage(input: { matchId: number; score: string }): Message {
+  return {
+    title: "Erősítsd meg az eredményt",
+    body: `Az ellenfeletek rögzítette az eredményt: ${input.score}. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To both pairs: the result counts (digest item).
+export function matchResultConfirmedMessage(input: { matchId: number; score: string; auto: boolean }): Message {
+  return {
+    title: "Végleges az eredmény",
+    body: input.auto ? `48 óra után magától elfogadtuk az eredményt: ${input.score}.` : `Megerősítették az eredményt: ${input.score}.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// To the pair that recorded the result: the other pair disputes it (instant,
+// #178). No names and no score: the match page has both versions.
+export function matchResultDisputedMessage(input: { matchId: number }): Message {
+  return {
+    title: "Vitatják az eredményt",
+    body: "Az ellenfeletek nem ért egyet a rögzített eredménnyel. A szervező dönt, szólunk, ha megvan.",
+    url: matchUrl(input.matchId),
+  };
+}
+
+// A dispute goes to the league's Szervezők and to every Admin, once each
+// (#178). All of them open the league's decision page. The player who
+// disputed is left out even if they organize: no notice about their own step (#221).
+export function disputeRecipients(organizerIds: readonly string[], adminIds: readonly string[], disputedBy: string): string[] {
+  return [...new Set([...adminIds, ...organizerIds])].filter((id) => id !== disputedBy);
+}
+
+// To the organizers and Admins (app and push, never email). No names: the
+// decision page shows both versions.
+export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Vitatott eredmény · ${input.leagueName}`,
+    body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
+  };
+}
+
+// To both pairs: the organizer decided or overrode the outcome (digest item).
+// The reason is on the match page only.
+export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "A szervező döntött a meccsetekről",
+    body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
     url: matchUrl(input.matchId),
   };
 }

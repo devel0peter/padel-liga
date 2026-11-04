@@ -11,7 +11,7 @@ vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queueSeasonEntryDecision: async (...args: any[]) => h.mails.push(args),
+  queueSeasonEntered: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
 }));
 
@@ -212,7 +212,10 @@ describe("pairs.server on real SQLite (#97)", () => {
         source: "manual",
         status: "active",
         locked: false,
-        entry: { season: "Tél", status: "pending" },
+        lockedIn: [],
+        entry: { seasonId: 1, season: "Tél", status: "pending", joinsPhase: null },
+        // #154: an entered pair can be taken out.
+        entryAction: { kind: "remove", seasonId: 1, season: "Tél" },
         season: "Tél",
       },
       {
@@ -225,7 +228,9 @@ describe("pairs.server on real SQLite (#97)", () => {
         source: "signup",
         status: "dissolved",
         locked: false,
+        lockedIn: [],
         entry: null,
+        entryAction: null,
         season: "Tél",
       },
     ]);
@@ -238,9 +243,10 @@ describe("pairs.server on real SQLite (#97)", () => {
 describe("the player-side pair invite is gone (#97)", () => {
   // Every app source file except tests and the files that only name the
   // kinds and the table for rows already stored (schema, budget, outbox
-  // labels, the local seed reset).
+  // labels, the local seed reset, and the account deletion that removes a
+  // deleted person's old rows, #152).
   const ROOT = new URL("../", import.meta.url);
-  const KEEP = new Set(["db/schema.ts", "lib/email/budget.ts", "lib/email/outbox-view.ts", "lib/seed.ts"]);
+  const KEEP = new Set(["db/schema.ts", "lib/email/budget.ts", "lib/email/outbox-view.ts", "lib/seed.ts", "lib/account-deletion.server.ts"]);
   function sources(dir: URL, prefix = ""): string[] {
     return (readdirSync(dir) as string[]).flatMap((name) => {
       const url = new URL(name, dir);

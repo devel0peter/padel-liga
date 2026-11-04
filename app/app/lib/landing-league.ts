@@ -105,6 +105,9 @@ export type LandingBlock = {
   chip: string;
   cta: string;
   ctaNote: string | null;
+  // The league's public page (groups, tables, matches; #30), when the league
+  // is known by its slug.
+  ladderPath?: string;
 };
 
 // The article before a round number: "az 1.", "a 2.", "az 5.".
@@ -195,12 +198,12 @@ function stateBlock(state: LeagueLanding): Omit<LandingBlock, "cta" | "ctaNote">
 // The block for each city that has a league, by city slug. A city with
 // several leagues shows the first one that has a season (else the first).
 export function landingByCity(
-  leagues: readonly { id: number; city: string }[],
+  leagues: readonly { id: number; city: string; slug?: string }[],
   seasons: readonly (LandingSeason & { leagueId: number })[],
   now: Date,
 ): Map<string, LandingBlock> {
   const withSeasons = new Set(seasons.map((s) => s.leagueId));
-  const pick = new Map<string, { id: number }>();
+  const pick = new Map<string, { id: number; slug?: string }>();
   for (const league of leagues) {
     const chosen = pick.get(league.city);
     if (!chosen || (!withSeasons.has(chosen.id) && withSeasons.has(league.id))) pick.set(league.city, league);
@@ -208,7 +211,10 @@ export function landingByCity(
   return new Map(
     [...pick].map(([city, league]) => [
       city,
-      landingBlock(leagueLanding(seasons.filter((s) => s.leagueId === league.id), now)),
+      {
+        ...landingBlock(leagueLanding(seasons.filter((s) => s.leagueId === league.id), now)),
+        ...(league.slug ? { ladderPath: `/league/${league.slug}` } : {}),
+      },
     ]),
   );
 }

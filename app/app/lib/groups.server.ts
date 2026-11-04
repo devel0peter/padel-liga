@@ -9,7 +9,7 @@ import { queueGroupsPublished } from "~/lib/email/outbox.server";
 import { groupsPublishedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
-import { audit } from "./leagues.server";
+import { auditEntry, auditWhen, leagueOfSeason } from "./audit.server";
 import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
 import { averageStartingElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
@@ -36,6 +36,10 @@ export type GroupPair = {
   averageElo: number;
   // False once the pair was dissolved after the draft was made.
   active: boolean;
+  // Withdrawn mid-phase from a published group (#34): out of its table,
+  // with the organizer's reason (for the organizer's pages only).
+  withdrawn: boolean;
+  withdrawalReason: string | null;
 };
 
 export type StoredGroup = { id: number; number: number; revision: number; publishedAt: Date | null; pairs: GroupPair[] };
@@ -77,6 +81,8 @@ function groupPair(r: PairRow): GroupPair {
     // rating is the average starting Elo of its levels (D20).
     averageElo: averageStartingElo(r.levelA, r.levelB) ?? 0,
     active: r.pairStatus === "active",
+    withdrawn: false,
+    withdrawalReason: null,
   };
 }
 
@@ -114,7 +120,12 @@ export async function phaseGroups(seasonId: number, phase = FIRST_PHASE): Promis
     .orderBy(asc(groups.number));
   if (list.length === 0) return [];
   const rows = await db
-    .select({ groupId: groupPairs.groupId, ...pairColumns })
+    .select({
+      groupId: groupPairs.groupId,
+      withdrawnAt: groupPairs.withdrawnAt,
+      withdrawalReason: groupPairs.withdrawalReason,
+      ...pairColumns,
+    })
     .from(groupPairs)
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
@@ -126,7 +137,12 @@ export async function phaseGroups(seasonId: number, phase = FIRST_PHASE): Promis
       ),
     )
     .orderBy(asc(groupPairs.groupId), asc(groupPairs.seed));
-  return list.map((g) => ({ ...g, pairs: rows.filter((r) => r.groupId === g.id).map(groupPair) }));
+  return list.map((g) => ({
+    ...g,
+    pairs: rows
+      .filter((r) => r.groupId === g.id)
+      .map((r) => ({ ...groupPair(r), withdrawn: r.withdrawnAt !== null, withdrawalReason: r.withdrawalReason })),
+  }));
 }
 
 // Whether a season's first-phase groups are published (seasons.ts seasonActions).
@@ -160,14 +176,17 @@ const MATCH_CHUNK = 13; // 7 per row (the status and revision defaults are bound
 
 // Whether the pair plays in a published group whose phase hasn't ended:
 // such a pair can't be dissolved (D16) or rejected, or the published groups
-// and their matches would change.
+// and their matches would change. A pair withdrawn from that group (#34)
+// plays there no more.
 export async function pairInRunningGroup(pairId: number, now = new Date()): Promise<boolean> {
   const [row] = await db
     .select({ id: groupPairs.groupId })
     .from(groupPairs)
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
     .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(eq(groupPairs.pairId, pairId), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)))
+    .where(
+      and(eq(groupPairs.pairId, pairId), isNull(groupPairs.withdrawnAt), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)),
+    )
     .limit(1);
   return !!row;
 }
@@ -177,7 +196,7 @@ export async function pairInRunningGroup(pairId: number, now = new Date()): Prom
 export function notInRunningGroup(pairId: number, now = new Date()) {
   return sql`not exists (select 1 from group_pairs gp join groups g on g.id = gp.group_id
     join season_phases sp on sp.season_id = g.season_id and sp.number = g.phase
-    where gp.pair_id = ${pairId} and g.published_at is not null and sp.deadline >= ${Math.floor(now.getTime() / 1000)})`;
+    where gp.pair_id = ${pairId} and gp.withdrawn_at is null and g.published_at is not null and sp.deadline >= ${Math.floor(now.getTime() / 1000)})`;
 }
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
@@ -211,6 +230,7 @@ export async function generateDraft(seasonId: number, actorId: string): Promise<
       .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, FIRST_PHASE), isNull(groups.publishedAt))),
     ...chunks(groupRows, GROUP_CHUNK).map((rows) => db.insert(groups).values(rows)),
     ...chunks(pairRows, PAIR_CHUNK).map((rows) => db.insert(groupPairs).values(rows)),
+    auditEntry({ actorId, action: "groups.draft", target: `season:${seasonId}`, detail: `${eligible.length} pairs`, leagueId: leagueOfSeason(seasonId) }),
   ];
   try {
     const [first, ...rest] = statements;
@@ -219,7 +239,6 @@ export async function generateDraft(seasonId: number, actorId: string): Promise<
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
     throw e;
   }
-  await audit(actorId, "groups.draft", `season:${seasonId}`, `${eligible.length} pairs`);
   return { ok: true };
 }
 
@@ -266,6 +285,7 @@ export async function moveDraftPair(seasonId: number, pairId: number, toNumber: 
         ),
       ),
     ...chunks(rows, PAIR_CHUNK).map((r) => db.insert(groupPairs).values(r)),
+    auditEntry({ actorId, action: "groups.move", target: `season:${seasonId}`, detail: `pair:${pairId} -> ${toNumber}`, leagueId: leagueOfSeason(seasonId) }),
   ];
   try {
     await db.batch([first, ...rest]);
@@ -273,7 +293,6 @@ export async function moveDraftPair(seasonId: number, pairId: number, toNumber: 
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
     throw e;
   }
-  await audit(actorId, "groups.move", `season:${seasonId}`, `pair:${pairId} -> ${toNumber}`);
   return { ok: true };
 }
 
@@ -333,6 +352,13 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     await db.batch([
       db.update(groups).set({ publishedAt: now }).where(and(sql`${draftOf}`, unchanged, pairsStillIn)),
       ...chunks(matchRows, MATCH_CHUNK).map((rows) => db.insert(matches).values(rows)),
+      auditWhen(claimed, {
+        actorId,
+        action: "groups.publish",
+        target: `season:${seasonId}`,
+        detail: `${draft.length} groups, ${fixtures.length} matches`,
+        leagueId: season.leagueId,
+      }),
     ]);
   } catch (e) {
     if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
@@ -344,7 +370,6 @@ export async function publishGroups(seasonId: number, actorId: string, now = new
     .from(groups)
     .where(and(inArray(groups.id, ids), eq(groups.publishedAt, now)));
   if ((done?.n ?? 0) !== ids.length) return { ok: false, error: (await groupsPublished(seasonId)) ? LOCKED : CHANGED };
-  await audit(actorId, "groups.publish", `season:${seasonId}`, `${draft.length} groups, ${fixtures.length} matches`);
 
   const [league] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, season.leagueId));
   const name = (p: Player) => p.name || "Névtelen";

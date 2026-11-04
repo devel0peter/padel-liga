@@ -5,11 +5,13 @@ import type { StepResult } from "./backup.server";
 // imports so a test can run it with stand-ins for the two jobs.
 export type Jobs = {
   backup: () => Promise<StepResult>;
-  email: () => Promise<{ sent: number }>;
+  hourly: (now: Date) => Promise<void>;
 };
 
-export function runScheduled(cron: string, ctx: { waitUntil(promise: Promise<unknown>): void }, jobs: Jobs): void {
-  if (cronJob(cron) === "backup") {
+type Controller = { cron: string; scheduledTime: number };
+
+export function runScheduled(controller: Controller, ctx: { waitUntil(promise: Promise<unknown>): void }, jobs: Jobs): void {
+  if (cronJob(controller.cron) === "backup") {
     // Not caught: a failed export shows as a failed cron run in the logs.
     ctx.waitUntil(
       jobs.backup().then((r) => {
@@ -20,5 +22,5 @@ export function runScheduled(cron: string, ctx: { waitUntil(promise: Promise<unk
     );
     return;
   }
-  ctx.waitUntil(jobs.email().then(({ sent }) => sent && console.log(`cron: sent ${sent} emails`)));
+  ctx.waitUntil(jobs.hourly(new Date(controller.scheduledTime)));
 }

@@ -28,6 +28,10 @@ export type Permission =
   | { kind: "leagues.manage" }
   | { kind: "cities.manage" }
   | { kind: "users.view" }
+  // Napló, the audit log (#226): read-only.
+  | { kind: "log.view" }
+  // Delete or anonymize an account (#152). Which accounts: account-deletion.ts.
+  | { kind: "users.delete" }
   // A city's clubs (venues): its Szervezők. Without a city: every city's.
   | { kind: "clubs.manage"; city?: string }
   // One league's organizer pages.
@@ -59,7 +63,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "pairs" | "solos" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -73,6 +77,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
+  { label: "Napló", to: "/admin/log", icon: "log", permission: { kind: "log.view" } },
 ];
 
 function leagueItems(league: LeagueRef): NavItem[] {
@@ -80,9 +85,13 @@ function leagueItems(league: LeagueRef): NavItem[] {
   return [
     { label: "Áttekintés", to: base, icon: "overview", permission: { kind: "league.manage", league: league.slug } },
     { label: "Szezonok", to: `${base}/seasons`, icon: "seasons", permission: { kind: "league.manage", league: league.slug } },
+    { label: "Meccsek", to: `${base}/matches`, icon: "matches", permission: { kind: "league.manage", league: league.slug } },
     { label: "Párok", to: `${base}/pairs`, icon: "pairs", permission: { kind: "league.manage", league: league.slug } },
     { label: "Párkeresők", to: `${base}/solos`, icon: "solos", permission: { kind: "league.manage", league: league.slug } },
+    { label: "Emlékeztetők", to: `${base}/reminders`, icon: "reminders", permission: { kind: "league.manage", league: league.slug } },
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
+    // Disputed results and decisions on any match (#29).
+    { label: "Viták", to: `${base}/disputes`, icon: "disputes", permission: { kind: "league.manage", league: league.slug } },
   ];
 }
 

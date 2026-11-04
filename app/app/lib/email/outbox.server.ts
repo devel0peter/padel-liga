@@ -3,6 +3,8 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { auditEntry } from "~/lib/audit.server";
+import { runAfterResponse } from "~/lib/background.server";
 import {
   accountInvites,
   broadcasts,
@@ -11,10 +13,13 @@ import {
   interestSignups,
   leagues,
   notificationOptOuts,
+  stuckReminderPeople,
+  stuckReminders,
   users,
 } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
 import { channelKey, followsEmailSwitch } from "~/lib/notifications";
+import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import { INTEREST_INVITE_NOTE, inviteRecipients, inviteStarts, type InviteRecipient, type InviteStart, type Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
@@ -22,22 +27,29 @@ import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
+import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { listCities } from "~/lib/cities.server";
+import { logError, logInfo, logWarn } from "~/lib/log";
 import { listSeasons } from "~/lib/seasons.server";
 
 import {
   broadcastEmail,
+  dailyDigest,
   groupsPublished,
   loginCode,
   matchAgreedTime,
   matchProposal,
+  matchResult,
+  matchTomorrow,
   pairIntro,
   partnerNotice,
   registrationInvite,
-  seasonEntryDecision,
+  seasonEntered,
   signupConfirmation,
+  stuckReminder,
   type Email,
   type PairIntroPerson,
+  type StuckReminderInput,
 } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
@@ -102,9 +114,15 @@ export async function emailSwitchedOff(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.email.toLowerCase()));
 }
 
+// A deleted account's placeholder address (#152) is nobody: whatever list
+// it slips into, no email is stored for it.
+const toSomeone = (m: { toEmail: string }) => !isAnonymizedEmail(m.toEmail);
+
 // Stores the emails, except notifications to an account that switched email
-// off (#115, followsEmailSwitch); the in-app list still has them.
-async function enqueue(queued: NewMessage[]): Promise<number[]> {
+// off (#115, followsEmailSwitch; the in-app list still has them) and mail to a
+// deleted account's placeholder address.
+async function enqueue(all: NewMessage[]): Promise<number[]> {
+  const queued = all.filter(toSomeone);
   const off = queued.some((m) => followsEmailSwitch(m.kind)) ? await emailSwitchedOff() : new Set<string>();
   const messages = queued.filter((m) => !followsEmailSwitch(m.kind) || !off.has(m.toEmail.toLowerCase()));
   const ids: number[] = [];
@@ -115,7 +133,16 @@ async function enqueue(queued: NewMessage[]): Promise<number[]> {
       .returning({ id: emailMessages.id });
     ids.push(...rows.map((r) => r.id));
   }
+  logQueued(messages);
   return ids;
+}
+
+// "email queued" (#227): how many of each kind, never the addresses.
+function logQueued(messages: readonly { kind: string }[]): void {
+  if (messages.length === 0) return;
+  const kinds: Record<string, number> = {};
+  for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+  logInfo("email queued", { count: messages.length, kinds });
 }
 
 export async function suppressedSet(): Promise<Set<string>> {
@@ -194,15 +221,14 @@ export async function queueLoginCode(email: string, code: string): Promise<void>
   await deliver(ids);
 }
 
-// A Szervező approved or rejected a season entry (#23): each player of the
-// pair gets one. An unsubscribed or bounced address, or a player who switched
+// A pair entered a season (#153): each player of the pair gets one. An unsubscribed or bounced address, or a player who switched
 // email off (#115), gets nothing; the status still shows in the app.
-export async function queueSeasonEntryDecision(
+export async function queueSeasonEntered(
   toEmail: string,
-  input: Parameters<typeof seasonEntryDecision>[0],
+  input: Parameters<typeof seasonEntered>[0],
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntryDecision(input) }]));
+  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntered(input) }]));
 }
 
 // The groups are published (#24, D22): one email per player, sent right away
@@ -228,6 +254,7 @@ export async function queueMatchEmails(
   messages: (
     | { kind: "match_proposal"; toEmail: string; input: Parameters<typeof matchProposal>[0] }
     | { kind: "match_agreed_time"; toEmail: string; input: Parameters<typeof matchAgreedTime>[0] }
+    | { kind: "match_result"; toEmail: string; input: Parameters<typeof matchResult>[0] }
   )[],
 ): Promise<void> {
   const suppressed = await suppressedSet();
@@ -237,10 +264,42 @@ export async function queueMatchEmails(
       (m): NewMessage => ({
         kind: m.kind,
         toEmail: m.toEmail,
-        ...(m.kind === "match_proposal" ? matchProposal(m.input) : matchAgreedTime(m.input)),
+        ...(m.kind === "match_proposal" ? matchProposal(m.input) : m.kind === "match_result" ? matchResult(m.input) : matchAgreedTime(m.input)),
       }),
     );
   await deliverNow(await enqueue(queued));
+}
+
+// The cron's match emails (#31): the daily digest and "holnap meccs", as
+// personal (transactional) mail within the daily limit. Unsubscribed or
+// bounced addresses, and players who switched email off (#115), get nothing;
+// the in-app list and push still have the items.
+export type ReminderEmail =
+  | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
+  | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] };
+
+// Returned as insert statements for the hourly job's own D1 batch (#183):
+// stored together with the job's records of what it sent, and sent by the
+// job's delivery step within the run's limits. Two queries at most (the
+// suppressed addresses and the email switch).
+// `batches`: one list of emails per D1 batch the caller makes; the statements
+// come back split the same way.
+export async function reminderEmailInserts(batches: ReminderEmail[][]): Promise<BatchItem<"sqlite">[][]> {
+  const messages = batches.flat();
+  if (messages.length === 0) return batches.map(() => []);
+  const suppressed = await suppressedSet();
+  const off = messages.some((m) => followsEmailSwitch(m.kind)) ? await emailSwitchedOff() : new Set<string>();
+  const wanted = (m: ReminderEmail) =>
+    toSomeone(m) && !suppressed.has(m.toEmail.toLowerCase()) && (!followsEmailSwitch(m.kind) || !off.has(m.toEmail.toLowerCase()));
+  return batches.map((list) => {
+    const queued = list
+      .filter(wanted)
+      .map((m): NewMessage => ({ kind: m.kind, toEmail: m.toEmail, ...(m.kind === "match_digest" ? dailyDigest(m.input) : matchTomorrow(m.input)) }));
+    const statements: BatchItem<"sqlite">[] = [];
+    for (let i = 0; i < queued.length; i += INSERT_CHUNK)
+      statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
+    return statements;
+  });
 }
 
 // SEND_NOW_MAX (budget.ts): one deliver() call, a handful of D1 queries and
@@ -249,9 +308,16 @@ export async function queueMatchEmails(
 export { SEND_NOW_MAX };
 
 // Sends the first SEND_NOW_MAX of the emails just queued, within the daily
-// limit; the cron sends the rest.
+// limit; the cron sends the rest. Personal emails: the request waits for it.
 async function deliverNow(ids: number[]): Promise<void> {
   if (ids.length > 0) await deliver(ids.slice(0, SEND_NOW_MAX));
+}
+
+// Bulk mail (BULK_KINDS: broadcasts, registration invites, #140): the same
+// send, but after the response, so the Admin's click answers at once. The
+// claim in deliver() keeps an overlapping cron run from sending any twice.
+function deliverAfterResponse(ids: number[]): void {
+  if (ids.length > 0) runAfterResponse("bulk send", () => deliverNow(ids));
 }
 
 export async function createBroadcast(input: {
@@ -260,21 +326,34 @@ export async function createBroadcast(input: {
   audience: string;
   recipients: Recipient[];
   createdBy: string;
+  // The Admin's account id, for the audit log (#225).
+  actorId: string;
 }): Promise<number> {
-  const [{ id }] = await db
-    .insert(broadcasts)
-    .values({
-      subject: input.subject,
-      body: input.body,
-      audience: input.audience,
-      recipients: input.recipients.length,
-      createdBy: input.createdBy,
-    })
-    .returning({ id: broadcasts.id });
+  const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
+  const [[{ id }]] = await db.batch([
+    db
+      .insert(broadcasts)
+      .values({
+        subject: input.subject,
+        body: input.body,
+        audience: input.audience,
+        recipients: recipients.length,
+        createdBy: input.createdBy,
+      })
+      .returning({ id: broadcasts.id }),
+    auditEntry({
+      actorId: input.actorId,
+      action: "broadcast.send",
+      target: sql`'broadcast:' || (select max(${broadcasts.id}) from ${broadcasts})`,
+      // The count only: the audience label can hold the Admin's search, an email
+      // address or a name (review of #272). The target names the subject.
+      detail: `${recipients.length} recipients`,
+    }),
+  ]);
 
   const secret = emailSecret();
   const messages = await Promise.all(
-    input.recipients.map(async (r): Promise<NewMessage> => {
+    recipients.map(async (r): Promise<NewMessage> => {
       const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
       return {
         kind: "broadcast",
@@ -285,8 +364,30 @@ export async function createBroadcast(input: {
       };
     }),
   );
-  await deliverNow(await enqueue(messages));
+  deliverAfterResponse(await enqueue(messages));
   return id;
+}
+
+// The automatic reminders for people stuck before entering (#155,
+// reminders.server.ts decides who, and already leaves out accounts with the
+// email switch off): bulk mail, after login codes and personal emails, with
+// an unsubscribe link. Returned as insert statements, so the caller puts
+// them in one D1 batch with its own records: the emails and the records of
+// what was sent commit or roll back together.
+export async function stuckReminderInserts(
+  messages: { toEmail: string; input: StuckReminderInput }[],
+): Promise<BatchItem<"sqlite">[]> {
+  const secret = emailSecret();
+  const queued = await Promise.all(
+    messages.filter(toSomeone).map(async (m): Promise<NewMessage> => {
+      const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(m.toEmail, secret));
+      return { kind: "stuck_reminder", toEmail: m.toEmail, headers: unsubscribeHeaders(url), ...stuckReminder(m.input, url) };
+    }),
+  );
+  const statements: BatchItem<"sqlite">[] = [];
+  for (let i = 0; i < queued.length; i += INSERT_CHUNK)
+    statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
+  return statements;
 }
 
 // Who would get the registration invite now (#20, audience.ts inviteRecipients).
@@ -366,12 +467,15 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // none of them and nobody is invited twice. Then, in one D1 batch (a
 // transaction): the emails and the account_invites rows (so the link works
 // before registration opens). If that fails, the claim is released. Then
-// they are sent, within the daily limit (#112). Returns how many were queued.
+// they are sent after the response, within the daily limit (#112, #140).
+// Returns how many were queued.
 // `only`: just these (lowercase) addresses, e.g. the partner's address a
 // player just added (#96); the same rules apply. Never to an address with an
 // account (inviteRecipients), so the email switch (#115) has nothing to skip.
-export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
-  const pending = (await pendingRegistrationInvites()).filter((r) => !only || only.includes(r.email));
+// `actorId`: the Admin who sent them from Jelentkezők, audited in the same
+// batch (#225); a player adding a partner's address isn't.
+export async function queueRegistrationInvites(now = new Date(), only?: readonly string[], actorId?: string): Promise<number> {
+  const pending = (await pendingRegistrationInvites()).filter((r) => (!only || only.includes(r.email)) && toSomeone({ toEmail: r.email }));
   if (pending.length === 0) return 0;
   const claimed = await markInvited(
     pending.map((r) => r.email),
@@ -407,14 +511,19 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
           .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
           .onConflictDoNothing(),
       );
+    if (actorId)
+      statements.push(
+        auditEntry({ actorId, action: "registration_invites.send", target: "signups", detail: `${recipients.length} invites` }),
+      );
     const [first, ...rest] = statements;
     const results = (await db.batch([first, ...rest])) as unknown[];
     ids = (results.slice(0, inserts) as { id: number }[][]).flat().map((r) => r.id);
+    logQueued(messages);
   } catch (e) {
     await markInvited(emails, null);
     throw e;
   }
-  await deliverNow(ids);
+  deliverAfterResponse(ids);
   return recipients.length;
 }
 
@@ -511,9 +620,19 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
 
   const failed = results.filter((r): r is Extract<SendResult, { ok: false }> => !r.ok);
   const errors = failed.filter((r) => !r.retryLater);
-  if (errors.length) console.error(`${errors.length} of ${rows.length} emails failed`, errors[0].error);
-  else if (failed.length) console.warn(`${failed.length} of ${rows.length} emails wait for a provider`, failed[0].error);
   const sent = rows.length - failed.length;
+  // "email sent" (#227): message ids and kinds, never the addresses; a
+  // provider's error text is scrubbed by the logger.
+  const outcome = {
+    sent,
+    failed: errors.length,
+    waiting: failed.length - errors.length,
+    kinds: [...new Set(rows.map((r) => r.kind))],
+    ids: rows.map((r) => r.id),
+  };
+  if (errors.length) logError("email failed", { ...outcome, error: errors[0].error });
+  else if (failed.length) logWarn("email waits for a provider", { ...outcome, error: failed[0].error });
+  else logInfo("email sent", outcome);
   return { sent, stop: sent === 0 || failed.some((r) => r.retryLater) };
 }
 
@@ -529,8 +648,11 @@ export async function sentLast24h(now = Date.now()): Promise<number> {
 
 // Sends pending emails within the daily budget: login codes first, then
 // signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
-export async function deliver(ids?: number[]): Promise<{ sent: number }> {
-  const now = Date.now();
+// `at`: the cron run's scheduled time (#188); the time of the call otherwise.
+// `run`: the cron run's limits (#183); `left` says how many emails wait when
+// the run stopped early because of them.
+export async function deliver(ids?: number[], at = new Date(), run?: RunBudget): Promise<{ sent: number; left?: number }> {
+  const now = at.getTime();
   const runStart = new Date(now);
   await db
     .update(emailMessages)
@@ -542,6 +664,8 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
   let sent = 0;
   for (const group of GROUPS) {
     for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
+      // The run's limits (#183): what's left waits for the next run.
+      if (run && !run.fits(BATCH_COST)) return { sent, left: await pendingCount() };
       const budget = sendBudget(limit, sentBefore + sent, GROUP_BUDGET_KIND[group]);
       const rows = await claim(budget, group, runStart, ids);
       if (rows.length === 0) break;
@@ -551,6 +675,18 @@ export async function deliver(ids?: number[]): Promise<{ sent: number }> {
     }
   }
   return { sent };
+}
+
+// One batch of deliver(): the claim, the results (one D1 batch) and the
+// count of what's left when the run stops; the relay connection, maybe a
+// second one, and Resend for what the relay refused.
+const BATCH_COST: Usage = { queries: 3, calls: 3 };
+// What deliver() needs to send anything in a run.
+export const DELIVER_MIN: Usage = { queries: 2 + BATCH_COST.queries, calls: BATCH_COST.calls };
+
+async function pendingCount(): Promise<number> {
+  const [{ n }] = await db.select({ n: count() }).from(emailMessages).where(eq(emailMessages.status, "pending"));
+  return n;
 }
 
 export type BroadcastSummary = typeof broadcasts.$inferSelect & {
@@ -674,8 +810,15 @@ export async function cancelUnsentSignupMail(emails: string[]): Promise<number> 
   return rows.length;
 }
 
-// Deletion request: remove the stored emails sent to these addresses.
+// Deletion request: remove the stored emails sent to these addresses, the
+// record of an A reminder (#155), whose key holds the address, and who got a
+// reminder this season (#191), by address.
 export async function deleteMessagesTo(emails: string[]) {
   if (emails.length === 0) return;
-  await db.delete(emailMessages).where(inArray(emailMessages.toEmail, emails.map((e) => e.toLowerCase())));
+  const lowered = emails.map((e) => e.toLowerCase());
+  await db.batch([
+    db.delete(emailMessages).where(inArray(emailMessages.toEmail, lowered)),
+    db.delete(stuckReminders).where(inArray(stuckReminders.key, lowered.map((e) => `A:${e}`))),
+    db.delete(stuckReminderPeople).where(inArray(stuckReminderPeople.email, lowered)),
+  ]);
 }

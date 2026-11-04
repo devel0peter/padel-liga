@@ -51,10 +51,13 @@
 			"RESEND_WEBHOOK_SECRET"
 		]
 	},
-	// Hourly: sends queued emails (retries, broadcasts spread over the daily quota).
+	// Every 10 minutes (#183, D84): the steps of app/lib/hourly-job.server.ts. The
+	// reminders keep their Budapest hours; the extra runs send what one run
+	// could not within the Workers Free limits (queued pushes and emails).
 	// Every 5 minutes, 03:00-05:59 UTC (BACKUP_CRON in app/lib/backup.ts): exports
-	// the database to R2 in small steps, then stops for the day (#32).
-	"triggers": { "crons": ["0 * * * *", "*/5 3-5 * * *"] },
+	// the database to R2 in small steps, then stops for the day (#32). Its own
+	// trigger, so the export gets a whole invocation's limits to itself.
+	"triggers": { "crons": ["*/10 * * * *", "*/5 3-5 * * *"] },
 	// Daily database exports (app/lib/backup.server.ts, #32). Create the
 	// bucket first: `npx wrangler r2 bucket create padel-liga-backups
 	// --jurisdiction eu` (the deploy fails without it). Keep it private.

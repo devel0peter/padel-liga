@@ -6,8 +6,15 @@ import {
   followsEmailSwitch,
   groupsPublishedMessage,
   matchAgreedTimeMessage,
+  matchDecidedMessage,
+  matchCancelledMessage,
   matchDeclinedMessage,
   matchProposalMessage,
+  matchResultConfirmedMessage,
+  matchResultDisputedMessage,
+  matchResultMessage,
+  disputeRecipients,
+  resultDisputedMessage,
   matchScheduledMessage,
   DIGEST_KINDS,
   isChannel,
@@ -15,7 +22,8 @@ import {
   isNotificationKind,
   kindsFor,
   pairIntroMessage,
-  seasonEntryDecisionMessage,
+  pairWithdrawnMessage,
+  seasonEntryMessage,
   newSignupMessage,
   parseSubscription,
   pushPayload,
@@ -28,10 +36,10 @@ import {
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers new signups to Szervezők and Admins only", () => {
+  it("offers new signups and disputed results to Szervezők and Admins only", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed"]);
   });
 });
 
@@ -209,28 +217,16 @@ describe("pairIntroMessage", () => {
 describe("player messages (#115)", () => {
   const base = { league: "Padelpárbaj Győr", season: "2026/27 tél" };
 
-  it("an approval says where the pair starts; no names", () => {
-    expect(
-      seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } }),
-    ).toEqual({
-      title: "Jóváhagyták a nevezéseteket",
+  it("#153: entered says where the pair starts; no names, no approval", () => {
+    expect(seasonEntryMessage({ ...base, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } })).toEqual({
+      title: "Beneveztetek",
       body: "2026/27 tél, Padelpárbaj Győr. Az 1. körtől játszotok (kezdés: nov. 9.).",
       url: "/pair",
     });
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
+    expect(seasonEntryMessage({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
       "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
     );
-    expect(seasonEntryDecisionMessage({ ...base, approved: true, joins: null }).body).toBe(
-      "2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.",
-    );
-  });
-
-  it("a rejection", () => {
-    expect(seasonEntryDecisionMessage({ ...base, approved: false, joins: null })).toEqual({
-      title: "Nem fogadták el a nevezéseteket",
-      body: "2026/27 tél, Padelpárbaj Győr.",
-      url: "/pair",
-    });
+    expect(seasonEntryMessage({ ...base, joins: null }).body).toBe("2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.");
   });
 
   it("the groups: group, phase and deadline in Budapest time", () => {
@@ -277,7 +273,96 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     });
   });
 
-  it("the digest kinds are the scheduled and declined ones, not the instant ones", () => {
-    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined"]);
+  it("a cancellation (#27): late says the cancelling pair proposes next; no names", () => {
+    expect(matchCancelledMessage({ matchId: 7, slot, late: false })).toEqual({
+      title: "Lemondták a meccset",
+      body: "Az ellenfeletek lemondta a nov. 17., kedd 18:00 időpontot. Egyeztessetek újra.",
+      url: "/matches/7",
+    });
+    expect(matchCancelledMessage({ matchId: 7, slot, late: true }).body).toBe(
+      "Az ellenfeletek 24 órán belül lemondta a nov. 17., kedd 18:00 időpontot. Nekik kell új időpontokat ajánlaniuk.",
+    );
+  });
+
+  it("the digest kinds: scheduled, declined, cancelled, the reminders, confirmed and decided results; never an instant one (#31)", () => {
+    expect([...DIGEST_KINDS]).toEqual(["match_scheduled", "match_declined", "match_cancelled", "match_no_proposal", "match_week_end", "match_deadline_soon", "match_result_confirmed", "match_decided"]);
+    for (const instant of ["match_proposal", "match_agreed_time", "match_tomorrow", "match_result"] as const) expect(DIGEST_KINDS).not.toContain(instant);
+  });
+});
+
+describe("result messages (#28, #29, spec 13)", () => {
+  it("waiting for confirmation: the score from the recipient's side and the 48 hours", () => {
+    expect(matchResultMessage({ matchId: 7, score: "1:4, 2:4" })).toEqual({
+      title: "Erősítsd meg az eredményt",
+      body: "Az ellenfeletek rögzítette az eredményt: 1:4, 2:4. Erősítsd meg, vagy jelezd, ha nem így volt. 48 óra múlva magától elfogadjuk.",
+      url: "/matches/7",
+    });
+  });
+
+  it("confirmed or accepted after 48 hours", () => {
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: false }).body).toBe("Megerősítették az eredményt: 4:1, 4:2.");
+    expect(matchResultConfirmedMessage({ matchId: 7, score: "4:1, 4:2", auto: true })).toEqual({
+      title: "Végleges az eredmény",
+      body: "48 óra után magától elfogadtuk az eredményt: 4:1, 4:2.",
+      url: "/matches/7",
+    });
+  });
+
+  it("a dispute: the recording pair is told at once, no names and no score (#178)", () => {
+    expect(matchResultDisputedMessage({ matchId: 7 })).toEqual({
+      title: "Vitatják az eredményt",
+      body: "Az ellenfeletek nem ért egyet a rögzített eredménnyel. A szervező dönt, szólunk, ha megvan.",
+      url: "/matches/7",
+    });
+    // Not a digest item: it goes out at once (D83).
+    expect(DIGEST_KINDS).not.toContain("match_result_disputed");
+  });
+
+  it("a dispute: the organizers and Admins get the decision page link, once each (#178)", () => {
+    expect(disputeRecipients(["o", "adm", "o2"], ["adm", "adm2"], "p1")).toEqual(["adm", "adm2", "o", "o2"]);
+    expect(disputeRecipients([], [], "p1")).toEqual([]);
+    expect(resultDisputedMessage({ matchId: 7, leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 2 })).toEqual({
+      title: "Vitatott eredmény · Padelpárbaj Győr",
+      body: "A 2. heti meccsek egyikének eredményét vitatják. A döntés rád vár.",
+      url: "/admin/leagues/gyor/matches/7/decide",
+    });
+  });
+
+  it("a dispute: the organizer or Admin who disputed is left out, the others are not (#221)", () => {
+    expect(disputeRecipients(["o", "p1"], ["adm"], "p1")).toEqual(["adm", "o"]);
+    expect(disputeRecipients(["o"], ["p1", "adm"], "p1")).toEqual(["adm", "o"]);
+  });
+
+  it("an organizer's decision: the outcome, not the reason", () => {
+    expect(matchDecidedMessage({ matchId: 7, outcome: "Játék nélküli győzelem nektek (4:0, 4:0)" })).toEqual({
+      title: "A szervező döntött a meccsetekről",
+      body: "Játék nélküli győzelem nektek (4:0, 4:0). Az indoklást a meccs oldalán látod.",
+      url: "/matches/7",
+    });
+  });
+});
+
+describe("pairWithdrawnMessage (#34)", () => {
+  const input = { league: "Padelpárbaj Győr", season: "2026/27 tél", phase: 1, group: 2, reason: "Sérülés." };
+
+  it("tells the pair it is out of the round and the season, with the reason, and links to Párom", () => {
+    const m = pairWithdrawnMessage(input, "pair");
+    expect(m.title).toBe("A szervező visszaléptetett titeket a körből");
+    expect(m.body).toContain("2. csoport, 1. kör, 2026/27 tél, Padelpárbaj Győr.");
+    expect(m.body).toContain("a szezonból is kikerültetek");
+    expect(m.body).toMatch(/Indok: Sérülés\.$/);
+    expect(m.url).toBe("/pair");
+  });
+
+  it("tells the group's other pairs without the reason", () => {
+    const m = pairWithdrawnMessage(input, "group");
+    expect(m.title).toBe("Visszalépett egy pár a csoportodból");
+    expect(m.body).not.toContain("Sérülés");
+    expect(m.body).toContain("kikerültek a tabellából");
+    expect(m.url).toBe("/home");
+  });
+
+  it("is not a digest item (no email, ever)", () => {
+    expect(DIGEST_KINDS).not.toContain("pair_withdrawn");
   });
 });

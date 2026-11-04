@@ -4,15 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InterestSignup } from "~/lib/interest";
 
-const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
+const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], gate: null as Promise<void> | null }));
 
 // The quota tests count against a limit of 100 a day.
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
+// A slow transport while h.gate is set: every send waits for it to open.
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
   sendEmails: async (emails: any[]) => {
+    if (h.gate) await h.gate;
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
@@ -21,36 +24,36 @@ vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor",
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const O = await import("~/lib/email/outbox.server");
+const { backgroundPending, settleBackground } = await import("~/test/background");
 
 const messages = () => h.raw.prepare("select kind, to_email, subject, status from email_messages").all();
 
-describe("queueSeasonEntryDecision", () => {
+describe("queueSeasonEntered", () => {
   const input = {
     to: "Béla",
     partnerName: "Anna",
     league: "Padelpárbaj Győr",
     season: "2026/27 tél",
-    approved: true,
     joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") },
-    note: null,
   };
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
   it("sends the email right away, without an Admin (#112)", async () => {
-    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    await O.queueSeasonEntered("bela@x.hu", input);
     expect(messages()).toEqual([
-      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Jóváhagyták a nevezéseteket – Padelpárbaj", status: "sent" },
+      { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Beneveztetek – Padelpárbaj", status: "sent" },
     ]);
     expect(h.sent.map((m) => m.to)).toEqual(["bela@x.hu"]);
   });
 
   it("sends nothing to a suppressed address", async () => {
     h.raw.prepare("insert into email_suppressions (email, reason) values (?, ?)").run("bela@x.hu", "unsubscribed");
-    await O.queueSeasonEntryDecision("bela@x.hu", input);
+    await O.queueSeasonEntered("bela@x.hu", input);
     expect(messages()).toEqual([]);
     expect(h.sent).toEqual([]);
   });
@@ -70,6 +73,7 @@ describe("queueGroupsPublished", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -114,6 +118,71 @@ describe("queueGroupsPublished", () => {
   });
 });
 
+// Whatever list a deleted account's placeholder address (#152) slips into,
+// no email is stored for it.
+describe("a deleted account's placeholder address", () => {
+  const group = (to: string, partnerName: string) => ({
+    to,
+    partnerName,
+    league: "Padelpárbaj Győr",
+    season: "2026/27 tél",
+    phase: 1,
+    group: 1,
+    weeks: [],
+    deadline: new Date("2026-11-29T22:59:00Z"),
+  });
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
+    h.sent = [];
+  });
+
+  it("gets no personal, match or reminder email", async () => {
+    await O.queueGroupsPublished([
+      { toEmail: "anna@x.hu", input: group("Anna", "Béla") },
+      { toEmail: "Deleted-u1@deleted.invalid", input: group("Törölt játékos", "Anna") },
+    ]);
+    expect(
+      await O.reminderEmailInserts([
+        [{ kind: "match_digest", toEmail: "deleted-u1@deleted.invalid", input: { to: "Törölt játékos", items: [{ title: "x", body: "y", url: "/matches/1" }] } }],
+      ]),
+    ).toEqual([[]]);
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+  });
+
+  it("gets no broadcast, and the broadcast doesn't count it", async () => {
+    await O.createBroadcast({
+      subject: "Hír",
+      body: "Szia {nev}!",
+      audience: "Párok",
+      recipients: [
+        { email: "anna@x.hu", name: "Anna" },
+        { email: "deleted-u1@deleted.invalid", name: "Törölt játékos" },
+      ],
+      createdBy: "admin@x.hu", actorId: "admin",
+    });
+    expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
+    expect(h.raw.prepare("select recipients from broadcasts").get()).toEqual({ recipients: 1 });
+  });
+
+  it("gets no automatic reminder", async () => {
+    const input = {
+      situation: "B" as const,
+      to: "Törölt játékos",
+      email: "deleted-u1@deleted.invalid",
+      partner: null,
+      league: "L",
+      season: "S",
+      deadline: new Date("2026-11-06T22:59:00Z"),
+      nextRound: null,
+      pairLink: null,
+      now: new Date("2026-11-02T12:00:00Z"),
+    };
+    expect(await O.stuckReminderInserts([{ toEmail: "deleted-u1@deleted.invalid", input }])).toEqual([]);
+  });
+});
+
 // Every email goes out by itself (#112, replaces the held outbox of #88).
 describe("automatic outbox", () => {
   const signup: InterestSignup = {
@@ -153,6 +222,7 @@ describe("automatic outbox", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -172,23 +242,22 @@ describe("automatic outbox", () => {
         "Győr",
       ),
     );
-    await O.queueSeasonEntryDecision("bela@x.hu", {
+    await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
       league,
       season: "2026/27 tél",
-      approved: false,
       joins: null,
-      note: null,
     });
     await O.createBroadcast({
       subject: "Hír",
       body: "Szia {nev}!",
       audience: "mind",
       recipients: [{ email: "anna@x.hu", name: "Anna" }],
-      createdBy: "admin@x.hu",
+      createdBy: "admin@x.hu", actorId: "admin",
     });
     expect(await O.queueRegistrationInvites()).toBe(2);
+    await settleBackground();
     await O.queueGroupsPublished([
       {
         toEmail: "bela@x.hu",
@@ -222,7 +291,8 @@ describe("automatic outbox", () => {
 
   it("a broadcast to many sends at most 50 in the request", async () => {
     const recipients = Array.from({ length: 70 }, (_, i) => ({ email: `p${i}@x.hu`, name: `P${i}` }));
-    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu" });
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu", actorId: "admin" });
+    await settleBackground();
     expect(h.sent).toHaveLength(50);
     expect(count("kind = 'broadcast' and status = 'pending'")).toBe(20);
   });
@@ -244,7 +314,16 @@ describe("automatic outbox", () => {
     expect(h.sent).toEqual([]);
   });
 
-  it("registration invites go out right away, only the ones just queued", async () => {
+  it("works from the time it is given (the cron run's scheduled time, #188), not the clock", async () => {
+    // Claimed 5 minutes ago: fresh by the clock, but 11 minutes old for a run
+    // scheduled 6 minutes from now.
+    insert("pair_intro", 1, "sending");
+    h.raw.prepare("update email_messages set claimed_at = unixepoch() - 300").run();
+    expect(await O.deliver(undefined, new Date(Date.now() + 6 * 60 * 1000))).toEqual({ sent: 0 });
+    expect(h.raw.prepare("select status, last_error from email_messages").get()).toEqual({ status: "failed", last_error: O.INTERRUPTED });
+  });
+
+  it("registration invites go out right after the response, only the ones just queued", async () => {
     h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
     h.raw
       .prepare(
@@ -254,20 +333,19 @@ describe("automatic outbox", () => {
     // Something else waiting (over yesterday's limit) is left to the cron.
     insert("broadcast", 1);
     expect(await O.queueRegistrationInvites()).toBe(2);
+    await settleBackground();
     expect(h.sent.map((m) => m.to).sort()).toEqual(["odon@x.hu", "zsofi@x.hu"]);
     expect(count("kind = 'broadcast' and status = 'pending'")).toBe(1);
   });
 
   it("with the daily limit used up, a new email stays queued and goes out on the next run after the limit frees up", async () => {
     sentToday(100);
-    await O.queueSeasonEntryDecision("bela@x.hu", {
+    await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
       league: "Padelpárbaj Győr",
       season: "2026/27 tél",
-      approved: true,
       joins: null,
-      note: null,
     });
     expect(h.sent).toEqual([]);
     expect(count("kind = 'season_entry_decision' and status = 'pending'")).toBe(1);
@@ -321,5 +399,80 @@ describe("automatic outbox", () => {
 
   it("logs nothing when no email was ever queued", async () => {
     expect(await O.outboxLog()).toEqual([]);
+  });
+});
+
+// Bulk mail doesn't keep the Admin's page loading (#140): the click only
+// queues, the send runs after the response; personal mail stays in-request.
+describe("bulk mail after the response", () => {
+  let open!: () => void;
+  const slowTransport = () => {
+    h.gate = new Promise<void>((resolve) => (open = resolve));
+  };
+  const status = () =>
+    h.raw.prepare("select status, count(*) as n from email_messages group by status order by status").all();
+  const inviteList = (n: number) => {
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
+    const st = h.raw.prepare(
+      "insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', ?, ?, 'kezdo', 1, 'gyor')",
+    );
+    for (let i = 0; i < n; i++) st.run(`P${i}`, `p${i}@x.hu`);
+  };
+
+  beforeEach(async () => {
+    await settleBackground();
+    h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
+    h.sent = [];
+    h.gate = null;
+  });
+
+  it("the invite action answers without waiting for any send", async () => {
+    inviteList(3);
+    slowTransport();
+    // Resolves although the transport hasn't answered a single email.
+    expect(await O.queueRegistrationInvites()).toBe(3);
+    expect(h.sent).toEqual([]);
+    expect(backgroundPending()).toBe(1);
+    open();
+    await settleBackground();
+    expect(h.sent.map((m) => m.to).sort()).toEqual(["p0@x.hu", "p1@x.hu", "p2@x.hu"]);
+    expect(status()).toEqual([{ status: "sent", n: 3 }]);
+  });
+
+  it("a broadcast answers without waiting for any send", async () => {
+    slowTransport();
+    const recipients = [{ email: "anna@x.hu", name: "Anna" }];
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu", actorId: "admin" });
+    expect(h.sent).toEqual([]);
+    expect(backgroundPending()).toBe(1);
+    open();
+    await settleBackground();
+    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu"]);
+  });
+
+  it("an overlapping cron run sends none of the queued invites twice", async () => {
+    inviteList(60);
+    slowTransport();
+    expect(await O.queueRegistrationInvites()).toBe(60);
+    // The cron starts while the background send waits on the transport.
+    const cron = O.deliver();
+    open();
+    await Promise.all([cron, settleBackground()]);
+    expect(h.sent).toHaveLength(60);
+    expect(new Set(h.sent.map((m) => m.to)).size).toBe(60);
+    expect(status()).toEqual([{ status: "sent", n: 60 }]);
+  });
+
+  it("a login code is still sent inside its request", async () => {
+    slowTransport();
+    let answered = false;
+    const request = O.queueLoginCode("anna@x.hu", "123456").then(() => (answered = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(answered).toBe(false);
+    expect(backgroundPending()).toBe(0);
+    open();
+    await request;
+    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu"]);
   });
 });

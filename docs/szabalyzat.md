@@ -1,6 +1,6 @@
-# Padelpárbaj – Szabályzat (tervezet)
+# Padelpárbaj – Szabályzat
 
-*Munkaverzió, 2026. 10. 05.*
+*Hatályos: 2026. 11. 09.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
@@ -8,11 +8,12 @@
 - Az időpontot az oldalon egyeztetitek. A kör végéig minden meccset le kell játszani.
 - 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
+- A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a divíziók győztesei díjat kapnak.
 
 A részleteket lent találod.
 
 ## Tartalom
-1. [A liga lényege](#section-1)
+1. [A liga lényege és a divíziók](#section-1)
 2. [Jelentkezés](#section-2)
 3. [Időpont-egyeztetés](#section-3)
 4. [A meccs](#section-4)
@@ -21,9 +22,9 @@ A részleteket lent találod.
 7. [Feljutás és kiesés](#section-7)
 8. [Egyéni értékszám (Élő)](#section-8)
 9. [Fair play](#section-9)
-10. [A szezon vége](#section-10)
+10. [A szezon vége és a díjak](#section-10)
 
-## 1. A liga lényege
+## 1. A liga lényege és a divíziók
 - Párok jelentkeznek, akik szint szerint **4 páros csoportokba** kerülnek. Ha a párok száma nem osztható néggyel, néhány csoport 3 páros.
 - Minden héten **egy meccset** játszotok a csoportotok egy másik párjával. 3 páros csoportban minden pár 2 meccset játszik, és egy héten szabad.
 - Egy kör **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
@@ -31,20 +32,28 @@ A részleteket lent találod.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
 - Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
 - Egy szezon **4 körből** áll. A szezon végéről a 10. pontban olvashatsz.
+- **Divíziók:** a csoportok sorrendje egyetlen létra, amelyet három részre osztunk: felül a **Bronz**, középen a **Réz**, alul a **Rookie** divízió.
+  - Minden divízió a csoportok harmadát kapja. Ha a csoportok száma nem osztható hárommal, az egy maradék csoport a Réz divízióé, két maradék csoport közül egy a Rézé, egy a Rookie-é.
+  - Például 15 csoportnál az 1–5. Bronz, a 6–10. Réz, a 11–15. Rookie. 5 csoportnál az 1. Bronz, a 2–3. Réz, a 4–5. Rookie. Egyetlen csoport a Bronz; 2 csoportnál az 1. Bronz, a 2. Réz.
+  - A határokat minden körben újraszámoljuk, így a csoportok számával együtt eltolódnak. A divíziód az, ahol a csoportod éppen van: ha feljuttok vagy kiestek, átléphettek a szomszéd divízióba.
+  - A divízió a ligán belüli helyed, nem minősítés: a meccseidet, a feljutást és a kiesést nem befolyásolja.
+  - A nevek a Magyar Padel Szövetség (MAPASZ) versenyszintjeit követik, hogy tudd, nagyjából hol tartasz. A liga nem MAPASZ-verseny, ranglistapontot nem ad.
 
 ## 2. Jelentkezés
-- Párban jelentkeztek. Ha nincs párod, egyedül is felírhatod magad, és megpróbálunk párt találni neked.
+- Párban jelentkeztek. Ha nincs párod:
+  - a „Hívd meg a párodat” kártyán (Kezdőlap vagy Párom) másold ki a meghívó linkedet, és küldd el annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
+  - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
-- Telefonszámot nem kötelező megadni. Ha megadod, csak az aktuális kör ellenfelei látják, nyilvánosan soha nem jelenik meg.
-- **Párcsere csak két kör között lehetséges.** Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
+- A telefonszámod kötelező, az első belépéskor kérjük. Csak az aktuális kör ellenfelei látják, nyilvánosan soha nem jelenik meg.
+- **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
 - **Helyettes:** ha a párod megsérül vagy nem ér rá, a szervező jóváhagyásával helyettes játszhat helyette egy vagy több meccsen a körön belül.
   - A kérést a meccs előtt kell beadni az oldalon, a helyettes nevével. Az ellenfelek látják, ki játszik.
   - A helyettes nagyjából azonos vagy alacsonyabb szintű legyen, és nem játszhat másik párban ugyanebben a csoportban.
   - Az eredmény a párnak számít, ugyanúgy, mint bármelyik meccs.
   - A helyettes értékszáma változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
-- **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja.
-- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, a szervező jóváhagyja. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban).
+- **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
+- **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
@@ -62,7 +71,7 @@ A részleteket lent találod.
 
 ## 4. A meccs
 - **Formátum:**
-  - 2 nyert szettig játszotok. Egy szett 4 nyert játékig tart (2 játék különbséggel), 4:4-nél rendes tie-break dönt 7 pontig (2 pont különbséggel).
+  - 2 nyert szettig játszotok. Egy szett 4 nyert játékig tart, 2 játék különbséggel: 4:3 után még egy játék jön, így a szett 5:3-mal is végződhet. 4:4-nél rendes tie-break dönt 7 pontig (2 pont különbséggel), ilyenkor 5:4 a szett.
   - 1:1-es szettállásnál a 3. szett helyett szuper tie-break jön 10 pontig (2 pont különbséggel).
   - **Arany pont:** 40:40-nél nincs előny, egyetlen pont dönt. A fogadó pár választja ki, melyik játékosuk fogadja.
   - A szett- és játékkülönbségnél a szuper tie-break egy szettnek és 1:0-s játéknak számít.
@@ -90,7 +99,7 @@ Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
 - A helyettes nem kap fekete pontot, a pár két játékosa igen.
 - A fekete pont a játékosé, párcserénél is veled marad. Minden szezon elején nullázódik.
 - A **második** fekete pontnál figyelmeztetést küldünk.
-- A **harmadiknál** a párod a kör végén kikerül a ligából. Az addigi eredmények megmaradnak. A párod új párral folytathatja, te a következő szezonra csak a szervező jóváhagyásával nevezhetsz.
+- A **harmadiknál** a párotok a kör végén kikerül a ligából. Az addigi eredmények megmaradnak. A párod új párral folytathatja. A következő szezonra ugyanúgy nevezhettek, mint bárki más.
 - Indokolt esetben (betegség, a klub lemondta a pályát) a szervező törölheti a fekete pontot.
 
 ## 6. Sorrend a csoportban
@@ -106,9 +115,12 @@ A szett- és játékkülönbségbe a kör összes csoportmeccse beszámít, a j�
 
 Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben már csak két pár marad holtversenyben, köztük az egymás elleni eredmény dönt.
 
+Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt: aki a beosztásban előrébb volt, az végez előrébb.
+
 ## 7. Feljutás és kiesés
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
+- **A liga első szezonjának első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. Ha a határ egyik oldalán 3 páros csoport van, ott ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
 - **Új párok a szezon közben** (később nevezők és párcsere után):
   - Az értékszámotok alapján soroljuk be a párt. Aki még nem játszott értékelt meccset, annál 100 ponttal kevesebbel számolunk, mert a szintje még csak saját becslés.
   - Új pár nem kerülhet a legfelső csoportba, oda fel kell jutni.
@@ -120,6 +132,7 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 - Az értékszám az **Élő-rendszer**, amelyet a magyar származású Élő Árpád dolgozott ki a sakkhoz. Azóta sok sportág használja, például az asztalitenisz és a FIFA-világranglista.
 - Minden játékosnak saját értékszáma van. A pár értékszáma a két játékos átlaga.
 - A kezdő értékszám a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
+- A szintedet a profilodon addig módosíthatod, amíg nem játszottál szezonban. Amint egy párod bekerül egy kihirdetett csoportba, a szinted lezárul: onnantól a liga eredményei döntik el, hol tartasz, ezt az értékszámod mutatja.
 - **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik.
   - Esély: `E = 1 / (1 + 10^((ellenfél − ti) / 400))`
   - Változás: `K × (eredmény − E)`, ahol az eredmény győzelemnél 1, vereségnél 0.
@@ -134,9 +147,14 @@ Ha három vagy több pár áll holtversenyben, a 3–5. pont dönt. Ha közben m
 - Az egyeztetésnél légy korrekt: ne ajánlj olyan időpontot, amelyről tudod, hogy az ellenfél számára elfogadhatatlan.
 - A szervező visszaélés esetén felülbírálhatja az automatikus döntést.
 
-## 10. A szezon vége
+## 10. A szezon vége és a díjak
 - Egy szezon 4 körből, vagyis 12 hétből áll. Utána 1–2 hét szünet jön, és indul a következő szezon.
 - A szezon végeredménye: az utolsó kör csoportja és helyezése.
+- **Díjak:** az utolsó kör tabellája dönt, a feljutás és a kiesés előtt.
+  - Díjat minden **divíziógyőztes** kap: az egyes divíziók (Bronz, Réz, Rookie) legfelső csoportjának első helyezettje. Háromnál kevesebb csoportnál kevesebb divízió van (1 csoportnál csak a Bronz, 2 csoportnál a Bronz és a Réz), így annyi díj jár, ahány divízió van. Páronként egy díj jár. A többi csoportgyőztes nem kap díjat.
+  - Díjat az a pár kaphat, amelynek mindkét tagja legalább 2 körben játszott a szezonban (akár más-más párral; helyettesként nem számít).
+  - Ha a divízió legfelső csoportját nem jogosult pár nyeri, az eredmény és a feljutás marad, a díjat pedig a csoport legjobb helyezett jogosult párja kapja. Ha nincs ilyen pár, a díj elmarad.
+  - A díjakat és a felajánlókat szezononként az oldalon hirdetjük meg. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.
 - A szezon végén e-mailben küldjük az összesítődet. A lezárt szezonok tabellái az oldalon visszanézhetők.
 - **Folytatás:** a következő szezonra a „Nevezünk újra” gombbal neveztek, a jelentkezési határidőig. Aki nem nevez újra, kimarad. Ha inkább a szervezőnek szólsz, ő is benevezhet titeket.
 - **Az értékszámod és a csoportod is megmarad:** a következő szezon az utolsó kör feljutása és kiesése utáni csoportokkal indul. A kimaradó párok helyére az alattuk lévők lépnek feljebb. A beosztást a szervező átnézi.

@@ -8,7 +8,8 @@
 // work, the rest find the day's file and stop. Must match the second entry of
 // `triggers.crons` in app/wrangler.jsonc (backup.test.ts checks).
 export const BACKUP_CRON = "*/5 3-5 * * *";
-export const EMAIL_CRON = "0 * * * *";
+// The 10-minute job (lib/hourly-job.server.ts, D84): the first entry.
+export const HOURLY_CRON = "*/10 * * * *";
 // How many daily files stay in the bucket. The ticket asks for at least 30.
 export const KEEP_BACKUPS = 35;
 export const BACKUP_PREFIX = "daily/";
@@ -20,8 +21,8 @@ export type SchemaRow = { type: string; name: string; sql: string };
 export type SequenceRow = { name: string; seq: number };
 
 // Which job a scheduled run is for (workers/app.ts).
-export function cronJob(cron: string): "backup" | "email" {
-  return cron === BACKUP_CRON ? "backup" : "email";
+export function cronJob(cron: string): "backup" | "hourly" {
+  return cron === BACKUP_CRON ? "backup" : "hourly";
 }
 
 // Tables SQLite and Cloudflare keep for themselves: they come back on their

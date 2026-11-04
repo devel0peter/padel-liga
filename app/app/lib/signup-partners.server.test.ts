@@ -10,7 +10,7 @@ vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({
-  queueSeasonEntryDecision: async () => {},
+  queueSeasonEntered: async () => {},
   queueGroupsPublished: async () => {},
 }));
 

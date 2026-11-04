@@ -14,6 +14,7 @@ vi.mock("cloudflare:workers", () => ({
   env: { EMAIL_DAILY_LIMIT: "100", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private" },
 }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/cities.server", () => ({
   listCities: async () => [{ slug: "gyor", name: "Győr" }],
   listedCities: async () => [{ slug: "gyor" }],
@@ -37,6 +38,7 @@ vi.stubGlobal("fetch", async (request: Request) => {
 });
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const E = await import("~/lib/season-entries.server");
 const N = await import("~/lib/notifications.server");
 const O = await import("~/lib/email/outbox.server");
@@ -79,11 +81,9 @@ beforeEach(() => {
 });
 
 async function approve() {
-  expect(await E.applyToSeason({ id: "a", email: "a@x.hu", name: "Anna", level: "halado" } as any, 1, DURING_REGISTRATION)).toEqual({
+  expect(await E.applyToSeason({ id: "a", email: "a@x.hu", name: "Anna", level: "halado" } as any, 1, DURING_REGISTRATION)).toMatchObject({
     ok: true,
   });
-  const [entry] = all("select id from season_entries");
-  expect(await E.decideEntry({ id: "o" }, 1, entry.id, "approve", null, DURING_REGISTRATION)).toEqual({ ok: true });
 }
 
 const inbox = (userId: string) =>
@@ -98,13 +98,13 @@ describe("notification switches (#115)", () => {
     expect(h.pushed.sort()).toEqual([endpoint("a"), endpoint("b")]);
   });
 
-  it("with email off, an entry decision sends no email but is on Értesítések", async () => {
+  it("with email off, an entry sends no email but is on Értesítések", async () => {
     await N.setChannelEnabled("a", "email", false);
     await approve();
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
     expect(all("select to_email from email_messages")).toEqual([{ to_email: "b@x.hu" }]);
     for (const id of ["a", "b"])
-      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Jóváhagyták a nevezéseteket", url: "/pair" }]);
+      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Beneveztetek", url: "/pair" }]);
     // Push is a separate switch.
     expect(h.pushed.sort()).toEqual([endpoint("a"), endpoint("b")]);
   });
@@ -168,7 +168,7 @@ describe("notification switches (#115)", () => {
         .prepare("insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'X', ?, 'gyor', 'kezdo', 1) returning id")
         .get(email).id as number;
     // Anna has an account (email off); z@x.hu has none.
-    expect(await SOLO.pairSolos(solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
+    expect(await SOLO.pairSolos("o", 1, solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
     expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "pair_intro", to_email: "z@x.hu" }]);
     expect(inbox("a")).toEqual([{ kind: "pair_intro", title: "Párt találtunk neked", url: "/pair" }]);
     expect(all("select count(*) n from notifications")[0].n).toBe(1);
@@ -186,7 +186,9 @@ describe("notification switches (#115)", () => {
         { email: "z@x.hu", name: "Zoli" },
       ],
       createdBy: "o@x.hu",
+      actorId: "o",
     });
+    await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);
     expect(await O.emailSwitchedOff()).toEqual(new Set(["a@x.hu"]));
 

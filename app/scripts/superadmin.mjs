@@ -29,8 +29,10 @@ if (found.length === 0) {
 
 const role = revoke ? "player" : "superadmin";
 const action = revoke ? "superadmin.revoke" : "superadmin.grant";
+// One command: the role change and its audit entry (#225, D91), by account
+// id, never the email. actor_id null: the command line ("Rendszer").
 d1(
   `UPDATE users SET platform_role = '${role}' WHERE email = ${q(email)}; ` +
-    `INSERT INTO audit_log (actor_id, action, target, detail) VALUES (NULL, '${action}', ${q(email)}, 'cli');`,
+    `INSERT INTO audit_log (actor_id, action, target, detail) VALUES (NULL, '${action}', 'user:' || ${q(found[0].id)}, 'cli');`,
 );
 console.log(`${email} is now ${revoke ? "a player (Admin removed)" : "Admin"}${remote ? " (remote)" : " (local)"}.`);

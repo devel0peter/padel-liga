@@ -130,12 +130,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requirePermission(request, { kind: "signups.manage" });
+  const actor = await requirePermission(request, { kind: "signups.manage" });
   const form = await request.formData();
   // The registration invite to the whole interest list (#20), not the filtered view.
   if (form.get("intent") === "invite") {
     // Queued and sent right away, within the daily limit (#112).
-    const queued = await queueRegistrationInvites();
+    const queued = await queueRegistrationInvites(new Date(), undefined, actor.id);
     return { ok: true, queued };
   }
   const id = Number(form.get("id"));
@@ -143,7 +143,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const intent = form.get("intent");
   if (intent === "delete") {
-    await deleteSignup(id);
+    await deleteSignup(id, actor.id);
     return { ok: true };
   }
   if (intent === "update") {
@@ -155,7 +155,7 @@ export async function action({ request }: Route.ActionArgs) {
       changes.status = status;
     }
     if (typeof note === "string") changes.adminNote = note.trim().slice(0, MAX_ADMIN_NOTE) || null;
-    await updateSignup(id, changes);
+    await updateSignup(id, changes, actor.id);
     return { ok: true };
   }
   throw new Response("Ismeretlen művelet.", { status: 400 });
@@ -377,8 +377,13 @@ function InviteButton({ pending }: { pending: number }) {
               <AlertDialogTitle>Meghívók elindultak</AlertDialogTitle>
               <AlertDialogDescription>
                 {queued <= SEND_NOW_MAX
-                  ? `${queued} levél most megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
-                  : `${queued} levél indul: az első ${SEND_NOW_MAX} most, a többi óránként, a napi limit szerint.`}
+                  ? `${queued} levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap.`
+                  : `${queued} levél a háttérben indul: az első ${SEND_NOW_MAX} most, a többi tízpercenként, a napi limit szerint.`}{" "}
+                Hogy hol tart, a{" "}
+                <Link to="/admin/outbox" className="underline">
+                  Kimenő levelek
+                </Link>{" "}
+                oldalon látod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

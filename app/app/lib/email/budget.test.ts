@@ -31,7 +31,9 @@ describe("sendBudget", () => {
   it("treats registration invites as bulk mail, behind the same reserve as broadcasts", () => {
     expect(sendBudget(100, 0, "registration_invite")).toBe(100 - TRANSACTIONAL_RESERVE);
     expect(sendBudget(100, 100 - TRANSACTIONAL_RESERVE, "registration_invite")).toBe(0);
-    expect(BULK_KINDS).toEqual(["broadcast", "registration_invite"]);
+    expect(BULK_KINDS).toEqual(["broadcast", "registration_invite", "stuck_reminder"]);
+    // The automatic reminders (#155) wait behind personal mail too.
+    expect(sendBudget(100, 0, "stuck_reminder")).toBe(100 - TRANSACTIONAL_RESERVE);
   });
 
   it("treats pair invites and answers as transactional: behind login codes, ahead of bulk mail", () => {

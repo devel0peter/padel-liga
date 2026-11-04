@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -17,6 +18,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const O = await import("~/lib/email/outbox.server");
 const S = await import("~/lib/signups-admin.server");
 
@@ -38,11 +40,13 @@ describe("queueRegistrationInvites", () => {
     h.sent = [];
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
   });
 
   it("invites both addresses of a pair signup, once each", async () => {
     signup({ mode: "pair", name1: "Anna", email1: "anna@x.hu", name2: "Béla", email2: "bela@x.hu" });
     expect(await O.queueRegistrationInvites()).toBe(2);
+    await settleBackground();
     expect(queued()).toEqual(["anna@x.hu", "bela@x.hu"]);
     expect(invites()).toEqual(["anna@x.hu", "bela@x.hu"]);
     // Sent right away (#112).
@@ -54,6 +58,7 @@ describe("queueRegistrationInvites", () => {
     // A second run, or Béla's own signup naming Anna, invites nobody again.
     signup({ mode: "pair", name1: "Béla", email1: "bela@x.hu", name2: "Anna", email2: "anna@x.hu" });
     expect(await O.queueRegistrationInvites()).toBe(0);
+    await settleBackground();
     expect(queued()).toEqual(["anna@x.hu", "bela@x.hu"]);
     expect(h.sent).toHaveLength(2);
   });
@@ -62,8 +67,9 @@ describe("queueRegistrationInvites", () => {
     const id = signup({ mode: "pair", name1: "Anna", email1: "anna@x.hu", name2: "Béla", email2: "bela@x.hu" });
     signup({ mode: "pair", name1: "Cili", email1: "cili@x.hu", name2: "Béla", email2: "BELA@x.hu" });
     await O.queueRegistrationInvites();
+    await settleBackground();
     expect(invites()).toEqual(["anna@x.hu", "bela@x.hu", "cili@x.hu"]);
-    await S.deleteSignup(id);
+    await S.deleteSignup(id, "admin");
     expect(invites()).toEqual(["bela@x.hu", "cili@x.hu"]);
   });
 
@@ -74,6 +80,7 @@ describe("queueRegistrationInvites", () => {
     h.raw.prepare("update interest_signups set paired_with = ?, status = 'paired' where id = ?").run(d, c);
     h.raw.prepare("update interest_signups set paired_with = ?, status = 'paired' where id = ?").run(c, d);
     expect(await O.queueRegistrationInvites()).toBe(3);
+    await settleBackground();
     expect(queued()).toEqual(["cili@x.hu", "dani@x.hu", "ede@x.hu"]);
     const text = (to: string) => h.sent.find((m) => m.to === to).text as string;
     expect(h.raw.prepare("select distinct status from email_messages").all()).toEqual([{ status: "sent" }]);
@@ -96,6 +103,7 @@ describe("queueRegistrationInvites", () => {
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('pecs', 'Pécs', 1)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
     expect(await O.queueRegistrationInvites(new Date("2026-11-02T08:00:00Z"))).toBe(2);
+    await settleBackground();
     const text = (to: string) => h.sent.find((m) => m.to === to).text as string;
     expect(text("ede@x.hu")).toContain("Köszi, hogy előzetesen jelentkeztél a Padelpárbajra! A liga november 9-én indul (Győr), a nevezés november 6-ig tart. Regisztrálni és nevezni itt tudsz:");
     // Pécs has a league but no season yet: no date sentence.
@@ -106,6 +114,7 @@ describe("queueRegistrationInvites", () => {
   it("asks the signer of a pair signup without the partner's email to add it (#96)", async () => {
     signup({ mode: "pair", name1: "Anna", email1: "anna@x.hu", name2: "Béla" });
     expect(await O.queueRegistrationInvites()).toBe(1);
+    await settleBackground();
     const row = h.raw.prepare("select to_email, status from email_messages").get();
     expect(row).toMatchObject({ to_email: "anna@x.hu", status: "sent" });
     expect(h.sent[0].text).toContain("belépéskor add meg, és ő is kap meghívót.");

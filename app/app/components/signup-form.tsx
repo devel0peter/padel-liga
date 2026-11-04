@@ -137,6 +137,9 @@ export function SignupForm({
   const errors = data && !data.ok && "errors" in data ? data.errors : {};
   const formError = data && !data.ok && "formError" in data ? data.formError : undefined;
   const submitting = fetcher.state !== "idle";
+  // No send until the bot check holds a token (#255); without Turnstile, always.
+  const [botOk, setBotOk] = useState(false);
+  const blocked = Boolean(turnstileSiteKey) && !botOk;
   const done = data?.ok === true;
   // What they typed, as sent: a listed city comes back without cityOther.
   const [sentCity, setSentCity] = useState("");
@@ -277,7 +280,9 @@ export function SignupForm({
           </div>
 
           {/* A form error means the server already used up the token. */}
-          {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} action="signup" resetKey={formError ? data : undefined} />}
+          {turnstileSiteKey && (
+            <Turnstile siteKey={turnstileSiteKey} action="signup" resetKey={formError ? data : undefined} onReady={setBotOk} />
+          )}
 
           {formError && (
             <p role="alert" className="font-semibold text-destructive">
@@ -293,7 +298,7 @@ export function SignupForm({
           <div>
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || blocked}
               className="h-auto rounded-full bg-ball px-6 py-3 text-base font-bold text-ball-foreground hover:bg-ball/85"
             >
               {submitting ? "Küldés…" : "Szóljatok, ha indul"}

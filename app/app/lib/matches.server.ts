@@ -595,7 +595,9 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     autoAcceptAt: ctx.voided ? null : autoAcceptAt(result),
     log,
     voided: ctx.voided ? voidedText(withdrawnOf(ctx), ours.pairId) : null,
-    calendar: calendarLinks(calendarEventOf(ctx, side, venues)),
+    // Not once the match has a result or ruling (played or decided: nothing to
+    // plan any more); a voided match keeps the link that removes the entry.
+    calendar: result.status === "none" || ctx.voided ? calendarLinks(calendarEventOf(ctx, side, venues)) : null,
   };
 }
 

@@ -658,4 +658,13 @@ describe("matchCalendarEvent (#192)", () => {
     await M.matchStep("p1a", id, { kind: "cancel" }, NOW);
     expect((await M.matchPage(id, "p1a", NOW))!.calendar).toMatchObject({ googleUrl: null, cancelled: true });
   });
+
+  it("the match page drops the links once the match has a result", async () => {
+    const id = matchOf(1, 3);
+    await fix(id);
+    h.raw.exec(`insert into match_decisions (match_id, kind, outcome, reason, user_id, at) values (${id}, 'organizer', '{"kind":"walkover","winner":"a"}', 'teszt', 'o', 1)`);
+    const page = (await M.matchPage(id, "p1a", NOW))!;
+    expect(page.result.status).toBe("final");
+    expect(page.calendar).toBeNull();
+  });
 });

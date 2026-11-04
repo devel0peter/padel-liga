@@ -261,7 +261,8 @@ export default function Privacy() {
             <p>
               Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
               jelzést. Ilyenkor a szervező látja a neved, a szinted és azt, hogy
-              mióta keresel párt, és párba tehet egy másik párkeresővel. Ha
+              mióta keresel párt, és párba tehet egy másik párkeresővel. Erről az
+              oldalon és e-mailben is szólunk, benne a párod nevével. Ha
               egyedül jelentkeztél előre, a jelzés eleve be van kapcsolva. Bármikor
               kikapcsolhatod.
             </p>
@@ -270,8 +271,10 @@ export default function Privacy() {
           <Section title="Ha változik a párod">
             <p>
               Felbontani vagy cserélni a párt a szervező tud: írj
-              nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
-              szól nektek. A Párok oldalon a szervező a játékosok nevét és
+              nekünk, ha változna a párod. Ha a szervező párba tesz valakivel
+              (új pár vagy partnercsere), az oldalon és e-mailben is szólunk,
+              benne a párod nevével, az e-mail-címe és a telefonszáma nélkül. A
+              felbontásról nem küldünk e-mailt, a szervező szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
               Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
               ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,

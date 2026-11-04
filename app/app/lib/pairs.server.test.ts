@@ -1,7 +1,8 @@
 // pairs.server.ts on a real SQLite with every migration applied
 // (~/test/sqlite): the organizer's create, dissolve and change partner (#97),
-// with the one-pair-per-league rule checked inside the SQL. Email is stubbed;
-// no pair change queues any.
+// with the one-pair-per-league rule checked inside the SQL. Email is stubbed:
+// a new pair (create, change partner) queues one per player (#260), nothing
+// else does.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
@@ -13,6 +14,7 @@ vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor
 vi.mock("~/lib/email/outbox.server", () => ({
   queueSeasonEntered: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
+  queuePairCreated: async (...args: any[]) => h.mails.push(["pair_created", ...args]),
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -29,6 +31,8 @@ const GYOR = { id: 1, city: "gyor" };
 const DEB = { id: 2, city: "deb" };
 const one = (q: string) => h.raw.prepare(q).get();
 const all = (q: string) => h.raw.prepare(q).all();
+const inbox = () => all("select user_id, kind, url from notifications order by user_id");
+const pairMails = () => h.mails.filter((m) => m[0] === "pair_created").flatMap((m) => m[1]);
 const audits = () => all("select actor_id, action, target from audit_log where action like 'pair.%' order by id");
 
 function freshDb() {
@@ -68,6 +72,24 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.create", target: `pair:${id}` }]);
     const [oa] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
     expect(oa.pair).toEqual({ id, partnerName: "Anna" });
+  });
+
+  it("tells both players of a new pair, in the app and by email, with the partner's name (#260)", async () => {
+    await P.createPair("o", 1, "a", "b");
+    expect(inbox()).toEqual([
+      { user_id: "a", kind: "pair_intro", url: "/pair" },
+      { user_id: "b", kind: "pair_intro", url: "/pair" },
+    ]);
+    expect(pairMails()).toEqual([
+      { toEmail: "a@x.hu", input: { to: "Anna", partnerName: "Béla", league: "Padelpárbaj Győr" } },
+      { toEmail: "b@x.hu", input: { to: "Béla", partnerName: "Anna", league: "Padelpárbaj Győr" } },
+    ]);
+  });
+
+  it("a refused pair tells nobody", async () => {
+    await P.createPair("o", 1, "a", "a");
+    await P.createPair("o", 1, "a", "n");
+    expect(inbox()).toEqual([]);
     expect(h.mails).toEqual([]);
   });
 
@@ -137,6 +159,7 @@ describe("pairs.server on real SQLite (#97)", () => {
 
   it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {
     await P.createPair("o", 1, "a", "b");
+    h.mails = []; // the create's own emails (#260)
     const id = one("select id from pairs").id;
     expect(await P.dissolvePair("o", 1, id, NOW)).toEqual({ ok: true });
     expect(one("select status, dissolved_by from pairs")).toEqual({ status: "dissolved", dissolved_by: "o" });
@@ -164,7 +187,12 @@ describe("pairs.server on real SQLite (#97)", () => {
       { id: 8, player_a: "a", player_b: "c", source: "manual", status: "active" },
     ]);
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.change", target: "pair:8" }]);
-    expect(h.mails).toEqual([]);
+    // The new pair hears of it (#260); Béla, who left, doesn't.
+    expect(inbox().map((n: any) => n.user_id)).toEqual(["a", "c"]);
+    expect(pairMails().map((m: any) => [m.toEmail, m.input.partnerName])).toEqual([
+      ["a@x.hu", "Cecil"],
+      ["c@x.hu", "Anna"],
+    ]);
   });
 
   it("refuses a change to the same pair, to an unregistered or a paired player, and changes nothing", async () => {

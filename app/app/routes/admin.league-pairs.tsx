@@ -314,7 +314,9 @@ function CreateDialog({ candidates }: { candidates: Candidate[] }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pár létrehozása</DialogTitle>
-          <DialogDescription>Két regisztrált játékos, akinek még nincs párja ebben a ligában.</DialogDescription>
+          <DialogDescription>
+            Két regisztrált játékos, akinek még nincs párja ebben a ligában. Az oldalon és e-mailben is szólunk nekik.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <PlayerSelect name="a" label="Első játékos" candidates={candidates.filter((c) => c.id !== b)} value={a} onChange={setA} />
@@ -399,8 +401,8 @@ function ChangeDialog({ pair, candidates }: { pair: Pair; candidates: Candidate[
         <DialogHeader>
           <DialogTitle>Partner cseréje</DialogTitle>
           <DialogDescription>
-            A mostani pár felbomlik, és {kept.name} új párt alkot. {leaving.name} pár nélkül marad. Nem kapnak róla e-mailt;
-            szólj nekik te.
+            A mostani pár felbomlik, és {kept.name} új párt alkot. Az új párnak az oldalon és e-mailben is szólunk.{" "}
+            {leaving.name} pár nélkül marad, és nem kap értesítést: neki szólj te.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">

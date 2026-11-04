@@ -8,7 +8,10 @@ import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { auditEntry, auditIfChanged } from "~/lib/audit.server";
 import { averageStartingElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
-import { withdrawEntries } from "~/lib/season-entries.server";
+import { queuePairCreated } from "~/lib/email/outbox.server";
+import { partnerFoundMessage } from "~/lib/notifications";
+import { notifyPlayers } from "~/lib/notifications.server";
+import { pairPlayers, withdrawEntries } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 
@@ -270,6 +273,26 @@ export const activePairIdOf = (leagueId: number, a: string, b: string) =>
   sql`(select ${pairs.id} from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
     and ${pairs.playerA} = ${a} and ${pairs.playerB} = ${b})`;
 
+// An organizer formed this pair (#260, replacing D59's "no email"): both
+// players get the in-app message and the email. The pair is saved already;
+// a notice problem must not turn the action into an error.
+async function announcePair(pairId: number): Promise<void> {
+  try {
+    const players = await pairPlayers(pairId);
+    if (!players) return;
+    const message = partnerFoundMessage(players.league);
+    await notifyPlayers("pair_intro", [players.a, players.b].map((p) => ({ userId: p.id, message })));
+    await queuePairCreated(
+      [
+        [players.a, players.b],
+        [players.b, players.a],
+      ].map(([to, partner]) => ({ toEmail: to.email, input: { to: to.name, partnerName: partner.name, league: players.league } })),
+    );
+  } catch (e) {
+    console.error("pair created notice failed", e);
+  }
+}
+
 // "Pár létrehozása": two registered players without a pair in the league.
 export async function createPair(actorId: string, leagueId: number, a: string, b: string): Promise<Result> {
   const refused = await newPairRefusal(leagueId, a, b);
@@ -285,7 +308,9 @@ export async function createPair(actorId: string, leagueId: number, a: string, b
     }),
   ]);
   // Someone was quicker with one of them.
-  if (!(await activePairOf(leagueId, a, b))) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
+  const id = await activePairOf(leagueId, a, b);
+  if (!id) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
+  await announcePair(id);
   return { ok: true };
 }
 
@@ -388,5 +413,7 @@ export async function changePartner(
     if (!/UNIQUE/i.test(String(e))) throw e;
     return { ok: false, error: await whyNotDissolved(leagueId, pairId, now) };
   }
+  const id = await activePairOf(leagueId, values.playerA, values.playerB);
+  if (id) await announcePair(id);
   return { ok: true };
 }

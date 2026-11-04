@@ -28,7 +28,9 @@ async function newPlayer(browser: Browser, who: { name: string; email: string })
 }
 
 test("Párt keresek: switched on by the player, paired by the Szervező", async ({ browser }) => {
-  const emailsBefore = d1("select count(*) as n from email_messages where kind != 'login_code'");
+  const OTHER = "select count(*) as n from email_messages where kind not in ('login_code', 'pair_created')";
+  const emailsBefore = d1(OTHER);
+  const lastBefore = d1("select max(id) as id from email_messages")[0].id ?? 0;
 
   // Kata on Párom: off by default (no solo signup), then on.
   const kata = await newPlayer(browser, KATA);
@@ -58,6 +60,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   await registered.getByRole("checkbox", { name: `${KATA.name} kijelölése` }).check();
   await registered.getByRole("checkbox", { name: `${KRISTOF.name} kijelölése` }).check();
   await registered.getByRole("button", { name: "Párba teszem (2/2)" }).click();
+  await expect(org.page.getByRole("alertdialog")).toContainText("e-mailben is szólunk nekik");
   await org.page.getByRole("alertdialog").getByRole("button", { name: "Párba teszem" }).click();
   await expect(registered).not.toContainText(KATA.name);
   await expect(registered).not.toContainText(KRISTOF.name);
@@ -67,8 +70,11 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
     d1(`select p.source, p.status from pairs p join users a on a.id = p.player_a join users b on b.id = p.player_b
       where a.email = '${KATA.email}' and b.email = '${KRISTOF.email}'`),
   ).toEqual([{ source: "manual", status: "active" }]);
-  // No email; a message in the app, and Párom shows the partner.
-  expect(d1("select count(*) as n from email_messages where kind != 'login_code'")).toEqual(emailsBefore);
+  // One email each (#260), nothing else; a message in the app, and Párom
+  // shows the partner.
+  const pairMails = d1(`select lower(to_email) as to_email from email_messages where kind = 'pair_created' and id > ${lastBefore}`);
+  expect(pairMails.map((r) => r.to_email).sort()).toEqual([KATA.email, KRISTOF.email].map((e) => e.toLowerCase()).sort());
+  expect(d1(OTHER)).toEqual(emailsBefore);
   const back = await as(browser, KATA.email);
   await visit(back.page, "/pair");
   await expect(content(back.page)).toContainText(KRISTOF.name);

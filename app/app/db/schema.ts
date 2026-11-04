@@ -63,6 +63,7 @@ export const emailMessages = sqliteTable(
         "pair_invite",
         "pair_answer",
         "pair_dissolved",
+        "pair_created",
         "season_entry_decision",
         "groups_published",
         "match_proposal",

@@ -43,7 +43,8 @@ import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up players who look for a partner. Registered
 // players who switched on "Párt keresek" (or whose solo signup still waits,
-// D59) become an active pair at once, with an in-app message and no email.
+// D59) become an active pair at once; both get an in-app message and an
+// email with the partner's name (#260).
 // Solos from the interest list who haven't registered yet are paired as
 // before: both get an email with each other's name and address (pairIntro),
 // and the pair forms once both have registered. No email addresses shown.
@@ -222,7 +223,7 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                   {chosen[0].name} és {chosen[1].name}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Rögtön párban lesznek, és nevezhetnek. Az oldalon értesítést kapnak, e-mailt nem. A Párok oldalon
+                  Rögtön párban lesznek, és nevezhetnek. Az oldalon és e-mailben is szólunk nekik. A Párok oldalon
                   bonthatod fel.
                 </AlertDialogDescription>
               </AlertDialogHeader>

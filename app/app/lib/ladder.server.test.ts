@@ -119,7 +119,7 @@ describe("ladderPage", () => {
     expect(week2.bands[0]!.groups[0]!.weekMatches.map((m) => m.when)).toEqual([null]);
   });
 
-  it("shows the table in seed order, with names, before any result", async () => {
+  it("shows the table in table order (Elo, then seed), with names, before any result", async () => {
     publish(1, 1);
     const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
     if (page?.kind !== "ladder") throw new Error("no ladder");

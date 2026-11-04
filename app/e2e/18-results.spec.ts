@@ -25,6 +25,19 @@ function annasMatches(): { id: number; week: number; opponents: Player[] }[] {
   });
 }
 
+// The match as the organizer pages name it (#202, #220): "X a Y ellen", the
+// 1st pair first, "az" before a vowel.
+function versus(matchId: number): string {
+  const [r] = d1(
+    `select ua.name as a1, ub.name as a2, va.name as b1, vb.name as b2 from matches m
+     join pairs pa on pa.id = m.pair_a join users ua on ua.id = pa.player_a join users ub on ub.id = pa.player_b
+     join pairs pb on pb.id = m.pair_b join users va on va.id = pb.player_a join users vb on vb.id = pb.player_b
+     where m.id = ${matchId}`,
+  ) as { a1: string; a2: string; b1: string; b2: string }[];
+  const b = `${r!.b1} – ${r!.b2}`;
+  return `${r!.a1} – ${r!.a2} ${/^[aáeéiíoóöőuúüű]/i.test(b) ? "az" : "a"} ${b} ellen`;
+}
+
 const status = (page: Page) => page.getByRole("region", { name: "Állapot" });
 const result = (page: Page) => content(page).getByRole("region", { name: "Eredmény" });
 
@@ -40,6 +53,12 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const [first] = annasMatches();
   const [opponent] = first!.opponents;
   const player = await as(browser, anna);
+  // Before any result the group card on Kezdőlap lists the pairs, no table (#201, #220).
+  await visit(player.page, "/home");
+  const pairList = content(player.page).getByRole("list", { name: "Párok" });
+  await expect(pairList.getByRole("listitem").filter({ hasText: "(ti)" })).toContainText(anna.name);
+  await expect(content(player.page).getByRole("table", { name: "Tabella" })).toHaveCount(0);
+
   await visit(player.page, `/matches/${first!.id}`);
   await expect(result(player.page).getByText("Eredmény rögzítése")).toBeVisible();
 
@@ -86,6 +105,12 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const partner = await as(browser, PAIRS.p1[1]);
   await visit(partner.page, "/home");
   await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText("Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
+  // The card now shows the table (#201, #220): their row has the match and the
+  // win's 3 points. Columns: #, Pár, M, P, Szett, Játék.
+  await expect(content(partner.page).getByRole("list", { name: "Párok" })).toHaveCount(0);
+  const ours = content(partner.page).getByRole("table", { name: "Tabella" }).getByRole("row").filter({ hasText: "(ti)" });
+  await expect(ours.getByRole("cell").nth(2)).toHaveText("1");
+  await expect(ours.getByRole("cell").nth(3)).toHaveText("3");
   await partner.context.close();
   await player.context.close();
 });
@@ -141,9 +166,13 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   const main = content(org.page);
   await expect(main.getByRole("heading", { name: "Vitatott eredmények (1)" })).toBeVisible();
   await expect(main).not.toContainText("@example.test");
+  // The match is named "X a Y ellen" on Viták, its decision page and Meccsek (#202, #220).
+  const named = versus(second!.id);
+  await expect(main.getByRole("region", { name: /^Vitatott eredmények/ })).toContainText(named);
   await main.getByRole("link", { name: "Döntök" }).click();
   await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
   await org.page.waitForLoadState("networkidle");
+  await expect(content(org.page).getByRole("heading", { level: 1 })).toHaveText(named);
   await expect(content(org.page)).toContainText("Megjegyzés: A szuper tie-breaket mi nyertük.");
   await expect(content(org.page).getByRole("region", { name: "Napló" })).toContainText("Vitatta az eredményt");
   await content(org.page).getByRole("radio", { name: /^Mindkét pár vereséget kap/ }).click();
@@ -158,6 +187,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   // Meccsek (#158) shows the results: the decision, and the confirmed one.
   await visit(org.page, "/admin/leagues/minta/matches");
   await expect(content(org.page)).toContainText("Döntés: Mindkét pár vereséget kap (0:4, 0:4)");
+  await expect(content(org.page)).toContainText(named);
   // From the 1st pair's side, whichever Anna's pair is.
   await expect(content(org.page)).toContainText(/Lejátszva: (4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10)/);
   await org.context.close();

@@ -335,7 +335,9 @@ export async function createBroadcast(input: {
       actorId: input.actorId,
       action: "broadcast.send",
       target: sql`'broadcast:' || (select max(${broadcasts.id}) from ${broadcasts})`,
-      detail: `${input.audience}; ${recipients.length} recipients`,
+      // The count only: the audience label can hold the Admin's search, an email
+      // address or a name (review of #272). The target names the subject.
+      detail: `${recipients.length} recipients`,
     }),
   ]);
 

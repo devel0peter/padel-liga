@@ -166,7 +166,7 @@ const STEPS: Step[] = [
     action: "broadcast.send",
     actor: ADMIN,
     run: () =>
-      OUTBOX.createBroadcast({ subject: "Hír", body: "Szia {név}!", audience: "Mind", recipients: [{ email: "p1a@x.hu", name: "Játékos 1a" }], createdBy: "adm@x.hu", actorId: ADMIN }),
+      OUTBOX.createBroadcast({ subject: "Hír", body: "Szia {név}!", audience: "Jelentkezők · „anna@x.hu”", recipients: [{ email: "p1a@x.hu", name: "Játékos 1a" }], createdBy: "adm@x.hu", actorId: ADMIN }),
   },
   { action: "registration_invites.send", actor: ADMIN, run: () => OUTBOX.queueRegistrationInvites(ENTRY_TIME, undefined, ADMIN).then((n) => expect(n).toBeGreaterThan(0)) },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },

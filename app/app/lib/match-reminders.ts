@@ -1,5 +1,5 @@
 // Match reminders and the daily digest (#31, spec 13): which reminder is due
-// for a match, when the hourly cron sends what, and the texts. Pure (no I/O);
+// for a match, when the cron sends what, and the texts. Pure (no I/O);
 // the D1 side is match-reminders.server.ts. Times are Budapest wall-clock
 // days and hours, so the daylight-saving change moves nothing (D75).
 
@@ -10,9 +10,9 @@ import { withArticle } from "./groups";
 import { venueLine } from "./matches";
 import type { Message } from "./notifications";
 
-// The digest goes out in the cron run of this Budapest hour, after the
-// reminders of the day are made, so their pushes come then too.
-export const DIGEST_HOUR = 7;
+// The morning's work (the day's reminders, then the digest) starts in the
+// first cron run of this Budapest hour, so their pushes come then too.
+export const MORNING_FIRST_HOUR = 7;
 // "Holnap meccs" goes out in the first run from 18:00 to 21:00 Budapest the
 // day before the slot.
 export const TOMORROW_FIRST_HOUR = 18;
@@ -31,10 +31,8 @@ export function budapestHour(now: Date): number {
   return Math.floor(budapestClock(now).minutes / 60);
 }
 
-export const isDigestRun = (now: Date) => budapestHour(now) === DIGEST_HOUR;
 // The cron runs every 10 minutes (#183, D84), so "the 21:00 run" is the last
-// one that sends "holnap meccs": from 18:00 to 21:00 sharp, as with the
-// hourly cron before.
+// one that sends "holnap meccs": from 18:00 to 21:00 sharp.
 export const isTomorrowRun = (now: Date) => {
   const m = budapestClock(now).minutes;
   return m >= TOMORROW_FIRST_HOUR * 60 && m <= TOMORROW_LAST_HOUR * 60;
@@ -46,7 +44,7 @@ export const isTomorrowRun = (now: Date) => {
 export const MORNING_LAST_HOUR = 11;
 export const isMorningRun = (now: Date) => {
   const h = budapestHour(now);
-  return h >= DIGEST_HOUR && h <= MORNING_LAST_HOUR;
+  return h >= MORNING_FIRST_HOUR && h <= MORNING_LAST_HOUR;
 };
 export const morningKey = (now: Date) => `morning:${budapestDay(now)}`;
 

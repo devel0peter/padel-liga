@@ -39,6 +39,12 @@ describe("GET /health", () => {
     expect(budget.used().queries).toBe(1);
   });
 
+  it("doesn't count as a visit on the traffic page", async () => {
+    await route.loader();
+    await route.loader();
+    expect(h.raw.prepare("select count(*) as n from landing_views").get().n).toBe(0);
+  });
+
   it("answers 503 when the database fails, and logs a warning", async () => {
     const res = await healthResponse(async () => {
       throw new Error("D1_ERROR: database unavailable");

@@ -11,7 +11,7 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 | Visitor | See the landing page, rules and public standings; send feedback (section 19) |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
 | Organizer ("Szervező") | Per league: create and configure seasons, enter or take out a pair, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
-| Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users, read feedback (Peter) |
+| Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic, usage and users, read feedback (Peter) |
 
 Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).
 - Code names: `player`, `league_admin`, `superadmin`; UI labels: Játékos, Szervező, Admin (2026-10-04).
@@ -255,12 +255,14 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Landing page: names, emails, level, comment.
   - Later: account data, the phone number, match history, ratings.
   - Feedback (section 19): the message, its type, the page it was sent from, the time, the device class and browser, the app version and, when the sender was logged in, the account. A prompt answer: the rating and the comment.
+  - Usage (section 20): for players, which app pages and actions the account used and when, the device class and the browser; no IP address, no full browser string, no cookie. Shown to the Admin only as totals. Szervezők's and Admins' own use is not recorded.
   - Notifications: the in-app list, the email and push choices, and each device's push subscription (the browser's push address; the push itself goes encrypted through the browser maker's push service: Google, Apple, Mozilla, Microsoft).
 - **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
 - **Who sees what:**
   - Public: names, results, standings and ratings. Names and the group tables are public from the day the groups are published (the league page, section 14; README decision log, 2026-11-02, #30), results and ratings once the league has started.
   - Never public: email and phone number.
   - Feedback: only the Admin. The sender's account is never in a GitHub issue.
+  - Usage: only the Admin, as totals; no screen shows one player's history.
   - Phone number: only the current round's opponents see it (section 3).
   - A mid-phase withdrawal's reason (section 4): only the organizer, the Admin and the pair itself; the others only see that the pair withdrew. Anonymizing a player's account (section 3) clears it, also from the partner's notice.
 - **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database; the bot check on the feedback form), GitHub (bug reports without personal data, section 19), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).
@@ -268,6 +270,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
   - Interest list: deleted at the end of the first season's first round, unless the person registers (README decision log, 2026-11-03, D88, #224).
   - Accounts: kept until deletion, then removed, or anonymized when results depend on them (section 3).
   - Feedback: deleted 1 year after it was sent, or with the account it came from. A GitHub issue opened for a bug report holds no personal data and stays.
+  - Usage events: deleted 180 days after they were recorded, or with the account they came from.
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address. A deletion request is carried out by the Admin (section 3); the deletion also removes the address's unsubscribe and bounce record, so every stored data of the address is gone (only the anonymized name in old results stays).
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
 - **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion, and they get the registration invite (section 3). Nothing else is sent to them until they register themselves. Until then, the player who registered sees only the partner's name from the signup on "Párom", never the email.
@@ -309,3 +312,28 @@ Players and visitors can tell us from the app that something is broken or could 
 - No email, no push, no notification (section 13).
 
 **Out of scope:** screenshots or attachments, chat or replies in the app, a reminder to give feedback, per-round prompts.
+
+## 20. Usage statistics (README decision log, 2026-11-04, D95, #139)
+The Admin sees how players use the app. No cookie, no local storage, no consent banner, no third-party tracker: everything is measured on our server and stays in our database. A Cloudflare Web Analytics script is not added to the logged-in pages; the public pages keep what they have (README decision log, 2026-10-04, #45).
+
+**What is recorded.** One event row per page view or action: the account, the time, the kind (`view` or the action's name), the page (the route's name, e.g. `match`, never the full path or any id), the device class (mobile or desktop), the browser family and whether the visit came from the installed app (the home-screen icon opens the app at a start address with a marker; a visit that started there is "telepített app", else "böngésző"). No IP address, no full browser string, no query string, no message or score text.
+- Recorded: every page view in the logged-in app (document and in-app navigation) and these actions: times offered, time accepted, result recorded, result confirmed, a notification switch changed, push enabled on a device, a pair link created, a "Párt keresek" post. More actions are added by listing them in one place.
+- **Not recorded: Szervezők and Admins.** An account that is the Admin or a Szervező of any league has no events written, and reports also leave out accounts that are one now (an account made Szervező later disappears from the numbers of its past too).
+- Recording runs after the response is sent (the background helper, so no page waits for it) and any failure is logged and ignored: a page never breaks or slows because of it.
+- Kept 180 days (about a season with its break), then a daily cron step deletes older events; deleting an account deletes its events.
+
+**Visit.** A player's events with no pause longer than **30 minutes** between two of them (default, Peter may change it). Visit length = last event minus first event; a visit with one event has no length and is left out of the length statistics. Time on a page = the time to the next event in the same visit, capped at 5 minutes; the last page of a visit has none.
+
+**Admin view ("Használat", Admin only).** `/admin/usage`, a date range in the page address (`?from=&to=`, default the last 14 days, at most the 180 kept days). Totals and simple bars, no chart library, no list of players, no screen with one player's history.
+1. **Active players** per day, per week and per round (a phase of the current or chosen season, by its dates); a player is active with at least one visit in the period.
+2. **Visits:** visits per active player, pages per visit, typical (median) visit length, typical time on the main pages.
+3. **Flows with drop-off:** per step, the number of people who reached it and the share of the previous step.
+   - Join: landing page views (all sources, from the landing views, a number of views not people) → signups → first login → profile complete (phone and level) → entry submitted. The first step is a count of views, so its share is only a hint; the steps after it count accounts.
+   - Match (per match, counted over players with a match in the period): times offered → time accepted → result recorded → result confirmed. A step counts matches, not people.
+   - Steps are read from the existing data (signups, accounts, profiles, entries, the match log), not from usage events, so they are exact and cover the time before usage recording started.
+4. **Feature use:** how many times each recorded action was used in the range, and by how many distinct players, split by mobile and desktop.
+5. **Devices:** share of mobile and desktop, of browser families, and of installed app against browser, by visit.
+
+**Privacy (D95).** Usage per account is personal data. The legal basis is the organizer's legitimate interest in improving the service; it is first-party, collects nothing from the device and shares nothing with third parties, so no consent is asked. The privacy page says what is measured and for how long (section 17). **Flag for human review.**
+
+**Out of scope:** ad pixels and campaign attribution (the `?ref=` tracking stays), session recordings, heatmaps, A/B tests, email opens or clicks, a per-player history, the feedback form (section 19).

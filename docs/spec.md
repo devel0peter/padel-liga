@@ -245,6 +245,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 - Hungarian characters everywhere (ő, ű), including email subject lines.
 - Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
 - Production logs (README decision log, 2026-11-04, D92, #227): one structured line per request (request id, path without query, status, duration, account id) and per cron run (start, steps, deferrals, finish), one error line with stack per unexpected error, and lines for emails queued/sent/failed, pushes and login attempts (outcome only). No email address, phone number, name, login code or token in any line (`app/app/lib/log.ts`). Cloudflare Workers Logs keeps them 3 days (Workers Free). Read in the dashboard or with `npm run logs:read -w app`.
+- Health check (README decision log, 2026-11-04, D92, #228): `GET /health` answers `ok` (200) when the database answers `SELECT 1` within 3 seconds, else `unavailable` (503); plain text, `Cache-Control: no-store`, not counted on the traffic page. An outside uptime monitor checks it every 5 minutes and emails Peter after 2 failures in a row and on recovery.
 - Logs: an audit log for every match status change. The match log (`match_events`, D68) is it; the league's Szervező and the Admin see every running-phase match with its status, activity and log on "Meccsek" (README decision log, 2026-11-02, D76).
 
 ## 17. Privacy page (Adatkezelési tájékoztató)

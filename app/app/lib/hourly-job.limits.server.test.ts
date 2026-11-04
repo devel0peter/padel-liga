@@ -88,7 +88,7 @@ async function bigLeague() {
 const count = (q: string) => (h.raw.prepare(q).get() as { n: number }).n;
 
 describe("the cron within the run limits (#183)", () => {
-  let log: { mock: { calls: unknown[][] } };
+  let lines: { event: string; result?: string }[] = [];
 
   beforeEach(async () => {
     await bigLeague();
@@ -96,8 +96,9 @@ describe("the cron within the run limits (#183)", () => {
       h.pushes.push(`${req.url} ${JSON.parse(await req.text()).url}`);
       return new Response(null, { status: 201 });
     });
-    log = vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    lines = [];
+    for (const method of ["log", "warn", "error"] as const)
+      vi.spyOn(console, method).mockImplementation((line: { event: string; result?: string }) => void lines.push(line));
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -143,8 +144,8 @@ describe("the cron within the run limits (#183)", () => {
     expect(runs.findIndex((r) => r.pushes === 0)).toBeLessThan(13);
 
     // A run that left work logs how much.
-    const lines = log.mock.calls.map((c) => String(c[0]));
-    expect(lines.some((l) => /^cron: pushed \d+ notifications; \d+ left for the next run \(run limits\)$/.test(l))).toBe(true);
+    const results = lines.filter((l) => l.event === "cron step").map((l) => l.result ?? "");
+    expect(results.some((l) => /^pushed \d+ notifications; \d+ left for the next run \(run limits\)$/.test(l))).toBe(true);
   });
 
   it("a second morning run makes nothing again", async () => {

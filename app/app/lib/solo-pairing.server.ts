@@ -8,6 +8,7 @@ import { pairIntroMessage } from "~/lib/notifications";
 import { notifyAccounts } from "~/lib/notifications.server";
 
 import { pairError } from "./solo-pairing";
+import { logError } from "~/lib/log";
 
 // Pairs two solo signups of the city and emails both (pairIntro). Returns an
 // error message (Hungarian) instead when they can't be paired.
@@ -60,7 +61,7 @@ export async function pairSolos(
       ),
     );
   } catch (e) {
-    console.error("pair intro email failed", e);
+    logError("pair intro email failed", { error: e });
   }
   // In the app too, for whoever has an account (#115): the email skips an
   // account that switched email off.

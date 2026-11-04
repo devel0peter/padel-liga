@@ -26,6 +26,7 @@ import {
   type ReminderRecipient,
   type Situation,
 } from "./reminders";
+import { logWarn } from "~/lib/log";
 
 // The automatic reminders in D1 (#155). The rules are in reminders.ts. The
 // hourly cron (workers/app.ts) queues what is due in the leagues whose
@@ -187,7 +188,7 @@ export async function queueDueReminders(now = new Date()): Promise<number> {
     await db.batch([first, ...rest]);
   } catch (e) {
     if (String(e).includes("UNIQUE constraint failed")) {
-      console.warn("reminders: another run queued some of these; left to the next run");
+      logWarn("stuck reminders deferred", { reason: "another run queued some of these; left to the next run" });
       return 0;
     }
     throw e;

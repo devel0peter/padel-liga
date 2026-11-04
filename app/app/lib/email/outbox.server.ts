@@ -29,6 +29,7 @@ import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { listCities } from "~/lib/cities.server";
+import { logError, logInfo, logWarn } from "~/lib/log";
 import { listSeasons } from "~/lib/seasons.server";
 
 import {
@@ -132,7 +133,16 @@ async function enqueue(all: NewMessage[]): Promise<number[]> {
       .returning({ id: emailMessages.id });
     ids.push(...rows.map((r) => r.id));
   }
+  logQueued(messages);
   return ids;
+}
+
+// "email queued" (#227): how many of each kind, never the addresses.
+function logQueued(messages: readonly { kind: string }[]): void {
+  if (messages.length === 0) return;
+  const kinds: Record<string, number> = {};
+  for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+  logInfo("email queued", { count: messages.length, kinds });
 }
 
 export async function suppressedSet(): Promise<Set<string>> {
@@ -508,6 +518,7 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
     const [first, ...rest] = statements;
     const results = (await db.batch([first, ...rest])) as unknown[];
     ids = (results.slice(0, inserts) as { id: number }[][]).flat().map((r) => r.id);
+    logQueued(messages);
   } catch (e) {
     await markInvited(emails, null);
     throw e;
@@ -609,9 +620,19 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
 
   const failed = results.filter((r): r is Extract<SendResult, { ok: false }> => !r.ok);
   const errors = failed.filter((r) => !r.retryLater);
-  if (errors.length) console.error(`${errors.length} of ${rows.length} emails failed`, errors[0].error);
-  else if (failed.length) console.warn(`${failed.length} of ${rows.length} emails wait for a provider`, failed[0].error);
   const sent = rows.length - failed.length;
+  // "email sent" (#227): message ids and kinds, never the addresses; a
+  // provider's error text is scrubbed by the logger.
+  const outcome = {
+    sent,
+    failed: errors.length,
+    waiting: failed.length - errors.length,
+    kinds: [...new Set(rows.map((r) => r.kind))],
+    ids: rows.map((r) => r.id),
+  };
+  if (errors.length) logError("email failed", { ...outcome, error: errors[0].error });
+  else if (failed.length) logWarn("email waits for a provider", { ...outcome, error: failed[0].error });
+  else logInfo("email sent", outcome);
   return { sent, stop: sent === 0 || failed.some((r) => r.retryLater) };
 }
 

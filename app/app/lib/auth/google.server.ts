@@ -11,6 +11,7 @@ import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.serve
 import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
 import { createSession } from "./session.server";
 import { timingSafeEqual } from "./tokens";
+import { logInfo, logWarn } from "~/lib/log";
 
 // Google login: OAuth authorization code flow with PKCE and state (arctic).
 // The ID token comes straight from Google's token endpoint over TLS, so its
@@ -34,6 +35,7 @@ function client(request: Request): Google {
 export type GoogleError = "google" | "unverified";
 
 function fail(error: GoogleError): never {
+  logWarn("login", { method: "google", outcome: error === "unverified" ? "unverified" : "failed" });
   throw redirect(`/login?error=${error}`, {
     headers: { "Set-Cookie": serializeCookie(FLOW_COOKIE, "", { maxAgeSeconds: 0, secure: SECURE }) },
   });
@@ -68,7 +70,7 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
     const tokens = await client(request).validateAuthorizationCode(code, verifier);
     claims = decodeIdToken(tokens.idToken()) as GoogleClaims;
   } catch (error) {
-    console.warn("Google login failed", error);
+    logWarn("google code exchange failed", { error });
     fail("google");
   }
   if (!claims.sub || !claims.email) fail("google");
@@ -102,6 +104,7 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
       break;
   }
 
+  logInfo("login", { method: "google", outcome: "ok", userId, created: decision.kind === "create" });
   await setProfileImage(userId, googlePicture(claims.picture));
   // The pair from the interest signup, if the partner registered first (D27).
   await formSignupPairs(userId);

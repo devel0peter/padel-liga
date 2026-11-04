@@ -193,7 +193,7 @@ describe("deleting an account (#152)", () => {
     // The pair and its entry are gone; the partner is a player without a pair.
     expect(n("select count(*) from pairs where id = 1")).toBe(0);
     expect(n("select count(*) from season_entries where pair_id = 1")).toBe(0);
-    expect((await pairCandidates(1)).map((c) => c.id)).toContain("b");
+    expect((await pairCandidates({ id: 1, city: "gyor" })).map((c) => c.id)).toContain("b");
     expect(personalRowsLeft()).toEqual(NONE);
     interestListAfter();
     // Logged by who and when, without the name or email.
@@ -271,7 +271,7 @@ describe("deleting an account (#152)", () => {
     // No contact data, no way to log in, gone from lists.
     expect(personalRowsLeft()).toEqual(NONE);
     interestListAfter();
-    expect((await pairCandidates(1)).map((c) => c.id)).not.toContain("a");
+    expect((await pairCandidates({ id: 1, city: "gyor" })).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
     // Párok still lists the dissolved pair, but "Levél nekik" doesn't write to them.
     const audience = (await leaguePairsAudience({ id: 1, city: "gyor", name: "Padelpárbaj Győr" }, { entry: null, q: "" })).people;

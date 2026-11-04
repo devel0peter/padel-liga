@@ -22,6 +22,7 @@
 - Auth, emails and personal data: always flag them for human review in the PR or summary.
 - Before a UI PR merges, call the `e2e-tester` agent (`.claude/agents/e2e-tester.md`, see README) on it and link its report in the PR.
 - Never expose another player's email or phone number on a public page.
+- Review findings, low ones included, are fixed in the PR where they were found. Don't open a new issue for a low finding. If one really is outside the PR's scope, add it as a checklist line to the open "Small follow-ups from PR reviews" issue (#285; open a new one with that title only when none is open). New issues are only for work that is not a low review finding.
 
 ## Stack
 - TypeScript everywhere, npm workspaces.

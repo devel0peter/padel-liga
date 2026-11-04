@@ -3,10 +3,10 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { leagues, pairLinks, pairs, users } from "~/db/schema";
 import { randomToken } from "~/lib/auth/tokens";
-import { audit } from "~/lib/leagues.server";
+import { auditIfChanged } from "~/lib/audit.server";
 
 import type { User } from "./auth/session.server";
-import { activePairWith, pairLeagues, type PairLeague } from "./pairs.server";
+import { activePairIdOf, activePairWith, insertPairIfFree, pairLeagues, type PairLeague } from "./pairs.server";
 import { checkPairLink, PAIR_LINK_REFUSALS } from "./pairs";
 
 // The pair link (README decision log, 2026-10-31): every player without a
@@ -90,15 +90,21 @@ export async function acceptPairLink(user: Pick<User, "id" | "consentAt">, token
   if (!user.consentAt) return { ok: false, error: "Előbb fejezd be a regisztrációt." };
   const refused = await refusalFor(link, user.id);
   if (refused) return { ok: false, error: refused };
-  await db.run(sql`insert into ${pairs} (league_id, player_a, player_b, source)
-    select ${link.leagueId}, ${link.ownerId}, ${user.id}, 'link'
-    where not ${activePairWith(link.leagueId, [link.ownerId, user.id])}`);
+  await db.batch([
+    insertPairIfFree(link.leagueId, link.ownerId, user.id, "link"),
+    auditIfChanged({
+      actorId: user.id,
+      action: "pair.link",
+      target: sql`'pair:' || ${activePairIdOf(link.leagueId, link.ownerId, user.id)}`,
+      detail: `league:${link.leagueId}; link:${link.id}; ${link.ownerId} + ${user.id}`,
+      leagueId: link.leagueId,
+    }),
+  ]);
   const [pair] = await db
     .select({ id: pairs.id })
     .from(pairs)
     .where(and(eq(pairs.leagueId, link.leagueId), eq(pairs.status, "active"), eq(pairs.playerA, link.ownerId), eq(pairs.playerB, user.id)));
   // Someone was quicker with one of them.
   if (!pair) return { ok: false, error: (await refusalFor(link, user.id)) ?? PAIR_LINK_REFUSALS.owner_paired };
-  await audit(user.id, "pair.link", `pair:${pair.id}`, `league:${link.leagueId}; link:${link.id}; ${link.ownerId} + ${user.id}`);
   return { ok: true };
 }

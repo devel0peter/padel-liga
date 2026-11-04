@@ -3,6 +3,7 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { auditEntry } from "~/lib/audit.server";
 import { runAfterResponse } from "~/lib/background.server";
 import {
   accountInvites,
@@ -315,18 +316,28 @@ export async function createBroadcast(input: {
   audience: string;
   recipients: Recipient[];
   createdBy: string;
+  // The Admin's account id, for the audit log (#225).
+  actorId: string;
 }): Promise<number> {
   const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
-  const [{ id }] = await db
-    .insert(broadcasts)
-    .values({
-      subject: input.subject,
-      body: input.body,
-      audience: input.audience,
-      recipients: recipients.length,
-      createdBy: input.createdBy,
-    })
-    .returning({ id: broadcasts.id });
+  const [[{ id }]] = await db.batch([
+    db
+      .insert(broadcasts)
+      .values({
+        subject: input.subject,
+        body: input.body,
+        audience: input.audience,
+        recipients: recipients.length,
+        createdBy: input.createdBy,
+      })
+      .returning({ id: broadcasts.id }),
+    auditEntry({
+      actorId: input.actorId,
+      action: "broadcast.send",
+      target: sql`'broadcast:' || (select max(${broadcasts.id}) from ${broadcasts})`,
+      detail: `${input.audience}; ${recipients.length} recipients`,
+    }),
+  ]);
 
   const secret = emailSecret();
   const messages = await Promise.all(
@@ -449,7 +460,9 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // `only`: just these (lowercase) addresses, e.g. the partner's address a
 // player just added (#96); the same rules apply. Never to an address with an
 // account (inviteRecipients), so the email switch (#115) has nothing to skip.
-export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
+// `actorId`: the Admin who sent them from Jelentkezők, audited in the same
+// batch (#225); a player adding a partner's address isn't.
+export async function queueRegistrationInvites(now = new Date(), only?: readonly string[], actorId?: string): Promise<number> {
   const pending = (await pendingRegistrationInvites()).filter((r) => (!only || only.includes(r.email)) && toSomeone({ toEmail: r.email }));
   if (pending.length === 0) return 0;
   const claimed = await markInvited(
@@ -485,6 +498,10 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
           .insert(accountInvites)
           .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
           .onConflictDoNothing(),
+      );
+    if (actorId)
+      statements.push(
+        auditEntry({ actorId, action: "registration_invites.send", target: "signups", detail: `${recipients.length} invites` }),
       );
     const [first, ...rest] = statements;
     const results = (await db.batch([first, ...rest])) as unknown[];

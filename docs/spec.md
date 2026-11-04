@@ -245,6 +245,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 - Hungarian characters everywhere (ő, ű), including email subject lines.
 - Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
 - Logs: an audit log for every match status change. The match log (`match_events`, D68) is it; the league's Szervező and the Admin see every running-phase match with its status, activity and log on "Meccsek" (README decision log, 2026-11-02, D76).
+- Audit log: every change an organizer, the Admin, a command-line script or a scheduled job makes to league, season, group, pair, match, club, city, signup or account data leaves one entry (who, what, on what, when, a short detail, the league), saved together with the change. "Rendszer" when no account did it (the cron's auto-accepted results, the command line). Entries name accounts by id, never by email or phone. Players' own changes are not in it (the match log covers matches). The list of actions and their names: README decision log, 2026-11-04, D91 (#225).
 
 ## 17. Privacy page (Adatkezelési tájékoztató)
 A short, plain-language Hungarian page. Needed from Phase 0, since the landing page already collects personal data. Contents:

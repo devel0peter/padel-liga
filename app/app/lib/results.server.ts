@@ -15,14 +15,15 @@ import {
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { matchDecisions, matchEvents, matches, pairs } from "~/db/schema";
+import { groups, matchDecisions, matchEvents, matches, pairs, seasons } from "~/db/schema";
+import { auditEntry } from "~/lib/audit.server";
 import { queueMatchEmails } from "~/lib/email/outbox.server";
 import { matchResultConfirmedMessage, matchResultDisputedMessage, matchResultMessage, type Message } from "~/lib/notifications";
 import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server";
 
 import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
-import { NOTE_MAX, scoreText } from "./results";
+import { neutralScoreText, NOTE_MAX, scoreText } from "./results";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
 // auto-accept run by the hourly cron. The rules are in packages/rules
@@ -233,6 +234,15 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
           .update(matches)
           .set({ revision: m.revision + 1, status: "final", outcome: ruling.outcome })
           .where(and(eq(matches.id, m.id), eq(matches.revision, m.revision))),
+        // The system's decision (#225): no actor, shown as "Rendszer".
+        auditEntry({
+          actorId: null,
+          action: "result.auto_accept",
+          target: `match:${m.id}`,
+          detail: neutralScoreText(m.results.state.score),
+          leagueId: sql`(select ${seasons.leagueId} from ${matches} join ${groups} on ${groups.id} = ${matches.groupId}
+            join ${seasons} on ${seasons.id} = ${groups.seasonId} where ${matches.id} = ${m.id})`,
+        }),
       ]);
       accepted.push(m);
     } catch (e) {

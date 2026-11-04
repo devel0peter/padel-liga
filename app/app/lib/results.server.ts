@@ -27,7 +27,7 @@ import { neutralScoreText, NOTE_MAX, scoreText } from "./results";
 import { logError } from "~/lib/log";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
-// auto-accept run by the hourly cron. The rules are in packages/rules
+// auto-accept run by the cron. The rules are in packages/rules
 // (results.ts, reporting.ts); the texts in results.ts. Every step goes into
 // the match log (match_events; the auto-accept into match_decisions) and is
 // mirrored on the match (status, outcome) for lists and the standings.
@@ -208,7 +208,7 @@ export const AUTO_ACCEPT_BATCH = 10;
 
 /**
  * Accepts every result that has waited 48 hours without an answer (spec 7),
- * from the hourly cron: a ruling in match_decisions (no user), the match
+ * from the cron: a ruling in match_decisions (no user), the match
  * final, and both pairs told in the app and by push (a digest item). A result
  * answered meanwhile is left alone (the revision guard), and so is a match
  * of a pair withdrawn mid-phase (#34), which doesn't count. Returns how many.
@@ -243,6 +243,7 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
           action: "result.auto_accept",
           target: `match:${m.id}`,
           detail: neutralScoreText(m.results.state.score),
+          at: now,
           leagueId: sql`(select ${seasons.leagueId} from ${matches} join ${groups} on ${groups.id} = ${matches.groupId}
             join ${seasons} on ${seasons.id} = ${groups.seasonId} where ${matches.id} = ${m.id})`,
         }),
@@ -252,11 +253,13 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
       if (!lostRace(e)) throw e;
     }
   }
-  if (accepted.length > 0) await tellAutoAccepted(accepted);
+  if (accepted.length > 0) await tellAutoAccepted(accepted, now);
   return accepted.length;
 }
 
-async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number; results: MatchResults }[]): Promise<void> {
+// The items carry the run's scheduled time, like every item the cron makes
+// (#188, #222).
+async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number; results: MatchResults }[], now: Date): Promise<void> {
   try {
     const parts = await Promise.all(
       chunks(list.flatMap((m) => [m.pairA, m.pairB])).map((ids) =>
@@ -276,8 +279,8 @@ async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number
         for (const userId of players.get(pairId) ?? [])
           messages.push({ userId, message: matchResultConfirmedMessage({ matchId: m.id, score: scoreText(score, side), auto: true }) });
     }
-    // From the hourly job: the pushes wait for its push step (#183).
-    await notifyPlayers("match_result_confirmed", messages, undefined, true);
+    // From the cron: the pushes wait for its push step (#183).
+    await notifyPlayers("match_result_confirmed", messages, now, true);
   } catch (error) {
     logError("auto-accept notification failed", { error });
   }

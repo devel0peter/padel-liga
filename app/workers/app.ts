@@ -1,6 +1,6 @@
 import { createRequestHandler } from "react-router";
 
-import { runHourlyJob } from "../app/lib/hourly-job.server";
+import { runCron } from "../app/lib/hourly-job.server";
 import { accountOf, beginInvocation, logError, logInfo, logPath, REQUEST_ID_HEADER } from "../app/lib/log";
 
 const requestHandler = createRequestHandler(
@@ -32,6 +32,6 @@ export default {
   // Every 10 minutes: the steps of lib/hourly-job.server.ts, in order, each
   // from the run's scheduled time; a failed step is logged and the next one runs.
   async scheduled(controller, _env, ctx) {
-    ctx.waitUntil(runHourlyJob(new Date(controller.scheduledTime)));
+    ctx.waitUntil(runCron(new Date(controller.scheduledTime)));
   },
 } satisfies ExportedHandler<Env>;

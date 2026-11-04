@@ -50,7 +50,7 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
   await expect(content(page).getByRole("switch", { name: "Bekapcsolva" })).toBeChecked();
   expect(d1("select count(*) as n from email_messages where kind = 'stuck_reminder'")).toEqual([{ n: 0 }]);
 
-  // The scheduled run (the hourly cron) sends one to each.
+  // The scheduled run (the cron) sends one to each.
   const offset = logOffset();
   expect((await fetch(`${BASE_URL}/cdn-cgi/local/scheduled`)).ok).toBe(true);
   const sent = await waitForEmails(offset, 2, (e) => e.to.startsWith("emlek."));

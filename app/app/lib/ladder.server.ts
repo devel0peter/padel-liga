@@ -6,7 +6,7 @@ import { db } from "~/db/client.server";
 import { cities, groupPairs, groups, matches, pairs, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
-import { buildLadder, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
+import { buildLadder, countedOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague } from "./leagues.server";
 import { averageStartingElo } from "./season-entries";
 import type { Season } from "./seasons";
@@ -100,9 +100,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         // Withdrawn mid-phase (#34): buildLadder drops it and its matches.
         withdrawn: m.withdrawnAt !== null,
       })),
-    // Only a final outcome counts (#186): confirmed, auto-accepted or decided
-    // by the organizer. A waiting or disputed result has no outcome on the
-    // match yet, and the status check keeps it that way whatever is stored.
+    // Only a final outcome counts (#186, countedOutcome): confirmed,
+    // auto-accepted or decided by the organizer.
     matches: played
       .filter((m) => m.groupId === g.id)
       .map((m) => ({
@@ -111,7 +110,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         b: m.b,
         week: m.week,
         scheduledAt: m.scheduledAt,
-        outcome: m.status === "final" ? m.outcome : null,
+        outcome: countedOutcome(m),
       })),
   }));
 }

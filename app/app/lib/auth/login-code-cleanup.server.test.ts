@@ -23,14 +23,14 @@ vi.mock("~/lib/email/outbox.server", async (original) => ({
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const { RunBudget, RUN_LIMITS } = await import("~/lib/run-usage");
-const { HOURLY_STEPS, runHourlyJob } = await import("~/lib/hourly-job.server");
+const { CRON_STEPS, runCron } = await import("~/lib/hourly-job.server");
 const L = await import("~/lib/auth/login-code.server");
 
 const MIN = 60 * 1000;
 const T0 = new Date("2026-11-10T08:00:00Z");
 const at = (minutes: number) => new Date(T0.getTime() + minutes * MIN);
 const sec = (d: Date) => Math.floor(d.getTime() / 1000);
-const CLEANUP = HOURLY_STEPS.filter((s) => s.name === "login code cleanup");
+const CLEANUP = CRON_STEPS.filter((s) => s.name === "login code cleanup");
 
 const emails = () => h.raw.prepare("select email from login_codes order by email").all().map((r: { email: string }) => r.email);
 const count = () => h.raw.prepare("select count(*) as n from login_codes").get().n as number;
@@ -47,7 +47,7 @@ let lines: Line[] = [];
 async function cronRun(now: Date): Promise<number> {
   vi.setSystemTime(now);
   const budget = new RunBudget();
-  await runHourlyJob(now, CLEANUP);
+  await runCron(now, CLEANUP);
   return budget.used().queries;
 }
 
@@ -66,7 +66,7 @@ afterEach(() => {
 
 describe("login code cleanup (#168)", () => {
   it("is a cron step, the first one", () => {
-    expect(HOURLY_STEPS[0].name).toBe("login code cleanup");
+    expect(CRON_STEPS[0].name).toBe("login code cleanup");
   });
 
   it("deletes a record whose code expired over an hour ago and whose window ended, at the next run", async () => {

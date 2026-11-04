@@ -5,6 +5,7 @@ import { db } from "~/db/client.server";
 import { jobRuns, matches, matchReminders, notifications, users } from "~/db/schema";
 import { reminderEmailInserts, type ReminderEmail } from "~/lib/email/outbox.server";
 import { runningMatches, type RunningMatch } from "~/lib/matches.server";
+import { logWarn } from "~/lib/log";
 import { DIGEST_KINDS, type Message, type StoredKind } from "~/lib/notifications";
 import { queuedNotifications } from "~/lib/notifications.server";
 import { RunBudget, type Usage } from "~/lib/run-usage";
@@ -25,7 +26,6 @@ import {
   type DigestItem,
   type DigestReminder,
 } from "./match-reminders";
-import { logWarn } from "~/lib/log";
 
 // Match reminders and the daily digest in D1 (#31, spec 13). The cron
 // (lib/hourly-job.server.ts) calls runMatchReminders; the rules and texts are
@@ -273,11 +273,15 @@ export async function runMatchReminders(
 ): Promise<string | null> {
   const tomorrow = isTomorrowRun(now);
   if (!isMorningRun(now) && !tomorrow) return null;
-  const morning = isMorningRun(now) && fits(budget, 1) && !(await morningFinished(now));
+  // Every run that has no room says so (#222), the morning's first check
+  // included.
+  const noRoom = "match reminders: no room in this run; left for the next one";
+  if (!fits(budget, 1)) return noRoom;
+  const morning = isMorningRun(now) && !(await morningFinished(now));
   if (!morning && !tomorrow) return null;
   const done: string[] = [];
   const left: string[] = [];
-  if (!fits(budget, RUNNING_QUERIES)) return "match reminders: no room in this run; left for the next one";
+  if (!fits(budget, RUNNING_QUERIES)) return noRoom;
   const running = await runningMatches(now);
   if (morning) {
     const reminders = await queueDigestReminders(now, running, budget);
@@ -288,6 +292,7 @@ export async function runMatchReminders(
       if (digests === null) left.push("the digest");
       else done.push(`${digests} digest emails`);
     } else if (fits(budget, 1)) await morningDone(now);
+    else left.push("the morning's done mark");
   }
   if (tomorrow) {
     const t = await queueTomorrowReminders(now, running, budget, emails.tomorrow);

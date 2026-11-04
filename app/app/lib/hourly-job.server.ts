@@ -12,14 +12,15 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // the run's scheduled time: stale login code records are deleted (#168),
 // results waiting 48 hours are accepted (#28), the match reminders and the
 // daily digest when their hour comes (#31), the reminders for people stuck
-// before entering (#155), then the queued pushes and whatever email waits. A step that fails is logged under its own name
-// and the next one runs anyway.
+// before entering (#155), then the queued pushes and whatever email waits.
+// A step that fails is logged under its own name and the next one runs
+// anyway.
 //
 // One run may make 50 D1 queries and 50 outgoing calls (Workers Free,
 // lib/run-usage.ts). The steps share one budget; each keeps enough of it for
 // the steps after it, and what doesn't fit is left for the next run, logged.
 
-export type HourlyStep = {
+export type CronStep = {
   name: string;
   // What the step did, for the log; nothing when there was nothing to do.
   run: (now: Date, budget: RunBudget) => Promise<string | null>;
@@ -33,7 +34,7 @@ const PUSH_MIN: Usage = { queries: 5, calls: 1 };
 const AFTER_STUCK = plus(PUSH_MIN, DELIVER_MIN);
 const AFTER_MATCH = plus({ queries: STUCK_QUERIES, calls: 0 }, AFTER_STUCK);
 
-export const HOURLY_STEPS: readonly HourlyStep[] = [
+export const CRON_STEPS: readonly CronStep[] = [
   {
     // One query (login-code.server.ts), first so that it runs every run
     // however much the others have to do: email delivery uses what is left.
@@ -89,7 +90,7 @@ const DEFERRED = /left for the next/;
 // The run's log (#227): a start and a finish line, one line per step that did
 // something (a warning when it left work for the next run), and an error line
 // per failed step, all with the run's request id.
-export async function runHourlyJob(now: Date, steps: readonly HourlyStep[] = HOURLY_STEPS): Promise<void> {
+export async function runCron(now: Date, steps: readonly CronStep[] = CRON_STEPS): Promise<void> {
   const requestId = `cron-${crypto.randomUUID()}`;
   const end = beginInvocation(requestId);
   const started = Date.now();

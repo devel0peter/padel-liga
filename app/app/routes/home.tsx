@@ -103,7 +103,7 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
     };
   }
   // The signup is saved; an email problem must not fail it. Anything not sent
-  // now stays queued for the hourly cron.
+  // now stays queued for the cron.
   try {
     await deliver(await queueSignupEmails(result.data));
   } catch (error) {

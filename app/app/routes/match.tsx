@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { CalendarPlus, Download, Plus } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
 
@@ -23,6 +23,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { requireUser } from "~/lib/auth/session.server";
+import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ResultSection } from "~/components/match-result";
@@ -337,6 +338,36 @@ function CancelCard({ late }: { late: boolean }) {
   );
 }
 
+// Add the fixed time to the calendar (#192, D106): a Google Calendar link and
+// an .ics file. The file keeps one entry per match: a new download replaces
+// the old one, and after a cancellation it removes it.
+function CalendarRow({ calendar }: { calendar: CalendarLinks }) {
+  return (
+    <div className="grid gap-1.5" aria-label="Naptárba">
+      <p className="text-sm font-medium">{calendar.cancelled ? "Naptár" : "Naptárba"}</p>
+      <div className="flex flex-wrap gap-2">
+        {calendar.googleUrl && (
+          <Button variant="outline" size="sm" asChild>
+            <a href={calendar.googleUrl} target="_blank" rel="noreferrer">
+              <CalendarPlus /> Google Naptár
+            </a>
+          </Button>
+        )}
+        <Button variant="outline" size="sm" asChild>
+          <a href={calendar.icsUrl} download>
+            <Download /> .ics letöltése
+          </a>
+        </Button>
+      </div>
+      {calendar.cancelled ? (
+        <p className="text-sm text-muted-foreground">Lemondták az időpontot. Töltsd le újra az .ics-t, és a naptáradból is kikerül.</p>
+      ) : (
+        <p className="text-sm text-muted-foreground">Ha változik az időpont, az új .ics lecseréli a régit.</p>
+      )}
+    </div>
+  );
+}
+
 export default function MatchRoute({ loaderData: m, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const result = actionData as ActionResult | undefined;
@@ -365,6 +396,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
         <p className="text-sm">
           <span className="font-medium">Ti:</span> {m.us}
         </p>
+        {m.calendar && <CalendarRow calendar={m.calendar} />}
         {m.contacts.length > 0 && (
           <div className="grid gap-1">
             <p className="text-sm font-medium">Az ellenfeleitek telefonszáma:</p>

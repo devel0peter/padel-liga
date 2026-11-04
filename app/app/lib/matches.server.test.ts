@@ -565,3 +565,97 @@ describe("venue and cancellation (#27)", () => {
     }
   });
 });
+
+// The calendar entry of a fixed time (#192, D106): from the real log and rows.
+describe("matchCalendarEvent (#192)", () => {
+  beforeEach(freshDb);
+  const player = { userId: "p1b", manages: () => false };
+  const LATER = [at("2026-11-17", 18), at("2026-11-18", 19, 30), at("2026-11-19", 10)];
+
+  async function fix(id: number) {
+    expect((await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: 1 }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p3b", id, { kind: "accept", slot: SLOTS[1]! }, NOW)).ok).toBe(true);
+  }
+
+  it("is nothing before a time is fixed, and nothing for strangers", async () => {
+    const id = matchOf(1, 3);
+    expect(await M.matchCalendarEvent(id, player)).toBeNull();
+    await fix(id);
+    expect(await M.matchCalendarEvent(id, player)).not.toBeNull();
+    expect(await M.matchCalendarEvent(id, { userId: "x", manages: () => false })).toBeNull();
+    expect(await M.matchCalendarEvent(id, { userId: "p5a", manages: () => false })).toBeNull();
+    expect(await M.matchCalendarEvent(9999, player)).toBeNull();
+  });
+
+  it("holds the four names, the time, the club, the court and the match link, never an email or phone number", async () => {
+    const { toIcs, googleCalendarUrl } = await import("~/lib/calendar");
+    const id = matchOf(1, 3);
+    await fix(id);
+    expect((await M.matchStep("p3b", id, { kind: "venue", clubId: 1, court: "2-es pálya" }, NOW)).ok).toBe(true);
+    const event = (await M.matchCalendarEvent(id, player))!;
+    const ics = toIcs(event);
+    const google = googleCalendarUrl(event);
+    // Unfolded and unescaped, as a calendar app reads them.
+    // The UID (match-1@padelparbaj.hu) is the one "@" a file may have.
+    const texts = [
+      ics.replace(/\r\n /g, "").replace(/UID:[^\r\n]*/, "").replace(/\\n/g, "\n").replace(/\\(.)/g, "$1"),
+      decodeURIComponent(google.replace(/\+/g, " ")),
+    ];
+    for (const text of texts) {
+      for (const name of ["Játékos 1A", "Játékos 1B", "Játékos 3A", "Játékos 3B"]) expect(text).toContain(name);
+      expect(text).toContain(`padelparbaj.hu/matches/${id}`);
+      expect(text).toContain("Ace Padel, 2-es pálya");
+      expect(text).not.toContain("@");
+      expect(text).not.toContain("+36");
+      expect(text).not.toMatch(/3630/);
+    }
+    expect(ics).toContain("DTSTART:20261113T183000Z");
+    expect(ics).toContain("DTEND:20261113T193000Z");
+    expect(ics).toContain(`UID:match-${id}@padelparbaj.hu`);
+  });
+
+  it("organizers get it for their league only; the opponents' file names the same four players", async () => {
+    const id = matchOf(1, 3);
+    await fix(id);
+    expect(await M.matchCalendarEvent(id, { userId: "o", manages: (league) => league === "gyor" })).not.toBeNull();
+    expect(await M.matchCalendarEvent(id, { userId: "o", manages: (league) => league === "pecs" })).toBeNull();
+    const opponent = (await M.matchCalendarEvent(id, { userId: "p3a", manages: () => false }))!;
+    const ours = (await M.matchCalendarEvent(id, player))!;
+    expect([...opponent.players].sort()).toEqual([...ours.players].sort());
+  });
+
+  it("a cancelled time is STATUS:CANCELLED, and a new time replaces it: same UID, higher SEQUENCE", async () => {
+    const { toIcs } = await import("~/lib/calendar");
+    const id = matchOf(1, 3);
+    await fix(id);
+    const first = (await M.matchCalendarEvent(id, player))!;
+    expect(first.sequence).toBe(0);
+    expect(toIcs(first)).toContain("STATUS:CONFIRMED");
+
+    expect((await M.matchStep("p1a", id, { kind: "cancel" }, NOW)).ok).toBe(true);
+    const cancelled = (await M.matchCalendarEvent(id, player))!;
+    expect(toIcs(cancelled)).toContain("STATUS:CANCELLED");
+    expect(toIcs(cancelled)).toContain("DTSTART:20261113T183000Z");
+    expect(cancelled.sequence).toBeGreaterThan(first.sequence);
+
+    expect((await M.matchStep("p1a", id, { kind: "propose", slots: LATER, clubId: null }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p3b", id, { kind: "accept", slot: LATER[0]! }, NOW)).ok).toBe(true);
+    const again = (await M.matchCalendarEvent(id, player))!;
+    expect(toIcs(again)).toContain("STATUS:CONFIRMED");
+    expect(toIcs(again)).toContain("DTSTART:20261117T170000Z");
+    expect(toIcs(again)).toContain(`UID:match-${id}@padelparbaj.hu`);
+    expect(again.sequence).toBeGreaterThan(cancelled.sequence);
+  });
+
+  it("the match page carries the links only for a match that has had a time", async () => {
+    const id = matchOf(1, 3);
+    expect((await M.matchPage(id, "p1a", NOW))!.calendar).toBeNull();
+    await fix(id);
+    const page = (await M.matchPage(id, "p1a", NOW))!;
+    expect(page.calendar).toMatchObject({ icsUrl: `/matches/${id}/calendar.ics`, cancelled: false });
+    expect(page.calendar!.googleUrl).toContain("https://calendar.google.com/calendar/render?action=TEMPLATE");
+    expect(page.calendar!.googleUrl).toContain("ctz=Europe%2FBudapest");
+    await M.matchStep("p1a", id, { kind: "cancel" }, NOW);
+    expect((await M.matchPage(id, "p1a", NOW))!.calendar).toMatchObject({ googleUrl: null, cancelled: true });
+  });
+});

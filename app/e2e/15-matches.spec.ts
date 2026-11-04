@@ -92,6 +92,22 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await other.page.getByRole("button", { name: "Elfogadom" }).click();
   await expect(content(other.page).getByRole("status").filter({ hasText: "Lefixáltátok a meccset." })).toBeVisible();
   await expect(status(other.page)).toContainText(/Lefixálva: .*19:30/);
+  // Add to calendar (#192): the Google link and the .ics, with names and no contact data.
+  const calendar = content(other.page).getByLabel("Naptárba");
+  const google = new URL((await calendar.getByRole("link", { name: "Google Naptár" }).getAttribute("href"))!);
+  expect(google.origin + google.pathname).toBe("https://calendar.google.com/calendar/render");
+  expect(google.searchParams.get("ctz")).toBe("Europe/Budapest");
+  expect(google.searchParams.get("details")).toContain(anna.name);
+  const icsHref = (await calendar.getByRole("link", { name: ".ics letöltése" }).getAttribute("href"))!;
+  expect(icsHref).toBe(`/matches/${first!.id}/calendar.ics`);
+  const ics = await other.context.request.get(icsHref);
+  expect(ics.status()).toBe(200);
+  expect(ics.headers()["content-type"]).toContain("text/calendar");
+  const icsText = (await ics.text()).replace(/\r\n /g, "");
+  expect(icsText).toContain(`UID:match-${first!.id}@padelparbaj.hu`);
+  expect(icsText).toContain("STATUS:CONFIRMED");
+  expect(icsText).toContain(anna.name);
+  expect(icsText.replace(/UID:\S+/, "")).not.toContain("@");
   // The log: both steps, with who did them.
   const log = content(other.page).getByRole("region", { name: "Napló" });
   await expect(log.getByRole("listitem")).toHaveCount(2);

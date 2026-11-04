@@ -8,6 +8,8 @@ import * as schema from "./schema";
 // Every query a run makes counts against its Workers Free limit (#183,
 // lib/run-usage.ts): a statement when it runs, a batch once (as D1 counts it).
 // The binding gets its own statements back, so a batch sees real ones.
+// The binding is read on each access, never at import: Cloudflare runs the
+// global scope without bindings when it validates an upload (#234).
 const originals = new WeakMap<object, D1PreparedStatement>();
 const RUNS = new Set<PropertyKey>(["run", "all", "raw", "first"]);
 
@@ -29,9 +31,10 @@ function counted(statement: D1PreparedStatement): D1PreparedStatement {
   return proxy;
 }
 
-export function countedDatabase(d1: D1Database): D1Database {
-  return new Proxy(d1, {
-    get(target, prop) {
+export function countedDatabase(binding: () => D1Database): D1Database {
+  return new Proxy({} as D1Database, {
+    get(_, prop) {
+      const target = binding();
       const value = Reflect.get(target, prop, target);
       if (typeof value !== "function") return value;
       if (prop === "prepare") return (query: string) => counted(value.call(target, query));
@@ -48,4 +51,4 @@ export function countedDatabase(d1: D1Database): D1Database {
   });
 }
 
-export const db = drizzle(countedDatabase(env.DB), { schema });
+export const db = drizzle(countedDatabase(() => env.DB), { schema });

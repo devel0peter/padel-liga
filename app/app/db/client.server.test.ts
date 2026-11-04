@@ -34,13 +34,17 @@ const fake = {
   },
 };
 
-vi.mock("cloudflare:workers", () => ({ env: { DB: fake } }));
+// No binding at import, as when Cloudflare validates an upload (#234).
+const env = vi.hoisted(() => ({ DB: undefined as unknown }));
+vi.mock("cloudflare:workers", () => ({ env }));
 
-const { countedDatabase } = await import("~/db/client.server");
+const { countedDatabase, db } = await import("~/db/client.server");
 const { RunBudget } = await import("~/lib/run-usage");
+const { sql } = await import("drizzle-orm");
+const { emailMessages } = await import("~/db/schema");
 
 describe("countedDatabase (#183)", () => {
-  const d1 = countedDatabase(fake as unknown as D1Database);
+  const d1 = countedDatabase(() => fake as unknown as D1Database);
 
   it("counts each statement that runs, not the ones only prepared or bound", async () => {
     const budget = new RunBudget();
@@ -58,5 +62,17 @@ describe("countedDatabase (#183)", () => {
     const out = await d1.batch([d1.prepare("insert 1").bind(1), d1.prepare("insert 2"), d1.prepare("insert 3").bind(3)]);
     expect(out).toHaveLength(3);
     expect(budget.used().queries).toBe(1);
+  });
+});
+
+describe("db (#234)", () => {
+  it("imports without a binding and reads it only when a query runs", async () => {
+    expect(db).toBeDefined();
+    await expect(db.run(sql`select 1`)).rejects.toThrow();
+    env.DB = fake;
+    const budget = new RunBudget();
+    await db.run(sql`select 1`);
+    await db.batch([db.delete(emailMessages), db.delete(emailMessages)]);
+    expect(budget.used().queries).toBe(2);
   });
 });

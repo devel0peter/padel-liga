@@ -14,6 +14,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:read": "node scripts/db-read.mjs",
+    "logs:read": "tsx scripts/logs-read.ts",
     "db:seed:local": "tsx scripts/seed-local.ts",
     "test": "vitest run",
     "auth:invite": "node scripts/invite.mjs",

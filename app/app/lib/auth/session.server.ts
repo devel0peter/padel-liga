@@ -4,6 +4,8 @@ import { redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { leagueAdmins, leagues, sessions, users } from "~/db/schema";
 
+import { noteAccount } from "~/lib/log";
+
 import type { LeagueRef } from "./permissions";
 import { nextExpiry, parseCookies, serializeCookie, sessionExpiry } from "./rules";
 import { randomToken, sha256Hex } from "./tokens";
@@ -74,7 +76,11 @@ async function lookup(request: Request): Promise<SessionData | null> {
 export function getSession(request: Request): Promise<SessionData | null> {
   let session = cache.get(request);
   if (!session) {
-    session = lookup(request);
+    session = lookup(request).then((found) => {
+      // The request line names the account by id (#227).
+      if (found) noteAccount(request, found.user.id);
+      return found;
+    });
     cache.set(request, session);
   }
   return session;

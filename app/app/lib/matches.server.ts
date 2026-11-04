@@ -42,6 +42,7 @@ import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
 import { averageStartingElo } from "./season-entries";
+import { logError } from "~/lib/log";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
@@ -835,6 +836,6 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
     }
   } catch (error) {
     // The step is saved; a failed notice must not undo or hide it.
-    console.error(`match ${matchId} notification failed`, error);
+    logError("match notification failed", { matchId, error });
   }
 }

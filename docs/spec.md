@@ -244,6 +244,7 @@ Payment, court booking integration, chat, mobile app, multi-language support, so
 - Mobile-first; most usage will be from a phone link.
 - Hungarian characters everywhere (ő, ű), including email subject lines.
 - Backups: D1 point-in-time restore (30 days) plus a daily export to R2 via a Cron Trigger.
+- Production logs (README decision log, 2026-11-04, D92, #227): one structured line per request (request id, path without query, status, duration, account id) and per cron run (start, steps, deferrals, finish), one error line with stack per unexpected error, and lines for emails queued/sent/failed, pushes and login attempts (outcome only). No email address, phone number, name, login code or token in any line (`app/app/lib/log.ts`). Cloudflare Workers Logs keeps them 3 days (Workers Free). Read in the dashboard or with `npm run logs:read -w app`.
 - Logs: an audit log for every match status change. The match log (`match_events`, D68) is it; the league's Szervező and the Admin see every running-phase match with its status, activity and log on "Meccsek" (README decision log, 2026-11-02, D76).
 
 ## 17. Privacy page (Adatkezelési tájékoztató)
@@ -263,6 +264,7 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
 - **Retention:**
   - Interest list: deleted at the end of the first season's first round, unless the person registers (README decision log, 2026-11-03, D88, #224).
   - Accounts: kept until deletion, then removed, or anonymized when results depend on them (section 3).
+  - Technical log: request time, page, answer and the account id, no name, email or phone; Cloudflare keeps it 3 days (D92, #227).
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address. A deletion request is carried out by the Admin (section 3); the deletion also removes the address's unsubscribe and bounce record, so every stored data of the address is gone (only the anonymized name in old results stays).
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
 - **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion, and they get the registration invite (section 3). Nothing else is sent to them until they register themselves. Until then, the player who registered sees only the partner's name from the signup on "Párom", never the email.

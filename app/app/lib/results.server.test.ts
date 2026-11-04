@@ -347,6 +347,17 @@ describe("auto-accept after 48 hours (#28)", () => {
     expect(decisions(id)).toHaveLength(1);
   });
 
+  it("the in-app items carry the run's scheduled time, not the database clock (#222, #188)", async () => {
+    const { id, rec } = setup();
+    await R.resultStep(rec, id, { kind: "record", score: score([[5, 4], [4, 2]]) }, PLAYED);
+    h.raw.exec("delete from notifications");
+    const run = new Date(PLAYED.getTime() + 49 * HOUR);
+    expect(await R.autoAcceptResults(run)).toBe(1);
+    const rows = h.raw.prepare("select created_at as at, push_due_at as due from notifications").all();
+    expect(rows).toHaveLength(4);
+    for (const r of rows) expect(r).toEqual({ at: run.getTime() / 1000, due: run.getTime() / 1000 });
+  });
+
   it("a confirmed result is never auto-accepted again; several due results go in one run", async () => {
     const first = setup();
     const second = matchOf(2, 4);

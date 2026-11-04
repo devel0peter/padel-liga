@@ -45,6 +45,7 @@ import { LEVELS } from "~/lib/interest";
 import { listLeagues } from "~/lib/leagues.server";
 import { statusChips, type StatusChip } from "~/lib/player-status";
 import { playerStatuses } from "~/lib/player-status.server";
+import { cn } from "~/lib/utils";
 import {
   cityLabel,
   countSignups,
@@ -215,6 +216,16 @@ function Player({ name, email, status }: { name: string; email: string | null; s
   );
 }
 
+// Below sm each signup is a stacked card (#146): the players first, then the
+// other fields, each with its label. Only max-sm: classes and sm:hidden
+// labels, so the desktop table is unchanged.
+const CARD_ROW = "max-sm:flex max-sm:flex-col max-sm:gap-2 max-sm:p-3";
+const CARD_CELL = "max-sm:p-0 max-sm:whitespace-normal max-sm:empty:hidden";
+
+function CardLabel({ children }: { children: string }) {
+  return <span className="text-muted-foreground sm:hidden">{children}: </span>;
+}
+
 function SignupTableRow({
   row,
 }: {
@@ -236,12 +247,16 @@ function SignupTableRow({
     fetcher.submit({ intent: "update", id: String(row.id), ...fields }, { method: "post" });
 
   return (
-    <TableRow className={deleting ? "opacity-40" : ""}>
-      <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+    <TableRow className={cn(CARD_ROW, deleting && "opacity-40")}>
+      <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", CARD_CELL)}>
+        <CardLabel>Jelentkezett</CardLabel>
         {formatDateTime(new Date(row.createdAt))}
       </TableCell>
-      <TableCell>{row.cityText}</TableCell>
-      <TableCell className="min-w-56">
+      <TableCell className={cn(CARD_CELL, "max-sm:text-xs")}>
+        <CardLabel>Város</CardLabel>
+        {row.cityText}
+      </TableCell>
+      <TableCell className={cn("min-w-56 max-sm:order-first", CARD_CELL)}>
         <div className="grid gap-2">
           <Player name={row.name1} email={row.email1} status={row.status1} />
           {row.mode === "pair" && row.name2 ? (
@@ -254,11 +269,35 @@ function SignupTableRow({
           {row.wantsToOrganize && <Badge>Szervezne ligát</Badge>}
         </div>
       </TableCell>
-      <TableCell>{levelLabel(row.level)}</TableCell>
-      <TableCell className="max-w-56 text-sm whitespace-normal">{row.note}</TableCell>
-      <TableCell className="text-sm">{row.plays}</TableCell>
-      <TableCell className="text-sm">{row.source}</TableCell>
-      <TableCell>
+      <TableCell className={CARD_CELL}>
+        <CardLabel>Szint</CardLabel>
+        {levelLabel(row.level)}
+      </TableCell>
+      <TableCell className={cn("max-w-56 text-sm whitespace-normal max-sm:max-w-none", CARD_CELL)}>
+        {row.note && (
+          <>
+            <CardLabel>Megjegyzés</CardLabel>
+            {row.note}
+          </>
+        )}
+      </TableCell>
+      <TableCell className={cn("text-sm", CARD_CELL)}>
+        {row.plays && (
+          <>
+            <CardLabel>Hol játszik</CardLabel>
+            {row.plays}
+          </>
+        )}
+      </TableCell>
+      <TableCell className={cn("text-sm", CARD_CELL)}>
+        {row.source && (
+          <>
+            <CardLabel>Forrás</CardLabel>
+            {row.source}
+          </>
+        )}
+      </TableCell>
+      <TableCell className={CARD_CELL}>
         <Select defaultValue={row.status} onValueChange={(status) => save({ status })}>
           <SelectTrigger aria-label="Állapot" className="w-36">
             <SelectValue />
@@ -272,7 +311,7 @@ function SignupTableRow({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell className="min-w-56">
+      <TableCell className={cn("min-w-56", CARD_CELL)}>
         <Textarea
           aria-label="Admin jegyzet"
           value={note}
@@ -285,7 +324,7 @@ function SignupTableRow({
           className="min-h-9 text-sm"
         />
       </TableCell>
-      <TableCell>
+      <TableCell className={CARD_CELL}>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Törlés" disabled={deleting}>
@@ -509,8 +548,8 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
+          <Table className="max-sm:block">
+            <TableHeader className="max-sm:hidden">
               <TableRow>
                 <TableHead>Jelentkezett</TableHead>
                 <TableHead>Város</TableHead>
@@ -526,7 +565,7 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="max-sm:block">
               {rows.map((row) => (
                 <SignupTableRow key={row.id} row={row} />
               ))}

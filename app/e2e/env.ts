@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -38,6 +39,13 @@ export const BASE_URL = `http://localhost:${PORT}`;
 // so they can't run against a server they didn't start.
 export const readyLine = (port: number) => `e2e server ready on port ${port}`;
 export const READY_PATTERN = new RegExp(`^${readyLine(PORT)}$`, "m");
+
+// True once the dev server's output has vite's "Local: http://localhost:<port>/"
+// line, which vite prints only after it bound the port itself. Before that,
+// whatever answers on the port may be someone else's server (#169).
+export function viteListening(output: string, port: number): boolean {
+  return new RegExp(`Local:\\s+http://localhost:${port}/`).test(stripVTControlCharacters(output));
+}
 
 // Refuses a port that something already listens on (IPv4 or IPv6), naming it.
 // server.ts calls it before it touches the state or starts anything.

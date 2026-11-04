@@ -23,6 +23,7 @@ import {
   assertSafeEnvironment,
   devVarsText,
   readyLine,
+  viteListening,
   wranglerLocal,
 } from "./env";
 
@@ -56,6 +57,8 @@ if (!keep) {
   wrangler(["d1", "execute", "DB", "--file", seedFile]);
 }
 
+// The setup above takes seconds: check again right before the dev server binds.
+await assertPortFree(PORT);
 const log = createWriteStream(SERVER_LOG, { flags: "a" });
 const dev = spawn("npx", ["--no-install", "react-router", "dev", "--port", String(PORT), "--strictPort"], {
   cwd: APP_DIR,
@@ -66,6 +69,8 @@ const dev = spawn("npx", ["--no-install", "react-router", "dev", "--port", Strin
 });
 dev.stdout.pipe(log);
 dev.stderr.pipe(log);
+let devOutput = "";
+dev.stdout.on("data", (d) => (devOutput += d));
 
 const stop = () => dev.kill("SIGTERM");
 process.on("SIGTERM", stop);
@@ -79,14 +84,17 @@ dev.on("exit", (code) => {
   process.exit(code ?? 0);
 });
 
-// Ready once our own dev server answers: it holds the port (--strictPort, and
-// the port was free above), so whatever answers while it runs is ours. The
+// Ready once our own dev server answers. Nothing is asked of the port until
+// vite says it bound it (--strictPort: if anything else took the port, vite
+// exits instead), so whatever answers after that, while it runs, is ours. The
 // suite and e2e:shots wait for this line, not for the port (#169).
 while (!exited) {
-  const ok = await fetch(`${BASE_URL}/login`).then(
-    (r) => r.ok,
-    () => false,
-  );
+  const ok =
+    viteListening(devOutput, PORT) &&
+    (await fetch(`${BASE_URL}/login`).then(
+      (r) => r.ok,
+      () => false,
+    ));
   if (ok && !exited) {
     console.log(readyLine(PORT));
     break;

@@ -1,8 +1,9 @@
 // `npm run e2e:shots -- [--data seed|walked] [--as admin|organizer|player|anon]...
 //   [--click "Name"] [--label name] <path>...` (#103). What the e2e-tester agent
 // uses to look at changed pages: it starts the suite's own dev server (the same
-// local D1 and guards as `npm run e2e`, E2E_PORT or a free port: #169), logs in as seeded accounts with
-// the code the server prints, opens every path as every role, notes the
+// local D1 and guards as `npm run e2e`; E2E_PORT or a free port, #169), logs in
+// as seeded accounts with the code the server prints, opens every path as
+// every role, notes the
 // status, the final URL, script errors and a sideways scroll at phone width,
 // and saves a desktop and a 390px screenshot of each into
 // app/e2e/.reports/shots/<label>/. Exit code 1 when a page answers 5xx or

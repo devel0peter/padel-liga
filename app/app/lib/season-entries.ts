@@ -188,7 +188,7 @@ export function noLevelRefusal(names: readonly string[]): string {
 }
 
 export const IN_RUNNING_PHASE =
-  "Ez a pár a futó kör csoportjában játszik: kör közben csak indokkal veheted ki (visszaléptetés). Frissítsd az oldalt.";
+  "Ennek a párnak már kihirdetett csoportja van: csak indokkal veheted ki (visszaléptetés). Frissítsd az oldalt.";
 
 // --- Withdrawing mid-phase (#34, D87) ----------------------------------------
 // The organizer takes a pair out of the running round: every match it has

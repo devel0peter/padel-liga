@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/login";
@@ -11,6 +12,7 @@ import { loginEmailParam, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
 import { formSignupPairs } from "~/lib/signup-partners.server";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
+import { turnstileError } from "~/lib/turnstile";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 
 // Login and registration (/register) are the same flow: the first login of
@@ -78,9 +80,8 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   }
 
   // Every code is an email, so sending one needs the bot check.
-  const result = (await verifyTurnstile(form, request, "login"))
-    ? await sendLoginCode(email)
-    : ({ ok: false, error: "Nem sikerült ellenőrizni, hogy nem vagy robot. Várj pár másodpercet, és próbáld újra." } as const);
+  const check = await verifyTurnstile(form, request, "login");
+  const result = check === "ok" ? await sendLoginCode(email) : ({ ok: false, error: turnstileError(check) } as const);
   if (!result.ok) {
     // A failed resend keeps the code step open; the earlier code may still work.
     return form.get("intent") === "resend" ? { step: "code", email, error: result.error } : { step: "email", email, error: result.error };
@@ -99,7 +100,12 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
   const busy = navigation.state !== "idle";
   const { google, returnTo, error, turnstileSiteKey } = loaderData;
   // A token is single use: a new one after every send or resend.
-  const turnstile = turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} action="login" resetKey={actionData} />;
+  // No send until the bot check holds a token (#255); without Turnstile, always.
+  const [botOk, setBotOk] = useState(false);
+  const blocked = Boolean(turnstileSiteKey) && !botOk;
+  const turnstile = turnstileSiteKey && (
+    <Turnstile siteKey={turnstileSiteKey} action="login" resetKey={actionData} onReady={setBotOk} />
+  );
 
   if (actionData?.step === "code") {
     return (
@@ -135,7 +141,7 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
             <Button type="submit" name="intent" value="verify" disabled={busy} className="h-11 px-6 text-base">
               {words.verify}
             </Button>
-            <Button type="submit" name="intent" value="resend" variant="ghost" disabled={busy} formNoValidate>
+            <Button type="submit" name="intent" value="resend" variant="ghost" disabled={busy || blocked} formNoValidate>
               Új kódot kérek
             </Button>
           </div>
@@ -225,7 +231,7 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
         </Field>
         {turnstile}
         <div>
-          <Button type="submit" name="intent" value="send" disabled={busy} className="h-11 w-full text-base">
+          <Button type="submit" name="intent" value="send" disabled={busy || blocked} className="h-11 w-full text-base">
             {busy ? "Küldés…" : "Kódot kérek"}
           </Button>
         </div>

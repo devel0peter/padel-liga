@@ -27,6 +27,7 @@ import {
 } from "./notifications";
 import { pushOutcome, pushRequest, type VapidKeys } from "./push/webpush";
 import { countCall, type RunBudget, type Usage } from "./run-usage";
+import { logError, logInfo, logWarn } from "~/lib/log";
 
 // Notifications are stored first (the /notifications list), then pushed to
 // every device the user subscribed. A push failure never fails the caller.
@@ -107,15 +108,17 @@ async function sendPushes(list: { s: Subscription; id: number; message: Message 
         const res = await fetch(await pushRequest(s, JSON.stringify(pushPayload(id, message)), vapid));
         const outcome = pushOutcome(res.status);
         if (outcome === "gone") gone.push(s.endpoint);
-        if (outcome === "failed") console.error(`push failed: ${res.status} ${new URL(s.endpoint).host}`);
+        if (outcome === "failed") logWarn("push failed", { status: res.status, host: new URL(s.endpoint).host });
         return outcome === "sent";
       } catch (error) {
-        console.error("push error", error);
+        logError("push failed", { error });
         return false;
       }
     }),
   );
-  return { sent: results.filter(Boolean).length, gone: [...new Set(gone)] };
+  const sent = results.filter(Boolean).length;
+  if (list.length > 0) logInfo("push", { sent, failed: list.length - sent, gone: new Set(gone).size });
+  return { sent, gone: [...new Set(gone)] };
 }
 
 const NONE: ReadonlySet<string> = new Set();
@@ -177,7 +180,7 @@ export async function notifyPlayers(
   try {
     await notify(kind, messages, createdAt, queuePush);
   } catch (error) {
-    console.error(`${kind} notification failed`, error);
+    logError("notification failed", { kind, error });
   }
 }
 
@@ -322,7 +325,7 @@ export async function notifyAccounts(kind: PlayerKind, messages: { email: string
       }),
     );
   } catch (error) {
-    console.error(`${kind} notification failed`, error);
+    logError("notification failed", { kind, error });
   }
 }
 
@@ -354,8 +357,16 @@ export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
 }
 
 // A result was disputed (#178): tell the league's Szervezők and the Admins,
-// in the app and by push, never by email. Accounts being deleted are skipped.
-export async function notifyResultDisputed(input: { matchId: number; leagueId: number; leagueSlug: string; leagueName: string; week: number }): Promise<void> {
+// in the app and by push, never by email. Accounts being deleted are skipped,
+// and so is the player who disputed (#221).
+export async function notifyResultDisputed(input: {
+  matchId: number;
+  leagueId: number;
+  leagueSlug: string;
+  leagueName: string;
+  week: number;
+  disputedBy: string;
+}): Promise<void> {
   const [organizers, admins] = await Promise.all([
     db
       .select({ id: users.id })
@@ -370,7 +381,7 @@ export async function notifyResultDisputed(input: { matchId: number; leagueId: n
   const message = resultDisputedMessage(input);
   await notify(
     "result_disputed",
-    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id)).map((userId) => ({ userId, message })),
+    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), input.disputedBy).map((userId) => ({ userId, message })),
   );
 }
 

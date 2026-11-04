@@ -51,8 +51,8 @@ import { cn } from "~/lib/utils";
 async function scope(request: Request, slug: string) {
   const league = await getLeague(slug);
   if (!league) throw data("Nincs ilyen liga.", { status: 404 });
-  await requirePermission(request, { kind: "league.manage", league: league.slug });
-  return { league, cityName: cityName(league.city, await listCities()) };
+  const actor = await requirePermission(request, { kind: "league.manage", league: league.slug });
+  return { league, actor, cityName: cityName(league.city, await listCities()) };
 }
 
 // Only what pairing needs: no email, no admin note, no source. `status`:
@@ -100,11 +100,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { league, cityName } = await scope(request, params.league);
+  const { league, actor, cityName } = await scope(request, params.league);
   const form = await request.formData();
   if (form.get("intent") === "create") {
     const [a, b] = form.getAll("user").map(String);
-    const actor = await requirePermission(request, { kind: "league.manage", league: league.slug });
     const result = await pairSeekers(actor.id, league, a ?? "", b ?? "");
     return result.ok ? { ok: true } : { error: result.error };
   }
@@ -114,11 +113,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = form.get("intent");
   if (intent === "pair") {
     if (ids.length !== 2) return { error: "Pontosan két játékost válassz." };
-    const error = await pairSolos(ids[0], ids[1], league.city, cityName);
+    const error = await pairSolos(actor.id, league.id, ids[0], ids[1], league.city, cityName);
     return error ? { error } : { ok: true };
   }
   if (intent === "unpair" && ids.length === 1) {
-    await unpairSolo(ids[0], league.city);
+    await unpairSolo(actor.id, league.id, ids[0], league.city);
     return { ok: true };
   }
   throw new Response("Ismeretlen művelet.", { status: 400 });

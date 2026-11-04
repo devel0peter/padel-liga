@@ -40,26 +40,28 @@ const { runHourlyJob } = await import("~/lib/hourly-job.server");
 const RUN = new Date("2026-11-10T06:00:00Z");
 const ALL = ["auto-accept", "match", "stuck", "push", "deliver"];
 
-let log: { mock: { calls: unknown[][] } };
-let error: { mock: { calls: unknown[][] } };
+type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
+let lines: Line[] = [];
 
 beforeEach(() => {
   h.calls = [];
   h.fail = new Set();
   h.result = { "auto-accept": 0, stuck: 0, sent: 0 };
-  log = vi.spyOn(console, "log").mockImplementation(() => {});
-  error = vi.spyOn(console, "error").mockImplementation(() => {});
+  lines = [];
+  for (const method of ["log", "warn", "error"] as const)
+    vi.spyOn(console, method).mockImplementation((line: Line) => void lines.push(line));
 });
 afterEach(() => vi.restoreAllMocks());
 
 const steps = () => h.calls.map((c) => c.step);
-const errorLines = () => error.mock.calls.map((c) => String(c[0]));
+const errorLines = () => lines.filter((l) => l.level === "error").map((l) => `${l.event}: ${l.step}`);
+const stepResults = () => lines.filter((l) => l.event === "cron step").map((l) => l.result);
 
 describe("runHourlyJob", () => {
   it("runs the steps in order: auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
-    expect(error).not.toHaveBeenCalled();
+    expect(errorLines()).toEqual([]);
   });
 
   it("gives every step the run's scheduled time", async () => {
@@ -69,17 +71,17 @@ describe("runHourlyJob", () => {
 
   it("logs what each step did, and nothing when there was nothing to do", async () => {
     await runHourlyJob(RUN);
-    expect(log).not.toHaveBeenCalled();
+    expect(stepResults()).toEqual([]);
     h.result = { "auto-accept": 2, stuck: 3, pushed: 4, sent: 5 };
     await runHourlyJob(RUN);
-    expect(log.mock.calls.map((c) => c[0])).toEqual(["cron: auto-accepted 2 results", "cron: queued 3 reminders", "cron: pushed 4 notifications", "cron: sent 5 emails"]);
+    expect(stepResults()).toEqual(["auto-accepted 2 results", "queued 3 reminders", "pushed 4 notifications", "sent 5 emails"]);
   });
 
   it("still sends the reminders and the email when auto-accept fails, and logs it as auto-accept", async () => {
     h.fail.add("auto-accept");
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
-    expect(errorLines()).toEqual(["cron: auto-accept failed"]);
+    expect(errorLines()).toEqual(["cron step failed: auto-accept"]);
   });
 
   it("still queues the stuck reminders and sends the email when the match reminders fail (#185)", async () => {
@@ -87,15 +89,15 @@ describe("runHourlyJob", () => {
     h.result = { "auto-accept": 0, stuck: 3, sent: 4 };
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
-    expect(errorLines()).toEqual(["cron: match reminders failed"]);
-    expect(log.mock.calls.map((c) => c[0])).toEqual(["cron: queued 3 reminders", "cron: sent 4 emails"]);
+    expect(errorLines()).toEqual(["cron step failed: match reminders"]);
+    expect(stepResults()).toEqual(["queued 3 reminders", "sent 4 emails"]);
   });
 
   it("still sends the email after the match reminders when the stuck reminders fail (#185)", async () => {
     h.fail.add("stuck");
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
-    expect(errorLines()).toEqual(["cron: stuck reminders failed"]);
+    expect(errorLines()).toEqual(["cron step failed: stuck reminders"]);
   });
 
   it("logs each failure under its own step when several fail", async () => {
@@ -103,12 +105,31 @@ describe("runHourlyJob", () => {
     await expect(runHourlyJob(RUN)).resolves.toBeUndefined();
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([
-      "cron: auto-accept failed",
-      "cron: match reminders failed",
-      "cron: stuck reminders failed",
-      "cron: push delivery failed",
-      "cron: email delivery failed",
+      "cron step failed: auto-accept",
+      "cron step failed: match reminders",
+      "cron step failed: stuck reminders",
+      "cron step failed: push delivery",
+      "cron step failed: email delivery",
     ]);
+  });
+
+  it("logs a start and a finish line, and every line of the run carries the same request id (#227)", async () => {
+    h.fail.add("stuck");
+    h.result = { "auto-accept": 1, stuck: 0, sent: 2 };
+    await runHourlyJob(RUN);
+    const events = lines.map((l) => l.event);
+    expect(events[0]).toBe("cron start");
+    expect(events.at(-1)).toBe("cron finish");
+    const ids = new Set(lines.map((l) => l.requestId));
+    expect(ids.size).toBe(1);
+    expect([...ids][0]).toMatch(/^cron-/);
+    expect(lines.find((l) => l.level === "error")?.error?.message).toBe("stuck broke");
+  });
+
+  it("logs work left for the next run as a warning (#227)", async () => {
+    const left = { name: "late", run: async () => "sent 3 emails; 4 left for the next run (run limits)" };
+    await runHourlyJob(RUN, [left]);
+    expect(lines.find((l) => l.event === "cron step")?.level).toBe("warn");
   });
 
   it("starts a step only after the one before it has finished", async () => {

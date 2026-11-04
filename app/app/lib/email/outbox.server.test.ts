@@ -39,6 +39,7 @@ describe("queueSeasonEntered", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -72,6 +73,7 @@ describe("queueGroupsPublished", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -132,6 +134,7 @@ describe("a deleted account's placeholder address", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -157,7 +160,7 @@ describe("a deleted account's placeholder address", () => {
         { email: "anna@x.hu", name: "Anna" },
         { email: "deleted-u1@deleted.invalid", name: "Törölt játékos" },
       ],
-      createdBy: "admin@x.hu",
+      createdBy: "admin@x.hu", actorId: "admin",
     });
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
     expect(h.raw.prepare("select recipients from broadcasts").get()).toEqual({ recipients: 1 });
@@ -219,6 +222,7 @@ describe("automatic outbox", () => {
 
   beforeEach(() => {
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
   });
 
@@ -250,7 +254,7 @@ describe("automatic outbox", () => {
       body: "Szia {nev}!",
       audience: "mind",
       recipients: [{ email: "anna@x.hu", name: "Anna" }],
-      createdBy: "admin@x.hu",
+      createdBy: "admin@x.hu", actorId: "admin",
     });
     expect(await O.queueRegistrationInvites()).toBe(2);
     await settleBackground();
@@ -287,7 +291,7 @@ describe("automatic outbox", () => {
 
   it("a broadcast to many sends at most 50 in the request", async () => {
     const recipients = Array.from({ length: 70 }, (_, i) => ({ email: `p${i}@x.hu`, name: `P${i}` }));
-    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu" });
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu", actorId: "admin" });
     await settleBackground();
     expect(h.sent).toHaveLength(50);
     expect(count("kind = 'broadcast' and status = 'pending'")).toBe(20);
@@ -418,6 +422,7 @@ describe("bulk mail after the response", () => {
   beforeEach(async () => {
     await settleBackground();
     h.raw = migratedDatabase();
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
     h.gate = null;
   });
@@ -438,7 +443,7 @@ describe("bulk mail after the response", () => {
   it("a broadcast answers without waiting for any send", async () => {
     slowTransport();
     const recipients = [{ email: "anna@x.hu", name: "Anna" }];
-    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu" });
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu", actorId: "admin" });
     expect(h.sent).toEqual([]);
     expect(backgroundPending()).toBe(1);
     open();

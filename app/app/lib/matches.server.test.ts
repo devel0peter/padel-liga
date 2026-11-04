@@ -140,7 +140,7 @@ describe("currentGroups (#25)", () => {
         .run(status, outcome ? JSON.stringify(outcome) : null, a, b);
     const won = (sets: [number, number][]) => ({ kind: "played", score: { sets } });
 
-    it("before any result every pair is there in seed order with no points", async () => {
+    it("before any result every pair is there in table order (Elo, then seed) with no points", async () => {
       const [g] = await M.currentGroups("p1a", NOW);
       expect(g!.pairs.map((p) => [p.pairId, p.matches, p.points])).toEqual([
         [1, 0, 0],

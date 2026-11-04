@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { groups, matchDecisions, matches, pairs, seasons, users } from "~/db/schema";
+import { auditEntry } from "~/lib/audit.server";
 import { matchDecidedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
@@ -13,6 +14,7 @@ import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matche
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
+import { logError } from "~/lib/log";
 
 // The organizer's side of results (#29): the league's disputes and matches,
 // one match with both pairs' versions and its log, and a decision or override
@@ -22,6 +24,8 @@ import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText,
 // request with another league's match id finds nothing.
 
 const NOT_IN_LEAGUE = "Nincs ilyen meccs ebben a ligában.";
+// The pairs in an audit entry's outcome text.
+export const SIDES = { a: "A pár", b: "B pár" };
 // A withdrawn pair's match (#34): out of the table, nothing to decide.
 const VOIDED_LABEL = "Nem számít: visszalépés";
 
@@ -274,6 +278,15 @@ export async function decideMatch(
         .update(matches)
         .set({ revision: revision + 1, status: "final", outcome })
         .where(and(eq(matches.id, matchId), eq(matches.revision, revision))),
+      // The ruling either went in or failed the batch. No names in the
+      // entry (an account deleted later must not show its old name): A/B.
+      auditEntry({
+        actorId: userId,
+        action: "match.decide",
+        target: `match:${matchId}`,
+        detail: neutralOutcomeText(outcome, SIDES),
+        leagueId,
+      }),
     ]);
   } catch (e) {
     if (lostRace(e)) return { ok: false, error: CHANGED };
@@ -287,7 +300,7 @@ export async function decideMatch(
       ),
     );
   } catch (error) {
-    console.error(`match ${matchId} decision notification failed`, error);
+    logError("decision notification failed", { matchId, error });
   }
   return { ok: true, notice: "Elmentettük a döntést. Mindkét pár értesítést kap." };
 }

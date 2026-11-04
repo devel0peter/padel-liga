@@ -1,4 +1,5 @@
 import { DELIVER_MIN, deliver } from "~/lib/email/outbox.server";
+import { beginInvocation, logError, logInfo, logWarn } from "~/lib/log";
 import { runMatchReminders } from "~/lib/match-reminders.server";
 import { pushQueued } from "~/lib/notifications.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
@@ -70,14 +71,31 @@ export const HOURLY_STEPS: readonly HourlyStep[] = [
   },
 ];
 
+// Work a step left for the next run says so in its result.
+const DEFERRED = /left for the next/;
+
+// The run's log (#227): a start and a finish line, one line per step that did
+// something (a warning when it left work for the next run), and an error line
+// per failed step, all with the run's request id.
 export async function runHourlyJob(now: Date, steps: readonly HourlyStep[] = HOURLY_STEPS): Promise<void> {
+  const requestId = `cron-${crypto.randomUUID()}`;
+  const end = beginInvocation(requestId);
+  const started = Date.now();
   const budget = new RunBudget();
-  for (const step of steps) {
-    try {
-      const done = await step.run(now, budget);
-      if (done) console.log(`cron: ${done}`);
-    } catch (error) {
-      console.error(`cron: ${step.name} failed`, error);
+  let failed = 0;
+  logInfo("cron start", { requestId, scheduled: now });
+  try {
+    for (const step of steps) {
+      try {
+        const done = await step.run(now, budget);
+        if (done) (DEFERRED.test(done) ? logWarn : logInfo)("cron step", { requestId, step: step.name, result: done });
+      } catch (error) {
+        failed++;
+        logError("cron step failed", { requestId, step: step.name, error });
+      }
     }
+  } finally {
+    logInfo("cron finish", { requestId, ms: Date.now() - started, failed, ...budget.used() });
+    end();
   }
 }

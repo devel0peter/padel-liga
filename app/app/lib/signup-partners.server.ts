@@ -8,6 +8,7 @@ import { queueRegistrationInvites } from "~/lib/email/outbox.server";
 import { activePairWith } from "./pairs.server";
 import type { User } from "./auth/session.server";
 import { checkPartnerEmail, partnerWithoutEmail, signupPartners, type SignupLink, type SignupPartner } from "./signup-partners";
+import { logError } from "~/lib/log";
 
 // The pair from the interest signup (#89, D27), in D1. The rules are in
 // signup-partners.ts.
@@ -119,7 +120,7 @@ export async function formSignupPairs(userId: string): Promise<void> {
         where not ${activePairWith(p.leagueId, players)} and not ${pairOf(p.leagueId, p.userId, me.id)}`);
     }
   } catch (e) {
-    console.error("signup pair failed", e);
+    logError("signup pair failed", { error: e });
   }
 }
 

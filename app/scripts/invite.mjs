@@ -17,7 +17,11 @@ if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 }
 
 const q = (s) => (s == null ? "NULL" : `'${String(s).replaceAll("'", "''")}'`);
-const sql = `INSERT INTO account_invites (email, note) VALUES (${q(email)}, ${q(note)}) ON CONFLICT(email) DO UPDATE SET note = excluded.note;`;
+// With its audit entry (#225, D91): no account yet, so no id to name, and no
+// email in the log; actor_id null: the command line ("Rendszer").
+const sql =
+  `INSERT INTO account_invites (email, note) VALUES (${q(email)}, ${q(note)}) ON CONFLICT(email) DO UPDATE SET note = excluded.note; ` +
+  `INSERT INTO audit_log (actor_id, action, target, detail) VALUES (NULL, 'account_invite.create', 'account_invite', 'cli');`;
 
 execFileSync("npx", ["wrangler", "d1", "execute", "DB", remote ? "--remote" : "--local", "--command", sql], {
   stdio: "inherit",

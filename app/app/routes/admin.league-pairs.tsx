@@ -175,7 +175,7 @@ function WithdrawDialog({ pair, action }: { pair: Pair; action: NonNullable<Pair
             Visszaléptetés kör közben: {a.name} – {b.name}
           </DialogTitle>
           <DialogDescription>
-            A pár a futó kör csoportjában játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
+            A pár kihirdetett csoportban játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
             lejátszottak is, a többi meccse elmarad, és a pár a szezonból is kikerül ({action.season}). Később újra
             benevezheted: a következő körtől játszik. A pár és a csoport többi párja értesítést kap az oldalon; e-mailt nem.
           </DialogDescription>

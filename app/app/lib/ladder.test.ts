@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { MatchOutcome } from "@padel-liga/rules";
+
 import { formatSlot } from "./format";
-import { buildLadder, groupTable, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
+import { buildLadder, countedOutcome, groupTable, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
 const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játékos ${id}A`, `Játékos ${id}B`], elo });
 
@@ -71,7 +73,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
     ]);
   });
 
-  it("shows seed order and zeros before any match is played", () => {
+  it("shows table order (Elo, then seed) and zeros before any match is played", () => {
     const [band] = buildLadder([group(1, [open(1, 11, 12, 1)])], 1);
     expect(band!.groups[0]!.rows.map((r) => [r.rank, r.names[0], r.points, r.matches])).toEqual([
       [1, "Játékos 11A", 0, 0],
@@ -216,5 +218,18 @@ describe("groupTable: a pair withdrawn mid-phase (#34), for the ladder and Kezd�
     const without = groupTable(pairs.slice(0, 3), matches.filter((m) => m.a !== 4 && m.b !== 4));
     expect(groupTable(pairs, matches)).toEqual(without);
     expect(groupTable(pairs, matches).map((r) => r.pairId)).not.toContain(4);
+  });
+});
+
+describe("countedOutcome: only a final match counts (#186, #220)", () => {
+  const won: MatchOutcome = { kind: "played", score: { sets: [[4, 1], [4, 2]] } };
+
+  it("a final match counts with its outcome", () => {
+    expect(countedOutcome({ status: "final", outcome: won })).toEqual(won);
+  });
+
+  it("a waiting or disputed result stays out whatever outcome is stored", () => {
+    for (const status of ["open", "scheduled", "result_pending", "disputed"])
+      expect(countedOutcome({ status, outcome: won })).toBeNull();
   });
 });

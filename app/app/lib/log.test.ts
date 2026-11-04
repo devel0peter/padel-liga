@@ -1,5 +1,6 @@
 // The structured logger (#227): no personal data gets written, errors keep
 // their stack, and every line of an invocation carries its request id.
+import { DrizzleQueryError } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -84,6 +85,13 @@ describe("scrub", () => {
     });
   });
 
+  it("keeps counts keyed by email kind, login_code included", () => {
+    expect(scrub({ kinds: { login_code: 2, broadcast: 1 }, loginCode: "123456" })).toEqual({
+      kinds: { login_code: 2, broadcast: 1 },
+      loginCode: "[redacted]",
+    });
+  });
+
   it("cleans nested objects and arrays", () => {
     expect(scrub({ list: [{ email: "a@b.hu" }, "c@d.hu"], kinds: { broadcast: 3 } })).toEqual({
       list: [{ email: "[redacted]" }, "[email]"],
@@ -101,6 +109,25 @@ describe("serializeError", () => {
     expect(out.stack).toContain("no account for [email]");
     expect(out.stack).toContain("log.test.ts");
     expect(JSON.stringify(out)).not.toContain("anna@example.hu");
+  });
+
+  it("hides the bound values of a failed query, at every level, in message and stack", () => {
+    const cause = new Error("D1_ERROR: no such table: interest_signups");
+    const error = new DrizzleQueryError('insert into "interest_signups" ("name1", "email1", "phone1", "name2", "note") values (?, ?, ?, ?, ?)', [
+      "Kovács Anna",
+      "anna@example.hu",
+      "+36301234567",
+      "Nagy Béla",
+      "Szombat jó",
+    ], cause);
+    const wrapped = new Error("signup failed", { cause: error });
+    const written = JSON.stringify(logLine("error", "interest signup insert failed", { error: wrapped }, AT));
+    for (const value of ["Kovács Anna", "Nagy Béla", "Szombat jó", "anna@example.hu", "36301234567"]) expect(written, value).not.toContain(value);
+    const out = serializeError(error);
+    expect(out.message).toBe('Failed query: insert into "interest_signups" ("name1", "email1", "phone1", "name2", "note") values (?, ?, ?, ?, ?)\nparams: [hidden]');
+    expect(out.stack).toContain("params: [hidden]\n");
+    expect(out.stack).toContain("log.test.ts");
+    expect((out.cause as { message: string }).message).toBe("D1_ERROR: no such table: interest_signups");
   });
 
   it("handles what isn't an Error", () => {

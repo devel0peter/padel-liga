@@ -26,9 +26,11 @@ export const REQUEST_ID_HEADER = "x-request-id";
 
 // ---- Scrubbing --------------------------------------------------------------
 
-// Keys whose value is personal or secret whatever it looks like.
+// Keys whose value is personal or secret whatever it looks like. A code is
+// `code` or a camelCase `…Code` field; snake_case keys such as the email kind
+// `login_code` (a count in "email queued") are names of things, not codes.
 const PERSONAL_KEY =
-  /e-?mail|phone|^(first|last|full|display|user|player|partner)?_?name$|^to$|recipient|address|code$|token|password|secret|cookie|authorization|endpoint|session/i;
+  /e-?mail|phone|^(first|last|full|display|user|player|partner)?_?name$|^to$|recipient|address|^code$|[a-z]Code$|token|password|secret|cookie|authorization|endpoint|session/i;
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // A run of digits with spaces, dashes, dots, slashes or brackets: a phone
@@ -38,7 +40,9 @@ const DATE_START = /^\d{4}[-./]\s?\d{1,2}[-./]/;
 const isPhone = (run: string) => !DATE_START.test(run) && (run.match(/\d/g)?.length ?? 0) >= 9;
 // A login code: six digits on their own.
 const SIX_DIGITS = /(?<![\d.:-])\d{6}(?![\d.:-])/g;
-// A random token: 20 or more URL-safe characters with at least one digit.
+// A random token: 20 or more URL-safe characters with at least one digit. A
+// safety net only: a token without a digit (rare) gets through, and harmless
+// long words with digits get masked. Callers never pass tokens.
 const TOKEN = /(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g;
 // Paths that carry a token (the pair link, #55).
 const TOKEN_PATHS = /^(\/pair\/join\/)[^/?#]+/;
@@ -70,14 +74,20 @@ export function logPath(url: string): string {
   return scrubString(pathname.replace(TOKEN_PATHS, "$1[token]"));
 }
 
+// A failed Drizzle query says "Failed query: <sql>\nparams: <every bound
+// value>" in its message and again in its stack: names, notes, addresses.
+// The values never reach the log; the SQL stays (it has only placeholders).
+const QUERY_PARAMS = /\nparams: [\s\S]*?(?=\n\s+at |$)/;
+const withoutParams = (text: string) => text.replace(QUERY_PARAMS, "\nparams: [hidden]");
+
 export function serializeError(error: unknown): Fields {
   if (error instanceof Error) {
-    const out: Fields = { name: error.name, message: scrubString(error.message) };
-    if (error.stack) out.stack = scrubString(error.stack);
+    const out: Fields = { name: error.name, message: scrubString(withoutParams(error.message)) };
+    if (error.stack) out.stack = scrubString(withoutParams(error.stack));
     if (error.cause !== undefined) out.cause = serializeError(error.cause);
     return out;
   }
-  return { message: scrubString(typeof error === "string" ? error : safeJson(error)) };
+  return { message: scrubString(withoutParams(typeof error === "string" ? error : safeJson(error))) };
 }
 
 function safeJson(value: unknown): string {

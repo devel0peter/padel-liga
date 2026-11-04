@@ -5,10 +5,10 @@ import {
   WORK_PREFIX,
   backupDay,
   backupKey,
+  cleanupSql,
   hasSequences,
   headSql,
   keysToDelete,
-  orphanCleanupSql,
   rowsSql,
   tableOrder,
   tailSql,
@@ -116,7 +116,7 @@ export async function exportStep(
       table: 0,
       after: Number.MIN_SAFE_INTEGER,
       parts: [],
-      tail: { schema: schema.filter((s) => s.type !== "table" || s.name === "sqlite_sequence"), sequences: hasSequences(schema), cleanup: orphanCleanupSql(schema) },
+      tail: { schema: schema.filter((s) => s.type !== "table" || s.name === "sqlite_sequence"), sequences: hasSequences(schema), cleanup: cleanupSql(schema) },
       complete: false,
     };
     await savePart(state, headSql(schema, now));

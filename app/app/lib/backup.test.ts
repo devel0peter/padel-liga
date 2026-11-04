@@ -13,11 +13,14 @@ import {
   insertStatement,
   isInternalTable,
   keysToDelete,
+  cleanupSql,
+  duplicateCleanupSql,
   orphanCleanupSql,
   rowsSql,
   sqlLiteral,
   tableOrder,
   tailSql,
+  uniqueIndex,
 } from "./backup";
 
 describe("sqlLiteral", () => {
@@ -87,8 +90,10 @@ describe("the pieces of the file", () => {
       'CREATE TABLE "parent" (id integer);',
     ]);
   });
-  it("writes one INSERT per row", () => {
-    expect(rowsSql("parent", [{ id: 7 }, { id: 8 }])).toBe('INSERT INTO "parent" ("id") VALUES (7);\nINSERT INTO "parent" ("id") VALUES (8);\n');
+  it("writes one INSERT OR REPLACE per row, so a primary key read twice keeps the later row (#179)", () => {
+    expect(rowsSql("parent", [{ id: 7 }, { id: 8 }])).toBe(
+      'INSERT OR REPLACE INTO "parent" ("id") VALUES (7);\nINSERT OR REPLACE INTO "parent" ("id") VALUES (8);\n',
+    );
     expect(rowsSql("parent", [])).toBe("");
   });
   it("ends with the AUTOINCREMENT counters, then the indexes", () => {
@@ -186,5 +191,53 @@ describe("orphanCleanupSql", () => {
     const tail = tailSql(schema, [{ name: "t", seq: 3 }], orphanCleanupSql(schema)).split("\n");
     expect(tail[0]).toContain('DELETE FROM "sessions"');
     expect(tail.indexOf("DELETE FROM sqlite_sequence;")).toBeGreaterThan(1);
+  });
+});
+
+describe("uniqueIndex", () => {
+  it("reads drizzle's unique and partial indexes", () => {
+    expect(uniqueIndex("CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`)")).toEqual({
+      name: "users_email_unique",
+      table: "users",
+      columns: ["`email`"],
+      where: null,
+    });
+    expect(uniqueIndex("CREATE UNIQUE INDEX `pairs_active_a_idx` ON `pairs` (`league_id`,`player_a`) WHERE status = 'active'")).toEqual({
+      name: "pairs_active_a_idx",
+      table: "pairs",
+      columns: ["`league_id`", "`player_a`"],
+      where: "status = 'active'",
+    });
+  });
+  it("keeps expressions whole and drops ASC/DESC", () => {
+    expect(uniqueIndex('CREATE UNIQUE INDEX IF NOT EXISTS "x" ON "t" (lower(a, \'(,)\'), b DESC)')?.columns).toEqual(["lower(a, '(,)')", "b"]);
+  });
+  it("is null for an index that isn't unique", () => {
+    expect(uniqueIndex("CREATE INDEX `pairs_league_idx` ON `pairs` (`league_id`)")).toBeNull();
+  });
+});
+
+describe("duplicateCleanupSql", () => {
+  const schema = [
+    { type: "table", name: "pairs", sql: "CREATE TABLE `pairs` (`id` integer PRIMARY KEY, `league_id` integer, `player_a` text REFERENCES users(id), `status` text)" },
+    { type: "table", name: "users", sql: "CREATE TABLE `users` (`id` text PRIMARY KEY, `email` text)" },
+    { type: "index", name: "pairs_active_a_idx", sql: "CREATE UNIQUE INDEX `pairs_active_a_idx` ON `pairs` (`league_id`,`player_a`) WHERE status = 'active'" },
+    { type: "index", name: "users_email_unique", sql: "CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`)" },
+    { type: "index", name: "pairs_league_idx", sql: "CREATE INDEX `pairs_league_idx` ON `pairs` (`league_id`)" },
+  ];
+  it("keeps the highest rowid per value of every unique index, parents' tables first, NULLs left alone", () => {
+    expect(duplicateCleanupSql(schema).trim().split("\n")).toEqual([
+      'DELETE FROM "users" WHERE (`email`) IS NOT NULL AND rowid NOT IN (SELECT max(rowid) FROM "users" WHERE (`email`) IS NOT NULL GROUP BY `email`);',
+      'DELETE FROM "pairs" WHERE (`league_id`) IS NOT NULL AND (`player_a`) IS NOT NULL AND (status = \'active\') AND rowid NOT IN ' +
+        '(SELECT max(rowid) FROM "pairs" WHERE (`league_id`) IS NOT NULL AND (`player_a`) IS NOT NULL AND (status = \'active\') GROUP BY `league_id`, `player_a`);',
+    ]);
+  });
+  it("runs before the orphan cleanup, so a dropped row's children go too", () => {
+    const all = cleanupSql(schema).trim().split("\n");
+    expect(all).toHaveLength(3);
+    expect(all[2]).toContain('DELETE FROM "pairs" WHERE "player_a" IS NOT NULL AND NOT EXISTS');
+  });
+  it("is empty without unique indexes", () => {
+    expect(duplicateCleanupSql(schema.filter((s) => !s.name.endsWith("unique") && !s.name.endsWith("a_idx")))).toBe("");
   });
 });

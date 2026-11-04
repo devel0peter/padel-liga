@@ -2,7 +2,7 @@
 // writes R2; this file turns what it read into pieces of one SQL file that
 // restores the database (README, "Restoring a backup").
 
-// Every 5 minutes from 03:00 to 05:59 UTC (04:00-07:59 in Budapest). The
+// Every 5 minutes from 03:00 to 05:59 UTC (04:00-06:59 in Budapest in winter). The
 // export is split into steps, one per run, because a Workers Free invocation
 // may spend only 10 ms of CPU and make 50 D1 queries; the first runs do the
 // work, the rest find the day's file and stop. Must match the second entry of
@@ -44,9 +44,9 @@ export function sqlLiteral(value: SqlValue | undefined): string {
   return `X'${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}'`;
 }
 
-export function insertStatement(table: string, row: Record<string, SqlValue>): string {
+export function insertStatement(table: string, row: Record<string, SqlValue>, verb = "INSERT"): string {
   const columns = Object.keys(row);
-  return `INSERT INTO ${quote(table)} (${columns.map(quote).join(", ")}) VALUES (${columns.map((c) => sqlLiteral(row[c])).join(", ")});`;
+  return `${verb} INTO ${quote(table)} (${columns.map(quote).join(", ")}) VALUES (${columns.map((c) => sqlLiteral(row[c])).join(", ")});`;
 }
 
 // Tables in an order that lets every INSERT find its parent row: a table
@@ -144,14 +144,96 @@ export function headSql(schema: SchemaRow[], takenAt: Date): string {
   return `${out.join("\n")}\n`;
 }
 
-// The INSERTs for some rows of a table.
+// The INSERTs for some rows of a table. OR REPLACE (#179): a table is read in
+// pages minutes apart, so a row read early can give up its primary key (a
+// `group_pairs` row taken out and put back, a `job_runs` key written again)
+// to a row read later; both reach the file, and the later one is the live
+// one. REPLACE keeps the later row instead of failing the restore. It can't
+// cascade into children: their tables come later in the file, so they are
+// still empty when a parent row is replaced.
 export function rowsSql(table: string, rows: Record<string, SqlValue>[]): string {
-  return rows.map((r) => `${insertStatement(table, r)}\n`).join("");
+  return rows.map((r) => `${insertStatement(table, r, "INSERT OR REPLACE")}\n`).join("");
 }
 
-// Last piece: the orphan cleanup (orphanCleanupSql), the AUTOINCREMENT
-// counters, so a deleted highest id is not handed out again after a restore,
-// then the indexes.
+export type UniqueIndex = { name: string; table: string; columns: string[]; where: string | null };
+
+// Splits at the commas outside parentheses and quotes.
+function topLevelList(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quoteChar = "";
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (quoteChar) {
+      if (ch === quoteChar) quoteChar = "";
+    } else if (ch === "'" || ch === '"' || ch === "`") quoteChar = ch;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === "," && depth === 0) {
+      out.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  out.push(text.slice(start).trim());
+  return out.filter(Boolean);
+}
+
+// A CREATE UNIQUE INDEX statement: its table, its columns (or expressions,
+// without ASC/DESC) and its WHERE for a partial index. Anything else: null.
+export function uniqueIndex(sql: string): UniqueIndex | null {
+  const head = sql.match(/^\s*CREATE\s+UNIQUE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s+ON\s+([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s*\(/i);
+  if (!head) return null;
+  const open = head[0].length - 1;
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")" && --depth === 0) {
+      close = i;
+      break;
+    }
+  }
+  if (close === -1) return null;
+  const columns = topLevelList(sql.slice(open + 1, close)).map((c) => c.replace(/\s+(ASC|DESC)\s*$/i, ""));
+  const rest = sql.slice(close + 1).trim();
+  const where = rest.match(/^WHERE\s+([\s\S]+?);?\s*$/i)?.[1] ?? null;
+  return { name: ident(head[1]!), table: ident(head[2]!), columns, where };
+}
+
+// DELETEs that keep one row per unique index value, the one with the highest
+// rowid (#179). The file creates the indexes at its end, so a value that
+// moved from a row read early to a row read later (a pair dissolved and the
+// same player's new active pair, `pairs_active_a_idx`) is in two rows by
+// then and CREATE UNIQUE INDEX would fail the whole restore. The rows go in
+// file order, which is rowid order within a table, so the highest rowid is
+// the one read last: the live row. NULLs never clash in a unique index, so
+// rows with a NULL in it stay. A dropped row's children go too (ON DELETE
+// CASCADE, or the orphan cleanup that runs after these).
+export function duplicateCleanupSql(schema: SchemaRow[]): string {
+  const order = tableOrder(schema);
+  const indexes = schema
+    .filter((s) => s.type === "index" && s.sql)
+    .map((s) => uniqueIndex(s.sql))
+    .filter((u): u is UniqueIndex => u !== null && order.includes(u.table))
+    .sort((a, b) => order.indexOf(a.table) - order.indexOf(b.table));
+  const out = indexes.map((u) => {
+    const filter = [...u.columns.map((c) => `(${c}) IS NOT NULL`), ...(u.where ? [`(${u.where})`] : [])].join(" AND ");
+    const t = quote(u.table);
+    return `DELETE FROM ${t} WHERE ${filter} AND rowid NOT IN (SELECT max(rowid) FROM ${t} WHERE ${filter} GROUP BY ${u.columns.join(", ")});`;
+  });
+  return out.length ? `${out.join("\n")}\n` : "";
+}
+
+// Everything the file runs after the rows and before the indexes: the
+// duplicates first (dropping one can orphan rows), then the orphans.
+export function cleanupSql(schema: SchemaRow[]): string {
+  return duplicateCleanupSql(schema) + orphanCleanupSql(schema);
+}
+
+// Last piece: the cleanup (cleanupSql: duplicates, then orphans), the
+// AUTOINCREMENT counters, so a deleted highest id is not handed out again
+// after a restore, then the indexes.
 export function tailSql(schema: SchemaRow[], sequences: SequenceRow[], cleanup = ""): string {
   const out: string[] = cleanup ? [cleanup.trimEnd()] : [];
   if (sequences.length) {

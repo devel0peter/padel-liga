@@ -208,6 +208,101 @@ describe("exportStep", () => {
     expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
+  // One page of two rows per run, so a table with three rows is cut by a step
+  // boundary (#179).
+  const ONE_PAGE_A_RUN = { maxOps: 40, pageRows: 2, stepChars: 1 };
+  // Runs `write` once, just before the second page of `table` is read.
+  const betweenPages = (table: string, write: () => void) => {
+    let pages = 0;
+    return {
+      hook: (sql: string) => {
+        if (sql.includes(`FROM "${table}" WHERE rowid >`) && ++pages === 2) write();
+      },
+      fired: () => pages >= 2,
+    };
+  };
+
+  it("restores although a pair was dissolved and its player's new active pair written between two steps (#179)", async () => {
+    const raw = migratedDatabase();
+    fill(raw);
+    raw.exec(`INSERT INTO cities (slug, name) VALUES ('teszt', 'Teszt')`);
+    raw.exec(`INSERT INTO leagues (id, city, slug, name) VALUES (91, 'teszt', 'teszt', 'Teszt')`);
+    for (const u of ["u2", "u3", "u4", "u5"]) raw.exec(`INSERT INTO users (id, email) VALUES ('${u}', '${u}@example.test')`);
+    raw.exec(`INSERT INTO pairs (id, league_id, player_a, player_b) VALUES (1, 91, 'u1', 'u2'), (2, 91, 'u3', 'u4')`);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // The first page of `pairs` holds pair 1 (u1, active). Then u1's pair is
+    // dissolved and u1 enters a new active pair 3: both reach the file as
+    // u1's active pair, and pairs_active_a_idx would fail the restore.
+    const gap = betweenPages("pairs", () => {
+      raw.exec(`UPDATE pairs SET status = 'dissolved', dissolved_at = 1790000000 WHERE id = 1`);
+      raw.exec(`INSERT INTO pairs (id, league_id, player_a, player_b) VALUES (3, 91, 'u1', 'u5')`);
+    });
+    await runAll(raw, c, bucket, ONE_PAGE_A_RUN, gap.hook);
+    expect(gap.fired()).toBe(true);
+    const file = files.get(FILE)!;
+    expect(file.match(/INTO "pairs" .*'u1'/g)).toHaveLength(2);
+
+    const restored = restore(file);
+    // The older row (pair 1 as read before it was dissolved) is dropped, the live one kept.
+    expect(restored.prepare("SELECT id, player_a, status FROM pairs ORDER BY id").all()).toEqual([
+      { id: 2, player_a: "u3", status: "active" },
+      { id: 3, player_a: "u1", status: "active" },
+    ]);
+    expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("drops the rows that depended on a dropped duplicate, so foreign keys still hold (#179)", async () => {
+    const raw = migratedDatabase();
+    fill(raw);
+    raw.exec(`INSERT INTO users (id, email) VALUES ('u2', 'u2@example.test'), ('u3', 'u3@example.test')`);
+    raw.exec(`INSERT INTO cities (slug, name) VALUES ('teszt', 'Teszt')`);
+    raw.exec(`INSERT INTO leagues (id, city, slug, name) VALUES (91, 'teszt', 'teszt', 'Teszt')`);
+    // player_a has no ON DELETE action: only the orphan cleanup can remove it.
+    raw.exec(`INSERT INTO pairs (id, league_id, player_a, player_b) VALUES (1, 91, 'u1', 'u2')`);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // u1 was read with a@example.test; then u1 changes address and a new
+    // account u9 takes it. users_email_unique keeps u9, so u1 goes, and with
+    // it u1's session (cascade) and pair (no action, orphan cleanup).
+    const gap = betweenPages("users", () => {
+      raw.exec(`UPDATE users SET email = 'uj@example.test' WHERE id = 'u1'`);
+      raw.exec(`INSERT INTO users (id, email) VALUES ('u9', 'a@example.test')`);
+    });
+    await runAll(raw, c, bucket, ONE_PAGE_A_RUN, gap.hook);
+    expect(gap.fired()).toBe(true);
+
+    const restored = restore(files.get(FILE)!);
+    expect(restored.prepare("SELECT id FROM users ORDER BY id").all()).toEqual([{ id: "u2" }, { id: "u3" }, { id: "u9" }]);
+    expect(restored.prepare("SELECT count(*) AS n FROM sessions").get()).toEqual({ n: 0 });
+    expect(restored.prepare("SELECT count(*) AS n FROM pairs").get()).toEqual({ n: 0 });
+    expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("restores although a primary key was given up and taken again between two steps (#179)", async () => {
+    const raw = migratedDatabase();
+    for (const k of ["a", "b", "c"]) raw.exec(`INSERT INTO job_runs (key, done_at) VALUES ('${k}', 1790000000)`);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // "a" was read on the first page; it is deleted and written again, so the
+    // new row sits after the cursor and is read on the second page too.
+    const gap = betweenPages("job_runs", () => {
+      raw.exec(`DELETE FROM job_runs WHERE key = 'a'`);
+      raw.exec(`INSERT INTO job_runs (key, done_at) VALUES ('a', 1790000999)`);
+    });
+    await runAll(raw, c, bucket, ONE_PAGE_A_RUN, gap.hook);
+    expect(gap.fired()).toBe(true);
+    const file = files.get(FILE)!;
+    expect(file.match(/INTO "job_runs" .*'a'/g)).toHaveLength(2);
+
+    const restored = restore(file);
+    expect(restored.prepare("SELECT key, done_at FROM job_runs ORDER BY key").all()).toEqual([
+      { key: "a", done_at: 1790000999 },
+      { key: "b", done_at: 1790000000 },
+      { key: "c", done_at: 1790000000 },
+    ]);
+  });
+
   it("finds every foreign key of the real schema, so no orphan cleanup is missing", async () => {
     const { foreignKeys } = await import("./backup");
     const tables = migratedDatabase().prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL").all() as { name: string; sql: string }[];

@@ -342,9 +342,10 @@ export function matchResultDisputedMessage(input: { matchId: number }): Message 
 }
 
 // A dispute goes to the league's Szervezők and to every Admin, once each
-// (#178). All of them open the league's decision page.
-export function disputeRecipients(organizerIds: readonly string[], adminIds: readonly string[]): string[] {
-  return [...new Set([...adminIds, ...organizerIds])];
+// (#178). All of them open the league's decision page. The player who
+// disputed is left out even if they organize: no notice about their own step (#221).
+export function disputeRecipients(organizerIds: readonly string[], adminIds: readonly string[], disputedBy: string): string[] {
+  return [...new Set([...adminIds, ...organizerIds])].filter((id) => id !== disputedBy);
 }
 
 // To the organizers and Admins (app and push, never email). No names: the
@@ -352,7 +353,7 @@ export function disputeRecipients(organizerIds: readonly string[], adminIds: rea
 export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Vitatott eredmény · ${input.leagueName}`,
-    body: `A ${input.week}. forduló egyik meccsének eredményét vitatják. A döntés rád vár.`,
+    body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }

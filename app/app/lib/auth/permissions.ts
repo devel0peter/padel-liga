@@ -28,6 +28,8 @@ export type Permission =
   | { kind: "leagues.manage" }
   | { kind: "cities.manage" }
   | { kind: "users.view" }
+  // Napló, the audit log (#226): read-only.
+  | { kind: "log.view" }
   // Delete or anonymize an account (#152). Which accounts: account-deletion.ts.
   | { kind: "users.delete" }
   // A city's clubs (venues): its Szervezők. Without a city: every city's.
@@ -61,7 +63,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -75,6 +77,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
+  { label: "Napló", to: "/admin/log", icon: "log", permission: { kind: "log.view" } },
 ];
 
 function leagueItems(league: LeagueRef): NavItem[] {

@@ -7,7 +7,7 @@ import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
 import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
 import { stuckReminder, type StuckReminderInput } from "~/lib/email/templates";
-import { audit } from "~/lib/leagues.server";
+import { auditIfChanged } from "~/lib/audit.server";
 import { pairLinkPath } from "~/lib/pair-links.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { listSignups } from "~/lib/signups-admin.server";
@@ -26,9 +26,10 @@ import {
   type ReminderRecipient,
   type Situation,
 } from "./reminders";
+import { logWarn } from "~/lib/log";
 
 // The automatic reminders in D1 (#155). The rules are in reminders.ts. The
-// hourly cron (workers/app.ts) queues what is due in the leagues whose
+// cron (workers/app.ts) queues what is due in the leagues whose
 // switch is on, then the same run sends it. Whole tables, filtered in
 // reminders.ts, never a long list of ids (D1: at most 100 bound parameters);
 // the volumes are small. A run takes about 20 D1 queries.
@@ -187,7 +188,7 @@ export async function queueDueReminders(now = new Date()): Promise<number> {
     await db.batch([first, ...rest]);
   } catch (e) {
     if (String(e).includes("UNIQUE constraint failed")) {
-      console.warn("reminders: another run queued some of these; left to the next run");
+      logWarn("stuck reminders deferred", { reason: "another run queued some of these; left to the next run" });
       return 0;
     }
     throw e;
@@ -250,9 +251,11 @@ export async function reminderOverview(league: LeagueRef, now = new Date()): Pro
 
 // The Szervező or the Admin switches the reminders on or off for the league.
 export async function setReminders(actorId: string, league: LeagueRef, on: boolean, now = new Date()): Promise<void> {
-  await db
-    .update(leagues)
-    .set({ remindersOnAt: on ? now : null })
-    .where(on ? and(eq(leagues.id, league.id), sql`${leagues.remindersOnAt} is null`) : eq(leagues.id, league.id));
-  await audit(actorId, on ? "reminders.on" : "reminders.off", `league:${league.id}`);
+  await db.batch([
+    db
+      .update(leagues)
+      .set({ remindersOnAt: on ? now : null })
+      .where(on ? and(eq(leagues.id, league.id), sql`${leagues.remindersOnAt} is null`) : eq(leagues.id, league.id)),
+    auditIfChanged({ actorId, action: on ? "reminders.on" : "reminders.off", target: `league:${league.id}`, leagueId: league.id }),
+  ]);
 }

@@ -27,6 +27,7 @@ const platformOnly: Permission[] = [
   { kind: "cities.manage" },
   { kind: "users.view" },
   { kind: "users.delete" },
+  { kind: "log.view" },
   { kind: "clubs.manage" },
 ];
 
@@ -110,6 +111,7 @@ describe("sidebar", () => {
       "/admin/broadcasts",
       "/admin/outbox",
       "/admin/traffic",
+      "/admin/log",
     ]);
     expect(adminHome(superadmin)).toBe("/admin/signups");
   });

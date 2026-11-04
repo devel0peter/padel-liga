@@ -18,6 +18,7 @@ export default [
   route("api/push", "routes/api.push.ts"),
   route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
+  route("health", "routes/health.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
@@ -37,6 +38,7 @@ export default [
       route("admin/leagues", "routes/admin.leagues.tsx"),
       route("admin/cities", "routes/admin.cities.tsx"),
       route("admin/users", "routes/admin.users.tsx"),
+      route("admin/log", "routes/admin.log.tsx"),
       route("admin/leagues/:league", "routes/admin.league.tsx"),
       route("admin/leagues/:league/seasons", "routes/admin.league-seasons.tsx"),
       route("admin/leagues/:league/seasons/:season/entries", "routes/admin.season-entries.tsx"),

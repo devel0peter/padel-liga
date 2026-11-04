@@ -8,6 +8,7 @@ import {
   type SiteverifyResult,
   type TurnstileOutcome,
 } from "./turnstile";
+import { logError, logWarn } from "~/lib/log";
 
 // The site key is public (it ships in the page). Empty: no widget and no check,
 // like before Turnstile (local dev without .dev.vars, or switched off).
@@ -24,12 +25,12 @@ export async function verifyTurnstile(form: FormData, request: Request, action: 
   if (!isPlausibleToken(token)) {
     // The widget never produced a token: hung, blocked or not loaded (#255).
     // No email or IP here, the browser is enough to spot a pattern.
-    console.warn("turnstile: no token", action, request.headers.get("User-Agent"));
+    logWarn("turnstile no token", { action, userAgent: request.headers.get("User-Agent") });
     return "missing";
   }
   const hostnames = parseHostnames(env.TURNSTILE_HOSTNAMES);
   if (hostnames.size === 0 || !env.TURNSTILE_SECRET) {
-    console.error("turnstile: TURNSTILE_SECRET or TURNSTILE_HOSTNAMES not set");
+    logError("turnstile not configured");
     return "rejected";
   }
 
@@ -47,7 +48,7 @@ export async function verifyTurnstile(form: FormData, request: Request, action: 
     if (!res.ok) throw new Error(`siteverify ${res.status}`);
     result = await res.json();
   } catch (error) {
-    console.error("turnstile: siteverify failed", error);
+    logError("turnstile siteverify failed", { error });
     return "rejected";
   }
 
@@ -55,6 +56,6 @@ export async function verifyTurnstile(form: FormData, request: Request, action: 
   if (import.meta.env.DEV && result.metadata?.result_with_testing_key) return result.success === true ? "ok" : "rejected";
 
   if (isAccepted(result, action, hostnames)) return "ok";
-  console.warn("turnstile: rejected", result["error-codes"], result.action, result.hostname);
+  logWarn("turnstile rejected", { errors: result["error-codes"], action: result.action, host: result.hostname });
   return "rejected";
 }

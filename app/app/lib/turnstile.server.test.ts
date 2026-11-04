@@ -32,7 +32,10 @@ describe("verifyTurnstile", () => {
     const fetch = siteverify({ success: true });
     expect(await verifyTurnstile(form({ email: "a@b.hu" }), request, "login")).toBe("missing");
     expect(fetch).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith("turnstile: no token", "login", "TestPhone/1.0");
+    const line = JSON.stringify(warn.mock.calls);
+    expect(line).toContain("turnstile no token");
+    expect(line).toContain("login");
+    expect(line).toContain("TestPhone/1.0");
     expect(JSON.stringify(warn.mock.calls)).not.toContain("a@b.hu");
   });
 

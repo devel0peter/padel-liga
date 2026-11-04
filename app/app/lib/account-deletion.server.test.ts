@@ -278,8 +278,8 @@ describe("deleting an account (#152)", () => {
     expect(audience.map((p) => p.email)).toContain("b@x.hu");
     expect(audience.map((p) => p.email).filter((e) => e.endsWith("@deleted.invalid"))).toEqual([]);
     expect(all("select action, target, detail from audit_log where action like 'account.%' or action like 'pair.%' order by id")).toEqual([
-      { action: "pair.dissolve", target: "pair:1", detail: "league:1; account deleted" },
       { action: "account.anonymize", target: "user:a", detail: null },
+      { action: "pair.dissolve", target: "pair:1", detail: "league:1; account deleted" },
     ]);
     // Twice: already gone.
     expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: false, error: DELETION_REFUSALS.gone });

@@ -7,7 +7,7 @@ import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
 import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
 import { stuckReminder, type StuckReminderInput } from "~/lib/email/templates";
-import { audit } from "~/lib/leagues.server";
+import { auditIfChanged } from "~/lib/audit.server";
 import { pairLinkPath } from "~/lib/pair-links.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { listSignups } from "~/lib/signups-admin.server";
@@ -251,9 +251,11 @@ export async function reminderOverview(league: LeagueRef, now = new Date()): Pro
 
 // The Szervező or the Admin switches the reminders on or off for the league.
 export async function setReminders(actorId: string, league: LeagueRef, on: boolean, now = new Date()): Promise<void> {
-  await db
-    .update(leagues)
-    .set({ remindersOnAt: on ? now : null })
-    .where(on ? and(eq(leagues.id, league.id), sql`${leagues.remindersOnAt} is null`) : eq(leagues.id, league.id));
-  await audit(actorId, on ? "reminders.on" : "reminders.off", `league:${league.id}`);
+  await db.batch([
+    db
+      .update(leagues)
+      .set({ remindersOnAt: on ? now : null })
+      .where(on ? and(eq(leagues.id, league.id), sql`${leagues.remindersOnAt} is null`) : eq(leagues.id, league.id)),
+    auditIfChanged({ actorId, action: on ? "reminders.on" : "reminders.off", target: `league:${league.id}`, leagueId: league.id }),
+  ]);
 }

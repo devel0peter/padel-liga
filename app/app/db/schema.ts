@@ -342,17 +342,26 @@ export const leagueAdminInvites = sqliteTable(
   (t) => [primaryKey({ columns: [t.leagueId, t.email] })],
 );
 
-// Who changed roles and leagues, and when. actor_id is null for the CLI.
-export const auditLog = sqliteTable("audit_log", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
-  action: text("action").notNull(), // e.g. "superadmin.grant", "league_admin.grant"
-  target: text("target").notNull(), // e.g. an email or "league:gyor"
-  detail: text("detail"),
-  at: integer("at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+// Every organizer and system change (#225), shown on Napló (#226). Written
+// only through lib/audit.server.ts, in the same batch as the change.
+// actor_id is null for the system (cron, the CLI). Since #225 targets and
+// details name accounts by id ("user:<id>"), never by email; older rows may.
+export const auditLog = sqliteTable(
+  "audit_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(), // lib/audit.ts AUDIT_ACTIONS, e.g. "pair.dissolve"
+    target: text("target").notNull(), // "<kind>:<id>", e.g. "pair:12", "user:<id>"
+    detail: text("detail"),
+    at: integer("at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    // The league the change belongs to, for Napló's league filter (#226).
+    leagueId: integer("league_id").references(() => leagues.id, { onDelete: "set null" }),
+  },
+  (t) => [index("audit_log_at_idx").on(t.at), index("audit_log_league_idx").on(t.leagueId)],
+);
 
 // Landing page views per Budapest day and source (app/lib/traffic.ts). Counts
 // only: nothing about the visitor is stored.

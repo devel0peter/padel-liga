@@ -444,6 +444,18 @@ On a deletion request the Admin removes the account (#152, README decision log D
   - Nothing new in the terminal or on Kimenő levelek.
   - A Szervező has no Felhasználók page at all.
 
+### 31. Admin reads the Napló (side path, after any organizer step)
+
+Every organizer and system change leaves an entry (#225, #226, README decision log D91).
+
+- Page: `/admin/log` ("Napló", sidebar section Platform)
+- Account: `admin@example.test`
+- Do: open Napló; pick "Művelet: Csoportok közzététele", then "Ki: Teszt Szervező"; reload the page; set "Ettől" and "Eddig" to today.
+- Expect:
+  - The newest entry first, with Budapest time, who did it ("Rendszer" for the cron, "Törölt játékos" for a deleted account), the action in Hungarian (e.g. "Pár felbontása"), what it was done on by name (a pair as "Anna – Béla", never an id or an address) and the league.
+  - Each filter narrows the list and stays in the address, so the reload shows the same list. 50 entries a page, "Régebbiek" for the next.
+  - Nothing on the page changes an entry. A Szervező or a player opening `/admin/log` gets the 403 page, and has no Napló in the sidebar.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

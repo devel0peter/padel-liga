@@ -25,6 +25,8 @@ const { readdirSync, readFileSync, statSync } = await import(/* @vite-ignore */ 
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const NOW = new Date("2026-11-03T12:00:00Z");
+const GYOR = { id: 1, city: "gyor" };
+const DEB = { id: 2, city: "deb" };
 const one = (q: string) => h.raw.prepare(q).get();
 const all = (q: string) => h.raw.prepare(q).all();
 const audits = () => all("select actor_id, action, target from audit_log where action like 'pair.%' order by id");
@@ -101,11 +103,36 @@ describe("pairs.server on real SQLite (#97)", () => {
 
   it("offers registered players without an active pair in the league as candidates", async () => {
     await P.createPair("o", 1, "a", "b");
-    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["c", "d", "o"]);
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["c", "d", "o"]);
     // A dissolved pair frees them.
     await P.dissolvePair("o", 1, one("select id from pairs").id, NOW);
-    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
-    expect((await P.pairCandidates(2)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+  });
+
+  it("offers only the league's players: by their signups' city, everyone without a signup (D93)", async () => {
+    const signup = (city: string, email1: string, email2: string | null = null) =>
+      h.raw
+        .prepare("insert into interest_signups (city, mode, name1, email1, email2, level, consent_at) values (?, ?, 'x', ?, ?, 'kezdo', 1)")
+        .run(city, email2 ? "pair" : "solo", email1, email2);
+    signup("gyor", "A@x.hu");
+    signup("deb", "b@x.hu", "C@X.HU");
+    signup("other", "d@x.hu");
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c", "o"]);
+    // No address leaves the server.
+    expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado" });
+  });
+
+  it("counts staff accounts like anyone else once they finished the first-login page (D93)", async () => {
+    h.raw.exec(`update users set platform_role = 'superadmin' where id = 'o'`);
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'Szervező', 1), ('t', 't@x.hu', 'Tóbiás', null)`);
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 's'), (1, 't')`);
+    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('deb', 'solo', 'x', 's@x.hu', 'kezdo', 1)`);
+    // The Admin without a signup: every league. The Szervező signed up in
+    // Debrecen: only there, although they organize Győr. Unfinished: nowhere.
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o", "s"]);
   });
 
   it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {

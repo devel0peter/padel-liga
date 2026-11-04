@@ -17,7 +17,7 @@ export type SoloRow = { id: string; name: string; level: string | null; seeking:
 export type LeaguePairsRow = PairsRow<LeaguePairRow, SoloRow>;
 
 export async function leaguePairsRows(league: { id: number; city: string }, now = new Date()): Promise<LeaguePairsRow[]> {
-  const [pairList, candidates, seekers] = await Promise.all([leaguePairs(league.id, now), pairCandidates(league.id), leagueSeekers(league)]);
+  const [pairList, candidates, seekers] = await Promise.all([leaguePairs(league.id, now), pairCandidates(league), leagueSeekers(league)]);
   const seeking = new Set(seekers.map((s) => s.id));
   return [
     ...pairList.map((pair) => ({ kind: "pair" as const, pair })),

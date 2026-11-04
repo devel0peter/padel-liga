@@ -1,4 +1,4 @@
-import { and, count, eq, gt, lt, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, lt, lte, notInArray, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, emailMessages, emailSuppressions, loginCodes, users } from "~/db/schema";
@@ -16,6 +16,7 @@ import {
   newAddressCodeDecision,
   normalizeCode,
   normalizeEmail,
+  staleCodeCutoffs,
 } from "./rules";
 import { generateCode, sha256Hex, timingSafeEqual } from "./tokens";
 import { logInfo, logWarn } from "~/lib/log";
@@ -129,6 +130,22 @@ export async function verifyLoginCode(emailInput: string, codeInput: string): Pr
   const existing = await findUserIdByEmail(email);
   if (existing) return attempt("ok", { ok: true, userId: existing });
   return attempt("ok", { ok: true, userId: await createUser(email) }, true);
+}
+
+// Stale code records go (#168, rules.ts isStaleCode): the cron calls this
+// every run, one query that deletes at most STALE_CODE_BATCH of them; a
+// bigger backlog goes over the next runs (144 runs a day). Once caught up the
+// table only holds the last hour or so of code requests. Returns how many went.
+export const STALE_CODE_BATCH = 1000;
+
+export async function deleteStaleLoginCodes(now: Date): Promise<number> {
+  const { expiredBy, windowStartedBy } = staleCodeCutoffs(now);
+  const stale = and(lte(loginCodes.expiresAt, expiredBy), lte(loginCodes.windowStart, windowStartedBy));
+  const deleted = await db
+    .delete(loginCodes)
+    .where(and(stale, inArray(loginCodes.email, db.select({ email: loginCodes.email }).from(loginCodes).where(stale).limit(STALE_CODE_BATCH))))
+    .returning({ email: loginCodes.email });
+  return deleted.length;
 }
 
 // Login attempts in the log (#227): the outcome and, on success, the account

@@ -244,6 +244,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 - Page: `/admin/leagues/minta/pairs` ("Párok")
 - Account: `szervezo@example.test`
 - Expect: every pair of the league with both names and levels, the average starting Elo, the source ("jelentkezésből" or "kézzel"), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
+- Expect, above the filter (#237): a small table, "Párok" and "Játékosok" per state (Nevezett, Nem nevezett, Elutasítva, Visszavonva, "Nincs párja" with players only, "Felbontott párok" with pairs only) and "Összesen". A label opens the list with that filter, and its number is the rows (or their players) shown; a search or a filter doesn't change the table. At 390px it fits without sideways scrolling.
 - Do:
   1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
@@ -354,7 +355,7 @@ The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
 - Page: `/admin/leagues/minta/matches` ("Meccsek" in the league section of the sidebar)
 - Account: the Szervező (or the Admin)
 - Expect:
-  - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match: both pairs (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), <pair> megerősítésére vár", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
+  - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match, named "<pair> a <pair> ellen" as on Viták (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), <pair> megerősítésére vár", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
   - "Elakadtak (<n>)" shows only the stuck matches, with a red badge saying why: nobody has stepped by Wednesday of the match's week, or a proposal or agreed time has waited 48 hours without an answer (also after it lapsed). Before round 1 starts, a fresh walkthrough has none. The group and status selects narrow the list and the count; "Szűrők törlése" clears them.
   - After steps 27 and 28, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.
@@ -397,10 +398,11 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Accounts: the player of step 17, then one of the opponents
 - Do: under "Eredmény rögzítése" fill 4:3 and 4:1 ("Ti" first) and press "Rögzítem az eredményt"; then 4:1, 2:4 and the super tie-break 10:8, and send again. As the opponent, press "Megerősítem".
 - Expect:
+  - Before the result, the group card on Kezdőlap lists the pairs ("(ti)" marks yours) without numbers.
   - The first try is refused: "1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
-  - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések".
+  - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések". The group card on Kezdőlap now shows the table (#, Pár, M, P, Szett, Játék), the same as the public league page.
   - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 28).
   - A result nobody answers is accepted by the cron (every 10 minutes) 48 hours after it was recorded; locally the cron doesn't run.
 
@@ -411,9 +413,9 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Do: record 4:2, 5:3; as the opponent, under "Nem így volt?" fill 4:2, 3:5, 10:7 with a note and press "Vitatom az eredményt". As the Szervező, open Viták, press "Döntök", pick an outcome, write a reason and press "Döntés mentése".
 - Expect:
   - The opponent: "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt". The match doesn't count; nobody takes more steps on it.
-  - Told at once, in "Értesítések" (and by push, never by email, #178): the recording pair gets "Vitatják az eredményt" (link: the match); the league's Szervezők and the Admins get "Vitatott eredmény · <liga>" (link: the decide page). No names, scores or contact details in the text. A Szervező or Admin who switched "Vitatott eredmény" off on the profile gets nothing.
+  - Told at once, in "Értesítések" (and by push, never by email, #178): the recording pair gets "Vitatják az eredményt" (link: the match); the league's Szervezők and the Admins get "Vitatott eredmény · <liga>", "A <n>. heti meccsek egyikének eredményét vitatják. A döntés rád vár." (link: the decide page); a Szervező or Admin who disputed it themselves gets nothing. No names, scores or contact details in the text. A Szervező or Admin who switched "Vitatott eredmény" off on the profile gets nothing.
   - As a player, `/admin/leagues/minta/disputes` and the decide page answer 403.
-  - Viták: "Vitatott eredmények (1)" with both pairs' versions (from the 1. pár's side), then "Minden meccs" with every match of the published groups, each with "Felülbírálom". No email address or phone.
+  - Viták: "Vitatott eredmények (1)", the match named "<pair> a <pair> ellen" (the decide page's title too), with both pairs' versions (from the 1. pár's side), then "Minden meccs" with every match of the published groups, each with "Felülbírálom". No email address or phone.
   - The decide page shows both versions, the note and the full log (1. pár / 2. pár). Without a reason the form doesn't send (the server refuses it too). After saving: "Elmentettük a döntést. Mindkét pár értesítést kap.", the decision in the log with the Szervező's name, time and reason, and Viták shows "Vitatott eredmények (0)".
   - Both pairs: "Végeredmény: <outcome>" ("Lejátszva: <score>" for a played match) and "A szervező döntött: … Indoklás: …" in the log; all four get it in "Értesítések" (no email: a daily-digest item, #31).
   - "Felülbírálom" works the same for any match, played or not; the latest decision counts.

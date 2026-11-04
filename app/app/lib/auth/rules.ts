@@ -85,6 +85,28 @@ export function codeSendDecision(existing: Pick<CodeRecord, "windowStart" | "sen
   return { ok: true, windowStart: existing.windowStart, sentInWindow: existing.sentInWindow + 1 };
 }
 
+// A code record nothing needs any more (#168): its code expired at least
+// STALE_CODE_GRACE_MS ago and its hour-long window ended, so a new request
+// starts a fresh window and a fresh code either way (codeSendDecision of it
+// equals that of no record). The cron deletes these. The grace hour keeps
+// "Ez a kód lejárt" for a late try instead of "nincs érvényes kód". The
+// window check is implied (a window starts no later than its last code,
+// which expires CODE_TTL_MS after it, so an hour past expiry is past the
+// window too); it stays as a safeguard should the TTL or the window change.
+export const STALE_CODE_GRACE_MS = HOUR;
+
+export function staleCodeCutoffs(now: Date): { expiredBy: Date; windowStartedBy: Date } {
+  return {
+    expiredBy: new Date(now.getTime() - STALE_CODE_GRACE_MS),
+    windowStartedBy: new Date(now.getTime() - CODE_WINDOW_MS),
+  };
+}
+
+export function isStaleCode(record: Pick<CodeRecord, "expiresAt" | "windowStart">, now: Date): boolean {
+  const { expiredBy, windowStartedBy } = staleCodeCutoffs(now);
+  return record.expiresAt <= expiredBy && record.windowStart <= windowStartedBy;
+}
+
 // Codes to an address without an account (#113). Anyone may sign up, so a
 // bot past the bot check could otherwise type random addresses and use up the
 // daily email quota that every login shares. An address with an account

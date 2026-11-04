@@ -1,4 +1,4 @@
-// The cron's order and failure isolation (#185, #188): the four step
+// The cron's order and failure isolation (#185, #188): the step
 // modules are replaced by stubs that log their calls, so each test can make
 // one of them fail and see what the others still do.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,10 @@ const step = (name: string, at: Date | undefined) => {
   if (h.fail.has(name)) throw new Error(`${name} broke`);
 };
 
+vi.mock("~/lib/auth/login-code.server", () => ({
+  STALE_CODE_BATCH: 1000,
+  deleteStaleLoginCodes: async (now?: Date) => (step("cleanup", now), h.result.cleanup ?? 0),
+}));
 vi.mock("~/lib/results.server", () => ({
   autoAcceptResults: async (now?: Date) => (step("auto-accept", now), h.result["auto-accept"]),
 }));
@@ -38,7 +42,7 @@ const { runCron } = await import("~/lib/hourly-job.server");
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["auto-accept", "match", "stuck", "push", "deliver"];
+const ALL = ["cleanup", "auto-accept", "match", "stuck", "push", "deliver"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -58,7 +62,7 @@ const errorLines = () => lines.filter((l) => l.level === "error").map((l) => `${
 const stepResults = () => lines.filter((l) => l.event === "cron step").map((l) => l.result);
 
 describe("runCron", () => {
-  it("runs the steps in order: auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
+  it("runs the steps in order: login code cleanup, auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
     await runCron(RUN);
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([]);
@@ -72,9 +76,18 @@ describe("runCron", () => {
   it("logs what each step did, and nothing when there was nothing to do", async () => {
     await runCron(RUN);
     expect(stepResults()).toEqual([]);
-    h.result = { "auto-accept": 2, stuck: 3, pushed: 4, sent: 5 };
+    h.result = { cleanup: 1, "auto-accept": 2, stuck: 3, pushed: 4, sent: 5 };
     await runCron(RUN);
-    expect(stepResults()).toEqual(["auto-accepted 2 results", "queued 3 reminders", "pushed 4 notifications", "sent 5 emails"]);
+    expect(stepResults()).toEqual(["deleted 1 stale login codes", "auto-accepted 2 results", "queued 3 reminders", "pushed 4 notifications", "sent 5 emails"]);
+  });
+
+  it("runs every other step when the login code cleanup fails (#168)", async () => {
+    h.fail.add("cleanup");
+    h.result = { "auto-accept": 2, stuck: 0, sent: 1 };
+    await runCron(RUN);
+    expect(steps()).toEqual(ALL);
+    expect(errorLines()).toEqual(["cron step failed: login code cleanup"]);
+    expect(stepResults()).toEqual(["auto-accepted 2 results", "sent 1 emails"]);
   });
 
   it("still sends the reminders and the email when auto-accept fails, and logs it as auto-accept", async () => {
@@ -101,10 +114,11 @@ describe("runCron", () => {
   });
 
   it("logs each failure under its own step when several fail", async () => {
-    for (const s of ["auto-accept", "match", "stuck", "push", "deliver"]) h.fail.add(s);
+    for (const s of ALL) h.fail.add(s);
     await expect(runCron(RUN)).resolves.toBeUndefined();
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([
+      "cron step failed: login code cleanup",
       "cron step failed: auto-accept",
       "cron step failed: match reminders",
       "cron step failed: stuck reminders",

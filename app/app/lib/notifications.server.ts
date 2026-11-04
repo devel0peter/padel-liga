@@ -170,7 +170,7 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
 // failure here, since the decision it reports is already saved.
 // `createdAt`: the time of a scheduled job (the reminders, #31), so the daily
 // digest reads the same clock; the database time otherwise. `queuePush`: the
-// hourly job, whose pushes go out within its run limits (#183, pushQueued).
+// cron, whose pushes go out within its run limits (#183, pushQueued).
 export async function notifyPlayers(
   kind: PlayerKind,
   messages: { userId: string; message: Message }[],

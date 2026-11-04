@@ -48,7 +48,7 @@ import {
 import { leaguePairsRows } from "~/lib/league-pairs-view.server";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
-import { changePartner, createPair, dissolvePair, pairCandidates } from "~/lib/pairs.server";
+import { changePartner, createPair, dissolvePair } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS, fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
@@ -78,7 +78,10 @@ async function scope(request: Request, slug: string) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, actor } = await scope(request, params.league);
   const query = parsePairsQuery(new URL(request.url).searchParams);
-  const [all, candidates] = await Promise.all([leaguePairsRows(league), pairCandidates(league.id)]);
+  const all = await leaguePairsRows(league);
+  // "Pár létrehozása" and "Csere" offer the same players as the rows without
+  // a pair: the league's (D93).
+  const candidates = all.flatMap((r) => (r.kind === "solo" ? [{ id: r.player.id, name: r.player.name, level: r.player.level }] : []));
   return {
     name: league.name,
     slug: league.slug,

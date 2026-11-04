@@ -144,3 +144,40 @@ describe("Levél nekik from Párok opens the broadcast page with those players (
     expect(await status(Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=nope", admin)))).toBe(404);
   });
 });
+
+describe("two leagues in two cities: each Párok has only its players (#175, D93)", () => {
+  beforeEach(() => {
+    h.raw.exec("insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 1)");
+    h.raw.exec("insert into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')");
+    h.raw.exec("insert into users (id, email, name, consent_at) values ('h', 'h@x.hu', 'Hegedűs Hanna', 1)");
+    // Ákos and Hanna signed up in Debrecen (Hanna as the partner of a pair
+    // signup), Boglárka in Győr; Edit and Ferenc have no signup.
+    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, name2, email2, level, consent_at) values
+      ('deb', 'solo', 'Ákos', 'G@x.hu', null, null, 'kezdo', 1),
+      ('deb', 'pair', 'Valaki', 'valaki@x.hu', 'Hanna', 'h@x.hu', 'kezdo', 1),
+      ('gyor', 'solo', 'Boglárka', 'k@x.hu', null, null, 'kezdo', 1)`);
+  });
+  const solos = (rows: any[]) => rows.filter((r) => r.kind === "solo").map((r) => r.player.id);
+
+  it("lists, counts and offers for a new pair only the league's players; staff without a signup in both", async () => {
+    const admin = await cookieFor("admin", "superadmin");
+    const gyor = await Pairs.loader(args("http://localhost/admin/leagues/gyor/pairs", admin));
+    expect(solos(gyor.rows)).toEqual(["admin", "e", "k", "f"]);
+    expect(gyor.counts.no_pair).toBe(4);
+    expect(gyor.candidates.map((c: any) => c.id)).toEqual(["admin", "e", "k", "f"]);
+    const deb = await Pairs.loader(args("http://localhost/admin/leagues/deb/pairs", admin, "deb"));
+    // No pair in Debrecen yet: everyone from Győr's pairs without a signup counts there too.
+    expect(solos(deb.rows)).toEqual(["admin", "g", "h", "e", "a", "b", "c", "d", "f"]);
+    expect(deb.candidates.map((c: any) => c.id)).not.toContain("k");
+  });
+
+  it("Levél nekik addresses only the league's players", async () => {
+    const admin = await cookieFor("admin", "superadmin");
+    const gyor = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=gyor&entry=no_pair", admin));
+    expect(gyor.recipients.map((r: any) => r.email).sort()).toEqual(["admin@x.hu", "e@x.hu", "f@x.hu", "k@x.hu"]);
+    const deb = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=deb&entry=no_pair", admin));
+    expect(deb.recipients.map((r: any) => r.email)).toEqual(expect.arrayContaining(["g@x.hu", "h@x.hu"]));
+    expect(deb.recipients.map((r: any) => r.email)).not.toContain("k@x.hu");
+    expect(h.sent).toEqual([]);
+  });
+});

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "dr
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groupPairs, groups, leagues, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
+import { groupPairs, groups, interestSignups, leagues, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { audit } from "~/lib/leagues.server";
@@ -12,6 +12,7 @@ import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 
 import type { User } from "./auth/session.server";
+import { inLeagueCity, signupCities } from "./league-players";
 import { canDissolve, checkNewPair, DISSOLVE_REFUSED, NEW_PAIR_REFUSALS, type PairSource } from "./pairs";
 
 // Pairs in D1. The rules are in pairs.ts. Players only see their pair
@@ -184,20 +185,27 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
 
 export type PairCandidate = { id: string; name: string; level: string | null };
 
-// Registered players (first-login page done) without an active pair in the
-// league, by name. Players don't belong to a league yet, so everyone counts.
-export async function pairCandidates(leagueId: number): Promise<PairCandidate[]> {
-  return db
-    .select({ id: users.id, name: users.name, level: users.level })
-    .from(users)
-    .where(
-      and(
-        isNotNull(users.consentAt),
-        sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
-          and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
-      ),
-    )
-    .orderBy(asc(users.name), asc(users.id));
+// Registered players (first-login page done) of the league without an active
+// pair in it, by name. A player belongs to the league by their signups' city,
+// or to every league without a signup (league-players.ts, D73, D93); staff
+// accounts too. No address in the result: it goes to the page.
+export async function pairCandidates(league: { id: number; city: string }): Promise<PairCandidate[]> {
+  const [accounts, signups] = await db.batch([
+    db
+      .select({ id: users.id, name: users.name, level: users.level, email: users.email })
+      .from(users)
+      .where(
+        and(
+          isNotNull(users.consentAt),
+          sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
+            and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+        ),
+      )
+      .orderBy(asc(users.name), asc(users.id)),
+    db.select({ email1: interestSignups.email1, email2: interestSignups.email2, city: interestSignups.city }).from(interestSignups),
+  ]);
+  const cities = signupCities(signups);
+  return accounts.filter((a) => inLeagueCity(cities, a.email, league.city)).map(({ id, name, level }) => ({ id, name, level }));
 }
 
 // Why `a` and `b` can't be a new pair, or null. `free`: the players who must

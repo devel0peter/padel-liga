@@ -8,10 +8,10 @@ Pairs who play padel in a city (starting with Győr) get a fixed weekly match ag
 ## 2. Roles
 | Role | Can do |
 |---|---|
-| Visitor | See the landing page, rules and public standings |
+| Visitor | See the landing page, rules and public standings; send feedback (section 19) |
 | Player | Register, form a pair, join a league, propose and accept slots, record results |
 | Organizer ("Szervező") | Per league: create and configure seasons, enter or take out a pair, seed groups, publish rounds, approve substitutes, settle disputes, override results, withdraw pairs. Edits the clubs (venues) of the league's city |
-| Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users (Peter) |
+| Platform admin ("Admin") | Create cities/leagues, appoint organizers, see the interest list, send broadcasts, see traffic and users, read feedback (Peter) |
 
 Organizer and platform admin are roles on a normal player account, inside the app. The current `/admin` (interest list, broadcasts) moves into the app under the platform admin role, and Cloudflare Access is retired (2026-10-03).
 - Code names: `player`, `league_admin`, `superadmin`; UI labels: Játékos, Szervező, Admin (2026-10-04).
@@ -227,6 +227,7 @@ Only while the league has a season accepting entries (section 4), since every re
 - Every notification is also kept in the app's notification list (`/notifications`), whatever the switches: unread ones first, opening one marks it read. Szervezők and Admins can switch off their own kinds (e.g. a new signup) on the profile page; a kind switched off is not stored or sent at all. Players have no per-kind switches, only the two channels.
 - **Email switch:** off, no email goes to that account's address except login codes and signup confirmations: broadcasts, pair intros, registration invites and partner notices are skipped too (Peter, 2026-10-29). Addresses without an account get everything as before. A pair intro also appears in the app for whoever has an account.
 - **Push switch:** off, no push goes to any of the account's devices. Turning it on asks this browser for permission and subscribes this device; other devices are switched on from themselves ("Bekapcsolom ezen az eszközön"). On iPhone it needs iOS 16.4+ and the site added to the home screen; the profile explains this. A player who switches email off gets instant items by push and in the app only.
+- **Feedback sends nothing** (README decision log, 2026-11-04, D94): a feedback message, a prompt answer or a new bug-report issue creates no email, no push and no notification, for the sender or the Admin. The Admin finds feedback on "Visszajelzések" (section 19).
 
 ## 14. Public pages
 - League home: groups, standings, matches this week. The ladder is one list with three colored division bands (Bronz, Réz, Rookie) and a header at each border. In the last phase, each group card shows what is at stake: "Divízió döntő" with the prize and its sponsor on a division's top group, nothing about prizes on the others (D81); earlier phases show a hint instead. A "Hogyan működik?" explainer (3 short points and a picture of the bands) is linked from every badge.
@@ -236,6 +237,7 @@ Only while the league has a season accepting entries (section 4), since every re
 - Season archive: every finished season's groups and standings for each phase (e.g. `/seasons/<slug>`), linked from pair profiles. A per-season recap block on profiles comes later.
 - Rules page (`szabalyzat.md`).
 - Privacy page ("Adatkezelési tájékoztató", section 17), linked from the footer and from every consent checkbox.
+- Feedback form ("Visszajelzés", section 19), linked from the footer of the public pages.
 
 ## 15. Out of MVP scope
 Payment, court booking integration, chat, mobile app, multi-language support, social auto-posting (phase 2), Facebook login, native mobile app push, a "keresek párt" list.
@@ -252,17 +254,20 @@ A short, plain-language Hungarian page. Needed from Phase 0, since the landing p
 - **What we collect:**
   - Landing page: names, emails, level, comment.
   - Later: account data, the phone number, match history, ratings.
+  - Feedback (section 19): the message, its type, the page it was sent from, the time, the device class and browser, the app version and, when the sender was logged in, the account. A prompt answer: the rating and the comment.
   - Notifications: the in-app list, the email and push choices, and each device's push subscription (the browser's push address; the push itself goes encrypted through the browser maker's push service: Google, Apple, Mozilla, Microsoft).
 - **Why:** only to organize the league and send league emails. No marketing for third parties, and no selling of data.
 - **Who sees what:**
   - Public: names, results, standings and ratings. Names and the group tables are public from the day the groups are published (the league page, section 14; README decision log, 2026-11-02, #30), results and ratings once the league has started.
   - Never public: email and phone number.
+  - Feedback: only the Admin. The sender's account is never in a GitHub issue.
   - Phone number: only the current round's opponents see it (section 3).
   - A mid-phase withdrawal's reason (section 4): only the organizer, the Admin and the pair itself; the others only see that the pair withdrew. Anonymizing a player's account (section 3) clears it, also from the partner's notice.
-- **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).
+- **Where it is stored:** Cloudflare (D1 database with EU location, backups in R2). Processors to list: Cloudflare (hosting, database; the bot check on the feedback form), GitHub (bug reports without personal data, section 19), Google (Google Workspace: the contact mailbox, and sending the league's emails through its SMTP relay, #111) and Resend (email, fallback when the relay can't send).
 - **Retention:**
   - Interest list: deleted at the end of the first season's first round, unless the person registers (README decision log, 2026-11-03, D88, #224).
   - Accounts: kept until deletion, then removed, or anonymized when results depend on them (section 3).
+  - Feedback: deleted 1 year after it was sent, or with the account it came from. A GitHub issue opened for a bug report holds no personal data and stays.
 - **Your rights:** access, correction, deletion and withdrawing consent, by emailing the contact address. A deletion request is carried out by the Admin (section 3); the deletion also removes the address's unsubscribe and bounce record, so every stored data of the address is gone (only the anonymized name in old results stays).
 - **Solo signups:** the league's organizer sees their name, level, home club and note (no email) and may pair two of them; both then get one email with the other's name, level and email (2026-10-05).
 - **Partner's data:** when someone signs up a pair, they enter their partner's name and email. We email the partner once, so they know about it and can ask for deletion, and they get the registration invite (section 3). Nothing else is sent to them until they register themselves. Until then, the player who registered sees only the partner's name from the signup on "Párom", never the email.
@@ -278,3 +283,29 @@ Dates are Europe/Budapest.
 | Season end | Thu 31 Dec 2026 | 4-phase seasons, re-entry ("Nevezünk újra", organizer re-entry by hand), carrying entries into the next season, season switch draft (carry-over, compaction, re-formed pairs as late joiners), season archive page, season recap email and re-entry reminder |
 
 First season: registration 29 Oct – 6 Nov (closes Fri 6 Nov 23:59; Peter, 2026-10-29), phase 1 runs 9–29 Nov, phase 2 30 Nov – 20 Dec (deadline may move to 23 Dec if matches are still open), break 21 Dec – 3 Jan, phase 3 4–24 Jan, phase 4 25 Jan – 14 Feb 2027. Season 2 starts after a 1–2 week gap. The first season is a warm-up. Until substitutes are built, the organizer handles them by hand.
+
+## 19. Feedback (README decision log, 2026-11-04, D94, #138)
+Players and visitors can tell us from the app that something is broken or could be better, and every user is asked once how it is going. Nothing here sends mail, push or a notification, to anyone (section 13).
+
+**Form ("Visszajelzés").** Linked from the sidebar of every logged-in page and from the footer of the public pages; the page is `/feedback`, public.
+- Fields: a type (`Hiba`, `Ötlet`, `Egyéb`) and a required message (1–2000 characters). No email address and no name: **we never reply by email**, so the form shows the contact address (the organizer's, as on the privacy page) for anyone who wants an answer.
+- Added automatically, and shown to the sender above the button ("Ezt küldjük el veled: ..."): the page the form was opened from (path only, no query string), the time, the device class (mobile or desktop) and browser family, the app version, and the account when logged in. The full browser string and the IP address are not stored.
+- After sending: a short thank-you in place of the form, with a link back to where the sender came from. Nothing else on the page changes.
+- Logged-out visitors can send feedback too, behind the same bot check as the signup form (Turnstile, section 3's signup). A failed check or a rate limit gives a short Hungarian error and stores nothing.
+- Rate limit (default, Peter may change it): a logged-in account 5 messages an hour and 20 a day; logged-out visitors together 30 an hour. The limit counts stored rows, so it needs no IP address.
+- The form tells people not to write passwords or other people's personal data.
+
+**Stored.** One row per message: type (`bug`, `idea`, `other`, or `rating` for a prompt answer), message, rating (1–5, `rating` only), page, device class, browser, app version, the account (empty for visitors), the time, "done" (time and who marked it), the GitHub issue number (bugs only). Feedback is kept 1 year, then a daily cron step deletes it; deleting an account deletes its feedback with it (the anonymizing delete too, since a message may name its sender).
+
+**Admin view ("Visszajelzések", Admin only).** Newest first, filter by type and by open or done, open one to read it with its context and the sender (the account's name, never shown in a GitHub issue), mark it done or open again.
+
+**Bug reports and GitHub.** Only `Hiba` messages open an issue, in this private repo, with the bug label. The issue has a fixed title (`Hiba a visszajelzésből #<n>`), the message text, the page, the time, the device and browser, the app version and a link to the item in the admin view. **No name, no email, no phone number and no account id.** (The message is free text, so the form's warning above matters; an issue with personal data in it is edited by the Admin by hand.) The token is a fine-grained GitHub token that can only write issues in this repo (secret `GITHUB_TOKEN`; local dev logs the issue instead of opening it). The issue is opened right after the message is stored, in the background; if GitHub can't be reached or the token is missing, the message stays stored without an issue number and a cron step opens it later (failure-isolated, section 13, within the run limits, a few issues per run). `Ötlet`, `Egyéb` and prompt answers open no issue.
+
+**Feedback prompt.** Every logged-in user except the Admin (players and Szervezők) is asked **once, ever**.
+- A **use** is a Budapest calendar day on which the account opened an app page logged in; many visits on one day count once. The account keeps its number of uses and the day of the last one.
+- The prompt shows from the first use day **after the account has had 4 earlier use days**, so never on the first four, and only on Kezdőlap (never on a form, never on another page).
+- A small card on Kezdőlap, not a modal: "Hogy tetszik eddig a Padelpárbaj?", five stars (1–5), an optional comment, "Küldés", a close button and "Most nem". Tapping a star opens the comment box and "Küldés"; nothing is sent before "Küldés".
+- Sending, closing and "Most nem" all end it: the account's prompt state is set (time and outcome), so it never shows again on any device. A rating is stored as feedback of type `rating` and opens no issue.
+- No email, no push, no notification (section 13).
+
+**Out of scope:** screenshots or attachments, chat or replies in the app, a reminder to give feedback, per-round prompts.

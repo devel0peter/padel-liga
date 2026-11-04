@@ -33,12 +33,17 @@ vi.mock("~/lib/email/outbox.server", () => ({
   deliver: async (ids?: number[], now?: Date) => (step("deliver", ids ? undefined : now), { sent: h.result.sent }),
 }));
 
+vi.mock("~/lib/push-stats.server", () => ({
+  PUSH_STATS_QUERIES: 1,
+  recordPushStats: async (now?: Date) => step("push stats", now),
+}));
+
 const { runHourlyJob } = await import("~/lib/hourly-job.server");
 
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["auto-accept", "match", "stuck", "push", "deliver"];
+const ALL = ["auto-accept", "match", "stuck", "push", "deliver", "push stats"];
 
 let log: { mock: { calls: unknown[][] } };
 let error: { mock: { calls: unknown[][] } };
@@ -56,7 +61,7 @@ const steps = () => h.calls.map((c) => c.step);
 const errorLines = () => error.mock.calls.map((c) => String(c[0]));
 
 describe("runHourlyJob", () => {
-  it("runs the steps in order: auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
+  it("runs the steps in order: auto-accept, match reminders, stuck reminders, pushes, email delivery, push stats", async () => {
     await runHourlyJob(RUN);
     expect(steps()).toEqual(ALL);
     expect(error).not.toHaveBeenCalled();
@@ -99,7 +104,7 @@ describe("runHourlyJob", () => {
   });
 
   it("logs each failure under its own step when several fail", async () => {
-    for (const s of ["auto-accept", "match", "stuck", "push", "deliver"]) h.fail.add(s);
+    for (const s of ALL) h.fail.add(s);
     await expect(runHourlyJob(RUN)).resolves.toBeUndefined();
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([
@@ -108,7 +113,15 @@ describe("runHourlyJob", () => {
       "cron: stuck reminders failed",
       "cron: push delivery failed",
       "cron: email delivery failed",
+      "cron: push stats failed",
     ]);
+  });
+
+  it("still writes the push stats when the email delivery fails", async () => {
+    h.fail.add("deliver");
+    await runHourlyJob(RUN);
+    expect(steps()).toEqual(ALL);
+    expect(errorLines()).toEqual(["cron: email delivery failed"]);
   });
 
   it("starts a step only after the one before it has finished", async () => {

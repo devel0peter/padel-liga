@@ -1,6 +1,7 @@
 import { DELIVER_MIN, deliver } from "~/lib/email/outbox.server";
 import { runMatchReminders } from "~/lib/match-reminders.server";
 import { pushQueued } from "~/lib/notifications.server";
+import { PUSH_STATS_QUERIES, recordPushStats } from "~/lib/push-stats.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
 import { autoAcceptResults } from "~/lib/results.server";
 import { RunBudget, type Usage } from "~/lib/run-usage";
@@ -10,7 +11,8 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // the run's scheduled time: results waiting 48 hours are accepted (#28), the
 // match reminders and the daily digest when their hour comes (#31), the
 // reminders for people stuck before entering (#155), then the queued pushes
-// and whatever email waits. A step that fails is logged under its own name
+// and whatever email waits, and last the day's push count (push-stats.server.ts)
+// when the run has a query left. A step that fails is logged under its own name
 // and the next one runs anyway.
 //
 // One run may make 50 D1 queries and 50 outgoing calls (Workers Free,
@@ -66,6 +68,16 @@ export const HOURLY_STEPS: readonly HourlyStep[] = [
       const { sent, left } = await deliver(undefined, now, run);
       if (left) return `sent ${sent} emails; ${left} left for the next run (run limits)`;
       return sent ? `sent ${sent} emails` : null;
+    },
+  },
+  {
+    // Last, so it never takes room from a delivery; a skipped run is fine,
+    // the next one of the day writes the same row.
+    name: "push stats",
+    run: async (now, run) => {
+      if (!run.fits({ queries: PUSH_STATS_QUERIES })) return "push stats: no room in this run; left for the next one";
+      await recordPushStats(now);
+      return null;
     },
   },
 ];

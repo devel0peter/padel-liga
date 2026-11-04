@@ -37,12 +37,17 @@ vi.mock("~/lib/email/outbox.server", () => ({
   deliver: async (ids?: number[], now?: Date) => (step("deliver", ids ? undefined : now), { sent: h.result.sent }),
 }));
 
+vi.mock("~/lib/push-stats.server", () => ({
+  PUSH_STATS_QUERIES: 1,
+  recordPushStats: async (now?: Date) => step("push stats", now),
+}));
+
 const { runCron } = await import("~/lib/hourly-job.server");
 
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["cleanup", "auto-accept", "match", "stuck", "push", "deliver"];
+const ALL = ["cleanup", "auto-accept", "match", "stuck", "push", "deliver", "push stats"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -62,7 +67,7 @@ const errorLines = () => lines.filter((l) => l.level === "error").map((l) => `${
 const stepResults = () => lines.filter((l) => l.event === "cron step").map((l) => l.result);
 
 describe("runCron", () => {
-  it("runs the steps in order: login code cleanup, auto-accept, match reminders, stuck reminders, pushes, email delivery", async () => {
+  it("runs the steps in order: login code cleanup, auto-accept, match reminders, stuck reminders, pushes, email delivery, push stats", async () => {
     await runCron(RUN);
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([]);
@@ -124,7 +129,15 @@ describe("runCron", () => {
       "cron step failed: stuck reminders",
       "cron step failed: push delivery",
       "cron step failed: email delivery",
+      "cron step failed: push stats",
     ]);
+  });
+
+  it("still writes the push stats when the email delivery fails", async () => {
+    h.fail.add("deliver");
+    await runCron(RUN);
+    expect(steps()).toEqual(ALL);
+    expect(errorLines()).toEqual(["cron step failed: email delivery"]);
   });
 
   it("logs a start and a finish line, and every line of the run carries the same request id (#227)", async () => {

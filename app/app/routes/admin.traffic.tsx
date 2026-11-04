@@ -19,6 +19,7 @@ import { refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { formatDay, formatPercent } from "~/lib/format";
 import { buildFunnel, parsePeriod, type FunnelRow } from "~/lib/traffic";
+import { currentPushStats, listPushDays, type PushStats } from "~/lib/push-stats.server";
 import { listLandings, listSignupStamps } from "~/lib/traffic.server";
 
 const CF_WEB_ANALYTICS = "https://dash.cloudflare.com/?to=/:account/web-analytics";
@@ -26,10 +27,12 @@ const CF_WEB_ANALYTICS = "https://dash.cloudflare.com/?to=/:account/web-analytic
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "traffic.view" });
   const period = parsePeriod(new URL(request.url).searchParams, new Date());
-  const [landings, signups, clubs] = await Promise.all([
+  const [landings, signups, clubs, push, pushDays] = await Promise.all([
     listLandings(period),
     listSignupStamps(period),
     listClubs(),
+    currentPushStats(),
+    listPushDays(period),
   ]);
   const funnel = buildFunnel(landings, signups, period);
   return {
@@ -38,6 +41,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     sources: funnel.sources.map((r) => ({ ...r, label: refLabel(r.ref, clubs) || "Forrás nélkül" })),
     // Newest first, like the signups list.
     days: funnel.days.reverse(),
+    push,
+    pushDays: pushDays.reverse(),
   };
 }
 
@@ -47,8 +52,12 @@ function Rate({ row }: { row: Pick<FunnelRow, "conversion"> }) {
 
 const num = "text-right tabular-nums";
 
+function pushShare({ players, pushUsers }: Pick<PushStats, "players" | "pushUsers">): string {
+  return players ? formatPercent(pushUsers / players) : "–";
+}
+
 export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
-  const { period, total, sources, days } = loaderData;
+  const { period, total, sources, days, push, pushDays } = loaderData;
 
   return (
     <AppPage
@@ -148,6 +157,46 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
                 <TableCell>{formatDay(d.day)}</TableCell>
                 <TableCell className={num}>{d.landings}</TableCell>
                 <TableCell className={num}>{d.signups}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
+      <section className="grid gap-2">
+        <h2 className="font-display text-lg font-bold">Push értesítés</h2>
+        <p className="text-muted-foreground">
+          Hány játékosnál van bekapcsolva most legalább egy eszközön (és nem kapcsolta ki a profilján). Az Admin, a
+          Szervezők és a még be nem fejezett regisztrációk nem számítanak. A napi sor az aznapi utolsó állapot.
+        </p>
+        <p className="text-lg">
+          <strong>{push.pushUsers}</strong> / {push.players} játékos · <strong>{pushShare(push)}</strong> ·{" "}
+          {push.devices} eszköz
+        </p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nap</TableHead>
+              <TableHead className={num}>Push be</TableHead>
+              <TableHead className={num}>Játékos</TableHead>
+              <TableHead className={num}>Arány</TableHead>
+              <TableHead className={num}>Eszköz</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pushDays.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground">
+                  Ebben az időszakban még nincs napi adat.
+                </TableCell>
+              </TableRow>
+            )}
+            {pushDays.map((d) => (
+              <TableRow key={d.day}>
+                <TableCell>{formatDay(d.day)}</TableCell>
+                <TableCell className={num}>{d.pushUsers}</TableCell>
+                <TableCell className={num}>{d.players}</TableCell>
+                <TableCell className={num}>{pushShare(d)}</TableCell>
+                <TableCell className={num}>{d.devices}</TableCell>
               </TableRow>
             ))}
           </TableBody>

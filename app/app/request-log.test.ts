@@ -18,7 +18,7 @@ vi.mock("react-router", async (original) => ({
     return h.respond(request);
   },
 }));
-vi.mock("./lib/hourly-job.server", () => ({ runHourlyJob: async () => {} }));
+vi.mock("./lib/hourly-job.server", () => ({ runCron: async () => {} }));
 vi.mock("./lib/backup.server", () => ({ exportStep: async () => ({ status: "done" }) }));
 
 const worker = (await import("../workers/app")).default;

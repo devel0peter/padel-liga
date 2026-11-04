@@ -6,7 +6,8 @@ import { beginInvocation, logError, logInfo } from "./log";
 // imports so a test can run it with stand-ins for the two jobs.
 export type Jobs = {
   backup: () => Promise<StepResult>;
-  hourly: (now: Date) => Promise<void>;
+  // The 10-minute cron steps (runCron in lib/hourly-job.server.ts).
+  steps: (now: Date) => Promise<void>;
 };
 
 type Controller = { cron: string; scheduledTime: number };
@@ -16,7 +17,7 @@ export function runScheduled(controller: Controller, ctx: { waitUntil(promise: P
     ctx.waitUntil(runBackup(jobs.backup));
     return;
   }
-  ctx.waitUntil(jobs.hourly(new Date(controller.scheduledTime)));
+  ctx.waitUntil(jobs.steps(new Date(controller.scheduledTime)));
 }
 
 // One export step and its log line (#227): a line while it works and when the

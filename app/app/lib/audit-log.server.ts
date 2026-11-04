@@ -129,15 +129,17 @@ export async function auditLogPage(f: LogFilters): Promise<LogPage> {
 
 // Rows before #225 named accounts by email: the account's name if it still
 // has one with that address (a deleted account's rows were rewritten to its
-// id when it was deleted), else the address as written (an invite that was
-// never accepted).
+// id when it was deleted), else "Meghívott, nincs fiókja" (an invite never
+// accepted): Napló shows no address.
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
+const NO_ACCOUNT = "Meghívott, nincs fiókja";
 function emailRefs(target: string): Ref[] {
   return EMAIL.test(target) ? [{ kind: "email", id: target.toLowerCase() }] : [];
 }
 
 function renderTarget(target: string, names: ReadonlyMap<string, string>): string {
-  if (EMAIL.test(target)) return names.get(`email:${target.toLowerCase()}`) ?? target;
+  // An address no account has (an invite never accepted): not shown.
+  if (EMAIL.test(target)) return names.get(`email:${target.toLowerCase()}`) ?? NO_ACCOUNT;
   return renderRefs(target, names);
 }
 

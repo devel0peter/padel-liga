@@ -49,7 +49,7 @@ describe("/admin/log (#226)", () => {
     admin = await cookieFor("admin", "superadmin");
     h.raw.exec(`insert into users (id, email, name, phone) values ('a', 'a@x.hu', 'Anna', '+36301234567'), ('b', 'b@x.hu', 'Béla', null)`);
     // An organizer whose account was anonymized later, and their pair.
-    h.raw.exec(`insert into users (id, email, name, deleted_at) values ('gone', 'deleted-gone@deleted.invalid', 'Törölt játékos', 1)`);
+    h.raw.exec(`insert into users (id, email, name, deleted_at) values ('gone', 'deleted-gone@deleted.invalid', 'Gábor Régi', 1)`);
     h.raw.exec(`insert into pairs (id, league_id, player_a, player_b, status) values (7, 1, 'a', 'b', 'active'), (8, 1, 'a', 'gone', 'dissolved')`);
     entry("admin", "league_admin.grant", "user:a", null, "2026-11-01T09:00:00Z");
     entry("gone", "pair.dissolve", "pair:8", "league:1", "2026-11-02T09:00:00Z");
@@ -105,6 +105,12 @@ describe("/admin/log (#226)", () => {
     const second = await load(admin, "?page=2");
     expect(second.rows).toHaveLength(16);
     expect(second.rows.at(-1)!.action).toBe("old.thing");
+  });
+
+  it("shows no address for an older invite entry nobody accepted", async () => {
+    entry("admin", "league_admin.invite", "uj@x.hu", "league:gyor", "2026-11-05T09:00:00Z");
+    const [row] = (await load(admin)).rows;
+    expect([row.actionLabel, row.target]).toEqual(["Szervező meghívása", "Meghívott, nincs fiókja"]);
   });
 
   it("has no action: nothing on the page can change an entry", () => {

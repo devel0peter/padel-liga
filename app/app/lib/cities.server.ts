@@ -4,7 +4,7 @@ import { db } from "~/db/client.server";
 import { cities, clubs, interestSignups, leagues } from "~/db/schema";
 
 import { matchesCity, OTHER_CITY, pairCounts, type City, type CityInput } from "./cities";
-import { audit } from "./leagues.server";
+import { auditEntry, auditIfChanged } from "./audit.server";
 
 export async function listCities(): Promise<City[]> {
   return db.select({ slug: cities.slug, name: cities.name, listed: cities.listed }).from(cities).orderBy(asc(cities.name));
@@ -34,21 +34,25 @@ export async function getCity(slug: string): Promise<City | undefined> {
 // Adds a city and files the "Más város" signups that typed its name under it.
 // Returns how many signups moved.
 export async function createCity(input: CityInput, actorId: string): Promise<number> {
-  await db.insert(cities).values(input);
   const others = await db
     .select({ id: interestSignups.id, cityOther: interestSignups.cityOther })
     .from(interestSignups)
     .where(eq(interestSignups.city, OTHER_CITY));
   const ids = others.filter((s) => matchesCity(s.cityOther, input)).map((s) => s.id);
-  if (ids.length)
-    await db.update(interestSignups).set({ city: input.slug, cityOther: null }).where(inArray(interestSignups.id, ids));
-  await audit(actorId, "city.create", `city:${input.slug}`, `${input.name}${ids.length ? `; ${ids.length} signups filed` : ""}`);
+  // One batch: the city, its signups and the audit entry (#225).
+  await db.batch([
+    db.insert(cities).values(input),
+    ...(ids.length ? [db.update(interestSignups).set({ city: input.slug, cityOther: null }).where(inArray(interestSignups.id, ids))] : []),
+    auditEntry({ actorId, action: "city.create", target: `city:${input.slug}`, detail: `${input.name}${ids.length ? `; ${ids.length} signups filed` : ""}` }),
+  ]);
   return ids.length;
 }
 
 export async function updateCity(slug: string, change: Pick<City, "name" | "listed">, actorId: string): Promise<void> {
-  await db.update(cities).set(change).where(eq(cities.slug, slug));
-  await audit(actorId, "city.update", `city:${slug}`, `${change.name}; listed=${change.listed}`);
+  await db.batch([
+    db.update(cities).set(change).where(eq(cities.slug, slug)),
+    auditIfChanged({ actorId, action: "city.update", target: `city:${slug}`, detail: `${change.name}; listed=${change.listed}` }),
+  ]);
 }
 
 export type CityUsage = { signups: number; clubs: number; leagues: number };
@@ -71,7 +75,9 @@ export async function cityUsage(): Promise<Map<string, CityUsage>> {
 export async function deleteCity(slug: string, actorId: string): Promise<boolean> {
   const usage = (await cityUsage()).get(slug);
   if (usage && usage.signups + usage.clubs + usage.leagues > 0) return false;
-  await db.delete(cities).where(eq(cities.slug, slug));
-  await audit(actorId, "city.delete", `city:${slug}`);
+  await db.batch([
+    db.delete(cities).where(eq(cities.slug, slug)),
+    auditIfChanged({ actorId, action: "city.delete", target: `city:${slug}` }),
+  ]);
   return true;
 }

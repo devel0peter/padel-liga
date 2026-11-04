@@ -2,13 +2,14 @@ import { and, asc, count, eq, gte, inArray, isNotNull, isNull, ne, or, sql } fro
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
+import { rowSelect } from "~/db/insert-select";
 import { groupPairs, groups, leagues, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { queueSeasonEntered } from "~/lib/email/outbox.server";
 import { pairWithdrawnMessage, seasonEntryMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
-import { audit } from "./leagues.server";
+import { auditIfChanged } from "./audit.server";
 import {
   averageStartingElo,
   checkEntry,
@@ -157,42 +158,80 @@ type Joins = { phase: number; startsAt: Date } | null;
 // and that phase 1's groups weren't published meanwhile; the unique index
 // settles a double submit. A withdrawn entry of the same pair is entered
 // again (#154). Returns where the pair starts, or null when nothing changed.
+// `logged`: an organizer's entry, audited in the same batch (#225); a
+// player's own entry isn't.
 async function enter(
   season: Season,
   pair: { id: number; players: [string, string] },
   decidedBy: string | null,
   now: Date,
+  logged?: { actorId: string },
 ): Promise<{ id: number; joins: Joins } | null> {
   const [a, b] = pair.players;
   // A pair entered once phase 1's groups are out starts at phase 2 (#24).
   const published = (await groupsPublished(season.id)) ? [FIRST_PHASE] : [];
   const phase = joinsPhase(season.phases, now, published);
   const seconds = Math.floor(now.getTime() / 1000);
-  const inserted = await db.all(sql`insert into ${seasonEntries} (season_id, pair_id, status, joins_phase, decided_by, decided_at, updated_at)
-    select ${season.id}, ${pair.id}, 'approved', ${phase}, ${decidedBy}, ${seconds}, ${seconds}
-    where exists (select 1 from ${pairs} where ${pairs.id} = ${pair.id} and ${pairs.status} = 'active')
-      and (select count(*) from ${users} where ${users.id} in (${a}, ${b}) and ${users.level} is not null) = 2
-      and not exists (
-        select 1 from season_entries se join pairs p on p.id = se.pair_id
-        where se.season_id = ${season.id} and se.status <> 'withdrawn'
-          and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
-      )
-      and (${phase} is not ${FIRST_PHASE} or not exists (
-        select 1 from groups g where g.season_id = ${season.id} and g.phase = ${FIRST_PHASE} and g.published_at is not null
-      ))
-    on conflict (season_id, pair_id) do update set
-      status = 'approved', joins_phase = excluded.joins_phase, decided_by = excluded.decided_by,
-      decided_at = excluded.decided_at, updated_at = excluded.updated_at, note = null
-    where season_entries.status = 'withdrawn'
-    returning id`);
-  if (inserted.length === 0) return null;
-  // The row's id by the unique (season, pair): raw rows come back in another
-  // shape on D1 than in the tests.
-  const [row] = await db
-    .select({ id: seasonEntries.id })
-    .from(seasonEntries)
-    .where(and(eq(seasonEntries.seasonId, season.id), eq(seasonEntries.pairId, pair.id)));
-  return { id: row!.id, joins: phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt } };
+  // A builder (insert ... select from the pair's row), not a raw statement,
+  // so it can share a D1 batch with the audit entry.
+  const upsert = db
+    .insert(seasonEntries)
+    .select(
+      rowSelect(
+        seasonEntries,
+        {
+          id: sql`null`,
+          seasonId: sql`${season.id}`,
+          pairId: sql`${pair.id}`,
+          status: sql`'approved'`,
+          note: sql`null`,
+          decidedBy: sql`${decidedBy}`,
+          decidedAt: sql`${seconds}`,
+          joinsPhase: sql`${phase}`,
+          updatedAt: sql`${seconds}`,
+          createdAt: sql`unixepoch()`,
+        },
+        sql`where exists (select 1 from ${pairs} where ${pairs.id} = ${pair.id} and ${pairs.status} = 'active')
+          and (select count(*) from ${users} where ${users.id} in (${a}, ${b}) and ${users.level} is not null) = 2
+          and not exists (
+            select 1 from season_entries se join pairs p on p.id = se.pair_id
+            where se.season_id = ${season.id} and se.status <> 'withdrawn'
+              and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
+          )
+          and (${phase} is not ${FIRST_PHASE} or not exists (
+            select 1 from groups g where g.season_id = ${season.id} and g.phase = ${FIRST_PHASE} and g.published_at is not null
+          ))`,
+      ),
+    )
+    .onConflictDoUpdate({
+      target: [seasonEntries.seasonId, seasonEntries.pairId],
+      set: {
+        status: "approved",
+        joinsPhase: sql`excluded.joins_phase`,
+        decidedBy: sql`excluded.decided_by`,
+        decidedAt: sql`excluded.decided_at`,
+        updatedAt: sql`excluded.updated_at`,
+        note: null,
+      },
+      setWhere: eq(seasonEntries.status, "withdrawn"),
+    })
+    .returning({ id: seasonEntries.id });
+  const entryId = sql`(select ${seasonEntries.id} from ${seasonEntries} where ${seasonEntries.seasonId} = ${season.id} and ${seasonEntries.pairId} = ${pair.id})`;
+  const [inserted] = logged
+    ? await db.batch([
+        upsert,
+        auditIfChanged({
+          actorId: logged.actorId,
+          action: "season_entry.enter",
+          target: sql`'season_entry:' || ${entryId}`,
+          detail: `pair:${pair.id}`,
+          leagueId: season.leagueId,
+        }),
+      ])
+    : [await upsert];
+  const [row] = inserted;
+  if (!row) return null;
+  return { id: row.id, joins: phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt } };
 }
 
 // Both players of the pair, with what the notices need.
@@ -304,9 +343,8 @@ export async function enterPairByOrganizer(
   if (!entryOpen(season, now)) return { ok: false, error: ORGANIZER_ENTRY_REFUSALS.closed };
   const missing = [pair.a, pair.b].filter((p) => !p.level).map((p) => p.name || "Névtelen");
   if (missing.length) return { ok: false, error: noLevelRefusal(missing) };
-  const entered = await enter(season, { id: pair.id, players: [pair.a.id, pair.b.id] }, actor.id, now);
+  const entered = await enter(season, { id: pair.id, players: [pair.a.id, pair.b.id] }, actor.id, now, { actorId: actor.id });
   if (!entered) return { ok: false, error: "A pár közben változott. Frissítsd az oldalt." };
-  await audit(actor.id, "season_entry.enter", `season_entry:${entered.id}`, `pair:${pairId}`);
   await notifyPair(pairId, season, "entered_by_organizer", entered.joins);
   return { ok: true, joins: entered.joins };
 }
@@ -328,23 +366,31 @@ export async function removePairFromSeason(
   const pair = await leaguePair(leagueId, pairId);
   if (!pair) return { ok: false, error: "Nincs ilyen pár." };
   if (await pairInRunningGroup(pairId, now)) return { ok: false, error: IN_RUNNING_PHASE };
-  const updated = await db
-    .update(seasonEntries)
-    .set({ status: "withdrawn", decidedBy: actor.id, decidedAt: now, updatedAt: now })
-    .where(
-      and(
-        eq(seasonEntries.seasonId, seasonId),
-        eq(seasonEntries.pairId, pairId),
-        inArray(seasonEntries.status, ["approved", "pending"]),
-        notInRunningGroup(pairId, now),
-      ),
-    )
-    .returning({ id: seasonEntries.id });
+  const [updated] = await db.batch([
+    db
+      .update(seasonEntries)
+      .set({ status: "withdrawn", decidedBy: actor.id, decidedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(seasonEntries.seasonId, seasonId),
+          eq(seasonEntries.pairId, pairId),
+          inArray(seasonEntries.status, ["approved", "pending"]),
+          notInRunningGroup(pairId, now),
+        ),
+      )
+      .returning({ id: seasonEntries.id }),
+    auditIfChanged({
+      actorId: actor.id,
+      action: "season_entry.remove",
+      target: sql`'season_entry:' || (select ${seasonEntries.id} from ${seasonEntries} where ${seasonEntries.seasonId} = ${seasonId} and ${seasonEntries.pairId} = ${pairId})`,
+      detail: `pair:${pairId}`,
+      leagueId,
+    }),
+  ]);
   if (updated.length === 0) {
     if (await pairInRunningGroup(pairId, now)) return { ok: false, error: IN_RUNNING_PHASE };
     return { ok: false, error: "Ez a pár nem nevezett erre a szezonra. Frissítsd az oldalt." };
   }
-  await audit(actor.id, "season_entry.remove", `season_entry:${updated[0]!.id}`, `pair:${pairId}`);
   await notifyPair(pairId, season, "removed", null);
   return { ok: true };
 }
@@ -394,6 +440,13 @@ export async function withdrawPairMidPhase(
       .set({ withdrawnAt: now, withdrawalReason: why })
       .where(and(inArray(groupPairs.groupId, ids), eq(groupPairs.pairId, pairId), isNull(groupPairs.withdrawnAt)))
       .returning({ groupId: groupPairs.groupId }),
+    auditIfChanged({
+      actorId: actor.id,
+      action: "season_entry.withdraw",
+      target: `pair:${pairId}`,
+      detail: `season:${seasonId} groups:${ids.join(",")}`,
+      leagueId,
+    }),
     db
       .update(matches)
       .set({ revision: sql`${matches.revision} + 1` })
@@ -404,7 +457,6 @@ export async function withdrawPairMidPhase(
       .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.pairId, pairId), inArray(seasonEntries.status, ["approved", "pending"]))),
   ]);
   if (withdrawn.length === 0) return { ok: false, error: NOT_IN_RUNNING_PHASE };
-  await audit(actor.id, "season_entry.withdraw", `pair:${pairId}`, `season:${seasonId} groups:${ids.join(",")}`);
   await notifyWithdrawal(pairId, season, running, why);
   return { ok: true };
 }

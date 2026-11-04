@@ -108,7 +108,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
   const { label, recipients } = await audience(new URL(request.url).searchParams);
   if (recipients.length === 0) return { error: "Nincs címzett." };
   // Sent right away, within the daily limit (#112); the rest by the cron.
-  await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email });
+  await createBroadcast({ subject, body, audience: label, recipients, createdBy: actor.email, actorId: actor.id });
   return redirect("/admin/broadcasts");
 }
 

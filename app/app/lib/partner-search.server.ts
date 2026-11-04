@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagues, pairs, partnerSearches, users } from "~/db/schema";
-import { audit } from "~/lib/leagues.server";
+import { auditEntry } from "~/lib/audit.server";
 
 import type { User } from "./auth/session.server";
 import { defaultSeekers, isSeeking } from "./partner-search";
@@ -48,11 +48,13 @@ export async function partnerSearchState(user: Pick<User, "id" | "email">, list:
 // The switch. Only for a registered player, in a league they can have a pair in.
 export async function setPartnerSearch(user: User, leagueId: number, seeking: boolean, list: PairLeague[]): Promise<boolean> {
   if (!user.consentAt || !list.some((l) => l.id === leagueId)) return false;
-  await db
-    .insert(partnerSearches)
-    .values({ leagueId, userId: user.id, seeking, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: [partnerSearches.leagueId, partnerSearches.userId], set: { seeking, updatedAt: new Date() } });
-  await audit(user.id, seeking ? "partner_search.on" : "partner_search.off", `league:${leagueId}`);
+  await db.batch([
+    db
+      .insert(partnerSearches)
+      .values({ leagueId, userId: user.id, seeking, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: [partnerSearches.leagueId, partnerSearches.userId], set: { seeking, updatedAt: new Date() } }),
+    auditEntry({ actorId: user.id, action: seeking ? "partner_search.on" : "partner_search.off", target: `league:${leagueId}`, leagueId }),
+  ]);
   return true;
 }
 

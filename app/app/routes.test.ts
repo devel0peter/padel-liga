@@ -20,6 +20,11 @@ describe("routes", () => {
     expect(fileFor("/admin/leagues/gyor/pairs")).toBe("routes/admin.league-pairs.tsx");
   });
 
+  it("serves the health check at /health, outside the login shell (#228)", () => {
+    expect(fileFor("/health")).toBe("routes/health.ts");
+    expect(matchRoutes(toObjects(routes as Entry[]), "/health")).toHaveLength(1);
+  });
+
   it("has no pair invite page any more: /pair/invite/<token> is a 404 (#97)", () => {
     expect(fileFor("/pair/invite/" + "a".repeat(43))).toBeNull();
   });

@@ -40,6 +40,7 @@ describe("queueRegistrationInvites", () => {
     h.sent = [];
     h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
     h.raw.exec(`insert or replace into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
+    h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
   });
 
   it("invites both addresses of a pair signup, once each", async () => {
@@ -68,7 +69,7 @@ describe("queueRegistrationInvites", () => {
     await O.queueRegistrationInvites();
     await settleBackground();
     expect(invites()).toEqual(["anna@x.hu", "bela@x.hu", "cili@x.hu"]);
-    await S.deleteSignup(id);
+    await S.deleteSignup(id, "admin");
     expect(invites()).toEqual(["bela@x.hu", "cili@x.hu"]);
   });
 

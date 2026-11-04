@@ -25,6 +25,7 @@ const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 const R = await import("~/lib/match-reminders.server");
 const O = await import("~/lib/email/outbox.server");
+const { RunBudget } = await import("~/lib/run-usage");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
@@ -137,6 +138,33 @@ describe("digest reminders (#31)", () => {
     await run(at("2026-11-11", 11, 50));
     expect(inbox("match_no_proposal")).toHaveLength(8);
     expect(mails("match_digest")).toHaveLength(8);
+  });
+
+  it("a morning run with no room left says the reminders are left for the next run, and the next run makes them (#222)", async () => {
+    const full = { run: new RunBudget({ queries: 0, calls: 50 }), keep: { queries: 0, calls: 0 } };
+    expect(await R.runMatchReminders(at("2026-11-11", 7), full, { digest: true, tomorrow: true })).toBe(
+      "match reminders: no room in this run; left for the next one",
+    );
+    expect(inbox("match_no_proposal")).toEqual([]);
+    await run(at("2026-11-11", 7, 10));
+    expect(inbox("match_no_proposal")).toHaveLength(8);
+    expect(mails("match_digest")).toHaveLength(8);
+  });
+
+  it("with no room left to mark the morning done, it says so; the next run marks it and makes nothing twice (#222)", async () => {
+    const off = { digest: false, tomorrow: false };
+    const measure = new RunBudget();
+    await R.runMatchReminders(at("2026-11-11", 7), { run: measure, keep: { queries: 0, calls: 0 } }, off);
+    const needed = measure.used().queries;
+    await freshDb();
+    const short = { run: new RunBudget({ queries: needed - 1, calls: 50 }), keep: { queries: 0, calls: 0 } };
+    expect(await R.runMatchReminders(at("2026-11-11", 7), short, off)).toBe(
+      "2 match reminders; left for the next run (run limits): the morning's done mark",
+    );
+    expect(all("select key from job_runs")).toEqual([]);
+    expect(await R.runMatchReminders(at("2026-11-11", 7, 10), undefined, off)).toBeNull();
+    expect(all("select key from job_runs")).toEqual([{ key: "morning:2026-11-11" }]);
+    expect(inbox("match_no_proposal")).toHaveLength(8);
   });
 
   it("the 07:00 run marks the morning done even with nothing due, so a later item waits for the next day's digest", async () => {

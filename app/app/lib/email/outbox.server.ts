@@ -3,6 +3,7 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { auditEntry } from "~/lib/audit.server";
 import { runAfterResponse } from "~/lib/background.server";
 import {
   accountInvites,
@@ -28,6 +29,7 @@ import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { listCities } from "~/lib/cities.server";
+import { logError, logInfo, logWarn } from "~/lib/log";
 import { listSeasons } from "~/lib/seasons.server";
 
 import {
@@ -53,7 +55,7 @@ import {
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
-// by deliver(), right away and again by the hourly cron (workers/app.ts).
+// by deliver(), right away and again by the cron (workers/app.ts).
 // deliver() stays under the daily limit; whatever doesn't fit waits for the
 // next run. Nothing waits for an Admin (#112, replaces the held outbox of
 // #88); /admin/outbox only shows the log (outboxLog).
@@ -132,7 +134,16 @@ async function enqueue(all: NewMessage[]): Promise<number[]> {
       .returning({ id: emailMessages.id });
     ids.push(...rows.map((r) => r.id));
   }
+  logQueued(messages);
   return ids;
+}
+
+// "email queued" (#227): how many of each kind, never the addresses.
+function logQueued(messages: readonly { kind: string }[]): void {
+  if (messages.length === 0) return;
+  const kinds: Record<string, number> = {};
+  for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+  logInfo("email queued", { count: messages.length, kinds });
 }
 
 export async function suppressedSet(): Promise<Set<string>> {
@@ -282,7 +293,7 @@ export type ReminderEmail =
   | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
   | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] };
 
-// Returned as insert statements for the hourly job's own D1 batch (#183):
+// Returned as insert statements for the cron's own D1 batch (#183):
 // stored together with the job's records of what it sent, and sent by the
 // job's delivery step within the run's limits. Two queries at most (the
 // suppressed addresses and the email switch).
@@ -330,18 +341,30 @@ export async function createBroadcast(input: {
   audience: string;
   recipients: Recipient[];
   createdBy: string;
+  // The Admin's account id, for the audit log (#225).
+  actorId: string;
 }): Promise<number> {
   const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
-  const [{ id }] = await db
-    .insert(broadcasts)
-    .values({
-      subject: input.subject,
-      body: input.body,
-      audience: input.audience,
-      recipients: recipients.length,
-      createdBy: input.createdBy,
-    })
-    .returning({ id: broadcasts.id });
+  const [[{ id }]] = await db.batch([
+    db
+      .insert(broadcasts)
+      .values({
+        subject: input.subject,
+        body: input.body,
+        audience: input.audience,
+        recipients: recipients.length,
+        createdBy: input.createdBy,
+      })
+      .returning({ id: broadcasts.id }),
+    auditEntry({
+      actorId: input.actorId,
+      action: "broadcast.send",
+      target: sql`'broadcast:' || (select max(${broadcasts.id}) from ${broadcasts})`,
+      // The count only: the audience label can hold the Admin's search, an email
+      // address or a name (review of #272). The target names the subject.
+      detail: `${recipients.length} recipients`,
+    }),
+  ]);
 
   const secret = emailSecret();
   const messages = await Promise.all(
@@ -464,7 +487,9 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // `only`: just these (lowercase) addresses, e.g. the partner's address a
 // player just added (#96); the same rules apply. Never to an address with an
 // account (inviteRecipients), so the email switch (#115) has nothing to skip.
-export async function queueRegistrationInvites(now = new Date(), only?: readonly string[]): Promise<number> {
+// `actorId`: the Admin who sent them from Jelentkezők, audited in the same
+// batch (#225); a player adding a partner's address isn't.
+export async function queueRegistrationInvites(now = new Date(), only?: readonly string[], actorId?: string): Promise<number> {
   const pending = (await pendingRegistrationInvites()).filter((r) => (!only || only.includes(r.email)) && toSomeone({ toEmail: r.email }));
   if (pending.length === 0) return 0;
   const claimed = await markInvited(
@@ -501,9 +526,14 @@ export async function queueRegistrationInvites(now = new Date(), only?: readonly
           .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
           .onConflictDoNothing(),
       );
+    if (actorId)
+      statements.push(
+        auditEntry({ actorId, action: "registration_invites.send", target: "signups", detail: `${recipients.length} invites` }),
+      );
     const [first, ...rest] = statements;
     const results = (await db.batch([first, ...rest])) as unknown[];
     ids = (results.slice(0, inserts) as { id: number }[][]).flat().map((r) => r.id);
+    logQueued(messages);
   } catch (e) {
     await markInvited(emails, null);
     throw e;
@@ -605,9 +635,19 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
 
   const failed = results.filter((r): r is Extract<SendResult, { ok: false }> => !r.ok);
   const errors = failed.filter((r) => !r.retryLater);
-  if (errors.length) console.error(`${errors.length} of ${rows.length} emails failed`, errors[0].error);
-  else if (failed.length) console.warn(`${failed.length} of ${rows.length} emails wait for a provider`, failed[0].error);
   const sent = rows.length - failed.length;
+  // "email sent" (#227): message ids and kinds, never the addresses; a
+  // provider's error text is scrubbed by the logger.
+  const outcome = {
+    sent,
+    failed: errors.length,
+    waiting: failed.length - errors.length,
+    kinds: [...new Set(rows.map((r) => r.kind))],
+    ids: rows.map((r) => r.id),
+  };
+  if (errors.length) logError("email failed", { ...outcome, error: errors[0].error });
+  else if (failed.length) logWarn("email waits for a provider", { ...outcome, error: failed[0].error });
+  else logInfo("email sent", outcome);
   return { sent, stop: sent === 0 || failed.some((r) => r.retryLater) };
 }
 

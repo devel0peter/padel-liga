@@ -370,6 +370,20 @@ export default function Privacy() {
                 őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
                 azt, hogy kinek, mikor és milyen tárggyal ment.
               </li>
+              <li>
+                <strong>Belépési kód:</strong> magát a kódot nem tároljuk,
+                csak egy lenyomatát, az e-mail-címeddel, a próbálkozásaid és a
+                kért kódok számával együtt. Belépéskor
+                azonnal töröljük, különben a kód lejárta után nagyjából egy
+                órával magától törlődik.
+              </li>
+              <li>
+                <strong>Technikai napló:</strong> a hibák kereséséhez a
+                szerver feljegyzi, mikor melyik oldalt kérték, mi lett a
+                válasz, és belépve a fiókod azonosítóját. Neved, e-mail-címed,
+                telefonszámod nincs benne. A Cloudflare 3 napig őrzi, utána
+                magától törlődik.
+              </li>
             </ul>
           </Section>
 

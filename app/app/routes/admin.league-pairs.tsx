@@ -41,6 +41,8 @@ import {
   isFiltered,
   PAIRS_FILTERS,
   pairsFilterCounts,
+  pairsSummary,
+  type PairsSummary,
   pairsQueryString,
   parsePairsQuery,
   type PairsFilter,
@@ -48,7 +50,7 @@ import {
 import { leaguePairsRows } from "~/lib/league-pairs-view.server";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
-import { changePartner, createPair, dissolvePair, pairCandidates } from "~/lib/pairs.server";
+import { changePartner, createPair, dissolvePair } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS, fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
@@ -78,12 +80,16 @@ async function scope(request: Request, slug: string) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, actor } = await scope(request, params.league);
   const query = parsePairsQuery(new URL(request.url).searchParams);
-  const [all, candidates] = await Promise.all([leaguePairsRows(league), pairCandidates(league.id)]);
+  const all = await leaguePairsRows(league);
+  // "Pár létrehozása" and "Csere" offer the same players as the rows without
+  // a pair: the league's (D93).
+  const candidates = all.flatMap((r) => (r.kind === "solo" ? [{ id: r.player.id, name: r.player.name, level: r.player.level }] : []));
   return {
     name: league.name,
     slug: league.slug,
     rows: filterPairsRows(all, query),
     counts: pairsFilterCounts(all, query.q),
+    summary: pairsSummary(all),
     query,
     activePairs: all.filter((r) => r.kind === "pair" && r.pair.status === "active").length,
     candidates,
@@ -169,7 +175,7 @@ function WithdrawDialog({ pair, action }: { pair: Pair; action: NonNullable<Pair
             Visszaléptetés kör közben: {a.name} – {b.name}
           </DialogTitle>
           <DialogDescription>
-            A pár a futó kör csoportjában játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
+            A pár kihirdetett csoportban játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
             lejátszottak is, a többi meccse elmarad, és a pár a szezonból is kikerül ({action.season}). Később újra
             benevezheted: a következő körtől játszik. A pár és a csoport többi párja értesítést kap az oldalon; e-mailt nem.
           </DialogDescription>
@@ -436,6 +442,44 @@ function ChangeDialog({ pair, candidates }: { pair: Pair; candidates: Candidate[
   );
 }
 
+// The counts at the top (#237): the whole league, whatever the search or the
+// filter; a label opens the list with that filter (and no search).
+function SummaryTable({ summary }: { summary: PairsSummary }) {
+  const num = (n: number | null) => (n === null ? "–" : n);
+  return (
+    <div className="w-full rounded-lg border sm:w-fit">
+      <Table className="tabular-nums">
+        <caption className="sr-only">Párok és játékosok állapot szerint</caption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Állapot</TableHead>
+            <TableHead className="text-right">Párok</TableHead>
+            <TableHead className="text-right">Játékosok</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {summary.rows.map((r) => (
+            <TableRow key={r.filter}>
+              <TableCell>
+                <Link to={`?entry=${r.filter}`} className="underline-offset-4 hover:underline">
+                  {PAIRS_FILTERS[r.filter]}
+                </Link>
+              </TableCell>
+              <TableCell className="text-right">{num(r.pairs)}</TableCell>
+              <TableCell className="text-right">{num(r.players)}</TableCell>
+            </TableRow>
+          ))}
+          <TableRow className="font-medium">
+            <TableCell>Összesen</TableCell>
+            <TableCell className="text-right">{summary.total.pairs}</TableCell>
+            <TableCell className="text-right">{summary.total.players}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 // Search by name and the entry filter, both in the address (#148).
 function Filters({ query, counts, slug, canMail, shown }: {
   query: Route.ComponentProps["loaderData"]["query"];
@@ -550,7 +594,7 @@ function PairRow({ pair: p, candidates }: { pair: Pair; candidates: Candidate[] 
 }
 
 export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
-  const { name, slug, rows, counts, query, activePairs, candidates, canMail } = loaderData;
+  const { name, slug, rows, counts, summary, query, activePairs, candidates, canMail } = loaderData;
   return (
     <AppPage
       title="Párok"
@@ -561,6 +605,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. Kör közben a csoportban
         játszó pár nem bontható fel, a kör határidejéig.
       </p>
+      <SummaryTable summary={summary} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />
       {rows.length === 0 ? (
         <p className="py-10 text-center text-muted-foreground">
@@ -568,7 +613,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table>
+          <Table aria-label="Párok listája">
             <TableHeader>
               <TableRow>
                 <TableHead>Játékosok</TableHead>

@@ -4,7 +4,7 @@ import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from "drizzle-o
 import { db } from "~/db/client.server";
 import { groups, seasonEntries, seasonPhases, seasons } from "~/db/schema";
 
-import { audit } from "./leagues.server";
+import { auditEntry, auditWhen } from "./audit.server";
 import { registrationWindow, type Season, type SeasonInput } from "./seasons";
 
 // Seasons of one league (or every league), newest first, each with its phases.
@@ -103,14 +103,12 @@ const phaseRows = (seasonId: number | SQL, phases: Phase[]) =>
 // never exists without its phases. Inside the batch nothing else writes, so
 // the newest season id is the one just inserted (AUTOINCREMENT only grows).
 export async function createSeason(leagueId: number, input: SeasonInput, phases: Phase[], actorId: string): Promise<void> {
-  const [[row]] = await db.batch([
-    db
-      .insert(seasons)
-      .values({ leagueId, ...columns(input) })
-      .returning({ id: seasons.id }),
-    db.insert(seasonPhases).values(phaseRows(sql`(select max(${seasons.id}) from ${seasons})`, phases)),
+  const newest = sql`(select max(${seasons.id}) from ${seasons})`;
+  await db.batch([
+    db.insert(seasons).values({ leagueId, ...columns(input) }),
+    db.insert(seasonPhases).values(phaseRows(newest, phases)),
+    auditEntry({ actorId, action: "season.create", target: sql`'season:' || ${newest}`, detail: input.name, leagueId }),
   ]);
-  await audit(actorId, "season.create", `season:${row!.id}`, input.name);
 }
 
 // Rewrites the season and its phases in one batch (one transaction in D1).
@@ -122,25 +120,36 @@ export async function updateSeason(id: number, input: SeasonInput, phases: Phase
       .where(eq(seasons.id, id)),
     db.delete(seasonPhases).where(eq(seasonPhases.seasonId, id)),
     db.insert(seasonPhases).values(phaseRows(id, phases)),
+    auditEntry({
+      actorId,
+      action: "season.update",
+      target: `season:${id}`,
+      detail: input.name,
+      leagueId: sql`(select ${seasons.leagueId} from ${seasons} where ${seasons.id} = ${id})`,
+    }),
   ]);
-  await audit(actorId, "season.update", `season:${id}`, input.name);
 }
 
 // Only while it has no entry but withdrawn ones and no published groups,
 // checked in the delete itself: an entry made in the meantime isn't deleted
 // with it. False if not.
 export async function deleteSeason(id: number, actorId: string): Promise<boolean> {
-  const [row] = await db
-    .delete(seasons)
-    .where(
-      and(
-        eq(seasons.id, id),
-        sql`not exists (select 1 from ${seasonEntries} where ${seasonEntries.seasonId} = ${id} and ${seasonEntries.status} <> 'withdrawn')`,
-        sql`not exists (select 1 from ${groups} where ${groups.seasonId} = ${id} and ${groups.publishedAt} is not null)`,
-      ),
-    )
-    .returning({ name: seasons.name });
-  if (!row) return false;
-  await audit(actorId, "season.delete", `season:${id}`, row.name);
-  return true;
+  const deletable = and(
+    eq(seasons.id, id),
+    sql`not exists (select 1 from ${seasonEntries} where ${seasonEntries.seasonId} = ${id} and ${seasonEntries.status} <> 'withdrawn')`,
+    sql`not exists (select 1 from ${groups} where ${groups.seasonId} = ${id} and ${groups.publishedAt} is not null)`,
+  )!;
+  // The entry first, while the season is still there to name: under the same
+  // condition as the delete, in the same transaction.
+  const [, deleted] = await db.batch([
+    auditWhen(sql`exists (select 1 from ${seasons} where ${deletable})`, {
+      actorId,
+      action: "season.delete",
+      target: `season:${id}`,
+      detail: sql`(select ${seasons.name} from ${seasons} where ${eq(seasons.id, id)})`,
+      leagueId: sql`(select ${seasons.leagueId} from ${seasons} where ${eq(seasons.id, id)})`,
+    }),
+    db.delete(seasons).where(deletable).returning({ id: seasons.id }),
+  ]);
+  return deleted.length > 0;
 }

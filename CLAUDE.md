@@ -37,10 +37,11 @@
 ## Commands (from the repo root)
 - `npm run dev`: local dev server with a local D1.
 - `npm test`: rules engine tests.
-- `npm run e2e`: end-to-end browser suite (Playwright, own local D1); needs `npx playwright install chromium` once. Runs in CI as the `e2e` job.
+- `npm run e2e`: end-to-end browser suite (Playwright, own local D1); needs `npx playwright install chromium` once. Runs in CI as the `e2e` job. Each run takes a free port (or `E2E_PORT`), so worktrees can run it at the same time; a busy `E2E_PORT` stops the run at once.
 - `npm run typecheck`, `npm run build`.
 - `npm run db:generate -w app -- --name <name>` after a schema change, then `npm run db:migrate:local -w app`.
 - `npm run db:read -w app -- "<SELECT ...>" [--local]`: one read-only query, production by default. The script refuses writes. Treat the output as personal data: don't paste emails or names into PRs or public places.
+- `npm run logs:read -w app -- [--since 1h] [--level error|warn|info] [--event "<event>"] [--request <id>] [--user <account id>] [--search "<text>"] [--limit 100] [--json]`: production logs (Cloudflare Workers Logs, kept 3 days), read-only. Needs `CF_LOGS_TOKEN` (Workers Observability token, KeePass group `PadelParbaj`, via the `core:secrets` script so the value stays out of the transcript) and `CF_ACCOUNT_ID`. Lines come from `app/app/lib/log.ts`: structured, no personal data; write new ones with `logInfo`/`logWarn`/`logError`, never with bare `console.*`.
 - Branches: `develop` is the default branch. Branch from `develop` and open PRs against `develop`. Merging into `develop` does not deploy; once CI is green and no review comment is open, agents may merge there. "CI green" means all three PR checks: `check` (typecheck, tests, build), `e2e` (browser suite, `npm run e2e`) and `commitlint`. Merging is possible while one is still pending or red, so wait for all of them. A red `e2e` has a downloadable `playwright-report` artifact (traces, screenshots) on the run.
 - Releases: `main` is production. A release is a merge of `develop` into `main` with a merge commit, done or approved by Peter only. Never push or merge to `main` yourself.
 - `npm run db:seed:local -w app`: fake data in the local D1 for the milestone 1 walkthrough (`docs/walkthrough.md`). Local only: it takes no options and refuses remote. Running it again resets its own rows.

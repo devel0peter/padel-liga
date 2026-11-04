@@ -2,9 +2,7 @@ import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagues, pairs, partnerSearches, users } from "~/db/schema";
-import { audit } from "~/lib/leagues.server";
-import { partnerFoundMessage } from "~/lib/notifications";
-import { notifyAccounts } from "~/lib/notifications.server";
+import { auditEntry } from "~/lib/audit.server";
 
 import type { User } from "./auth/session.server";
 import { defaultSeekers, isSeeking } from "./partner-search";
@@ -50,11 +48,13 @@ export async function partnerSearchState(user: Pick<User, "id" | "email">, list:
 // The switch. Only for a registered player, in a league they can have a pair in.
 export async function setPartnerSearch(user: User, leagueId: number, seeking: boolean, list: PairLeague[]): Promise<boolean> {
   if (!user.consentAt || !list.some((l) => l.id === leagueId)) return false;
-  await db
-    .insert(partnerSearches)
-    .values({ leagueId, userId: user.id, seeking, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: [partnerSearches.leagueId, partnerSearches.userId], set: { seeking, updatedAt: new Date() } });
-  await audit(user.id, seeking ? "partner_search.on" : "partner_search.off", `league:${leagueId}`);
+  await db.batch([
+    db
+      .insert(partnerSearches)
+      .values({ leagueId, userId: user.id, seeking, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: [partnerSearches.leagueId, partnerSearches.userId], set: { seeking, updatedAt: new Date() } }),
+    auditEntry({ actorId: user.id, action: seeking ? "partner_search.on" : "partner_search.off", target: `league:${leagueId}`, leagueId }),
+  ]);
   return true;
 }
 
@@ -112,16 +112,13 @@ export async function leagueSeekers(league: { id: number; city: string }): Promi
 
 // "Párba teszem" for two seekers: the active pair at once (as "Pár
 // létrehozása" on Párok, source "manual", audited), and a message in the app
-// for both. No email.
+// and an email for both (#260).
 export async function pairSeekers(
   actorId: string,
   league: { id: number; name: string },
   a: string,
   b: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const result = await createPair(actorId, league.id, a, b);
-  if (!result.ok) return result;
-  const players = await db.select({ email: users.email }).from(users).where(inArray(users.id, [a, b]));
-  await notifyAccounts("pair_intro", players.map((p) => ({ email: p.email, message: partnerFoundMessage(league.name) })));
-  return result;
+  // createPair tells both players, in the app and by email (#260).
+  return createPair(actorId, league.id, a, b);
 }

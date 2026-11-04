@@ -39,10 +39,12 @@ import { listSignups } from "~/lib/signups-admin.server";
 import { soloPairs, waitingSolos } from "~/lib/solo-pairing";
 import { pairSolos, unpairSolo } from "~/lib/solo-pairing.server";
 import { leagueSeekers, pairSeekers } from "~/lib/partner-search.server";
+import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up players who look for a partner. Registered
 // players who switched on "Párt keresek" (or whose solo signup still waits,
-// D59) become an active pair at once, with an in-app message and no email.
+// D59) become an active pair at once; both get an in-app message and an
+// email with the partner's name (#260).
 // Solos from the interest list who haven't registered yet are paired as
 // before: both get an email with each other's name and address (pairIntro),
 // and the pair forms once both have registered. No email addresses shown.
@@ -50,8 +52,8 @@ import { leagueSeekers, pairSeekers } from "~/lib/partner-search.server";
 async function scope(request: Request, slug: string) {
   const league = await getLeague(slug);
   if (!league) throw data("Nincs ilyen liga.", { status: 404 });
-  await requirePermission(request, { kind: "league.manage", league: league.slug });
-  return { league, cityName: cityName(league.city, await listCities()) };
+  const actor = await requirePermission(request, { kind: "league.manage", league: league.slug });
+  return { league, actor, cityName: cityName(league.city, await listCities()) };
 }
 
 // Only what pairing needs: no email, no admin note, no source. `status`:
@@ -99,11 +101,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { league, cityName } = await scope(request, params.league);
+  const { league, actor, cityName } = await scope(request, params.league);
   const form = await request.formData();
   if (form.get("intent") === "create") {
     const [a, b] = form.getAll("user").map(String);
-    const actor = await requirePermission(request, { kind: "league.manage", league: league.slug });
     const result = await pairSeekers(actor.id, league, a ?? "", b ?? "");
     return result.ok ? { ok: true } : { error: result.error };
   }
@@ -113,17 +114,32 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = form.get("intent");
   if (intent === "pair") {
     if (ids.length !== 2) return { error: "Pontosan két játékost válassz." };
-    const error = await pairSolos(ids[0], ids[1], league.city, cityName);
+    const error = await pairSolos(actor.id, league.id, ids[0], ids[1], league.city, cityName);
     return error ? { error } : { ok: true };
   }
   if (intent === "unpair" && ids.length === 1) {
-    await unpairSolo(ids[0], league.city);
+    await unpairSolo(actor.id, league.id, ids[0], league.city);
     return { ok: true };
   }
   throw new Response("Ismeretlen művelet.", { status: 400 });
 }
 
 type Row = Route.ComponentProps["loaderData"]["waiting"][number];
+
+// Below sm the note and the date go under the name and their columns hide
+// (#146), so nothing is cut at 390px; the desktop table is unchanged.
+const WIDE = "hidden sm:table-cell";
+
+function Folded({ note, label, at }: { note: string | null; label: string; at: Date | string }) {
+  return (
+    <div className="grid gap-0.5 text-xs whitespace-normal text-muted-foreground sm:hidden">
+      {note && <div>{note}</div>}
+      <div>
+        {label}: {formatDateTime(new Date(at))}
+      </div>
+    </div>
+  );
+}
 
 function Who({ row }: { row: Row }) {
   return (
@@ -207,7 +223,7 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                   {chosen[0].name} és {chosen[1].name}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Rögtön párban lesznek, és nevezhetnek. Az oldalon értesítést kapnak, e-mailt nem. A Párok oldalon
+                  Rögtön párban lesznek, és nevezhetnek. Az oldalon és e-mailben is szólunk nekik. A Párok oldalon
                   bonthatod fel.
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -235,8 +251,8 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                   <span className="sr-only">Kijelölés</span>
                 </TableHead>
                 <TableHead>Játékos</TableHead>
-                <TableHead>Megjegyzés</TableHead>
-                <TableHead>Párt keres</TableHead>
+                <TableHead className={WIDE}>Megjegyzés</TableHead>
+                <TableHead className={WIDE}>Párt keres</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,16 +265,17 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                       onCheckedChange={(on) => toggle(row.id, on === true)}
                     />
                   </TableCell>
-                  <TableCell className="min-w-48">
+                  <TableCell className="min-w-48 max-sm:whitespace-normal">
                     <div className="font-medium">{row.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {row.level || "Nincs szintje"}
                       {row.plays && ` · ${row.plays}`}
                       {row.fromSignup && " · egyedül jelentkezett"}
                     </div>
+                    <Folded note={row.note} label="Párt keres" at={row.since} />
                   </TableCell>
-                  <TableCell className="max-w-72 text-sm whitespace-normal">{row.note}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                  <TableCell className={cn("max-w-72 text-sm whitespace-normal", WIDE)}>{row.note}</TableCell>
+                  <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", WIDE)}>
                     {formatDateTime(new Date(row.since))}
                   </TableCell>
                 </TableRow>
@@ -354,8 +371,8 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                     <span className="sr-only">Kijelölés</span>
                   </TableHead>
                   <TableHead>Játékos</TableHead>
-                  <TableHead>Megjegyzés</TableHead>
-                  <TableHead>Jelentkezett</TableHead>
+                  <TableHead className={WIDE}>Megjegyzés</TableHead>
+                  <TableHead className={WIDE}>Jelentkezett</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -368,11 +385,12 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                         onCheckedChange={(on) => toggle(row.id, on === true)}
                       />
                     </TableCell>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={row} />
+                      <Folded note={row.note} label="Jelentkezett" at={row.createdAt} />
                     </TableCell>
-                    <TableCell className="max-w-72 text-sm whitespace-normal">{row.note}</TableCell>
-                    <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                    <TableCell className={cn("max-w-72 text-sm whitespace-normal", WIDE)}>{row.note}</TableCell>
+                    <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", WIDE)}>
                       {formatDateTime(new Date(row.createdAt))}
                     </TableCell>
                   </TableRow>
@@ -391,10 +409,13 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
               <TableBody>
                 {pairs.map(([a, b]) => (
                   <TableRow key={a.id}>
-                    <TableCell className="min-w-48">
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
                       <Who row={a} />
+                      <div className="mt-3 sm:hidden">
+                        <Who row={b} />
+                      </div>
                     </TableCell>
-                    <TableCell className="min-w-48">
+                    <TableCell className={cn("min-w-48", WIDE)}>
                       <Who row={b} />
                     </TableCell>
                     <TableCell className="text-right">

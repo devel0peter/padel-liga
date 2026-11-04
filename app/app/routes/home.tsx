@@ -27,7 +27,9 @@ import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
 import { notifyNewSignup } from "~/lib/notifications.server";
+import { turnstileError } from "~/lib/turnstile";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
+import { logError } from "~/lib/log";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -85,34 +87,30 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
   if (!result.ok) return result;
 
   // After the field checks, so a typo doesn't use up the single-use token.
-  if (!(await verifyTurnstile(form, request, "signup"))) {
-    return {
-      ok: false,
-      formError: "Nem sikerült ellenőrizni, hogy nem vagy robot. Várj pár másodpercet, és próbáld újra.",
-    };
-  }
+  const check = await verifyTurnstile(form, request, "signup");
+  if (check !== "ok") return { ok: false, formError: turnstileError(check) };
 
   try {
     await saveInterest(result.data);
   } catch (error) {
-    console.error("interest signup insert failed", error);
+    logError("interest signup insert failed", { error });
     return {
       ok: false,
       formError: "Nem sikerült elküldeni a jelentkezést. Próbáld újra pár perc múlva.",
     };
   }
   // The signup is saved; an email problem must not fail it. Anything not sent
-  // now stays queued for the hourly cron.
+  // now stays queued for the cron.
   try {
     await deliver(await queueSignupEmails(result.data));
   } catch (error) {
-    console.error("signup email failed", error);
+    logError("signup email failed", { error });
   }
   // Szervezők and Admins hear about it (in the app and by push); same rule.
   try {
     await notifyNewSignup(result.data);
   } catch (error) {
-    console.error("signup notification failed", error);
+    logError("signup notification failed", { error });
   }
   return { ok: true, cityOther: result.data.cityOther };
 }

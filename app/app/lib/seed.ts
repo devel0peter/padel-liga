@@ -110,8 +110,9 @@ export function resetStatements(): string[] {
     `delete from email_messages where ${like("to_email")}`,
     `delete from pair_invites where league_id in (${SEED_LEAGUE}) or inviter_id in (${SEED_USERS}) or ${like("invitee_email")}`,
     `delete from pairs where league_id in (${SEED_LEAGUE}) or player_a in (${SEED_USERS}) or player_b in (${SEED_USERS})`,
+    // Before the league: its system entries (actor null) go by league_id (#225).
+    `delete from audit_log where actor_id in (${SEED_USERS}) or league_id in (${SEED_LEAGUE}) or ${like("target")} or target = ${q(`league:${LEAGUE.slug}`)} or target in (select 'user:' || id from users where ${like("email")})`,
     `delete from leagues where slug = ${q(LEAGUE.slug)}`,
-    `delete from audit_log where actor_id in (${SEED_USERS}) or ${like("target")} or target = ${q(`league:${LEAGUE.slug}`)}`,
     `delete from users where ${like("email")}`,
     `delete from login_codes where ${like("email")}`,
     `delete from account_invites where ${like("email")}`,

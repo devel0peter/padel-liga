@@ -261,7 +261,8 @@ export default function Privacy() {
             <p>
               Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
               jelzést. Ilyenkor a szervező látja a neved, a szinted és azt, hogy
-              mióta keresel párt, és párba tehet egy másik párkeresővel. Ha
+              mióta keresel párt, és párba tehet egy másik párkeresővel. Erről az
+              oldalon és e-mailben is szólunk, benne a párod nevével. Ha
               egyedül jelentkeztél előre, a jelzés eleve be van kapcsolva. Bármikor
               kikapcsolhatod.
             </p>
@@ -270,8 +271,10 @@ export default function Privacy() {
           <Section title="Ha változik a párod">
             <p>
               Felbontani vagy cserélni a párt a szervező tud: írj
-              nekünk, ha változna a párod. Erről nem küldünk e-mailt, a szervező
-              szól nektek. A Párok oldalon a szervező a játékosok nevét és
+              nekünk, ha változna a párod. Ha a szervező párba tesz valakivel
+              (új pár vagy partnercsere), az oldalon és e-mailben is szólunk,
+              benne a párod nevével, az e-mail-címe és a telefonszáma nélkül. A
+              felbontásról nem küldünk e-mailt, a szervező szól nektek. A Párok oldalon a szervező a játékosok nevét és
               szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
               Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
               ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
@@ -366,6 +369,26 @@ export default function Privacy() {
                 <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
                 őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
                 azt, hogy kinek, mikor és milyen tárggyal ment.
+              </li>
+              <li>
+                <strong>Belépési kód:</strong> magát a kódot nem tároljuk,
+                csak egy lenyomatát, az e-mail-címeddel, a próbálkozásaid és a
+                kért kódok számával együtt. Belépéskor
+                azonnal töröljük, különben a kód lejárta után nagyjából egy
+                órával magától törlődik.
+              </li>
+              <li>
+                <strong>Technikai napló:</strong> a hibák kereséséhez a
+                szerver feljegyzi, mikor melyik oldalt kérték, mi lett a
+                válasz, és belépve a fiókod azonosítóját. Neved, e-mail-címed,
+                telefonszámod nincs benne. A Cloudflare 3 napig őrzi, utána
+                magától törlődik.
+              </li>
+              <li>
+                <strong>Biztonsági mentés:</strong> naponta másolat készül az
+                egész adatbázisról, a Cloudflare EU-s tárhelyén. A mentéseket 35
+                napig őrizzük, ezért a törölt vagy anonimizált adataid a
+                mentésekből is legfeljebb 35 nap alatt tűnnek el.
               </li>
             </ul>
           </Section>

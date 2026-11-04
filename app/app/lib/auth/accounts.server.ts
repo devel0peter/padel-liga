@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { auditLog, leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
+import { leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
+import { auditIfChanged } from "~/lib/audit.server";
 
 import type { ProfileInput, Sex } from "./rules";
 
@@ -23,14 +24,16 @@ export async function createUser(email: string, name = ""): Promise<string> {
 // (leagues.server.ts grantOrganizer).
 async function acceptOrganizerInvites(userId: string, email: string): Promise<void> {
   const invites = await db.select().from(leagueAdminInvites).where(eq(leagueAdminInvites.email, email));
-  for (const inv of invites) {
-    await db
-      .insert(leagueAdmins)
-      .values({ leagueId: inv.leagueId, userId, grantedBy: inv.invitedBy })
-      .onConflictDoNothing();
-    await db.insert(auditLog).values({ actorId: inv.invitedBy, action: "league_admin.grant", target: email, detail: `invite:${inv.leagueId}` });
-  }
-  if (invites.length) await db.delete(leagueAdminInvites).where(eq(leagueAdminInvites.email, email));
+  if (invites.length === 0) return;
+  // One batch: the invites go, and each grant comes with its audit entry (by
+  // account id, #225).
+  await db.batch([
+    db.delete(leagueAdminInvites).where(eq(leagueAdminInvites.email, email)),
+    ...invites.flatMap((inv) => [
+      db.insert(leagueAdmins).values({ leagueId: inv.leagueId, userId, grantedBy: inv.invitedBy }).onConflictDoNothing(),
+      auditIfChanged({ actorId: inv.invitedBy, action: "league_admin.grant", target: `user:${userId}`, detail: "invite", leagueId: inv.leagueId }),
+    ]),
+  ]);
 }
 
 // First login: the profile and the privacy consent.

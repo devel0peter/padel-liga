@@ -1,7 +1,8 @@
 // pairs.server.ts on a real SQLite with every migration applied
 // (~/test/sqlite): the organizer's create, dissolve and change partner (#97),
-// with the one-pair-per-league rule checked inside the SQL. Email is stubbed;
-// no pair change queues any.
+// with the one-pair-per-league rule checked inside the SQL. Email is stubbed:
+// a new pair (create, change partner) queues one per player (#260), nothing
+// else does.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
@@ -13,6 +14,7 @@ vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor
 vi.mock("~/lib/email/outbox.server", () => ({
   queueSeasonEntered: async (...args: any[]) => h.mails.push(args),
   queueGroupsPublished: async (...args: any[]) => h.mails.push(args),
+  queuePairCreated: async (...args: any[]) => h.mails.push(["pair_created", ...args]),
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -25,8 +27,12 @@ const { readdirSync, readFileSync, statSync } = await import(/* @vite-ignore */ 
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const NOW = new Date("2026-11-03T12:00:00Z");
+const GYOR = { id: 1, city: "gyor" };
+const DEB = { id: 2, city: "deb" };
 const one = (q: string) => h.raw.prepare(q).get();
 const all = (q: string) => h.raw.prepare(q).all();
+const inbox = () => all("select user_id, kind, url from notifications order by user_id");
+const pairMails = () => h.mails.filter((m) => m[0] === "pair_created").flatMap((m) => m[1]);
 const audits = () => all("select actor_id, action, target from audit_log where action like 'pair.%' order by id");
 
 function freshDb() {
@@ -66,6 +72,24 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.create", target: `pair:${id}` }]);
     const [oa] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
     expect(oa.pair).toEqual({ id, partnerName: "Anna" });
+  });
+
+  it("tells both players of a new pair, in the app and by email, with the partner's name (#260)", async () => {
+    await P.createPair("o", 1, "a", "b");
+    expect(inbox()).toEqual([
+      { user_id: "a", kind: "pair_intro", url: "/pair" },
+      { user_id: "b", kind: "pair_intro", url: "/pair" },
+    ]);
+    expect(pairMails()).toEqual([
+      { toEmail: "a@x.hu", input: { to: "Anna", partnerName: "Béla", league: "Padelpárbaj Győr" } },
+      { toEmail: "b@x.hu", input: { to: "Béla", partnerName: "Anna", league: "Padelpárbaj Győr" } },
+    ]);
+  });
+
+  it("a refused pair tells nobody", async () => {
+    await P.createPair("o", 1, "a", "a");
+    await P.createPair("o", 1, "a", "n");
+    expect(inbox()).toEqual([]);
     expect(h.mails).toEqual([]);
   });
 
@@ -101,15 +125,41 @@ describe("pairs.server on real SQLite (#97)", () => {
 
   it("offers registered players without an active pair in the league as candidates", async () => {
     await P.createPair("o", 1, "a", "b");
-    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["c", "d", "o"]);
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["c", "d", "o"]);
     // A dissolved pair frees them.
     await P.dissolvePair("o", 1, one("select id from pairs").id, NOW);
-    expect((await P.pairCandidates(1)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
-    expect((await P.pairCandidates(2)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+  });
+
+  it("offers only the league's players: by their signups' city, everyone without a signup (D93)", async () => {
+    const signup = (city: string, email1: string, email2: string | null = null) =>
+      h.raw
+        .prepare("insert into interest_signups (city, mode, name1, email1, email2, level, consent_at) values (?, ?, 'x', ?, ?, 'kezdo', 1)")
+        .run(city, email2 ? "pair" : "solo", email1, email2);
+    signup("gyor", "A@x.hu");
+    signup("deb", "b@x.hu", "C@X.HU");
+    signup("other", "d@x.hu");
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c", "o"]);
+    // No address leaves the server.
+    expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado" });
+  });
+
+  it("counts staff accounts like anyone else once they finished the first-login page (D93)", async () => {
+    h.raw.exec(`update users set platform_role = 'superadmin' where id = 'o'`);
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'Szervező', 1), ('t', 't@x.hu', 'Tóbiás', null)`);
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 's'), (1, 't')`);
+    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('deb', 'solo', 'x', 's@x.hu', 'kezdo', 1)`);
+    // The Admin without a signup: every league. The Szervező signed up in
+    // Debrecen: only there, although they organize Győr. Unfinished: nowhere.
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o", "s"]);
   });
 
   it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {
     await P.createPair("o", 1, "a", "b");
+    h.mails = []; // the create's own emails (#260)
     const id = one("select id from pairs").id;
     expect(await P.dissolvePair("o", 1, id, NOW)).toEqual({ ok: true });
     expect(one("select status, dissolved_by from pairs")).toEqual({ status: "dissolved", dissolved_by: "o" });
@@ -137,7 +187,12 @@ describe("pairs.server on real SQLite (#97)", () => {
       { id: 8, player_a: "a", player_b: "c", source: "manual", status: "active" },
     ]);
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.change", target: "pair:8" }]);
-    expect(h.mails).toEqual([]);
+    // The new pair hears of it (#260); Béla, who left, doesn't.
+    expect(inbox().map((n: any) => n.user_id)).toEqual(["a", "c"]);
+    expect(pairMails().map((m: any) => [m.toEmail, m.input.partnerName])).toEqual([
+      ["a@x.hu", "Cecil"],
+      ["c@x.hu", "Anna"],
+    ]);
   });
 
   it("refuses a change to the same pair, to an unregistered or a paired player, and changes nothing", async () => {

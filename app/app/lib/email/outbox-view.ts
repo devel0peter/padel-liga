@@ -16,6 +16,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   pair_invite: "Pármeghívó",
   pair_answer: "Válasz a pármeghívóra",
   pair_dissolved: "Megszűnt a pár",
+  pair_created: "Párba tett a szervező",
   season_entry_decision: "Nevezés",
   groups_published: "Kihirdetett csoportok",
   match_proposal: "Időpont-ajánlat",

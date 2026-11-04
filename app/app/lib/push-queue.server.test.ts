@@ -1,4 +1,4 @@
-// The hourly job's push queue (#183, notifications.server.ts pushQueued) on a
+// The cron's push queue (#183, notifications.server.ts pushQueued) on a
 // real SQLite: oldest first, an item only when all its devices fit the run,
 // each push once, gone devices forgotten. Push is stubbed; nothing leaves the
 // process.
@@ -41,7 +41,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const queued = () => h.raw.prepare("select user_id as user, title from notifications where push_due_at is not null order by id").all();
 
-// The queue as the hourly job fills it (notifyPlayers with queuePush).
+// The queue as the cron fills it (notifyPlayers with queuePush).
 async function queue(...users: string[]) {
   await N.notifyPlayers(
     "match_no_proposal",
@@ -117,6 +117,29 @@ describe("pushQueued (#183)", () => {
     expect(await N.pushQueued(new RunBudget())).toEqual({ pushed: 2, left: 0 });
     expect(h.pushes).toEqual([]);
     expect(queued()).toEqual([]);
+  });
+
+  it("a player with more devices than a run can push to doesn't hold up the queue: newest devices only, the skip logged (#222)", async () => {
+    // u1 gets 60 more devices, the newest last; with the three it has, more than a run's 50 calls.
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
+    for (let i = 0; i < 60; i++) device.run(`https://push.example/u1-many-${i}`, 2_000_000_000 + i);
+    await queue("u1", "u2");
+    const warnings: any[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: any) => void warnings.push(line));
+    try {
+      // As the cron calls it: the email step's room kept (DELIVER_MIN).
+      expect(await N.pushQueued(new RunBudget(), { queries: 5, calls: 3 })).toEqual({ pushed: 2, left: 0 });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(h.pushes.filter((p) => p.startsWith("https://push.example/u2 "))).toHaveLength(1);
+    const u1 = h.pushes.filter((p) => p.startsWith("https://push.example/u1"));
+    expect(u1.map((p) => p.split(" ")[0]).sort()).toEqual(
+      Array.from({ length: N.MAX_PUSH_DEVICES }, (_, i) => `https://push.example/u1-many-${59 - i}`).sort(),
+    );
+    expect(warnings).toEqual([
+      expect.objectContaining({ level: "warn", event: "push devices skipped", notificationId: 1, devices: 63, pushed: N.MAX_PUSH_DEVICES }),
+    ]);
   });
 
   it("an item claimed by an overlapping run is not pushed again", async () => {

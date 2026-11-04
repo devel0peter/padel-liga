@@ -102,6 +102,22 @@ describe("Párok search and filter (#148)", () => {
     expect((await pairsPage("?q=kovacs", cookie)).query).toEqual({ entry: null, q: "kovacs" });
   });
 
+  it("the counts table covers the whole league, whatever the search or filter (#237)", async () => {
+    const cookie = await cookieFor("szervezo", "player", 1);
+    const all = await pairsPage("", cookie);
+    // Solos: Ákos, Edit, Boglárka, Ferenc and the Szervező's own account.
+    expect(all.summary.rows.map((r: any) => [r.filter, r.pairs, r.players])).toEqual([
+      ["entered", 1, 2],
+      ["not_entered", 1, 2],
+      ["rejected", 0, 0],
+      ["withdrawn", 0, 0],
+      ["no_pair", null, 5],
+      ["dissolved", 1, null],
+    ]);
+    expect(all.summary.total).toEqual({ pairs: 2, players: 9 });
+    expect((await pairsPage("?q=kovacs&entry=entered", cookie)).summary).toEqual(all.summary);
+  });
+
   it("shows no email address or phone number anywhere", async () => {
     const page = await pairsPage("?entry=not_in_league", await cookieFor("admin", "superadmin"));
     expect(JSON.stringify(page)).not.toContain("@");

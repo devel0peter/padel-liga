@@ -2,13 +2,13 @@
 // (~/test/sqlite): the "Párt keresek" switch and the Párkeresők list (D59).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any, notified: [] as unknown[] }));
+const h = vi.hoisted(() => ({ raw: null as any, notified: [] as unknown[], mailed: [] as unknown[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
-vi.mock("~/lib/email/outbox.server", () => ({}));
-vi.mock("~/lib/notifications.server", () => ({ notifyAccounts: async (...args: unknown[]) => void h.notified.push(args) }));
+vi.mock("~/lib/email/outbox.server", () => ({ queuePairCreated: async (...args: unknown[]) => void h.mailed.push(args) }));
+vi.mock("~/lib/notifications.server", () => ({ notifyPlayers: async (...args: unknown[]) => void h.notified.push(args) }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const S = await import("~/lib/partner-search.server");
@@ -21,6 +21,7 @@ const ids = async () => (await S.leagueSeekers(LEAGUE)).map((s) => s.id);
 beforeEach(() => {
   h.raw = migratedDatabase();
   h.notified = [];
+  h.mailed = [];
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
   h.raw.exec(`insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
   for (const [id, name, level] of [
@@ -67,14 +68,16 @@ describe("Párt keresek on real SQLite (D59)", () => {
     expect(h.raw.prepare("select count(*) as n from partner_searches").get()).toEqual({ n: 0 });
   });
 
-  it("pairs two seekers at once, with a message and no email, and they leave the list", async () => {
+  it("pairs two seekers at once, with a message and an email (#260), and they leave the list", async () => {
     await S.setPartnerSearch(user("a"), 1, true, [GYOR]);
     expect(await S.pairSeekers("org", LEAGUE, "a", "c")).toEqual({ ok: true });
     expect(h.raw.prepare("select player_a, player_b, source, status from pairs").all()).toEqual([
       { player_a: "a", player_b: "c", source: "manual", status: "active" },
     ]);
     expect(h.notified).toHaveLength(1);
-    expect((h.notified[0] as any)[1].map((m: any) => m.email).sort()).toEqual(["a@x.hu", "c@x.hu"]);
+    expect((h.notified[0] as any)[1].map((m: any) => m.userId).sort()).toEqual(["a", "c"]);
+    expect(h.mailed).toHaveLength(1);
+    expect((h.mailed[0] as any)[0].map((m: any) => m.toEmail).sort()).toEqual(["a@x.hu", "c@x.hu"]);
     expect(await ids()).toEqual([]);
     // A second try with one of them refuses, as on Párok.
     expect((await S.pairSeekers("org", LEAGUE, "a", "b")).ok).toBe(false);

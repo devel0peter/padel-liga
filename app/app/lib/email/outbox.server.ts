@@ -39,6 +39,7 @@ import {
   matchProposal,
   matchResult,
   matchTomorrow,
+  pairCreated,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -198,6 +199,20 @@ export async function queuePairIntros(a: PairIntroPerson, b: PairIntroPerson, ci
     .filter(([to]) => !suppressed.has(to.email.toLowerCase()))
     .map(([to, partner]) => ({ kind: "pair_intro", toEmail: to.email, ...pairIntro(to, partner, city) }));
   return enqueue(messages);
+}
+
+// An organizer put two registered players in a pair (#260): one email each,
+// sent right away as transactional mail. Unsubscribed or bounced addresses,
+// and players who switched email off (#115), get nothing; the pair still
+// shows in the app.
+export async function queuePairCreated(
+  messages: { toEmail: string; input: Parameters<typeof pairCreated>[0] }[],
+): Promise<void> {
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map((m): NewMessage => ({ kind: "pair_created", toEmail: m.toEmail, ...pairCreated(m.input) }));
+  await deliverNow(await enqueue(queued));
 }
 
 // A login code goes out at once, ahead of broadcasts (transactional budget).

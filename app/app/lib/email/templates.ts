@@ -175,6 +175,27 @@ export function pairIntro(to: PairIntroPerson, partner: PairIntroPerson, city: s
   );
 }
 
+// An organizer put two registered players in a pair (Párkeresők, Párok or
+// "Partner cseréje", #260): each gets the partner's name, never an email or
+// phone, and the way to Párom, where they enter the season. Names stay plain
+// text.
+export function pairCreated(input: { to: string; partnerName: string; league: string }): Email {
+  const pairPage = `${SITE_URL}/pair`;
+  return buildPlain(
+    `Van párod – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `A szervező párba tett: a párod ${input.partnerName} (${input.league}).`,
+      `A Párom oldalon látod a párodat, és ott tudtok nevezni a szezonra:`,
+      pairPage,
+      `Ha valami nem stimmel, válaszolj erre a levélre.`,
+      SIGNATURE,
+    ],
+    [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert a szervező párba tett a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
 // "{nev}" in the subject or body is replaced with the recipient's name.
 export const NAME_PLACEHOLDER = "{nev}";
 

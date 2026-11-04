@@ -18,7 +18,9 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   const [boglarka, akos] = WAITING_SOLOS;
   // Two players whose signup partner never registers: no pair yet.
   await registerAll(browser, [torok, lakatos]);
-  const emailsBefore = d1("select count(*) as n from email_messages");
+  const OTHER = "select count(*) as n from email_messages where kind != 'pair_created'";
+  const emailsBefore = d1(OTHER);
+  const pairMailsBefore = d1("select max(id) as id from email_messages")[0].id ?? 0;
 
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta/pairs");
@@ -28,6 +30,7 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await page.getByRole("button", { name: "Pár létrehozása" }).click();
   await pick(page, "Első játékos", torok);
   await pick(page, "Második játékos", lakatos);
+  await expect(page.getByRole("dialog")).toContainText("e-mailben is szólunk nekik");
   await page.getByRole("dialog").getByRole("button", { name: "Létrehozás" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(row(page, torok, lakatos)).toContainText("kézzel");
@@ -102,6 +105,12 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await expect(fresh).toContainText(/Nevezés \(.+\): Visszavonva/);
   await context.close();
 
-  // No email for a pair change or an entry change.
-  expect(d1("select count(*) as n from email_messages")).toEqual(emailsBefore);
+  // A new pair (create, partner change) emails both its players (#260);
+  // nothing else here sends one: not the dissolve, not Lakatos who left, not
+  // an entry change.
+  const pairMails = d1(`select lower(to_email) as to_email from email_messages where kind = 'pair_created' and id > ${pairMailsBefore}`);
+  expect(pairMails.map((r) => r.to_email).sort()).toEqual(
+    [torok.email, lakatos.email, torok.email, boglarka.email].map((e) => e.toLowerCase()).sort(),
+  );
+  expect(d1(OTHER)).toEqual(emailsBefore);
 });

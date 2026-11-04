@@ -11,6 +11,7 @@ import {
   matchTomorrow,
   matchProposal,
   matchResult,
+  pairCreated,
   pairIntro,
   partnerNotice,
   registrationInvite,
@@ -490,5 +491,29 @@ describe("daily digest and holnap meccs (#31, spec 13)", () => {
     expect(email.text).toContain("Helyszín: Ace Padel, 2-es pálya");
     expect(email.text).toContain("https://padelparbaj.hu/matches/7");
     expect(matchTomorrow({ to: "Anna", opponents: "X és Y", matchId: 7, slot, venue: null }).text).toContain("A helyszínt még nem rögzítettétek");
+  });
+});
+
+describe("pairCreated (#260)", () => {
+  const input = { to: "Nagy Anna", partnerName: "Kovács Béla", league: "Padelpárbaj Győr" };
+
+  it("names the partner and the league, and links Párom", () => {
+    const e = pairCreated(input);
+    expect(e.subject).toBe("Van párod – Padelpárbaj");
+    expect(e.text).toContain("Szia Nagy Anna!");
+    expect(e.text).toContain("A szervező párba tett: a párod Kovács Béla (Padelpárbaj Győr).");
+    expect(e.text).toContain("https://padelparbaj.hu/pair");
+    expect(e.html).toContain('href="https://padelparbaj.hu/pair"');
+  });
+
+  it("never carries an email address or phone number besides ours", () => {
+    const e = pairCreated(input);
+    const addresses = (e.text.match(/[\w.+-]+@[\w.-]+/g) ?? []).filter((a) => !a.startsWith("hello@") && !a.startsWith("info@"));
+    expect(addresses).toEqual([]);
+    expect(e.text).not.toMatch(/\+36/);
+  });
+
+  it("escapes names in the HTML", () => {
+    expect(pairCreated({ ...input, partnerName: "<b>Béla</b>" }).html).toContain("&lt;b&gt;Béla&lt;/b&gt;");
   });
 });

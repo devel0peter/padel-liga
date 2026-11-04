@@ -196,7 +196,7 @@ async function enter(
 }
 
 // Both players of the pair, with what the notices need.
-async function pairPlayers(pairId: number) {
+export async function pairPlayers(pairId: number) {
   const [row] = await db
     .select({
       league: leagues.name,

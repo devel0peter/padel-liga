@@ -243,6 +243,16 @@ export async function queuedNotifications(
 
 // Rows looked at per round of pushQueued (one subscription lookup each).
 const PUSH_ROUND = ID_CHUNK;
+// The most devices one queued item is pushed to: its player's newest ones
+// (#222, D97). An item goes only when all its devices fit the run, so without
+// a cap a player with more devices than a run can push to would stop the
+// queue for good. Well inside a run's calls with the email step's room kept
+// (hourly-job.limits.server.test.ts).
+export const MAX_PUSH_DEVICES = 10;
+
+// The newest devices first, at most MAX_PUSH_DEVICES.
+const newestDevices = (subs: Subscription[]) =>
+  [...subs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.endpoint < b.endpoint ? 1 : -1)).slice(0, MAX_PUSH_DEVICES);
 // What one round costs at most besides the pushes: the queue, the devices,
 // the claim and forgetting gone devices.
 const PUSH_ROUND_QUERIES = 4;
@@ -251,7 +261,8 @@ const PUSH_ROUND_QUERIES = 4;
  * Pushes the queued items, oldest first, as many as fit the run (`budget`)
  * while keeping `keep` for the steps after it. Each item is taken off the
  * queue (claimed) before its push goes out, so an overlapping run can't push
- * it twice; an item goes only when all its devices fit. Returns how many
+ * it twice; an item goes only when all its devices fit (its player's newest
+ * MAX_PUSH_DEVICES, the others skipped and logged, #222). Returns how many
  * items were pushed and how many still wait.
  */
 export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, calls: 0 }): Promise<{ pushed: number; left: number }> {
@@ -266,7 +277,8 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
       .orderBy(asc(notifications.pushDueAt), asc(notifications.id))
       .limit(PUSH_ROUND);
     if (queue.length === 0) break;
-    const subs = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
+    const all = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
+    const subs = new Map([...all].map(([userId, list]) => [userId, newestDevices(list)]));
     let calls = budget.left().calls - keep.calls;
     const taken: typeof queue = [];
     for (const n of queue) {
@@ -294,6 +306,10 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
       ).map((r) => r.id),
     );
     const sending = taken.filter((n) => claimed.has(n.id));
+    for (const n of sending) {
+      const devices = all.get(n.userId)?.length ?? 0;
+      if (devices > MAX_PUSH_DEVICES) logWarn("push devices skipped", { userId: n.userId, notificationId: n.id, devices, pushed: MAX_PUSH_DEVICES });
+    }
     if (vapid) {
       const { gone } = await sendPushes(
         sending.flatMap((n) => (subs.get(n.userId) ?? []).map((s) => ({ s, id: n.id, message: n }))),

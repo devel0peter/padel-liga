@@ -119,6 +119,29 @@ describe("pushQueued (#183)", () => {
     expect(queued()).toEqual([]);
   });
 
+  it("a player with more devices than a run can push to doesn't hold up the queue: newest devices only, the skip logged (#222)", async () => {
+    // u1 gets 60 more devices, the newest last; with the three it has, more than a run's 50 calls.
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
+    for (let i = 0; i < 60; i++) device.run(`https://push.example/u1-many-${i}`, 2_000_000_000 + i);
+    await queue("u1", "u2");
+    const warnings: any[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: any) => void warnings.push(line));
+    try {
+      // As the cron calls it: the email step's room kept (DELIVER_MIN).
+      expect(await N.pushQueued(new RunBudget(), { queries: 5, calls: 3 })).toEqual({ pushed: 2, left: 0 });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(h.pushes.filter((p) => p.startsWith("https://push.example/u2 "))).toHaveLength(1);
+    const u1 = h.pushes.filter((p) => p.startsWith("https://push.example/u1"));
+    expect(u1.map((p) => p.split(" ")[0]).sort()).toEqual(
+      Array.from({ length: N.MAX_PUSH_DEVICES }, (_, i) => `https://push.example/u1-many-${59 - i}`).sort(),
+    );
+    expect(warnings).toEqual([
+      expect.objectContaining({ level: "warn", event: "push devices skipped", notificationId: 1, devices: 63, pushed: N.MAX_PUSH_DEVICES }),
+    ]);
+  });
+
   it("an item claimed by an overlapping run is not pushed again", async () => {
     await queue("u2");
     await Promise.all([N.pushQueued(new RunBudget()), N.pushQueued(new RunBudget())]);

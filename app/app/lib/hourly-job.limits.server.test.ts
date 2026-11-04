@@ -40,6 +40,8 @@ vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor",
 const { migratedDatabase } = await import("~/test/sqlite");
 const { RunBudget, RUN_LIMITS } = await import("~/lib/run-usage");
 const G = await import("~/lib/groups.server");
+const { MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
+const { DELIVER_MIN } = await import("~/lib/email/outbox.server");
 const { runHourlyJob } = await import("~/lib/hourly-job.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -146,6 +148,10 @@ describe("the cron within the run limits (#183)", () => {
     // A run that left work logs how much.
     const results = lines.filter((l) => l.event === "cron step").map((l) => l.result ?? "");
     expect(results.some((l) => /^pushed \d+ notifications; \d+ left for the next run \(run limits\)$/.test(l))).toBe(true);
+  });
+
+  it("one item's devices (capped, #222) always fit a run with the email step's room kept", () => {
+    expect(MAX_PUSH_DEVICES).toBeLessThanOrEqual(RUN_LIMITS.calls - DELIVER_MIN.calls);
   });
 
   it("a second morning run makes nothing again", async () => {

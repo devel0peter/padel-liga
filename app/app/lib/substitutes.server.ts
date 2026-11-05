@@ -121,7 +121,7 @@ export type SubstitutePanel = {
   open: boolean;
   closesAt: Date;
   // Approved substitutes of both pairs: every player of the match sees them.
-  approved: { ours: boolean; absent: string; substitute: string }[];
+  approved: { id: number; ours: boolean; absent: string; substitute: string }[];
   // The own pair's requests not approved (waiting, rejected, withdrawn, revoked), newest first.
   ours: { id: number; absent: string; substitute: string; status: SubstituteStatus; label: string; reason: string | null; canWithdraw: boolean }[];
   // The form, while the window is open and a player of the pair has no live
@@ -145,7 +145,7 @@ export async function substitutePanel(ctx: MatchContext, side: Side, userId: str
     closesAt,
     approved: rows
       .filter((r) => r.status === "approved")
-      .map((r) => ({ ours: r.pairId === ours.pairId, absent: r.absentName, substitute: r.substituteName })),
+      .map((r) => ({ id: r.id, ours: r.pairId === ours.pairId, absent: r.absentName, substitute: r.substituteName })),
     // An approved one is in `approved` already.
     ours: rows
       .filter((r) => r.pairId === ours.pairId && r.status !== "approved")

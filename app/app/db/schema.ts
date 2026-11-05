@@ -914,12 +914,15 @@ export const matchSubstitutes = sqliteTable(
     pairId: integer("pair_id")
       .notNull()
       .references(() => pairs.id, { onDelete: "cascade" }),
+    // Restrict: who played stays resolvable (Elo). An account named here in
+    // an approved request counts as history and is anonymized, never removed
+    // (account-deletion.server.ts, D60); a removal deletes its other requests.
     absentId: text("absent_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     substituteId: text("substitute_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     status: text("status", { enum: ["requested", "approved", "rejected", "withdrawn", "revoked"] }).notNull().default("requested"),
     requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
     requestedAt: integer("requested_at", { mode: "timestamp" }).notNull(),
@@ -931,6 +934,10 @@ export const matchSubstitutes = sqliteTable(
   (t) => [
     uniqueIndex("match_substitutes_live_idx")
       .on(t.matchId, t.absentId)
+      .where(sql`${t.status} in ('requested', 'approved')`),
+    // A person is named once per match.
+    uniqueIndex("match_substitutes_live_substitute_idx")
+      .on(t.matchId, t.substituteId)
       .where(sql`${t.status} in ('requested', 'approved')`),
     index("match_substitutes_match_idx").on(t.matchId),
     index("match_substitutes_status_idx").on(t.status),

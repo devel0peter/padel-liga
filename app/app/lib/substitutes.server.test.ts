@@ -169,6 +169,16 @@ describe("asking for a substitute (#37 requirement 1)", () => {
     expect(await S.requestSubstitute("e", 1, { absentId: "e", substituteId: "s" }, NOW)).toMatchObject({ ok: false, notFound: true });
   });
 
+  it("names a person once per match even when two requests race (unique index)", async () => {
+    await asked("b", "s");
+    expect(() =>
+      h.raw.exec("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (1, 2, 'd', 's', 'requested', 1)"),
+    ).toThrow(/UNIQUE constraint failed: match_substitutes/);
+    // A rejected or withdrawn one doesn't hold the name.
+    h.raw.exec("update match_substitutes set status = 'withdrawn'");
+    await asked("d", "s", "c");
+  });
+
   it("lets only the asker withdraw it, while it waits", async () => {
     const id = await asked();
     expect(await S.withdrawSubstitute("b", 1, id)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_requester });
@@ -224,8 +234,8 @@ describe("approving, rejecting and revoking (#37 requirement 2, D91)", () => {
     expect(told.find((n) => n.user_id === "c").body).toBe("Játékos B helyett Játékos S játszik a meccseteken.");
     // The substitute gets nothing (D109).
     expect(all("select * from notifications where user_id = 's'")).toEqual([]);
-    expect((await panel("c")).approved).toEqual([{ ours: false, absent: "Játékos B", substitute: "Játékos S" }]);
-    expect((await panel("a")).approved).toEqual([{ ours: true, absent: "Játékos B", substitute: "Játékos S" }]);
+    expect((await panel("c")).approved).toEqual([{ id, ours: false, absent: "Játékos B", substitute: "Játékos S" }]);
+    expect((await panel("a")).approved).toEqual([{ id, ours: true, absent: "Játékos B", substitute: "Játékos S" }]);
     // The opponents don't see the other pair's requests themselves.
     expect((await panel("c")).ours).toEqual([]);
     // Nor the asking pair twice: the approval is listed once, in `approved`.

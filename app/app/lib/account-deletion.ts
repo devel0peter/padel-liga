@@ -4,7 +4,8 @@
 //
 // - Without history the account goes completely, with everything tied to it.
 // - With history (a pair of theirs was placed in a published group, which is
-//   also where every match comes from) it is anonymized: the name becomes
+//   also where every match comes from, or they were an approved substitute
+//   in a match, #37) it is anonymized: the name becomes
 //   "Törölt játékos" and the contact data, login methods, sessions and
 //   devices go, so other players' groups and results don't change.
 // - Never while a pair of theirs plays in a published group whose phase

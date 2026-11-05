@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "409eb766-100e-4cbd-b0c8-105df8bee97f",
+  "id": "7ba1211e-f429-4b0f-81c4-13d00b7df6f2",
   "prevId": "935ad8f8-e1e3-4926-8d77-96916cc57e08",
   "tables": {
     "account_invites": {
@@ -1694,6 +1694,15 @@
           "isUnique": true,
           "where": "\"match_substitutes\".\"status\" in ('requested', 'approved')"
         },
+        "match_substitutes_live_substitute_idx": {
+          "name": "match_substitutes_live_substitute_idx",
+          "columns": [
+            "match_id",
+            "substitute_id"
+          ],
+          "isUnique": true,
+          "where": "\"match_substitutes\".\"status\" in ('requested', 'approved')"
+        },
         "match_substitutes_match_idx": {
           "name": "match_substitutes_match_idx",
           "columns": [
@@ -1746,7 +1755,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "match_substitutes_substitute_id_users_id_fk": {
@@ -1759,7 +1768,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "match_substitutes_requested_by_users_id_fk": {

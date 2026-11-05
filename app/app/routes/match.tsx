@@ -376,7 +376,7 @@ function SubstituteSection({ s, deadline, result }: { s: SubstitutePanel; deadli
         {s.approved.length > 0 && (
           <ul className="grid gap-1 text-sm" aria-label="Jóváhagyott helyettesek">
             {s.approved.map((a) => (
-              <li key={`${a.absent}-${a.substitute}`}>
+              <li key={a.id}>
                 <span className="font-medium">{substituteLine(a)}</span> játszik {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
               </li>
             ))}

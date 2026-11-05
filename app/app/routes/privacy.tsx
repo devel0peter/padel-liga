@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 02.";
+const EFFECTIVE_FROM = "2026. 11. 05.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({

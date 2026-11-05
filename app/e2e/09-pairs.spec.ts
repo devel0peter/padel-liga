@@ -95,6 +95,8 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await visit(player.page, "/pair");
   await expect(content(player.page)).toContainText(boglarka.name);
   await expect(content(player.page)).toContainText("Beneveztetek: a 2. körtől játszotok.");
+  // A paired player still reads that they can write to us if the pair should change (#124).
+  await expect(content(player.page)).toContainText("Ha változna, írj nekünk: hello@padelparbaj.hu");
   await visit(player.page, "/notifications");
   await expect(content(player.page)).toContainText("A szervező kivett titeket a szezonból");
   await expect(content(player.page)).toContainText("A szervező benevezett titeket");

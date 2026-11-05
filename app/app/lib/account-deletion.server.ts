@@ -12,6 +12,7 @@ import {
   leagueAdminInvites,
   leagueAdmins,
   loginCodes,
+  matchSubstitutes,
   notificationOptOuts,
   groupPairs,
   notifications,
@@ -61,13 +62,18 @@ function inPublishedGroup(u: SQLWrapper | string, now?: Date) {
     where (p.player_a = ${u} or p.player_b = ${u}) and g.published_at is not null ${running})`;
 }
 
+// An approved substitute appearance of `u` (#37): history too, so the Elo
+// replay can still tell who played.
+const approvedSubstitute = (u: SQLWrapper | string) =>
+  sql`exists (select 1 from match_substitutes ms where ms.substitute_id = ${u} and ms.status = 'approved')`;
+
 // Who has history and who plays now, for every account at once (whole
 // tables, no id lists: D1 binds at most 100 parameters).
 export async function deletionFacts(now = new Date()): Promise<DeletionFacts> {
   const rows = await db
     .select({ id: users.id, playing: sql<number>`${inPublishedGroup(users.id, now)}` })
     .from(users)
-    .where(and(isNull(users.deletedAt), inPublishedGroup(users.id)));
+    .where(and(isNull(users.deletedAt), or(inPublishedGroup(users.id), approvedSubstitute(users.id))));
   return { history: new Set(rows.map((r) => r.id)), playing: new Set(rows.filter((r) => !!r.playing).map((r) => r.id)) };
 }
 
@@ -218,7 +224,11 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
 // them (entries, draft group places, sessions, login methods, devices,
 // notifications, pair links, partner search). If a pair of theirs got into a
 // published group in the meantime it stays, and the account's delete fails
-// on its foreign key, so the whole batch rolls back.
+// on its foreign key, so the whole batch rolls back. Their substitute
+// requests (#37) that were not approved go with them (a waiting one simply
+// disappears from the match page and Helyettesek; the pair can ask for
+// someone else); an approval in the meantime stays and fails the delete the
+// same way (restrict).
 async function remove(actorId: string, userId: string, email: string, mail: MailContext): Promise<boolean> {
   const theirPairs = db
     .select({ id: pairs.id })
@@ -240,6 +250,7 @@ async function remove(actorId: string, userId: string, email: string, mail: Mail
               where gp.pair_id = ${pairs.id} and g.published_at is not null)`,
           ),
         ),
+      db.delete(matchSubstitutes).where(and(eq(matchSubstitutes.substituteId, userId), ne(matchSubstitutes.status, "approved"))),
       db.delete(users).where(eq(users.id, userId)),
       auditIfChanged({ actorId, action: "account.delete", target: `user:${userId}` }),
       ...personalDataStatements(userId, email, mail, sql`1`),
@@ -286,6 +297,12 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
       .update(groupPairs)
       .set({ withdrawalReason: null })
       .where(and(isNotNull(groupPairs.withdrawalReason), inArray(groupPairs.pairId, theirPairs), guard)),
+    // The organizer's reason for rejecting or revoking a substitute (#37) is
+    // free text about the pair too (an absence, an injury): gone with it.
+    db
+      .update(matchSubstitutes)
+      .set({ reason: null })
+      .where(and(isNotNull(matchSubstitutes.reason), inArray(matchSubstitutes.pairId, theirPairs), guard)),
   ];
 }
 

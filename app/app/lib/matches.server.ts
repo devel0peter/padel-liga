@@ -516,8 +516,9 @@ export const noWithdrawnPair = sql`not exists (select 1 from group_pairs gp wher
 
 // The match page for a player of either pair; null for anyone else, or a
 // match that doesn't exist (the page answers 404 either way).
-export async function matchPage(matchId: number, userId: string, now = new Date()): Promise<MatchPage | null> {
-  const ctx = await loadMatch(matchId);
+// `loaded`: the match, when the caller already loaded it.
+export async function matchPage(matchId: number, userId: string, now = new Date(), loaded?: MatchContext): Promise<MatchPage | null> {
+  const ctx = loaded ?? (await loadMatch(matchId));
   if (!ctx) return null;
   const side = sideOf(ctx, userId);
   if (!side) return null;

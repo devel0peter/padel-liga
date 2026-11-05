@@ -42,6 +42,7 @@ const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
 const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
+const SUBSTITUTES = await import("~/lib/substitutes.server");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs.
@@ -143,6 +144,9 @@ const STEPS: Step[] = [
   { action: "groups.draft", actor: ORG, run: () => expectOk(GROUPS.generateDraft(1, ORG)) },
   { action: "groups.move", actor: ORG, run: () => expectOk(GROUPS.moveDraftPair(1, firstPairOfGroup(1), 2, ORG)) },
   { action: "groups.publish", actor: ORG, run: () => expectOk(GROUPS.publishGroups(1, ORG, PUBLISHED)) },
+  { action: "substitute.approve", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "approve", "", IN_PHASE))) },
+  { action: "substitute.revoke", actor: ORG, run: () => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, lastRequest(), "revoke", "Mégsem.", IN_PHASE)) },
+  { action: "substitute.reject", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "reject", "", IN_PHASE))) },
   {
     action: "match.decide",
     actor: ORG,
@@ -194,6 +198,15 @@ const springId = () => one("select id from seasons where name like 'Tavasz%'").i
 const pairOf = (player: string) => one("select id from pairs where player_a = ? order by id desc", player).id as number;
 const firstPairOfGroup = (n: number) => one("select gp.pair_id from group_pairs gp join groups g on g.id = gp.group_id where g.number = ? order by gp.seed", n).pair_id as number;
 const matchIds = () => all("select id from matches order by id").map((r: any) => r.id as number);
+// A player of the third match's first pair asks for q1 (free, no signup)
+// instead of their partner; no entry of its own (a player's step).
+const lastRequest = () => one("select max(id) as id from match_substitutes").id as number;
+async function substituteRequest(): Promise<number> {
+  const id = matchIds()[2]!;
+  const p = one("select p.player_a, p.player_b from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+  await expectOk(SUBSTITUTES.requestSubstitute(p.player_a, id, { absentId: p.player_b, substituteId: "q1" }, IN_PHASE));
+  return lastRequest();
+}
 async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
   expect(await p).toMatchObject({ ok: true });
 }
@@ -217,6 +230,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.match-decide.tsx": ["match.decide"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
   "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
+  "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
 };
 
@@ -245,7 +259,7 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/@/);
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/\+?36\d{6,}/);
     }
-    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|strike)\./.test(r.action));
+    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|strike|substitute)\./.test(r.action));
     for (const r of leagueActions) expect(r.league_id, r.action).not.toBeNull();
   });
 

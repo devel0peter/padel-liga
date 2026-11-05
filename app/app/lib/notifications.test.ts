@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   channelEnabled,
+  substituteAnnouncedMessage,
+  substituteDecidedMessage,
+  substituteRequestedMessage,
+  substituteRevokedMessage,
   channelKey,
   followsEmailSwitch,
   groupsPublishedMessage,
@@ -36,10 +40,10 @@ import {
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers new signups and disputed results to Szervezők and Admins only", () => {
+  it("offers new signups, disputed results and substitute requests to Szervezők and Admins only", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed", "substitute_requested"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed", "substitute_requested"]);
   });
 });
 
@@ -364,5 +368,32 @@ describe("pairWithdrawnMessage (#34)", () => {
 
   it("is not a digest item (no email, ever)", () => {
     expect(DIGEST_KINDS).not.toContain("pair_withdrawn");
+  });
+});
+
+describe("substitute notices (#37, D109)", () => {
+  const n = { matchId: 7, substitute: "Nagy Béla", absent: "Kiss Anna" };
+
+  it("tells the organizers without names, linking to Helyettesek", () => {
+    expect(substituteRequestedMessage({ leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 2 })).toEqual({
+      title: "Helyettes kérés · Padelpárbaj Győr",
+      body: "Egy pár helyettest kér a 2. heti meccsére. A jóváhagyás rád vár.",
+      url: "/admin/leagues/gyor/substitutes",
+    });
+  });
+
+  it("tells the asking pair the decision, never the reason", () => {
+    expect(substituteDecidedMessage({ ...n, approved: true })).toMatchObject({ title: "Jóváhagyták a helyettest", url: "/matches/7" });
+    expect(substituteDecidedMessage({ ...n, approved: false }).body).toBe("Nagy Béla nem játszhat Kiss Anna helyett. A részleteket a meccs oldalán látod.");
+  });
+
+  it("tells the opponents who plays, and when it's revoked", () => {
+    expect(substituteAnnouncedMessage(n).body).toBe("Kiss Anna helyett Nagy Béla játszik a meccseteken.");
+    expect(substituteRevokedMessage({ ...n, ours: false }).body).toBe("Kiss Anna helyett mégsem Nagy Béla játszik a meccseteken.");
+    expect(substituteRevokedMessage({ ...n, ours: true }).body).toMatch(/^Nagy Béla mégsem játszhat Kiss Anna helyett/);
+  });
+
+  it("are not digest items (no email, D83)", () => {
+    for (const kind of ["substitute_approved", "substitute_rejected", "substitute_revoked"] as const) expect(DIGEST_KINDS).not.toContain(kind);
   });
 });

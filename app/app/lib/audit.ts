@@ -49,6 +49,9 @@ export const AUDIT_ACTIONS = {
   "result.auto_accept": "Eredmény automatikus elfogadása",
   "match.deadline": "Határidős döntés",
   "strike.cancel": "Fekete pont törlése",
+  "substitute.approve": "Helyettes jóváhagyása",
+  "substitute.reject": "Helyettes elutasítása",
+  "substitute.revoke": "Helyettes visszavonása",
   // Emails and reminders
   "broadcast.send": "Körlevél küldése",
   "registration_invites.send": "Regisztrációs meghívók",

@@ -12,3 +12,4 @@ export * from "./seeding";
 export * from "./slots";
 export * from "./standings";
 export * from "./strikes";
+export * from "./substitutes";

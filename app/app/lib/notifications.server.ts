@@ -14,6 +14,7 @@ import {
   disputeRecipients,
   isEnabled,
   resultDisputedMessage,
+  substituteRequestedMessage,
   newSignupMessage,
   pushPayload,
   signupRecipients,
@@ -383,22 +384,43 @@ export async function notifyResultDisputed(input: {
   week: number;
   disputedBy: string;
 }): Promise<void> {
+  const message = resultDisputedMessage(input);
+  await notify("result_disputed", (await leagueStaff(input.leagueId, input.disputedBy)).map((userId) => ({ userId, message })));
+}
+
+// The league's Szervezők and every Admin, once each, accounts being deleted
+// and `except` (the player whose step it is) left out.
+async function leagueStaff(leagueId: number, except: string): Promise<string[]> {
   const [organizers, admins] = await Promise.all([
     db
       .select({ id: users.id })
       .from(leagueAdmins)
       .innerJoin(users, eq(users.id, leagueAdmins.userId))
-      .where(and(eq(leagueAdmins.leagueId, input.leagueId), isNull(users.deletedAt))),
+      .where(and(eq(leagueAdmins.leagueId, leagueId), isNull(users.deletedAt))),
     db
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.platformRole, "superadmin"), isNull(users.deletedAt))),
   ]);
-  const message = resultDisputedMessage(input);
-  await notify(
-    "result_disputed",
-    disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), input.disputedBy).map((userId) => ({ userId, message })),
-  );
+  return disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), except);
+}
+
+// A pair asked for a substitute (#37, D109): tell the league's Szervezők and
+// the Admins, in the app and by push, never by email; the asking player left
+// out. Never throws: the request is already saved.
+export async function notifySubstituteRequested(input: {
+  leagueId: number;
+  leagueSlug: string;
+  leagueName: string;
+  week: number;
+  requestedBy: string;
+}): Promise<void> {
+  try {
+    const message = substituteRequestedMessage(input);
+    await notify("substitute_requested", (await leagueStaff(input.leagueId, input.requestedBy)).map((userId) => ({ userId, message })));
+  } catch (error) {
+    logError("notification failed", { kind: "substitute_requested", error });
+  }
 }
 
 // The profile's "Próba" button. Returns how many devices got the push (none

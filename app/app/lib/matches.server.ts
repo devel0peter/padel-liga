@@ -557,9 +557,9 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       key: `d${d.id}`,
       id: Number.MAX_SAFE_INTEGER,
       at: d.at,
-      who: d.kind === "auto_accepted" ? "Padelpárbaj" : d.userName || "Szervező",
+      who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
       ours: false,
-      by: d.kind === "auto_accepted" ? ("auto" as const) : ("organizer" as const),
+      by: d.kind === "organizer" ? ("organizer" as const) : ("auto" as const),
       text: decisionText(d, side),
     })),
   ]

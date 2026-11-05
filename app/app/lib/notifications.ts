@@ -373,6 +373,16 @@ export function matchDecidedMessage(input: { matchId: number; outcome: string })
   };
 }
 
+// To each player of the pair that ended the phase unplayed (#11, D103): the
+// outcome the deadline set, from this pair's side. Digest item.
+export function matchResolvedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "Lejárt a határidő: eldőlt a meccsetek",
+    body: `${input.outcome}. A részletek a meccs oldalán.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
 // A strike (#294, spec 8 and 13), with the season's count. No names: a lock
 // screen is not a private place.
 export function strikeMessage(input: { count: number; source: "deadline" | "no_show"; matchId: number | null }): Message {

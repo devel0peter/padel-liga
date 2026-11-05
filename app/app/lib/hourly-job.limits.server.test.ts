@@ -154,6 +154,33 @@ describe("the cron within the run limits (#183)", () => {
     expect(MAX_PUSH_DEVICES).toBeLessThanOrEqual(RUN_LIMITS.calls - DELIVER_MIN.calls);
   });
 
+  it("the round switch: every unplayed match is resolved from 06:00 Monday, within the limits, each once (#11)", async () => {
+    // Nobody scheduled anything: 150 matches, both pairs lose, 200 players get a strike each per match.
+    await runCron(budapestTime("2026-11-30", 5, 50));
+    expect(count("select count(*) as n from matches where status = 'final'")).toBe(0);
+    const runs: { at: string; queries: number; calls: number }[] = [];
+    // The first hour from 06:00: 6 runs of 25.
+    for (let minutes = 0; minutes < 60; minutes += 10) {
+      const at = budapestTime("2026-11-30", 6, minutes);
+      const budget = new RunBudget();
+      await runCron(at);
+      runs.push({ at: at.toISOString(), ...budget.used() });
+    }
+    for (const r of runs) {
+      expect(r.queries, r.at).toBeLessThanOrEqual(RUN_LIMITS.queries);
+      expect(r.calls, r.at).toBeLessThanOrEqual(RUN_LIMITS.calls);
+    }
+    expect(count("select count(*) as n from matches where status = 'final'")).toBe(150);
+    expect(count("select count(*) as n from match_decisions where kind = 'deadline'")).toBe(150);
+    // 3 matches per pair in a group of 4: 3 strikes for each of the 200 players.
+    expect(count("select count(*) as n from strikes")).toBe(600);
+    expect(count("select count(*) as n from email_messages where kind = 'strike_warning'")).toBe(200);
+    expect(count("select count(*) as n from audit_log where action = 'match.deadline'")).toBe(150);
+    // Before 06:00 nothing is resolved (a late result may still come in).
+    const results = lines.filter((l) => l.event === "cron step").map((l) => l.result ?? "");
+    expect(results.filter((l) => /^resolved 25 matches at the deadline; more left for the next run$/.test(l))).toHaveLength(5);
+  });
+
   it("a second morning run makes nothing again", async () => {
     await runCron(budapestTime("2026-11-18", 7, 0));
     const items = count("select count(*) as n from notifications");

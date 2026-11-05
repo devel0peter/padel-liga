@@ -825,7 +825,9 @@ export const matchDecisions = sqliteTable(
     matchId: integer("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["auto_accepted", "organizer"] }).notNull(),
+    // "deadline": the cron resolved an unplayed match after the deadline
+    // (#11, D103; user_id null).
+    kind: text("kind", { enum: ["auto_accepted", "deadline", "organizer"] }).notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     // Sides as pair_a/pair_b.
     outcome: text("outcome", { mode: "json" }).$type<MatchOutcome>().notNull(),

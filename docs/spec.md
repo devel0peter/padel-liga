@@ -102,7 +102,9 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 
 ## 8. Unplayed matches (resolved automatically at the deadline)
 The deadline is the end of the phase (section 5), so a match missed in its scheduled week can still be played later in the phase.
-"Valid activity" means a valid proposal or counter-proposal, recording an agreed time, or confirming one, before the deadline.
+"Valid activity" means a valid proposal or counter-proposal, recording an agreed time, or confirming one, before the deadline. A match that reached an agreed slot before the deadline (scheduled at the deadline, also a scheduled slot that passed without a result) counts both sides as active, and the other side of a late cancellation counts as active; a late canceller counts as inactive whatever it did before (README decision log, 2026-11-05, D103).
+
+The system resolves a match with no result at 06:00 Budapest the morning after the deadline (Monday for the Sunday 23:59 deadline): a result recorded before then goes through confirmation, auto-accept or the organizer as usual. The outcome is stored like an organizer's ruling (marked as the deadline's) and both pairs are told in the app and by push; a withdrawn pair's matches are not resolved (D103).
 
 | Situation | Outcome |
 |---|---|
@@ -156,7 +158,7 @@ A withdrawn pair (section 4) is left out of the table with all of its matches; u
   5. Several new pairs are placed one by one, highest placement rating first, after promotion and relegation of the continuing pairs.
   6. The result is part of the round switch draft; the organizer can move pairs before publishing.
 - First phase of a season: the system sorts the entered pairs by average Elo (no discount, no cap) into groups of 4 (and 3, section 4); the organizer can move pairs between groups, then publishes. Publishing creates the phase's matches, emails every player and locks the groups (README decision log, 2026-10-24, #24).
-- **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8) and drafts the next phase's groups (promotion, relegation, newly entered pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
+- **Round switch:** after the deadline (Sunday 23:59) the system resolves unplayed matches (section 8, from Monday 06:00) and drafts the next phase's groups (promotion, relegation, newly entered pairs). The organizer reviews it, settles open disputes and publishes on Monday morning; publishing sends the new-phase emails.
 - **Season end and switch** (README decision log, 2026-10-05):
   1. **Final standings:** each pair's group and place in the last phase.
   2. **Winners** (README decision log, 2026-10-08), from the last phase's standings, before the last promotion and relegation:

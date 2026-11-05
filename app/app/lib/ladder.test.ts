@@ -239,6 +239,8 @@ describe("isValidOutcome: what the public league page can count (#190, D115)", (
     for (const outcome of [
       { kind: "played", score: { sets: [[4, 1], [4, 2]] } },
       { kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [10, 8] } },
+      // A null super tie-break is none, as the rules engine reads it.
+      { kind: "played", score: { sets: [[4, 1], [4, 2]], superTieBreak: null } },
       { kind: "walkover", winner: "a" },
       { kind: "walkover", winner: "b" },
       { kind: "both-inactive" },

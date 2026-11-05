@@ -118,7 +118,8 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
     case "played": {
       const score = o.score as { sets?: unknown; superTieBreak?: unknown } | null | undefined;
       if (!score || typeof score !== "object" || !Array.isArray(score.sets) || !score.sets.every(isPair)) return false;
-      if (score.superTieBreak !== undefined && !isPair(score.superTieBreak)) return false;
+      // null is no super tie-break, as validateScore reads it.
+      if (score.superTieBreak != null && !isPair(score.superTieBreak)) return false;
       return validateScore(score as MatchScore).ok;
     }
     default:

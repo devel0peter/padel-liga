@@ -8,7 +8,7 @@ import {
   type NoShowStatus,
   type Side,
 } from "@padel-liga/rules";
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -24,7 +24,7 @@ import { loadMatch, NOT_FOUND, noWithdrawnPair, sideOf, type MatchContext } from
 import { NO_SHOW_CHANGED, NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS, noShowDecisionReason } from "./no-shows";
 import { lostRace } from "./results.server";
 import { neutralOutcomeText } from "./results";
-import { giveStrikes } from "./strikes.server";
+import { strikeInserts, tellStruck, type StrikeGrant } from "./strikes.server";
 
 // No-shows (#33, spec 8, D108) in D1. A player of the pair that showed up
 // reports from the match page, after the agreed slot's start and before the
@@ -91,7 +91,8 @@ export type NoShowPanel = {
 export async function noShowPanel(ctx: MatchContext, side: Side, userId: string, now = new Date()): Promise<NoShowPanel> {
   const rows = await reportsOf(ctx.match.id);
   const ourPair = ctx.pairs[side].pairId;
-  const open = openOf(rows);
+  // A match made final meanwhile (auto-accept, an override) leaves nothing waiting.
+  const open = ctx.match.status === "final" ? null : openOf(rows);
   return {
     canReport: refusalOf(ctx, rows, now) === null,
     closesAt: noShowClosesAt(ctx.match.deadline),
@@ -212,6 +213,8 @@ export async function leagueNoShows(leagueId: number, matchId?: number): Promise
         eq(seasons.leagueId, leagueId),
         isNotNull(groups.publishedAt),
         eq(noShowReports.status, "open"),
+        // A match made final meanwhile (auto-accept, an override): nothing left to decide.
+        ne(matches.status, "final"),
         noWithdrawnPair,
         matchId === undefined ? undefined : eq(matches.id, matchId),
       ),
@@ -239,9 +242,10 @@ const NOT_IN_LEAGUE = "Nincs ilyen bejelentés ebben a ligában.";
  * The league's organizer confirms or rejects a waiting report (optional
  * reason, at most NO_SHOW_REASON_MAX characters), with an audit entry in the
  * same batch. A confirmation also stores the walkover as the organizer's
- * ruling (the match final, guarded by its revision) and gives the absent
- * pair's two players a strike (giveStrikes, which tells them). Then both
- * pairs are told in the app and by push.
+ * ruling (the match final, guarded by its revision and the report still
+ * waiting) and the absent pair's two players' strikes, all in one batch;
+ * the strike notices then go out as giveStrikes sends them (tellStruck).
+ * Then both pairs are told in the app and by push.
  */
 export async function decideNoShow(
   userId: string,
@@ -259,9 +263,9 @@ export async function decideNoShow(
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
     .where(eq(noShowReports.id, reportId));
   if (!found || found.leagueId !== leagueId) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
+  const row = (await reportsOf(found.matchId)).find((r) => r.id === reportId)!;
   const ctx = await loadMatch(found.matchId);
   if (!ctx) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
-  const row = (await reportsOf(found.matchId)).find((r) => r.id === reportId)!;
   const text = reason.trim();
   if (text.length > NO_SHOW_REASON_MAX) return { ok: false, error: `Az indoklás legfeljebb ${NO_SHOW_REASON_MAX} karakter lehet.` };
   const refusal = decision === "confirm" ? confirmRefusal(row, { voided: ctx.voided, status: ctx.match.status }) : rejectRefusal(row);
@@ -285,6 +289,16 @@ export async function decideNoShow(
 
   const { outcome, absent } = noShowOutcome(reporting);
   const revision = ctx.match.revision;
+  // The absent pair's own two players, never a substitute (spec 8).
+  const absentPair = ctx.pairs[absent];
+  const grant: StrikeGrant = {
+    seasonId: ctx.seasonId,
+    pairId: absentPair.pairId,
+    players: absentPair.players.map((p) => p.id),
+    matchId: ctx.match.id,
+    source: "no_show",
+    at: now,
+  };
   // The ruling goes in only while the match took no step since it was read
   // and the report still waits; else the whole batch fails and nothing changes.
   const guardedId = sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${ctx.match.id} and ${matches.revision} = ${revision}
@@ -298,22 +312,20 @@ export async function decideNoShow(
         .where(and(eq(matches.id, ctx.match.id), eq(matches.revision, revision))),
       settle,
       auditEntry({ actorId: userId, action: "match.no_show_confirm", target: `match:${ctx.match.id}`, detail: `${detail}: ${neutralOutcomeText(outcome, SIDES)}`, leagueId }),
+      // The strikes go in with the walkover, or neither does (#294's rows).
+      ...strikeInserts([grant]),
     ]);
   } catch (e) {
     if (lostRace(e)) return { ok: false, error: NO_SHOW_CHANGED };
     throw e;
   }
   logInfo("no-show confirmed", { matchId: ctx.match.id });
-  // The absent pair's own two players, never a substitute (spec 8).
-  const absentPair = ctx.pairs[absent];
-  await giveStrikes({
-    seasonId: ctx.seasonId,
-    pairId: absentPair.pairId,
-    players: absentPair.players.map((p) => p.id),
-    matchId: ctx.match.id,
-    source: "no_show",
-    at: now,
-  });
+  // Each player's count and notice as giveStrikes sends them (the 2nd strike's warning too).
+  try {
+    await tellStruck(grant, new Set(grant.players));
+  } catch (error) {
+    logError("no-show strike notice failed", { matchId: ctx.match.id, error });
+  }
   await tellPairs(ctx, row.pairId, true);
   return { ok: true, notice: "Jóváhagytad: 4-0 4-0 a bejelentő párnak, a másik pár fekete pontot kapott. Mindkét pár értesítést kap." };
 }

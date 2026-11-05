@@ -431,8 +431,6 @@ export function substituteRevokedMessage(input: SubstituteNotice & { ours: boole
   };
 }
 
-// To both pairs: the organizer decided or overrode the outcome (digest item).
-// The reason is on the match page only.
 // --- No-shows (#33, D108) ---------------------------------------------------
 
 // To the league's Szervezők and the Admins (app and push, never email), the
@@ -462,6 +460,8 @@ export function noShowDecidedMessage(input: { matchId: number; confirmed: boolea
     : { title: "A szervező elutasította az ellenfeleitek bejelentését", body: "Nem kaptok érte semmit: a meccs ott tart, ahol előtte.", url };
 }
 
+// To both pairs: the organizer decided or overrode the outcome (digest item).
+// The reason is on the match page only.
 export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
   return {
     title: "A szervező döntött a meccsetekről",

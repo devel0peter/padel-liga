@@ -223,7 +223,8 @@ export default function Privacy() {
                 jelezte és mikor, és a szervező döntése az indoklásával) mindkét
                 pár, a liga szervezője és az oldal adminja látja. Ha a szervező
                 jóváhagyja, a döntése a nevével és idejével a meccs naplójába is
-                bekerül, a másik pár játékosai pedig fekete pontot kapnak.
+                bekerül, a másik pár játékosai pedig fekete pontot kapnak. A
+                szervező indoklását, ha törlöd a fiókodat, töröljük.
               </li>
               <li>
                 A jelentkezési listát csak a szervező látja, semmi nem

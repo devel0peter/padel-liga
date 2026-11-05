@@ -261,6 +261,21 @@ describe("deleting an account (#152)", () => {
     ]);
   });
 
+  it("anonymizing takes the organizer's no-show reasons off the player's pairs' matches, in the report and the ruling (#33)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into no_show_reports (match_id, pair_id, status, reported_at, reason) values (1, 2, 'confirmed', 1, 'Beteg volt a párja.')`);
+    h.raw.exec(`insert into match_decisions (match_id, kind, outcome, reason, at) values
+      (1, 'organizer', '{"kind":"walkover","winner":"b"}', 'Nem jöttek el: a szervező jóváhagyta a bejelentést. Beteg volt a párja.', 1),
+      (1, 'organizer', '{"kind":"unplayed"}', 'A klub lemondta a pályát.', 2)`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(one("select reason from no_show_reports")).toEqual({ reason: null });
+    expect(all("select reason from match_decisions order by id").map((r: any) => r.reason)).toEqual([
+      "Nem jöttek el: a szervező jóváhagyta a bejelentést.",
+      // An ordinary ruling's reason stays, as before.
+      "A klub lemondta a pályát.",
+    ]);
+  });
+
   it("anonymizes, never removes, an approved substitute, so the Elo replay still rates who played (#37)", async () => {
     publishPairOne();
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);

@@ -285,12 +285,23 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     expect(await N.decideNoShow("o", 1, report, "reject", "", AFTER)).toMatchObject({ ok: true });
   });
 
-  it("refuses the confirmation when the match took a step meanwhile, changing nothing", async () => {
+  it("a match made final meanwhile (auto-accept, an override) leaves its waiting report off Viták and the match page", async () => {
+    const { id } = await reported();
+    h.raw.prepare("update matches set status = 'final', outcome = ? where id = ?").run(JSON.stringify({ kind: "unplayed" }), id);
+    expect(await N.leagueNoShows(1)).toEqual([]);
+    expect(await panel(id, "p1a")).toMatchObject({ canReport: false, open: null });
+  });
+
+  it("confirms the walkover over a result recorded after the report, without any Elo change", async () => {
     const { id, report } = await reported();
-    // A result recorded after the report: the organizer can still confirm the walkover.
+    const elo = () => all("select id, elo from users where id like 'p%' order by id");
+    const before = elo();
     expect(await R.resultStep("p3a", id, { kind: "record", score: { sets: [[4, 1], [4, 2]] } }, AFTER)).toMatchObject({ ok: true });
     expect(await N.decideNoShow("o", 1, report, "confirm", "", at("2026-11-13", 9))).toMatchObject({ ok: true });
     expect(one("select status from matches where id = ?", id).status).toBe("final");
+    // A walkover is not rated (spec 11): no Elo row and nobody's rating moved.
+    expect(all("select * from elo_changes")).toEqual([]);
+    expect(elo()).toEqual(before);
   });
 
   it("is 404 for another league's organizer", async () => {
@@ -315,9 +326,10 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     const { id, report } = await reported();
     h.race = { id, sql: "update matches set revision = revision + 1 where id = ?" };
     expect(await N.decideNoShow("o", 1, report, "confirm", "", AFTER)).toEqual({ ok: false, error: NO_SHOW_CHANGED });
-    // Withdrawn while the organizer's request runs.
+    // Withdrawn after the organizer's request read it: the batch's guard on the report catches it.
     h.race = { id: report, sql: "update no_show_reports set status = 'withdrawn' where id = ?" };
-    expect(await N.decideNoShow("o", 1, report, "confirm", "", AFTER)).toEqual({ ok: false, error: NO_SHOW_REFUSALS.not_open });
+    expect(await N.decideNoShow("o", 1, report, "confirm", "", AFTER)).toEqual({ ok: false, error: NO_SHOW_CHANGED });
+    expect(one("select status from no_show_reports where id = ?", report).status).toBe("withdrawn");
     expect(one("select status, outcome from matches where id = ?", id)).toEqual({ status: "scheduled", outcome: null });
     expect(all("select * from match_decisions")).toEqual([]);
     expect(all("select * from strikes")).toEqual([]);

@@ -20,8 +20,10 @@ export const NO_SHOW_REFUSALS: Record<NoShowRefusal, string> = {
 export const NO_SHOW_CHANGED = "Közben változott a meccs vagy a bejelentés. Nézd meg újra, és próbáld még egyszer.";
 
 // The ruling's reason in the match log (both pairs see it), with the
-// organizer's own words when they gave any.
+// organizer's own words when they gave any. Anonymizing an account cuts it
+// back to the prefix (account-deletion.server.ts).
+export const NO_SHOW_DECISION_PREFIX = "Nem jöttek el: a szervező jóváhagyta a bejelentést.";
+
 export function noShowDecisionReason(reason: string): string {
-  const base = "Nem jöttek el: a szervező jóváhagyta a bejelentést";
-  return reason ? `${base}. ${reason}` : `${base}.`;
+  return reason ? `${NO_SHOW_DECISION_PREFIX} ${reason}` : NO_SHOW_DECISION_PREFIX;
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { MatchOutcome } from "@padel-liga/rules";
 
 import { formatSlot } from "./format";
-import { buildLadder, countedOutcome, groupTable, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
+import { buildLadder, countedOutcome, groupTable, isValidOutcome, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
 const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játékos ${id}A`, `Játékos ${id}B`], elo });
 
@@ -231,5 +231,47 @@ describe("countedOutcome: only a final match counts (#186, #220)", () => {
   it("a waiting or disputed result stays out whatever outcome is stored", () => {
     for (const status of ["open", "scheduled", "result_pending", "disputed"])
       expect(countedOutcome({ status, outcome: won })).toBeNull();
+  });
+});
+
+describe("isValidOutcome: what the public league page can count (#190, D115)", () => {
+  it("accepts every outcome a write can store", () => {
+    for (const outcome of [
+      { kind: "played", score: { sets: [[4, 1], [4, 2]] } },
+      { kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [10, 8] } },
+      { kind: "walkover", winner: "a" },
+      { kind: "walkover", winner: "b" },
+      { kind: "both-inactive" },
+      { kind: "unplayed" },
+    ])
+      expect(isValidOutcome(outcome), JSON.stringify(outcome)).toBe(true);
+  });
+
+  it("rejects a score, kind or shape the rules engine would throw on", () => {
+    for (const outcome of [
+      null,
+      "played",
+      {},
+      { kind: "forfeit" },
+      { kind: "walkover" },
+      { kind: "walkover", winner: "c" },
+      { kind: "played" },
+      { kind: "played", score: null },
+      { kind: "played", score: { sets: "4:1" } },
+      { kind: "played", score: { sets: [[4, 1]] } },
+      { kind: "played", score: { sets: [4, 1, 4, 2] } },
+      { kind: "played", score: { sets: [[6, 1], [6, 2]] } },
+      { kind: "played", score: { sets: [[4, 1], [2, 4]] } },
+      { kind: "played", score: { sets: [[4, 1], [4, 2]], superTieBreak: [10, 8] } },
+      { kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: 10 } },
+      { kind: "played", score: { sets: [["4", "1"], [4, 2]] } },
+    ])
+      expect(isValidOutcome(outcome), JSON.stringify(outcome)).toBe(false);
+  });
+
+  it("a valid outcome never makes groupTable throw", () => {
+    const outcome: MatchOutcome = { kind: "played", score: { sets: [[5, 4], [4, 0]] } };
+    expect(isValidOutcome(outcome)).toBe(true);
+    expect(groupTable([pair(1), pair(2)], [{ a: 1, b: 2, outcome }])[0]).toMatchObject({ pairId: 1, points: 3 });
   });
 });

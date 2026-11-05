@@ -6,8 +6,9 @@ import { db } from "~/db/client.server";
 import { cities, groupPairs, groups, matches, pairs, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
-import { buildLadder, countedOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
+import { buildLadder, countedOutcome, isValidOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague } from "./leagues.server";
+import { logWarn } from "./log";
 import { averageElo } from "./season-entries";
 import { currentSeason } from "./seasons";
 import { listSeasons } from "./seasons.server";
@@ -82,6 +83,16 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
     .from(matches)
     .where(inArray(matches.groupId, phaseGroups))
     .orderBy(asc(matches.week), asc(matches.id));
+  // A stored outcome the rules engine can't count (D115, #190: a bug or a hand
+  // edit; every write is validated) is skipped, so one bad row can't take the
+  // public page down: the match counts nowhere on it and shows no result.
+  const invalid = played.filter((m) => {
+    const outcome = countedOutcome(m);
+    return outcome !== null && !isValidOutcome(outcome);
+  });
+  if (invalid.length > 0)
+    logWarn("league page skipped invalid outcomes", { count: invalid.length, matchIds: invalid.map((m) => m.id) });
+  const skipped = new Set(invalid.map((m) => m.id));
   return list.map((g) => ({
     id: g.id,
     number: g.number,
@@ -96,7 +107,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         withdrawn: m.withdrawnAt !== null,
       })),
     // Only a final outcome counts (#186, countedOutcome): confirmed,
-    // auto-accepted or decided by the organizer.
+    // auto-accepted or decided by the organizer; an invalid one never (D115).
     matches: played
       .filter((m) => m.groupId === g.id)
       .map((m) => ({
@@ -105,7 +116,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         b: m.b,
         week: m.week,
         scheduledAt: m.scheduledAt,
-        outcome: countedOutcome(m),
+        outcome: skipped.has(m.id) ? null : countedOutcome(m),
       })),
   }));
 }

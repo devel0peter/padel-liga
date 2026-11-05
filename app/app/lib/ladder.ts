@@ -12,6 +12,8 @@ import {
   groupStandings,
   type GroupMatch,
   type MatchOutcome,
+  type MatchScore,
+  validateScore,
 } from "@padel-liga/rules";
 
 import { formatSlot } from "./format";
@@ -94,6 +96,34 @@ function scoreText(outcome: MatchOutcome): string | null {
  */
 export function countedOutcome(m: { status: string; outcome: MatchOutcome | null }): MatchOutcome | null {
   return m.status === "final" ? m.outcome : null;
+}
+
+const isPair = (x: unknown) => Array.isArray(x) && x.length === 2;
+
+/**
+ * Whether a stored outcome is one a table can count (#190, D115): a known
+ * kind, a walkover with its winner, a played match with a valid score. Every
+ * write is validated, so a bad one means a bug or a hand edit; the rules engine
+ * throws on it, and the public league page skips the match instead of failing.
+ */
+export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
+  if (!outcome || typeof outcome !== "object") return false;
+  const o = outcome as { kind?: unknown; winner?: unknown; score?: unknown };
+  switch (o.kind) {
+    case "both-inactive":
+    case "unplayed":
+      return true;
+    case "walkover":
+      return o.winner === "a" || o.winner === "b";
+    case "played": {
+      const score = o.score as { sets?: unknown; superTieBreak?: unknown } | null | undefined;
+      if (!score || typeof score !== "object" || !Array.isArray(score.sets) || !score.sets.every(isPair)) return false;
+      if (score.superTieBreak !== undefined && !isPair(score.superTieBreak)) return false;
+      return validateScore(score as MatchScore).ok;
+    }
+    default:
+      return false;
+  }
 }
 
 /**

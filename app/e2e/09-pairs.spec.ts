@@ -55,7 +55,7 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   const locked = row(page, PAIRS.p1[0], PAIRS.p1[1]);
   await expect(locked.getByRole("button", { name: "Felbontás" })).toBeDisabled();
   await expect(locked.getByRole("button", { name: "Partner cseréje" })).toBeDisabled();
-  await expect(locked).toContainText("Kör közben nem bontható fel");
+  await expect(locked).toContainText("Nem bontható fel: a pár kihirdetett csoportban");
 
   // #154: the organizer enters the new pair, takes it out and enters it again.
   // Round 1's groups are out (step 11): it plays from round 2.
@@ -83,7 +83,7 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   // here, it stays entered.
   await locked.getByRole("button", { name: "Kivétel a szezonból" }).click();
   const withdraw = page.getByRole("dialog");
-  await expect(withdraw).toContainText("Visszaléptetés kör közben");
+  await expect(withdraw).toContainText("Visszaléptetés a csoportból");
   await expect(withdraw.getByRole("button", { name: "Visszaléptetés" })).toBeDisabled();
   await withdraw.getByRole("button", { name: "Mégse" }).click();
   await expect(withdraw).toHaveCount(0);

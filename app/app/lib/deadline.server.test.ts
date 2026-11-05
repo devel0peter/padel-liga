@@ -287,12 +287,14 @@ describe("strikes (#294)", () => {
     expect(await S.cancelStrike("o", 1, first, "Beteg volt.", at("2026-11-30", 8))).toEqual({ ok: true, notice: "Töröltük a fekete pontot." });
     expect(await S.cancelStrike("o", 1, first, "Megint.", at("2026-11-30", 8))).toMatchObject({ ok: false });
     expect(one("select actor_id, detail, league_id from audit_log where action = 'strike.cancel'")).toEqual({ actor_id: "o", detail: "Beteg volt.", league_id: 1 });
-    expect((await S.myStrikes("p3a"))[0]).toEqual({ seasonId: 1, league: "Padelpárbaj Győr", season: "2026/27 tél", count: 2 });
+    // p3b still has 3: the pair leaves, and p3a's card says so too.
+    expect(await S.myStrikes("p3a")).toEqual([{ seasonId: 1, count: 2, leaving: true }]);
     expect((await S.myStrikes("p3b"))[0]!.count).toBe(3);
     // p3b still has 3: the pair still leaves. Cancel one of p3b's too.
     const p3b = one("select id from strikes where user_id = 'p3b' order by id").id;
     expect(await S.cancelStrike("o", 1, p3b, "Beteg volt.", at("2026-11-30", 8))).toMatchObject({ ok: true });
     expect((await S.pairsLeavingAfterPhase(1, 1)).map((p) => p.pairId)).not.toContain(3);
+    expect(await S.myStrikes("p3a")).toEqual([{ seasonId: 1, count: 2, leaving: false }]);
   });
 
   it("giveStrikes (for no-shows, #33): both players, their new counts, the notice and the 2nd strike's email at once", async () => {
@@ -307,11 +309,15 @@ describe("strikes (#294)", () => {
     // The same match and source again: nothing new.
     expect((await S.giveStrikes(grant)).get("p1a")).toBe(1);
     expect(h.warnings).toEqual([]);
-    expect((await S.giveStrikes({ ...grant, matchId: matchOf(1, 4).id })).get("p1a")).toBe(2);
+    const second = { ...grant, matchId: matchOf(1, 4).id };
+    expect((await S.giveStrikes(second)).get("p1a")).toBe(2);
+    // A retried 2nd (the #33 confirmation sent twice): no notice, no email again.
+    expect((await S.giveStrikes(second)).get("p1a")).toBe(2);
     expect(h.warnings.map((w) => [w.toEmail, w.sendNow])).toEqual([
       ["p1a@x.hu", true],
       ["p1b@x.hu", true],
     ]);
+    expect(all("select count(*) n from notifications where user_id = 'p1a' and kind = 'strike'")[0].n).toBe(2);
     expect(all("select body from notifications where user_id = 'p1a' and kind = 'strike' order by id")[0].body).toMatch(/^Nem jelentetek meg egy lefixált meccsen\. Ebben a szezonban 1 fekete pontod van/);
   });
 
@@ -320,9 +326,54 @@ describe("strikes (#294)", () => {
     await S.giveStrikes({ seasonId: 2, pairId: 1, players: ["p1a", "p1b"], matchId: null, source: "no_show", at: NOW });
     await S.giveStrikes({ seasonId: 1, pairId: 1, players: ["p1a", "p1b"], matchId: matchOf(1, 3).id, source: "no_show", at: NOW });
     expect(await S.myStrikes("p1a")).toEqual([
-      { seasonId: 2, league: "Padelpárbaj Győr", season: "Tavasz", count: 1 },
-      { seasonId: 1, league: "Padelpárbaj Győr", season: "2026/27 tél", count: 1 },
+      { seasonId: 2, count: 1, leaving: false },
+      { seasonId: 1, count: 1, leaving: false },
     ]);
+  });
+
+  // A partner change (spec 8): p3a has 2 strikes from an earlier pair, p3b none.
+  const earlier = (user: string, n: number) => {
+    for (let i = 0; i < n; i++)
+      h.raw.prepare("insert into strikes (season_id, user_id, pair_id, match_id, source, at) values (1, ?, 3, null, 'no_show', ?)").run(user, sec("2026-11-09T10:00:00Z") + i);
+  };
+
+  it("the partner's 3rd strike: both players hear that the pair leaves, and no warning email goes out", async () => {
+    earlier("p3a", 2);
+    expect(await S.myStrikes("p3b")).toEqual([]);
+    expect(await S.giveStrikes({ seasonId: 1, pairId: 3, players: ["p3a", "p3b"], matchId: matchOf(1, 3).id, source: "no_show", at: NOW })).toEqual(
+      new Map([
+        ["p3a", 3],
+        ["p3b", 1],
+      ]),
+    );
+    const told = (u: string) => one("select title, body from notifications where user_id = ? and kind = 'strike'", u);
+    expect(told("p3a").title).toBe("3. fekete pont: a kör végén kikerültök");
+    expect(told("p3b")).toEqual({
+      title: "Fekete pontot kaptál: a kör végén kikerültök",
+      body: expect.stringMatching(/Ebben a szezonban 1 fekete pontod van, a párodnak már 3\. A párod és te a kör végén kikerültök/),
+    });
+    expect(h.warnings).toEqual([]);
+    expect(await S.myStrikes("p3b")).toEqual([{ seasonId: 1, count: 1, leaving: true }]);
+    expect((await S.pairsLeavingAfterPhase(1, 1)).map((p) => p.pairId)).toEqual([3]);
+  });
+
+  it("the deadline step tells the partner below 3 that the pair leaves, too", async () => {
+    earlier("p3a", 2);
+    await propose(1, 3);
+    await resolveDeadlines(MONDAY_6, undefined, 25);
+    const titles = (u: string) => all("select title from notifications where user_id = ? and kind = 'strike' order by id", u).map((x: any) => x.title);
+    expect(titles("p3a")[0]).toBe("3. fekete pont: a kör végén kikerültök");
+    expect(titles("p3b")[0]).toBe("Fekete pontot kaptál: a kör végén kikerültök");
+    expect(titles("p3b").every((t: string) => t.endsWith("a kör végén kikerültök"))).toBe(true);
+    const mails = all("select to_email from email_messages where kind = 'strike_warning'").map((x: any) => x.to_email);
+    expect(mails.filter((m: string) => m.startsWith("p3"))).toEqual([]);
+  });
+
+  it("the Kezdőlap card shows that the pair leaves when only the partner has strikes", async () => {
+    earlier("p3a", 3);
+    expect(await S.myStrikes("p3b")).toEqual([{ seasonId: 1, count: 0, leaving: true }]);
+    // Another league's or pair's player: not affected.
+    expect(await S.myStrikes("p1a")).toEqual([]);
   });
 
   it("anonymizing a player clears the reasons of their cancelled strikes, in the rows and the audit log", async () => {

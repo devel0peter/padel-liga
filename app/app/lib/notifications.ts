@@ -383,18 +383,22 @@ export function matchResolvedMessage(input: { matchId: number; outcome: string }
   };
 }
 
-// A strike (#294, spec 8 and 13), with the season's count. No names: a lock
-// screen is not a private place.
-export function strikeMessage(input: { count: number; source: "deadline" | "no_show"; matchId: number | null }): Message {
+// A strike (#294, spec 8 and 13), with the season's count. `leaving`: a
+// player of the pair has 3 (maybe the partner, after a partner change), so
+// the pair leaves at the end of the phase. No names: a lock screen is not a
+// private place.
+export function strikeMessage(input: { count: number; leaving: boolean; source: "deadline" | "no_show"; matchId: number | null }): Message {
   const why =
     input.source === "no_show"
       ? "Nem jelentetek meg egy lefixált meccsen."
       : "A határidőig nem próbáltatok egyeztetni a meccsre (vagy 24 órán belül lemondtátok, és nem pótoltátok).";
   const url = input.matchId ? matchUrl(input.matchId) : "/home";
-  if (input.count >= 3)
+  const out = "A párod és te a kör végén kikerültök a ligából; a kör eredményei maradnak. A következő szezonban újra nevezhettek.";
+  if (input.count >= 3) return { title: `${input.count}. fekete pont: a kör végén kikerültök`, body: `${why} ${out}`, url };
+  if (input.leaving)
     return {
-      title: `${input.count}. fekete pont: a kör végén kikerültök`,
-      body: `${why} A párod és te a kör végén kikerültök a ligából; a kör eredményei maradnak. A következő szezonban újra nevezhettek.`,
+      title: "Fekete pontot kaptál: a kör végén kikerültök",
+      body: `${why} Ebben a szezonban ${input.count} fekete pontod van, a párodnak már 3. ${out}`,
       url,
     };
   return {

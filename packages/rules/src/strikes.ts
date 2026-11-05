@@ -34,14 +34,18 @@ export type StrikeNotice = "strike" | "warning" | "leaving";
 
 /**
  * What a player is told after a strike that brought them to `count` (spec 13):
- * the 1st with the count, the 2nd as the warning (also by email), from the
- * 3rd on that the pair leaves at the end of the phase.
+ * the 1st with the count, the 2nd as the warning (also by email), and that
+ * the pair leaves at the end of the phase once a player of the pair has
+ * STRIKE_LIMIT (`pairCount`: the pair's highest count, the player's own when
+ * left out). A partner change can leave one player at 3 and the other below:
+ * the pair leaves, so both are told so, and the warning, which says "one
+ * more and you leave", is not sent then.
  */
-export function strikeNotice(count: number): StrikeNotice | null {
+export function strikeNotice(count: number, pairCount = count): StrikeNotice | null {
   if (count < 1) return null;
+  if (Math.max(count, pairCount) >= STRIKE_LIMIT) return "leaving";
   if (count < STRIKE_WARNING) return "strike";
-  if (count < STRIKE_LIMIT) return "warning";
-  return "leaving";
+  return "warning";
 }
 
 /**

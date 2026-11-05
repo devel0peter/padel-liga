@@ -54,7 +54,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // The pair's entry, the "Nevezünk" button or why not (#23).
   const views = await entryViews(user, shown, now);
   // The player's own strikes (#294): only here and nowhere public.
-  const strikes = new Map((await myStrikes(user.id)).map((s) => [s.seasonId, s.count]));
+  const strikes = new Map((await myStrikes(user.id)).map(({ seasonId, ...s }) => [seasonId, s]));
   const seasons = shown.map((s) => ({
     id: s.id,
     name: s.name,
@@ -63,7 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     registrationClosesAt: s.registrationClosesAt,
     phases: s.phases,
     entry: views.get(s.id) ?? null,
-    strikes: strikes.get(s.id) ?? 0,
+    strikes: strikes.get(s.id) ?? { count: 0, leaving: false },
   }));
   // No pair in a league: the player's own link to invite one (2026-10-31),
   // first thing after the first-login page, and "Párt keresek" (D59).
@@ -103,12 +103,13 @@ export async function action({ request }: Route.ActionArgs): Promise<{ season: n
 }
 
 // The player's strikes in the season (#294, spec 8): the count, what the 3rd
-// means, and that the organizer can cancel one.
-function StrikeLine({ count }: { count: number }) {
+// means (or that the pair leaves: a player of it has 3, maybe the partner),
+// and that the organizer can cancel one.
+function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
   return (
     <p role="status" className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
       <span className="font-semibold">Fekete pontjaid ebben a szezonban: {count}.</span>{" "}
-      {count >= 3
+      {leaving
         ? "A párod és te a kör végén kikerültök a ligából; a következő szezonban újra nevezhettek."
         : "A 3.-nál a párod és te a kör végén kikerültök a ligából."}{" "}
       Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.{" "}
@@ -158,7 +159,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
               {formatDeadline(s.registrationClosesAt)}
             </p>
             <PhaseList phases={s.phases} />
-            {s.strikes > 0 && <StrikeLine count={s.strikes} />}
+            {(s.strikes.count > 0 || s.strikes.leaving) && <StrikeLine {...s.strikes} />}
             {actionData?.season === s.id && (
               <p
                 role={actionData.error ? "alert" : "status"}

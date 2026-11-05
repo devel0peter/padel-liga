@@ -1,5 +1,5 @@
-import { pairsLeaving, strikeCounts, strikeNotice, type StrikeSource } from "@padel-liga/rules";
-import { and, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
+import { pairsLeaving, STRIKE_LIMIT, strikeCounts, strikeNotice, type StrikeSource } from "@padel-liga/rules";
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -32,11 +32,11 @@ export type StrikeGrant = {
 // The inserts of a grant, for the caller's batch. A player gets at most one
 // strike per match and source (the unique index): a re-run adds nothing.
 export function strikeInserts(grants: readonly StrikeGrant[]): BatchItem<"sqlite">[] {
-  const rows = grants.flatMap((g) =>
-    g.players.map((userId) => ({ seasonId: g.seasonId, userId, pairId: g.pairId, matchId: g.matchId, source: g.source, at: g.at })),
-  );
-  return chunks(rows, 10).map((part) => db.insert(strikes).values(part).onConflictDoNothing());
+  return chunks(strikeRows(grants), 10).map((part) => db.insert(strikes).values(part).onConflictDoNothing());
 }
+
+const strikeRows = (grants: readonly StrikeGrant[]) =>
+  grants.flatMap((g) => g.players.map((userId) => ({ seasonId: g.seasonId, userId, pairId: g.pairId, matchId: g.matchId, source: g.source, at: g.at })));
 
 /** The live (not cancelled) strike counts of these players in these seasons, by `${seasonId}:${userId}`. One query per 90 players. */
 export async function liveCounts(userIds: readonly string[], seasonIds: readonly number[]): Promise<Map<string, number>> {
@@ -57,18 +57,23 @@ export async function liveCounts(userIds: readonly string[], seasonIds: readonly
   return out;
 }
 
-export type StrikeNoticeInput = { userId: string; email: string; name: string; count: number; source: StrikeSource; matchId: number | null };
+// `pairCount`: the highest count in the player's pair after the strike, so
+// both players hear that the pair leaves when either has 3 (spec 13).
+export type StrikeNoticeInput = { userId: string; email: string; name: string; count: number; pairCount: number; source: StrikeSource; matchId: number | null };
 
 // What each player is told after a strike that brought them to `count`
 // (spec 13): the in-app notice and push with the count; the 2nd also the
-// warning email.
+// warning email, unless the pair leaves already (packages/rules strikeNotice).
 export function strikeNotices(list: readonly StrikeNoticeInput[], season: (userId: string) => { league: string; season: string }) {
   const messages: { userId: string; message: Message }[] = [];
   const warnings: { toEmail: string; input: { to: string; league: string; season: string } }[] = [];
   for (const p of list) {
-    const notice = strikeNotice(p.count);
+    const notice = strikeNotice(p.count, p.pairCount);
     if (!notice) continue;
-    messages.push({ userId: p.userId, message: strikeMessage({ count: p.count, source: p.source, matchId: p.matchId }) });
+    messages.push({
+      userId: p.userId,
+      message: strikeMessage({ count: p.count, leaving: notice === "leaving", source: p.source, matchId: p.matchId }),
+    });
     if (notice === "warning") warnings.push({ toEmail: p.email, input: { to: p.name, ...season(p.userId) } });
   }
   return { messages, warnings };
@@ -78,16 +83,23 @@ export function strikeNotices(list: readonly StrikeNoticeInput[], season: (userI
  * Gives a strike to both players of a pair (spec 8) from a request: for #33,
  * an organizer-confirmed no-show. Stored, then each player is told (in the
  * app and by push; the 2nd strike also by the warning email, sent at once).
- * Returns the players' new counts. The deadline resolution gives its strikes
- * in its own batch (deadline.server.ts).
+ * Only a player whose strike was stored now is told: the same grant again
+ * (a retried request) stores and sends nothing. Returns the players' new
+ * counts. The deadline resolution gives its strikes in its own batch
+ * (deadline.server.ts).
  */
 export async function giveStrikes(grant: StrikeGrant): Promise<Map<string, number>> {
-  await db.batch(strikeInserts([grant]) as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  if (grant.players.length === 0) return new Map();
+  const stored = new Set(
+    (await db.insert(strikes).values(strikeRows([grant])).onConflictDoNothing().returning({ userId: strikes.userId })).map((r) => r.userId),
+  );
   const counts = await liveCounts(grant.players, [grant.seasonId]);
   const out = new Map(grant.players.map((id) => [id, counts.get(`${grant.seasonId}:${id}`) ?? 0]));
+  if (stored.size === 0) return out;
+  const pairCount = Math.max(...out.values());
   try {
     const [people, [names]] = await Promise.all([
-      db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(inArray(users.id, [...grant.players])),
+      db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(inArray(users.id, [...stored])),
       db
         .select({ league: leagues.name, season: seasons.name })
         .from(seasons)
@@ -95,7 +107,7 @@ export async function giveStrikes(grant: StrikeGrant): Promise<Map<string, numbe
         .where(eq(seasons.id, grant.seasonId)),
     ]);
     const { messages, warnings } = strikeNotices(
-      people.map((p) => ({ userId: p.id, email: p.email, name: p.name ?? "", count: out.get(p.id) ?? 0, source: grant.source, matchId: grant.matchId })),
+      people.map((p) => ({ userId: p.id, email: p.email, name: p.name ?? "", count: out.get(p.id) ?? 0, pairCount, source: grant.source, matchId: grant.matchId })),
       () => ({ league: names?.league ?? "", season: names?.season ?? "" }),
     );
     await notifyPlayers("strike", messages);
@@ -137,17 +149,44 @@ export async function pairsLeavingAfterPhase(seasonId: number, phase: number): P
 
 // --- Reading -----------------------------------------------------------------
 
-/** A player's own live strikes in each season of a league they have any in, newest season first (Kezdőlap card). */
-export async function myStrikes(userId: string): Promise<{ seasonId: number; league: string; season: string; count: number }[]> {
-  const rows = await db
-    .select({ league: leagues.name, season: seasons.name, seasonId: seasons.id, count: sql<number>`count(*)` })
-    .from(strikes)
-    .innerJoin(seasons, eq(seasons.id, strikes.seasonId))
-    .innerJoin(leagues, eq(leagues.id, seasons.leagueId))
-    .where(and(eq(strikes.userId, userId), isNull(strikes.cancelledAt)))
-    .groupBy(seasons.id)
-    .orderBy(desc(seasons.id));
-  return rows.map(({ seasonId, league, season, count }) => ({ seasonId, league, season, count: Number(count) }));
+/**
+ * A player's own live strikes per season they have any in, newest season
+ * first, and whether their pair leaves at the end of the phase (Kezdőlap
+ * card): a player of their pair in the season's newest published phase they
+ * play has 3 (maybe the partner alone, after a partner change: spec 8, 13).
+ * A season where only the partner has strikes is listed with 0 when the pair
+ * leaves. Three queries.
+ */
+export async function myStrikes(userId: string): Promise<{ seasonId: number; count: number; leaving: boolean }[]> {
+  const [rows, mine] = await Promise.all([
+    db
+      .select({ seasonId: strikes.seasonId, count: sql<number>`count(*)` })
+      .from(strikes)
+      .where(and(eq(strikes.userId, userId), isNull(strikes.cancelledAt)))
+      .groupBy(strikes.seasonId),
+    db
+      .select({ seasonId: groups.seasonId, phase: groups.phase, a: pairs.playerA, b: pairs.playerB })
+      .from(groupPairs)
+      .innerJoin(groups, eq(groups.id, groupPairs.groupId))
+      .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
+      .where(and(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)), isNotNull(groups.publishedAt), isNull(groupPairs.withdrawnAt))),
+  ]);
+  const own = new Map(rows.map((r) => [r.seasonId, Number(r.count)]));
+  const newest = new Map<number, number>();
+  for (const r of mine) newest.set(r.seasonId, Math.max(newest.get(r.seasonId) ?? 0, r.phase));
+  const current = mine.filter((r) => r.phase === newest.get(r.seasonId)).map((r) => ({ seasonId: r.seasonId, partner: r.a === userId ? r.b : r.a }));
+  const partners = await liveCounts(
+    current.map((r) => r.partner),
+    current.map((r) => r.seasonId),
+  );
+  const leaving = new Set(
+    current
+      .filter((r) => Math.max(own.get(r.seasonId) ?? 0, partners.get(`${r.seasonId}:${r.partner}`) ?? 0) >= STRIKE_LIMIT)
+      .map((r) => r.seasonId),
+  );
+  return [...new Set([...own.keys(), ...leaving])]
+    .sort((x, y) => y - x)
+    .map((seasonId) => ({ seasonId, count: own.get(seasonId) ?? 0, leaving: leaving.has(seasonId) }));
 }
 
 export type LeagueStrike = {
@@ -192,7 +231,7 @@ export async function leagueStrikes(leagueId: number): Promise<LeagueStrike[]> {
   return rows.map((r) => ({ ...r, name: r.name || "Törölt játékos" }));
 }
 
-/** Live strike counts per player in the league's newest season that has any, for the Párok list. */
+/** Live strike counts per player and season, for the Párok list. */
 export function countsBySeason(list: readonly LeagueStrike[]): Map<number, Map<string, number>> {
   const out = new Map<number, Map<string, number>>();
   const rows = list.map((s) => ({ userId: s.userId, seasonId: s.seasonId, cancelled: s.cancelledAt !== null }));

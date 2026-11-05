@@ -54,6 +54,8 @@ import { changePartner, createPair, dissolvePair } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS, fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
+import { currentSeason } from "~/lib/seasons";
+import { listSeasons } from "~/lib/seasons.server";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
 import { formatDeadline } from "~/lib/format";
@@ -88,10 +90,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // "Pár létrehozása" and "Csere" offer the same players as the rows without
   // a pair: the league's (D93).
   const candidates = all.flatMap((r) => (r.kind === "solo" ? [{ id: r.player.id, name: r.player.name, level: r.player.level }] : []));
-  // The strikes of the league's newest season that has any (#294): they reset
-  // every season.
-  const strikeList = await leagueStrikes(league.id);
-  const strikeSeason = strikeList.reduce((max, s) => Math.max(max, s.seasonId), 0);
+  // The strikes of the league's current season (#294): they reset every
+  // season, so a new season shows none, not the last one's.
+  const [strikeList, seasons] = await Promise.all([leagueStrikes(league.id), listSeasons(league.id)]);
+  const strikeSeason = currentSeason(seasons, new Date())?.id ?? 0;
   const strikes = strikeList.filter((s) => s.seasonId === strikeSeason);
   return {
     strikes: strikes.map(({ userId: _, ...s }) => s),

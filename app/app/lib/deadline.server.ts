@@ -118,14 +118,18 @@ export async function resolveDeadlines(
     const messages: { userId: string; message: Message }[] = [];
     for (const s of ["a", "b"] as const)
       for (const u of players.get(side(m, s)) ?? []) messages.push({ userId: u.id, message: matchResolvedMessage({ matchId: m.id, outcome: outcomeText(outcome, s) }) });
-    const given = inactive.flatMap((s) => (players.get(side(m, s)) ?? []).map((u) => ({ ...u, pairId: side(m, s) })));
-    const { messages: strikeMessages, warnings } = strikeNotices(
-      given.map((u) => {
+    const given = inactive.flatMap((s) =>
+      (players.get(side(m, s)) ?? []).map((u) => {
         const key = `${m.seasonId}:${u.id}`;
         const count = (counts.get(key) ?? 0) + 1;
         counts.set(key, count);
-        return { userId: u.id, email: u.email, name: u.name, count, source: "deadline" as const, matchId: m.id };
+        return { ...u, key, count, pairId: side(m, s) };
       }),
+    );
+    // The pair leaves when either of its players has 3 (spec 13): both are told.
+    const pairCount = (pairId: number) => Math.max(...given.filter((u) => u.pairId === pairId).map((u) => u.count));
+    const { messages: strikeMessages, warnings } = strikeNotices(
+      given.map((u) => ({ userId: u.id, email: u.email, name: u.name, count: u.count, pairCount: pairCount(u.pairId), source: "deadline" as const, matchId: m.id })),
       () => ({ league: m.league, season: m.season }),
     );
     notices.push([

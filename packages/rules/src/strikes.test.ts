@@ -42,6 +42,14 @@ describe("strikeNotice (spec 13)", () => {
     expect(strikeNotice(STRIKE_LIMIT)).toBe("leaving");
     expect(strikeNotice(4)).toBe("leaving");
   });
+
+  it("the pair leaves when the partner has 3 (a partner change): both are told so, no warning", () => {
+    expect(strikeNotice(1, STRIKE_LIMIT)).toBe("leaving");
+    expect(strikeNotice(STRIKE_WARNING, 4)).toBe("leaving");
+    expect(strikeNotice(1, STRIKE_WARNING)).toBe("strike");
+    expect(strikeNotice(STRIKE_WARNING, 1)).toBe("warning");
+    expect(strikeNotice(0, STRIKE_LIMIT)).toBeNull();
+  });
 });
 
 describe("pairsLeaving (spec 8, 10)", () => {

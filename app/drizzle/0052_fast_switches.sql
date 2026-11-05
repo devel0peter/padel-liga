@@ -1,0 +1,1 @@
+ALTER TABLE `leagues` ADD `fast_switches` integer DEFAULT 1 NOT NULL;

@@ -268,6 +268,10 @@ export const leagues = sqliteTable("leagues", {
   // When the league's Szervező or the Admin switched on the automatic
   // reminders for people stuck before entering (#155); null: off.
   remindersOnAt: integer("reminders_on_at", { mode: "timestamp" }),
+  // How many round switches of the league's first season are fast
+  // calibration switches (spec 10, #12): 2 pairs swap at a border of two
+  // groups of 4. Default 1: the switch after phase 1 only.
+  fastSwitches: integer("fast_switches").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

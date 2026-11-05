@@ -142,6 +142,21 @@ describe("pushQueued (#183)", () => {
     ]);
   });
 
+  it("three items for one player over the cap: one skip warning in the run (#279)", async () => {
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
+    for (let i = 0; i < 9; i++) device.run(`https://push.example/u1-more-${i}`, 2_000_000_000 + i);
+    await queue("u1", "u1", "u2", "u1");
+    const warnings: any[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: any) => void warnings.push(line));
+    try {
+      expect(await N.pushQueued(new RunBudget(), { queries: 5, calls: 3 })).toEqual({ pushed: 4, left: 0 });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(h.pushes.filter((p) => p.startsWith("https://push.example/u1"))).toHaveLength(3 * N.MAX_PUSH_DEVICES);
+    expect(warnings).toEqual([expect.objectContaining({ event: "push devices skipped", notificationId: 1, devices: 12, pushed: N.MAX_PUSH_DEVICES })]);
+  });
+
   it("an item claimed by an overlapping run is not pushed again", async () => {
     await queue("u2");
     await Promise.all([N.pushQueued(new RunBudget()), N.pushQueued(new RunBudget())]);

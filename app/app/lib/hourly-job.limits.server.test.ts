@@ -43,6 +43,7 @@ const G = await import("~/lib/groups.server");
 const { MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
 const { DELIVER_MIN } = await import("~/lib/email/outbox.server");
 const { runCron } = await import("~/lib/hourly-job.server");
+const { forgetMorningDone } = await import("~/lib/match-reminders.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const PAIRS = 100;
@@ -54,6 +55,7 @@ const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:0
 // matches due a reminder: its week-1 match, still not scheduled ("pótoljátok
 // a kör végéig"), and its week-2 match, with no proposal yet.
 async function bigLeague() {
+  forgetMorningDone();
   h.raw = migratedDatabase();
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
   h.raw.exec(`insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);

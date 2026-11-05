@@ -270,6 +270,9 @@ const PUSH_ROUND_QUERIES = 4;
 export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, calls: 0 }): Promise<{ pushed: number; left: number }> {
   const vapid = vapidKeys();
   let pushed = 0;
+  // Players whose skipped devices this run already logged: one warning per
+  // player per run, however many of their items it pushes (#279).
+  const skipLogged = new Set<string>();
   // One more query at the end: what is left.
   while (budget.fits({ queries: keep.queries + PUSH_ROUND_QUERIES + 1, calls: keep.calls })) {
     const queue = await db
@@ -310,7 +313,9 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
     const sending = taken.filter((n) => claimed.has(n.id));
     for (const n of sending) {
       const devices = all.get(n.userId)?.length ?? 0;
-      if (devices > MAX_PUSH_DEVICES) logWarn("push devices skipped", { userId: n.userId, notificationId: n.id, devices, pushed: MAX_PUSH_DEVICES });
+      if (devices <= MAX_PUSH_DEVICES || skipLogged.has(n.userId)) continue;
+      skipLogged.add(n.userId);
+      logWarn("push devices skipped", { userId: n.userId, notificationId: n.id, devices, pushed: MAX_PUSH_DEVICES });
     }
     if (vapid) {
       const { gone } = await sendPushes(

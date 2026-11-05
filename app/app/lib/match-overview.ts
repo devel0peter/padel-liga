@@ -8,7 +8,7 @@ import { addDays, budapestTime, isValidActivity, other, type ResultState, type S
 
 import { weekDays } from "./groups";
 import { formatSlot, venueLine, type Tone } from "./matches";
-import { neutralOutcomeText, neutralScoreText } from "./results";
+import { finalLabel, neutralOutcomeText, neutralScoreText } from "./results";
 
 // Scheduling, then the result (#28): once a result is recorded, its status
 // is the match's.
@@ -53,7 +53,7 @@ export function resultStatus(result: ResultState, names: Record<Side, string>): 
     case "disputed":
       return { label: "Vitatott eredmény, a szervező dönt", tone: "todo" };
     case "final":
-      return { label: `${result.how === "organizer" ? "Döntés" : "Lejátszva"}: ${neutralOutcomeText(result.outcome, names)}`, tone: "done" };
+      return { label: `${finalLabel(result.how)}: ${neutralOutcomeText(result.outcome, names)}`, tone: "done" };
   }
 }
 

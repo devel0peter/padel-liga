@@ -55,11 +55,17 @@ import { changePartner, createPair, dissolvePair } from "~/lib/pairs.server";
 import { entryChip, missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS, fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
+import { currentSeason } from "~/lib/seasons";
+import { listSeasons } from "~/lib/seasons.server";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
+import { formatDeadline } from "~/lib/format";
+import { CANCEL_REASON_MAX } from "~/lib/strikes";
+import { cancelStrike, countsBySeason, leagueStrikes } from "~/lib/strikes.server";
 
 // Párok (#97): the Szervező of the league (or the Admin) creates, dissolves
 // and changes pairs, and enters a pair for the season or takes it out (#154).
+// The players' strikes (#294) show here, with the organizer's cancel.
 // Players can't change their pair themselves. No email goes out: the
 // organizer tells the players (an entry change is also an in-app notice).
 // Registered players without a pair are rows too; the list can be searched
@@ -85,7 +91,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // "Pár létrehozása" and "Csere" offer the same players as the rows without
   // a pair: the league's (D93).
   const candidates = all.flatMap((r) => (r.kind === "solo" ? [{ id: r.player.id, name: r.player.name, level: r.player.level }] : []));
+  // The strikes of the league's current season (#294): they reset every
+  // season, so a new season shows none, not the last one's.
+  const [strikeList, seasons] = await Promise.all([leagueStrikes(league.id), listSeasons(league.id)]);
+  const strikeSeason = currentSeason(seasons, new Date())?.id ?? 0;
+  const strikes = strikeList.filter((s) => s.seasonId === strikeSeason);
   return {
+    strikes: strikes.map(({ userId: _, ...s }) => s),
+    strikeCounts: Object.fromEntries(countsBySeason(strikes).get(strikeSeason) ?? []),
     name: league.name,
     slug: league.slug,
     rows: filterPairsRows(all, query),
@@ -121,6 +134,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         : await removePairFromSeason(actor, league.id, pairId, seasonId);
   else if (intent === "withdraw" && valid(pairId) && valid(seasonId))
     result = await withdrawPairMidPhase(actor, league.id, pairId, seasonId, field("reason"));
+  else if (intent === "strike-cancel" && valid(Number(field("strike"))))
+    result = await cancelStrike(actor.id, league.id, Number(field("strike")), field("reason"));
   else throw new Response("Hibás kérés.", { status: 400 });
   return result.ok ? { ok: true as const } : { error: result.error };
 }
@@ -557,7 +572,7 @@ function SoloRow({ player }: { player: Solo }) {
   );
 }
 
-function PairRow({ pair: p, candidates }: { pair: Pair; candidates: Candidate[] }) {
+function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Candidate[]; strikes: Record<string, number> }) {
   return (
     <TableRow className={p.status === "dissolved" ? "text-muted-foreground" : undefined}>
       <TableCell className="min-w-56">
@@ -565,6 +580,11 @@ function PairRow({ pair: p, candidates }: { pair: Pair; candidates: Candidate[] 
           <div key={pl.id}>
             <span className="font-medium">{pl.name}</span>
             {pl.level && <span className="text-xs text-muted-foreground"> · {levelLabel(pl.level)}</span>}
+            {(strikes[pl.id] ?? 0) > 0 && (
+              <Badge variant={(strikes[pl.id] ?? 0) >= 3 ? "destructive" : "outline"} className="ml-2">
+                {strikes[pl.id]} fekete pont
+              </Badge>
+            )}
             {p.status === "active" && (
               <StatusChips chips={missingChips({ registered: true, level: pl.level, phone: pl.phone, pairs: [] })} />
             )}
@@ -594,8 +614,123 @@ function PairRow({ pair: p, candidates }: { pair: Pair; candidates: Candidate[] 
   );
 }
 
+type Strike = Route.ComponentProps["loaderData"]["strikes"][number];
+
+const STRIKE_SOURCES = { deadline: "Határidő: nem próbált egyeztetni", no_show: "Nem jelent meg" } as const;
+
+// The season's strikes (#294, spec 8): who, when, why, and the cancel with a
+// required reason (audited, D91). A player at 3 leaves with the pair at the
+// end of the phase; a cancelled strike no longer counts.
+function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) {
+  if (strikes.length === 0) return null;
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="strikes-title">
+      <h2 id="strikes-title" className="font-display text-lg font-bold">
+        Fekete pontok · {strikes[0]!.season}
+      </h2>
+      <p className="max-w-2xl text-sm text-muted-foreground">
+        A pár mindkét játékosa kap egyet, ha a határidőig nem próbált egyeztetni, vagy nem jelent meg. A 3.-nál a pár a kör
+        végén kikerül a ligából. Indokolt esetben (betegség, a klub lemondta a pályát) itt törölheted; a játékost nem
+        értesítjük, a számot az oldalán látja.
+      </p>
+      <div className="rounded-lg border">
+        <Table aria-label="Fekete pontok">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Játékos</TableHead>
+              <TableHead>Mikor</TableHead>
+              <TableHead>Miért</TableHead>
+              <TableHead>Állapot</TableHead>
+              <TableHead>
+                <span className="sr-only">Műveletek</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {strikes.map((s) => (
+              <TableRow key={s.id} className={s.cancelledAt ? "text-muted-foreground" : undefined}>
+                <TableCell className="font-medium">{s.name}</TableCell>
+                <TableCell className="whitespace-nowrap">{formatDeadline(new Date(s.at))}</TableCell>
+                <TableCell className="min-w-48 whitespace-normal">
+                  {STRIKE_SOURCES[s.source]}
+                  {s.matchId && (
+                    <>
+                      {" · "}
+                      <Link to={`/admin/leagues/${slug}/matches/${s.matchId}`} className="underline">
+                        meccs
+                      </Link>
+                    </>
+                  )}
+                </TableCell>
+                <TableCell className="min-w-48 whitespace-normal">
+                  {s.cancelledAt ? `Törölve (${s.cancelledBy ?? "szervező"}): ${s.cancelReason ?? ""}` : "Érvényes"}
+                </TableCell>
+                <TableCell className="text-right">{!s.cancelledAt && <CancelStrikeDialog strike={s} />}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+function CancelStrikeDialog({ strike }: { strike: Strike }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const busy = fetcher.state !== "idle";
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.ok) setOpen(false);
+  }, [fetcher.state, fetcher.data]);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" disabled={busy}>
+          Törlés
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Fekete pont törlése: {strike.name}</DialogTitle>
+          <DialogDescription>
+            A fekete pont nem számít tovább, a játékos száma eggyel csökken. Ha emiatt 3 alá kerül, a párja a kör végén mégsem
+            esik ki. A törlés a Naplóba kerül az indokkal.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor={`strike-reason-${strike.id}`}>Indok</Label>
+          <Textarea
+            id={`strike-reason-${strike.id}`}
+            value={reason}
+            maxLength={CANCEL_REASON_MAX}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Pl. betegség, a klub lemondta a pályát"
+          />
+          {fetcher.data?.error && (
+            <p role="alert" className="text-sm font-semibold text-destructive">
+              {fetcher.data.error}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Mégse</Button>
+          </DialogClose>
+          <Button
+            disabled={busy || !reason.trim()}
+            onClick={() => fetcher.submit({ intent: "strike-cancel", strike: String(strike.id), reason }, { method: "post" })}
+          >
+            Törlés
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
-  const { name, slug, rows, counts, summary, query, activePairs, candidates, canMail } = loaderData;
+  const { name, slug, rows, counts, summary, query, activePairs, candidates, canMail, strikes, strikeCounts } = loaderData;
   return (
     <AppPage
       title="Párok"
@@ -630,7 +765,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
             <TableBody>
               {rows.map((r) =>
                 r.kind === "pair" ? (
-                  <PairRow key={`p${r.pair.id}`} pair={r.pair} candidates={candidates} />
+                  <PairRow key={`p${r.pair.id}`} pair={r.pair} candidates={candidates} strikes={strikeCounts} />
                 ) : (
                   <SoloRow key={`s${r.player.id}`} player={r.player} />
                 ),
@@ -639,6 +774,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
+      <StrikesSection strikes={strikes} slug={slug} />
     </AppPage>
   );
 }

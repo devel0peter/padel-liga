@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 02.";
+const EFFECTIVE_FROM = "2026. 11. 05.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -123,7 +123,11 @@ export default function Privacy() {
             </ul>
             <p>
               Amikor elindul a liga, ehhez jön még a meccseid története
-              (kivel, mikor és milyen eredménnyel játszottál) és az értékszámod.
+              (kivel, mikor és milyen eredménnyel játszottál), az értékszámod,
+              és ha kapsz, a fekete pontjaid (mikor és miért; ha a szervező
+              töröl egyet, az indoka is). A fekete pontjaidat csak te és a
+              szervező látja; ha törlöd a fiókodat, a törlések indokát is
+              töröljük.
             </p>
           </Section>
 
@@ -143,7 +147,8 @@ export default function Privacy() {
               levelet kapsz, a többit az oldalon és push értesítésben látod. A
               meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
               meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
-              nem.
+              nem. A fekete pontról az oldalon és push értesítésben szólunk; a
+              másodiknál egy figyelmeztető levelet is küldünk.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem

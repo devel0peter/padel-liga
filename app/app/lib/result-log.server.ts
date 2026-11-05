@@ -1,4 +1,4 @@
-import { RESULT_EVENT_KINDS, resultState, type MatchOutcome, type MatchScore, type ResultEvent, type ResultEventKind, type ResultState, type Ruling, type Side } from "@padel-liga/rules";
+import { RESULT_EVENT_KINDS, resultState, type RulingKind, type MatchOutcome, type MatchScore, type ResultEvent, type ResultEventKind, type ResultState, type Ruling, type Side } from "@padel-liga/rules";
 import { and, asc, eq, inArray, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
@@ -22,7 +22,7 @@ export type StoredResultEvent = {
 
 export type StoredDecision = {
   id: number;
-  kind: "auto_accepted" | "organizer";
+  kind: RulingKind;
   userName: string | null;
   outcome: MatchOutcome;
   reason: string | null;

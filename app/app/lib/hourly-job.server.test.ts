@@ -21,6 +21,9 @@ vi.mock("~/lib/auth/login-code.server", () => ({
 vi.mock("~/lib/results.server", () => ({
   autoAcceptResults: async (now?: Date) => (step("auto-accept", now), h.result["auto-accept"]),
 }));
+vi.mock("~/lib/deadline.server", () => ({
+  resolveDeadlines: async (now?: Date) => (step("deadline", now), { resolved: h.result.deadline ?? 0, left: false }),
+}));
 vi.mock("~/lib/match-reminders.server", () => ({
   runMatchReminders: async (now?: Date) => (step("match", now), null),
 }));
@@ -47,7 +50,7 @@ const { runCron } = await import("~/lib/hourly-job.server");
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["cleanup", "auto-accept", "match", "stuck", "push", "deliver", "push stats"];
+const ALL = ["cleanup", "auto-accept", "deadline", "match", "stuck", "push", "deliver", "push stats"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -81,9 +84,16 @@ describe("runCron", () => {
   it("logs what each step did, and nothing when there was nothing to do", async () => {
     await runCron(RUN);
     expect(stepResults()).toEqual([]);
-    h.result = { cleanup: 1, "auto-accept": 2, stuck: 3, pushed: 4, sent: 5 };
+    h.result = { cleanup: 1, "auto-accept": 2, deadline: 6, stuck: 3, pushed: 4, sent: 5 };
     await runCron(RUN);
-    expect(stepResults()).toEqual(["deleted 1 stale login codes", "auto-accepted 2 results", "queued 3 reminders", "pushed 4 notifications", "sent 5 emails"]);
+    expect(stepResults()).toEqual([
+      "deleted 1 stale login codes",
+      "auto-accepted 2 results",
+      "resolved 6 matches at the deadline",
+      "queued 3 reminders",
+      "pushed 4 notifications",
+      "sent 5 emails",
+    ]);
   });
 
   it("runs every other step when the login code cleanup fails (#168)", async () => {
@@ -125,6 +135,7 @@ describe("runCron", () => {
     expect(errorLines()).toEqual([
       "cron step failed: login code cleanup",
       "cron step failed: auto-accept",
+      "cron step failed: deadline resolution",
       "cron step failed: match reminders",
       "cron step failed: stuck reminders",
       "cron step failed: push delivery",

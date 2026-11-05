@@ -133,6 +133,14 @@ export function seasonEnd(season: Pick<Season, "phases">): Date | null {
   return last?.deadline ?? null;
 }
 
+// The league's season on show (the public table, the strikes on Párok): the
+// earliest one that has not ended, else the latest.
+export function currentSeason<T extends Pick<Season, "firstPhaseStart" | "phases">>(seasons: readonly T[], now: Date): T | undefined {
+  const byStart = [...seasons].sort((a, b) => (a.firstPhaseStart < b.firstPhaseStart ? -1 : 1));
+  const ongoing = byStart.find((s) => s.phases.length > 0 && s.phases[s.phases.length - 1]!.deadline >= now);
+  return ongoing ?? byStart[byStart.length - 1];
+}
+
 // The seasons a player sees on the home page, per league: the earliest that
 // hasn't ended yet (the current or next one), and any later one whose
 // registration hasn't closed, so the next season's registration shows while

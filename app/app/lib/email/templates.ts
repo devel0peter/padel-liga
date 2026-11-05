@@ -196,6 +196,26 @@ export function pairCreated(input: { to: string; partnerName: string; league: st
   );
 }
 
+// A player's 2nd strike (#294, spec 8 and 13): the warning. Says what a 3rd
+// one means and that the organizer can cancel a strike with a reason. No
+// other player is named.
+export function strikeWarning(input: { to: string; league: string; season: string }): Email {
+  const home = `${SITE_URL}/home`;
+  return buildPlain(
+    `Figyelmeztetés: 2. fekete pont – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Megkaptad a 2. fekete pontodat ebben a szezonban (${input.season}, ${input.league}). Fekete pont jár, ha a határidőig nem próbáltatok egyeztetni, ha 24 órán belül lemondtátok az időpontot és nem pótoltátok, vagy ha nem jelentetek meg.`,
+      `Ha lesz egy 3., a párod és te a kör végén kikerültök a ligából. A következő szezonban újra nevezhettek, akkor a fekete pontok is nullázódnak.`,
+      `Ha betegség vagy a pálya lemondása miatt kaptad, írj a szervezőnek: indokkal törölheti.`,
+      home,
+      SIGNATURE,
+    ],
+    [home],
+    footer(`Azért kaptad ezt a levelet, mert játszol a ${SITE_URL.replace("https://", "")} ligájában.`),
+  );
+}
+
 // "{nev}" in the subject or body is replaced with the recipient's name.
 export const NAME_PLACEHOLDER = "{nev}";
 

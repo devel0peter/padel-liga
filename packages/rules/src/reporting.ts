@@ -25,9 +25,12 @@ export type ResultEvent = {
   score?: MatchScore | null;
 };
 
-// An outcome set from outside the two pairs: the 48-hour rule, or the
-// organizer (a decision on a dispute, or an override of any match).
-export type Ruling = { kind: "auto_accepted" | "organizer"; at: Date; outcome: MatchOutcome };
+// An outcome set from outside the two pairs: the 48-hour rule, the deadline
+// resolution of an unplayed match (deadline.ts, #11), or the organizer (a
+// decision on a dispute, or an override of any match).
+export const RULING_KINDS = ["auto_accepted", "deadline", "organizer"] as const;
+export type RulingKind = (typeof RULING_KINDS)[number];
+export type Ruling = { kind: RulingKind; at: Date; outcome: MatchOutcome };
 
 /** A result nobody answered is accepted this many hours after it was recorded (spec 7). */
 export const AUTO_ACCEPT_HOURS = 48;
@@ -39,7 +42,7 @@ export type ResultState =
   // `by` recorded `score`; the other pair disputed it with `counter`.
   | { status: "disputed"; by: Side; score: MatchScore; at: Date; counter: MatchScore | null; disputedAt: Date }
   // The outcome that counts.
-  | { status: "final"; outcome: MatchOutcome; how: "confirmed" | "auto_accepted" | "organizer"; at: Date };
+  | { status: "final"; outcome: MatchOutcome; how: "confirmed" | RulingKind; at: Date };
 
 /**
  * The match's result from its log (the pairs' steps, in order) and the

@@ -25,6 +25,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   match_digest: "Napi összefoglaló",
   match_tomorrow: "Holnap meccs",
   match_result: "Eredmény megerősítése",
+  strike_warning: "Figyelmeztetés: 2. fekete pont",
 };
 
 export function kindLabel(kind: string): string {

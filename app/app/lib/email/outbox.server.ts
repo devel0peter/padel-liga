@@ -47,6 +47,7 @@ import {
   registrationInvite,
   seasonEntered,
   signupConfirmation,
+  strikeWarning,
   stuckReminder,
   type Email,
   type PairIntroPerson,
@@ -285,13 +286,36 @@ export async function queueMatchEmails(
   await deliverNow(await enqueue(queued));
 }
 
+// A player's 2nd strike (#294, spec 13): the warning, one email per strike
+// that brought the player to 2. Personal mail; unsubscribed or bounced
+// addresses, and players who switched email off (#115), get nothing (the
+// in-app notice and push still have it). From a request (a no-show, #33) it
+// goes at once; from the cron it waits for the run's delivery step.
+export async function queueStrikeWarnings(
+  messages: { toEmail: string; input: Parameters<typeof strikeWarning>[0] }[],
+  sendNow: boolean,
+): Promise<void> {
+  if (messages.length === 0) return;
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map((m): NewMessage => ({ kind: "strike_warning", toEmail: m.toEmail, ...strikeWarning(m.input) }));
+  const ids = await enqueue(queued);
+  if (sendNow) await deliverNow(ids);
+}
+
 // The cron's match emails (#31): the daily digest and "holnap meccs", as
 // personal (transactional) mail within the daily limit. Unsubscribed or
 // bounced addresses, and players who switched email off (#115), get nothing;
 // the in-app list and push still have the items.
+// The deadline resolution's 2nd-strike warnings (#294) go the same way.
 export type ReminderEmail =
   | { kind: "match_digest"; toEmail: string; input: Parameters<typeof dailyDigest>[0] }
-  | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] };
+  | { kind: "match_tomorrow"; toEmail: string; input: Parameters<typeof matchTomorrow>[0] }
+  | { kind: "strike_warning"; toEmail: string; input: Parameters<typeof strikeWarning>[0] };
+
+const reminderEmail = (m: ReminderEmail): Email =>
+  m.kind === "match_digest" ? dailyDigest(m.input) : m.kind === "match_tomorrow" ? matchTomorrow(m.input) : strikeWarning(m.input);
 
 // Returned as insert statements for the cron's own D1 batch (#183):
 // stored together with the job's records of what it sent, and sent by the
@@ -309,7 +333,7 @@ export async function reminderEmailInserts(batches: ReminderEmail[][]): Promise<
   return batches.map((list) => {
     const queued = list
       .filter(wanted)
-      .map((m): NewMessage => ({ kind: m.kind, toEmail: m.toEmail, ...(m.kind === "match_digest" ? dailyDigest(m.input) : matchTomorrow(m.input)) }));
+      .map((m): NewMessage => ({ kind: m.kind, toEmail: m.toEmail, ...reminderEmail(m) }));
     const statements: BatchItem<"sqlite">[] = [];
     for (let i = 0; i < queued.length; i += INSERT_CHUNK)
       statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));

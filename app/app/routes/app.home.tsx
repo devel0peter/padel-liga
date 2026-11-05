@@ -23,6 +23,7 @@ import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { missingPartnerEmails, partnerEmailAction } from "~/lib/signup-partners.server";
 import { SITE_NAME } from "~/lib/site";
+import { myStrikes } from "~/lib/strikes.server";
 
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. Once the
 // groups are out it is "your group and your matches" (#25): the Teendők, the
@@ -52,6 +53,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const shown = homeSeasons(await listSeasons(), now).filter((s) => leagueName.has(s.leagueId));
   // The pair's entry, the "Nevezünk" button or why not (#23).
   const views = await entryViews(user, shown, now);
+  // The player's own strikes (#294): only here and nowhere public.
+  const strikes = new Map((await myStrikes(user.id)).map((s) => [s.seasonId, s.count]));
   const seasons = shown.map((s) => ({
     id: s.id,
     name: s.name,
@@ -60,6 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     registrationClosesAt: s.registrationClosesAt,
     phases: s.phases,
     entry: views.get(s.id) ?? null,
+    strikes: strikes.get(s.id) ?? 0,
   }));
   // No pair in a league: the player's own link to invite one (2026-10-31),
   // first thing after the first-login page, and "Párt keresek" (D59).
@@ -96,6 +100,23 @@ export async function action({ request }: Route.ActionArgs): Promise<{ season: n
     throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
   return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
+}
+
+// The player's strikes in the season (#294, spec 8): the count, what the 3rd
+// means, and that the organizer can cancel one.
+function StrikeLine({ count }: { count: number }) {
+  return (
+    <p role="status" className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+      <span className="font-semibold">Fekete pontjaid ebben a szezonban: {count}.</span>{" "}
+      {count >= 3
+        ? "A párod és te a kör végén kikerültök a ligából; a következő szezonban újra nevezhettek."
+        : "A 3.-nál a párod és te a kör végén kikerültök a ligából."}{" "}
+      Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.{" "}
+      <Link to="/rules#section-5" className="underline">
+        Szabályzat
+      </Link>
+    </p>
+  );
 }
 
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
@@ -137,6 +158,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
               {formatDeadline(s.registrationClosesAt)}
             </p>
             <PhaseList phases={s.phases} />
+            {s.strikes > 0 && <StrikeLine count={s.strikes} />}
             {actionData?.season === s.id && (
               <p
                 role={actionData.error ? "alert" : "status"}

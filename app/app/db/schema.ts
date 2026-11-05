@@ -72,6 +72,7 @@ export const emailMessages = sqliteTable(
         "match_digest",
         "match_tomorrow",
         "match_result",
+        "strike_warning",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -419,6 +420,7 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "strike",
         "test",
       ],
     }).notNull(),
@@ -847,6 +849,39 @@ export const jobRuns = sqliteTable("job_runs", {
   key: text("key").primaryKey(),
   doneAt: integer("done_at", { mode: "timestamp" }).notNull(),
 });
+
+// Strikes ("fekete pont", spec 8, #294, D103): one row per player and
+// strike, given by the deadline resolution (#11) or a confirmed no-show
+// (#33). They count per player per season (packages/rules strikes.ts), so a
+// partner change keeps them and a new season starts from zero. The organizer
+// can cancel one with a reason; the row stays, the count leaves it out.
+// Personal data: the reason may name an illness; anonymizing the player's
+// account clears it.
+export const strikes = sqliteTable(
+  "strikes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // The pair the player played in when it was given.
+    pairId: integer("pair_id").references(() => pairs.id, { onDelete: "set null" }),
+    matchId: integer("match_id").references(() => matches.id, { onDelete: "set null" }),
+    source: text("source", { enum: ["deadline", "no_show"] }).notNull(),
+    at: integer("at", { mode: "timestamp" }).notNull(),
+    cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
+    cancelledBy: text("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+    cancelReason: text("cancel_reason"),
+  },
+  (t) => [
+    index("strikes_season_user_idx").on(t.seasonId, t.userId),
+    // One strike per player per match and source: a re-run gives none twice.
+    uniqueIndex("strikes_match_user_source_idx").on(t.matchId, t.userId, t.source),
+  ],
+);
 
 export const matchReminders = sqliteTable(
   "match_reminders",

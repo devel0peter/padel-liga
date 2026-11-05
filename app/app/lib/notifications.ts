@@ -51,7 +51,12 @@ export type PlayerKind =
   | "match_result_disputed"
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
-  | "pair_withdrawn";
+  | "pair_withdrawn"
+  // A strike (#294, spec 13), with the count; from the 3rd on that the pair
+  // leaves at the end of the phase. In the app and by push; the 2nd also
+  // sends the warning email (strike_warning). Not a digest item: that email
+  // is its own.
+  | "strike";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -365,6 +370,27 @@ export function matchDecidedMessage(input: { matchId: number; outcome: string })
     title: "A szervező döntött a meccsetekről",
     body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
     url: matchUrl(input.matchId),
+  };
+}
+
+// A strike (#294, spec 8 and 13), with the season's count. No names: a lock
+// screen is not a private place.
+export function strikeMessage(input: { count: number; source: "deadline" | "no_show"; matchId: number | null }): Message {
+  const why =
+    input.source === "no_show"
+      ? "Nem jelentetek meg egy lefixált meccsen."
+      : "A határidőig nem próbáltatok egyeztetni a meccsre (vagy 24 órán belül lemondtátok, és nem pótoltátok).";
+  const url = input.matchId ? matchUrl(input.matchId) : "/home";
+  if (input.count >= 3)
+    return {
+      title: `${input.count}. fekete pont: a kör végén kikerültök`,
+      body: `${why} A párod és te a kör végén kikerültök a ligából; a kör eredményei maradnak. A következő szezonban újra nevezhettek.`,
+      url,
+    };
+  return {
+    title: input.count === 2 ? "2. fekete pont: figyelmeztetés" : "Fekete pontot kaptál",
+    body: `${why} Ebben a szezonban ${input.count} fekete pontod van; a 3.-nál a párod és te a kör végén kikerültök. Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.`,
+    url,
   };
 }
 

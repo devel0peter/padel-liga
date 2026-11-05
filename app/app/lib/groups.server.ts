@@ -1,4 +1,4 @@
-import { currentElo, movePair, phaseMatches, seedGroups } from "@padel-liga/rules";
+import { movePair, phaseMatches, seedGroups } from "@padel-liga/rules";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -31,10 +31,7 @@ const playerA = alias(users, "player_a_user");
 const playerB = alias(users, "player_b_user");
 
 // Id and email stay on the server: only the publish notifications use them.
-// elo: the current Elo (the level's starting value before a rated match);
-// rated: the player has a rated match (a stored Elo, #13). Both for the new
-// pairs' placement rating (spec 10).
-type Player = { id: string; name: string; level: string | null; email: string; elo: number; rated: boolean };
+type Player = { id: string; name: string; level: string | null; email: string };
 
 export type GroupPair = {
   pairId: number;
@@ -84,8 +81,8 @@ function groupPair(r: PairRow): GroupPair {
   return {
     pairId: r.pairId,
     players: [
-      { id: r.idA, name: r.nameA, level: r.levelA, email: r.emailA, elo: currentElo(r.eloA, r.levelA) ?? 0, rated: r.eloA !== null },
-      { id: r.idB, name: r.nameB, level: r.levelB, email: r.emailB, elo: currentElo(r.eloB, r.levelB) ?? 0, rated: r.eloB !== null },
+      { id: r.idA, name: r.nameA, level: r.levelA, email: r.emailA },
+      { id: r.idB, name: r.nameB, level: r.levelB, email: r.emailB },
     ],
     // Both levels are required to enter (D18); the pair's rating is the
     // average current Elo (#13), the starting value before a rated match (D20).

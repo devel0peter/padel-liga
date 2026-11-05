@@ -206,14 +206,27 @@ describe("roundSwitch (#12, #35)", () => {
     expect(s.origins.get(7)).toEqual({ kind: "new" });
   });
 
-  it("places a pair entered for phase 2 (interim: at the bottom)", async () => {
+  it("places a pair entered for phase 2 by its starting Elo, with no discount (D107f)", async () => {
     addPair(9, { joinsPhase: 2 });
     finishAll();
     const s = (await R.roundSwitch(1, 2, AFTER))!;
-    expect(s.newPairs.map((n) => [n.pair.pairId, n.rating])).toEqual([[9, 900]]);
+    // Kezdő + kezdő: 1000, not 900.
+    expect(s.newPairs.map((n) => [n.pair.pairId, n.rating])).toEqual([[9, 1000]]);
     expect(s.origins.get(9)).toEqual({ kind: "new" });
+    // 9 pairs: 3+3+3, the weakest pair at the bottom.
     expect(ids(s.draft).map((g) => g.length)).toEqual([3, 3, 3]);
     expect(ids(s.draft)[2]).toContain(9);
+  });
+
+  it("rates a returning player by their current Elo: the pair enters the bottom of its target's division", async () => {
+    addPair(9, { joinsPhase: 2 });
+    // A rated player (1500) with a kezdő partner (1000): 1250, exactly group 2's
+    // average, so group 2 is the target and, one group per division, the entry.
+    h.raw.exec("update users set elo = 1500 where id = 'p9a'");
+    finishAll();
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(s.newPairs.map((n) => n.rating)).toEqual([1250]);
+    expect(ids(s.draft)[1]).toContain(9);
   });
 });
 

@@ -218,6 +218,34 @@ describe("once the league has started", () => {
     ]);
   });
 
+  it("a substitute's match moves their rating and chart, but public pages keep the pair's names (D109)", async () => {
+    // Emma (pair 3) plays for Bea in pair 1 v pair 2; the replay rates the four who played (#37).
+    const m = match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    h.raw
+      .prepare(
+        "insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at, decided_at) values (?, 1, 'ub', 'ue', 'approved', ?, ?)",
+      )
+      .run(m, sec("2026-11-10T10:00:00Z"), sec("2026-11-10T12:00:00Z"));
+    for (const [u, before, after] of [["ua", 1400, 1420], ["ue", 1400, 1420], ["uc", 1200, 1180], ["ud", 1200, 1180]] as const) {
+      eloChange(m, u, before, after, "2026-11-11T10:00:00Z");
+      h.raw.prepare("update users set elo = ? where id = ?").run(after, u);
+    }
+
+    const emma = await playerProfile("ue", DURING);
+    expect(emma).toMatchObject({ elo: 1420, eloHistory: [1400, 1420], matches: [] });
+    const bea = await playerProfile("ub", DURING);
+    expect(bea).toMatchObject({ elo: 1400, eloHistory: [] });
+    expect(bea!.matches.map((x) => [x.verdict, x.elo])).toEqual([["Győzelem", null]]);
+    const anna = await playerProfile("ua", DURING);
+    expect(anna!.matches.map((x) => x.elo)).toEqual([{ delta: "+20", after: 1420 }]);
+    // The match names pair 1 as Anna and Bea, on every page: never the substitute.
+    const pages = [await pairProfile(1, DURING), await pairProfile(2, DURING), bea, anna, await playerProfile("uc", DURING)];
+    for (const page of pages) {
+      expect(JSON.stringify(page)).not.toMatch(/Emma|"ue"/);
+    }
+    expect((await playerProfile("uc", DURING))!.matches[0]!.opponents.players.map((p) => p.name)).toEqual(["Anna", "Bea"]);
+  });
+
   it("before the first rated match the rating is the level's starting value", async () => {
     const cili = await playerProfile("uc", DURING);
     expect(cili).toMatchObject({ started: true, elo: 1200, eloHistory: [], matches: [] });

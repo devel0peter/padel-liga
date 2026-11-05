@@ -16,7 +16,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const R = await import("~/lib/round-switch.server");
-const { NOT_READY } = await import("~/lib/round-switch");
+const { DISPUTES_FIRST, NOT_READY } = await import("~/lib/round-switch");
 const { STALE_DRAFT } = await import("~/lib/groups");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -170,7 +170,7 @@ describe("roundSwitch (#12, #35)", () => {
     const s = (await R.roundSwitch(1, 2, AFTER))!;
     expect(s.state).toBe("ready");
     expect(s.tables[0]!.rows[0]!.pair.pairId).toBe(2);
-    expect(s.disputes.map((d) => [d.group, d.pairs.map((p) => p.pairId).sort()])).toEqual([[1, [3, 4]]]);
+    expect(s.disputes.map((d) => [d.kind, d.group, d.pairs.map((p) => p.pairId).sort()])).toEqual([["disputed", 1, [3, 4]]]);
   });
 
   it("removes leavers after promotion and relegation: a 3rd strike, a dissolved pair, a take-out, a withdrawal", async () => {
@@ -237,7 +237,7 @@ describe("generateRoundSwitchDraft and publishRoundSwitch (#35)", () => {
     finishAll([matchOf(5, 6)]);
     h.raw.prepare("update matches set status = 'disputed' where id = ?").run(matchOf(5, 6));
     expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
-    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: "Előbb rendezd a vitatott eredményeket." });
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: DISPUTES_FIRST });
     h.raw.prepare("update matches set status = 'final', outcome = ? where id = ?").run(won(5, 6), matchOf(5, 6));
     expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
     const phase2 = all("select m.deadline from matches m join groups g on g.id = m.group_id where g.phase = 2");
@@ -246,6 +246,24 @@ describe("generateRoundSwitchDraft and publishRoundSwitch (#35)", () => {
     expect(h.mails).toHaveLength(16);
     expect(h.mails.every((m) => m.input.phase === 2)).toBe(true);
     expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toMatchObject({ ok: false });
+  });
+
+  it("drafts around a waiting no-show report (#33) and refuses to publish until it is decided", async () => {
+    const m = matchOf(7, 8);
+    finishAll([m]);
+    // The deadline resolution left the match open for the organizer.
+    h.raw
+      .prepare("insert into no_show_reports (match_id, pair_id, status, reported_by, reported_at) values (?, 7, 'open', 'p7a', ?)")
+      .run(m, sec("2026-11-28T18:00:00Z"));
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(s.state).toBe("ready");
+    expect(s.disputes.map((d) => [d.kind, d.matchId])).toEqual([["no_show", m]]);
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: DISPUTES_FIRST });
+    // Decided (a walkover for the reporting pair): it goes out.
+    h.raw.prepare("update no_show_reports set status = 'confirmed' where match_id = ?").run(m);
+    h.raw.prepare("update matches set status = 'final', outcome = ? where id = ?").run(won(7, 8), m);
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
   });
 
   it("refuses a stale draft: a pair entered since", async () => {

@@ -3,14 +3,14 @@ import { and, asc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, jobRuns, leagues, matches, seasonPhases, seasons } from "~/db/schema";
+import { groups, jobRuns, leagues, matches, noShowReports, seasonPhases, seasons } from "~/db/schema";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
 import { resultsOf } from "./result-log.server";
-import { type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin } from "./round-switch";
+import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin } from "./round-switch";
 import { getSeason } from "./seasons.server";
 import { pairsLeavingAfterPhase } from "./strikes.server";
 
@@ -24,7 +24,7 @@ import { pairsLeavingAfterPhase } from "./strikes.server";
 // ("Tervezet újraszámolása") and publishes it by hand, which creates the
 // phase's matches and sends the new-phase emails (groups.server.ts
 // publishPhase). Publishing is refused while the ending phase has a disputed
-// result. A recorded result not yet confirmed counts as recorded in the
+// result or a waiting no-show report (#33). A recorded result not yet confirmed counts as recorded in the
 // draft (it is accepted automatically unless disputed). The last phase of a
 // season has no next-phase draft (the season switch is later).
 
@@ -47,8 +47,9 @@ export type RoundSwitch = {
   // The draft from the current results and pairs, 1. csoport first, by seed.
   draft: GroupPair[][];
   origins: Map<number, Origin>;
-  // Disputed results of the ending phase: they block publishing.
-  disputes: { matchId: number; group: number; pairs: [GroupPair, GroupPair] }[];
+  // What blocks publishing: the ending phase's disputed results and waiting
+  // no-show reports (#33).
+  disputes: { matchId: number; kind: "disputed" | "no_show"; group: number; pairs: [GroupPair, GroupPair] }[];
 };
 
 /**
@@ -86,13 +87,32 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
   // A withdrawn pair's match doesn't count and is never resolved (D87).
   const counted = rows.filter((m) => !withdrawn.has(m.pairA) && !withdrawn.has(m.pairB));
   const pending = counted.filter((m) => m.status === "result_pending");
-  const recorded = await resultsOf(pending);
+  const [recorded, reported] = await Promise.all([
+    resultsOf(pending),
+    // Matches with a waiting no-show report (#33): the deadline resolution
+    // leaves them to the organizer, and they block publishing.
+    counted.length === 0
+      ? Promise.resolve([])
+      : db
+          .selectDistinct({ matchId: noShowReports.matchId })
+          .from(noShowReports)
+          .where(
+            and(
+              eq(noShowReports.status, "open"),
+              inArray(
+                noShowReports.matchId,
+                db.select({ id: matches.id }).from(matches).where(inArray(matches.groupId, stored.map((g) => g.id))),
+              ),
+            ),
+          ),
+  ]);
+  const noShow = new Set(reported.map((r) => r.matchId));
   const outcomeOf = (m: (typeof rows)[number]): MatchOutcome | null => {
     if (m.status === "final") return m.outcome;
     const state = recorded.get(m.id)?.state;
     return state?.status === "recorded" ? { kind: "played", score: state.score } : null;
   };
-  const unresolved = counted.some((m) => m.status === "open" || m.status === "scheduled");
+  const unresolved = counted.some((m) => (m.status === "open" || m.status === "scheduled") && !noShow.has(m.id));
   const state = now <= ending.deadline ? "running" : unresolved ? "resolving" : "ready";
 
   const tables = stored.map((g) => {
@@ -149,8 +169,13 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
   const pairById = new Map(stored.flatMap((g) => g.pairs.map((p) => [p.pairId, p])));
   const numberOf = new Map(stored.map((g) => [g.id, g.number]));
   const disputes = counted
-    .filter((m) => m.status === "disputed")
-    .map((m) => ({ matchId: m.id, group: numberOf.get(m.groupId)!, pairs: [pairById.get(m.pairA)!, pairById.get(m.pairB)!] as [GroupPair, GroupPair] }));
+    .filter((m) => m.status === "disputed" || (m.status !== "final" && noShow.has(m.id)))
+    .map((m) => ({
+      matchId: m.id,
+      kind: m.status === "disputed" ? ("disputed" as const) : ("no_show" as const),
+      group: numberOf.get(m.groupId)!,
+      pairs: [pairById.get(m.pairA)!, pairById.get(m.pairB)!] as [GroupPair, GroupPair],
+    }));
 
   return { endingPhase, nextPhase, state, fast, tables, leaving, newPairs, draft, origins, disputes };
 }
@@ -186,7 +211,7 @@ export async function publishRoundSwitch(seasonId: number, nextPhase: number, ac
   const s = await roundSwitch(seasonId, nextPhase, now);
   if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
-  if (s.disputes.length > 0) return { ok: false, error: "Előbb rendezd a vitatott eredményeket." };
+  if (s.disputes.length > 0) return { ok: false, error: DISPUTES_FIRST };
   return publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
 }
 
@@ -194,8 +219,9 @@ export async function publishRoundSwitch(seasonId: number, nextPhase: number, ac
 
 // One run drafts at most one switch: the candidates lookup, the Elo replay,
 // the switch's reads (season 2, groups 2, league, first season, matches,
-// entries, strikes 2, recorded results), the write batch and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: 1 + ELO_REPLAY_QUERIES + 11 + 2, calls: 0 };
+// entries, strikes 2, recorded results, no-show reports), the write batch
+// and the job mark.
+export const ROUND_DRAFT_MIN: Usage = { queries: 1 + ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 

@@ -44,6 +44,7 @@ import {
 } from "~/lib/groups.server";
 import { getLeague } from "~/lib/leagues.server";
 import {
+  BLOCKER_KINDS,
   DISPUTES_BLOCK,
   LAST_PHASE,
   LEAVE_REASONS,
@@ -172,7 +173,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       state: s.state,
       fast: s.fast,
       leaving: s.leaving.map((l) => ({ id: l.pair.pairId, name: pairName(l.pair.players), reason: LEAVE_REASONS[l.reason] })),
-      disputes: s.disputes.map((d) => ({ matchId: d.matchId, group: d.group, names: d.pairs.map((p) => pairName(p.players)).join(" – ") })),
+      disputes: s.disputes.map((d) => ({
+        matchId: d.matchId,
+        kind: BLOCKER_KINDS[d.kind],
+        group: d.group,
+        names: d.pairs.map((p) => pairName(p.players)).join(" – "),
+      })),
     },
   };
 }
@@ -389,9 +395,10 @@ function SwitchPanel({ d }: { d: LoaderData }) {
           <ul className="mt-2 grid gap-1">
             {s.disputes.map((m) => (
               <li key={m.matchId}>
-                <Link to={`/admin/leagues/${d.league.slug}/matches/${m.matchId}`} className="underline underline-offset-2">
+                <Link to={`/admin/leagues/${d.league.slug}/matches/${m.matchId}/decide`} className="underline underline-offset-2">
                   {m.group}. csoport: {m.names}
-                </Link>
+                </Link>{" "}
+                <span className="text-muted-foreground">({m.kind})</span>
               </li>
             ))}
           </ul>

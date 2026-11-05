@@ -55,7 +55,9 @@ export function shownPhase(
   return latest.published && hasNext && deadline && deadline < now ? latest.phase + 1 : latest.phase;
 }
 
-export const DISPUTES_BLOCK = "Közzététel előtt rendezd a vitatott eredményeket:";
+export const DISPUTES_BLOCK = "Közzététel előtt döntsd el ezeket:";
+export const DISPUTES_FIRST = "Előbb döntsd el a vitatott eredményeket és a meg nem jelenés bejelentéseket.";
+export const BLOCKER_KINDS = { disputed: "vitatott eredmény", no_show: "meg nem jelenés bejelentése" } as const;
 export const RECOMPUTE_HINT = "Ha közben rendeztél egy vitát vagy változtak a párok, számold újra a tervezetet. Az áthelyezéseid ilyenkor elvesznek.";
 export const NOT_READY = "A kör még nem zárult le, a tervezet még nem készíthető el.";
 export const NOTHING_TO_DRAFT = "Nincs pár a következő körre.";

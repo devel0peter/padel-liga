@@ -431,14 +431,16 @@ export async function publishPhase(seasonId: number, number: number, actorId: st
   const pairsStillIn = sql`not exists (select 1 from group_pairs gp join groups dg on dg.id = gp.group_id join pairs p on p.id = gp.pair_id
     where dg.season_id = ${seasonId} and dg.phase = ${number} and dg.published_at is null and (p.status <> 'active' or not exists (
       select 1 from season_entries se where se.season_id = dg.season_id and se.pair_id = gp.pair_id and se.status = 'approved' and ${joins})))`;
-  // A later phase: no disputed result left in the ending phase (#35); a
-  // withdrawn pair's match doesn't count.
+  // A later phase: no disputed result or waiting no-show report (#33) left
+  // in the ending phase (#35); a withdrawn pair's match doesn't count.
   const noDispute =
     number === FIRST_PHASE
       ? sql`1`
       : sql`not exists (select 1 from matches m join groups eg on eg.id = m.group_id
-          where eg.season_id = ${seasonId} and eg.phase = ${number - 1} and m.status = 'disputed' and not exists (
-            select 1 from group_pairs wp where wp.group_id = m.group_id and wp.pair_id in (m.pair_a, m.pair_b) and wp.withdrawn_at is not null))`;
+          where eg.season_id = ${seasonId} and eg.phase = ${number - 1}
+            and (m.status = 'disputed' or (m.status <> 'final' and exists (select 1 from no_show_reports nr where nr.match_id = m.id and nr.status = 'open')))
+            and not exists (
+              select 1 from group_pairs wp where wp.group_id = m.group_id and wp.pair_id in (m.pair_a, m.pair_b) and wp.withdrawn_at is not null))`;
   // The matches go in only if this publish claimed every group.
   const claimed = sql`(select count(*) from ${groups} where ${groups.seasonId} = ${seasonId} and ${groups.phase} = ${number} and ${groups.publishedAt} = ${publishedAt}) = ${ids.length}`;
   // The batch is one transaction, so checking the claim on the first match

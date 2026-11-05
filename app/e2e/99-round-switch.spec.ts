@@ -42,8 +42,8 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
   await expect(content(page)).toContainText("visszalépett a kör közben");
 
   // The disputed result blocks publishing and links to the match.
-  const block = page.getByRole("alert").filter({ hasText: "Közzététel előtt rendezd a vitatott eredményeket" });
-  await expect(block.getByRole("link")).toHaveAttribute("href", `/admin/leagues/minta/matches/${disputed}`);
+  const block = page.getByRole("alert").filter({ hasText: "Közzététel előtt döntsd el ezeket:" });
+  await expect(block.getByRole("link")).toHaveAttribute("href", `/admin/leagues/minta/matches/${disputed}/decide`);
   await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
   await test.info().attach("round 2 draft, disputed", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.setViewportSize({ width: 390, height: 844 });

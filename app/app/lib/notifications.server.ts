@@ -249,30 +249,37 @@ const PUSH_ROUND = ID_CHUNK;
 // (#222, D97). An item goes only when all its devices fit the run, so without
 // a cap a player with more devices than a run can push to would stop the
 // queue for good. Well inside a run's calls with the email step's room kept
-// (hourly-job.limits.server.test.ts).
+// (hourly-job.limits.server.test.ts). The devices past the cap would never
+// get a push, so a dead one among them would never be found: the cron
+// forgets them when it pushes to that player (#279, D116).
 export const MAX_PUSH_DEVICES = 10;
 
-// The newest devices first, at most MAX_PUSH_DEVICES.
-const newestDevices = (subs: Subscription[]) =>
-  [...subs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.endpoint < b.endpoint ? 1 : -1)).slice(0, MAX_PUSH_DEVICES);
+// The newest devices first.
+const byNewest = (subs: Subscription[]) =>
+  [...subs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.endpoint < b.endpoint ? 1 : -1));
 // What one round costs at most besides the pushes: the queue, the devices,
-// the claim and forgetting gone devices.
+// the claim and forgetting gone devices and devices past the cap (one query).
 const PUSH_ROUND_QUERIES = 4;
+// Bound values in one D1 statement: the forgetting stays one query, and
+// devices past the cap that don't fit wait for the player's next push.
+const MAX_FORGET = 100;
 
 /**
  * Pushes the queued items, oldest first, as many as fit the run (`budget`)
  * while keeping `keep` for the steps after it. Each item is taken off the
  * queue (claimed) before its push goes out, so an overlapping run can't push
  * it twice; an item goes only when all its devices fit (its player's newest
- * MAX_PUSH_DEVICES, the others skipped and logged, #222). Returns how many
- * items were pushed and how many still wait.
+ * MAX_PUSH_DEVICES, #222). The player's other devices are forgotten in the
+ * same query as the devices the push service no longer knows, and logged
+ * once per player per run (#279, D116). Returns how many items were pushed
+ * and how many still wait.
  */
 export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, calls: 0 }): Promise<{ pushed: number; left: number }> {
   const vapid = vapidKeys();
   let pushed = 0;
-  // Players whose skipped devices this run already logged: one warning per
-  // player per run, however many of their items it pushes (#279).
-  const skipLogged = new Set<string>();
+  // Players whose devices past the cap this run already forgot and logged:
+  // one warning per player per run, however many of their items it pushes.
+  const capped = new Set<string>();
   // One more query at the end: what is left.
   while (budget.fits({ queries: keep.queries + PUSH_ROUND_QUERIES + 1, calls: keep.calls })) {
     const queue = await db
@@ -283,7 +290,8 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
       .limit(PUSH_ROUND);
     if (queue.length === 0) break;
     const all = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
-    const subs = new Map([...all].map(([userId, list]) => [userId, newestDevices(list)]));
+    const sorted = new Map([...all].map(([userId, list]) => [userId, byNewest(list)]));
+    const subs = new Map([...sorted].map(([userId, list]) => [userId, list.slice(0, MAX_PUSH_DEVICES)]));
     let calls = budget.left().calls - keep.calls;
     const taken: typeof queue = [];
     for (const n of queue) {
@@ -311,18 +319,23 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
       ).map((r) => r.id),
     );
     const sending = taken.filter((n) => claimed.has(n.id));
-    for (const n of sending) {
-      const devices = all.get(n.userId)?.length ?? 0;
-      if (devices <= MAX_PUSH_DEVICES || skipLogged.has(n.userId)) continue;
-      skipLogged.add(n.userId);
-      logWarn("push devices skipped", { userId: n.userId, notificationId: n.id, devices, pushed: MAX_PUSH_DEVICES });
-    }
     if (vapid) {
       const { gone } = await sendPushes(
         sending.flatMap((n) => (subs.get(n.userId) ?? []).map((s) => ({ s, id: n.id, message: n }))),
         vapid,
       );
-      if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, gone));
+      const forget = [...gone];
+      for (const n of sending) {
+        const past = (sorted.get(n.userId) ?? []).slice(MAX_PUSH_DEVICES);
+        if (past.length === 0 || capped.has(n.userId)) continue;
+        const room = Math.max(0, MAX_FORGET - forget.length);
+        if (room === 0) break;
+        const endpoints = past.slice(0, room).map((s) => s.endpoint);
+        forget.push(...endpoints);
+        capped.add(n.userId);
+        logWarn("push devices forgotten", { userId: n.userId, notificationId: n.id, devices: past.length + MAX_PUSH_DEVICES, kept: MAX_PUSH_DEVICES, forgotten: endpoints.length });
+      }
+      if (forget.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, forget));
     } else if (import.meta.env.DEV && sending.length > 0) console.log(`[push disabled] ${sending.length} queued pushes`);
     pushed += sending.length;
     if (taken.length < queue.length) break;

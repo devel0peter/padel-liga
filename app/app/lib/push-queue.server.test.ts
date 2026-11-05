@@ -39,6 +39,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+const devicesOf = (user: string) =>
+  (h.raw.prepare("select endpoint from push_subscriptions where user_id = ? order by endpoint").all(user) as { endpoint: string }[]).map((r) => r.endpoint);
 const queued = () => h.raw.prepare("select user_id as user, title from notifications where push_due_at is not null order by id").all();
 
 // The queue as the cron fills it (notifyPlayers with queuePush).
@@ -119,7 +121,7 @@ describe("pushQueued (#183)", () => {
     expect(queued()).toEqual([]);
   });
 
-  it("a player with more devices than a run can push to doesn't hold up the queue: newest devices only, the skip logged (#222)", async () => {
+  it("a player with more devices than a run can push to doesn't hold up the queue: newest devices only, the others forgotten and logged (#222, #279)", async () => {
     // u1 gets 60 more devices, the newest last; with the three it has, more than a run's 50 calls.
     const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
     for (let i = 0; i < 60; i++) device.run(`https://push.example/u1-many-${i}`, 2_000_000_000 + i);
@@ -138,11 +140,14 @@ describe("pushQueued (#183)", () => {
       Array.from({ length: N.MAX_PUSH_DEVICES }, (_, i) => `https://push.example/u1-many-${59 - i}`).sort(),
     );
     expect(warnings).toEqual([
-      expect.objectContaining({ level: "warn", event: "push devices skipped", notificationId: 1, devices: 63, pushed: N.MAX_PUSH_DEVICES }),
+      expect.objectContaining({ level: "warn", event: "push devices forgotten", notificationId: 1, devices: 63, kept: N.MAX_PUSH_DEVICES, forgotten: 53 }),
     ]);
+    // Only the newest ten are left (D116).
+    expect(devicesOf("u1")).toEqual(Array.from({ length: N.MAX_PUSH_DEVICES }, (_, i) => `https://push.example/u1-many-${59 - i}`).sort());
+    expect(devicesOf("u2")).toEqual(["https://push.example/u2"]);
   });
 
-  it("three items for one player over the cap: one skip warning in the run (#279)", async () => {
+  it("three items for one player over the cap: one warning in the run (#279)", async () => {
     const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
     for (let i = 0; i < 9; i++) device.run(`https://push.example/u1-more-${i}`, 2_000_000_000 + i);
     await queue("u1", "u1", "u2", "u1");
@@ -154,7 +159,47 @@ describe("pushQueued (#183)", () => {
       vi.restoreAllMocks();
     }
     expect(h.pushes.filter((p) => p.startsWith("https://push.example/u1"))).toHaveLength(3 * N.MAX_PUSH_DEVICES);
-    expect(warnings).toEqual([expect.objectContaining({ event: "push devices skipped", notificationId: 1, devices: 12, pushed: N.MAX_PUSH_DEVICES })]);
+    expect(warnings).toEqual([expect.objectContaining({ event: "push devices forgotten", notificationId: 1, devices: 12, kept: N.MAX_PUSH_DEVICES, forgotten: 2 })]);
+  });
+
+  it("dead devices past the cap are forgotten with the others at the player's first push; nothing more is logged after (#279)", async () => {
+    // u1: its three old devices (dead) are past the cap once ten newer ones exist.
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
+    for (let i = 0; i < 10; i++) device.run(`https://push.example/u1-new-${i}`, 2_000_000_000 + i);
+    for (const old of ["u1-a", "u1-b", "u1-c"]) h.status.set(`https://push.example/${old}`, 410);
+    await queue("u1");
+    const warnings: any[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: any) => void warnings.push(line));
+    const budget = new RunBudget();
+    try {
+      expect(await N.pushQueued(budget)).toEqual({ pushed: 1, left: 0 });
+      // The dead ones were never pushed to, and are gone all the same.
+      expect(h.pushes.some((p) => /u1-[abc] /.test(p))).toBe(false);
+      expect(devicesOf("u1")).toEqual(Array.from({ length: 10 }, (_, i) => `https://push.example/u1-new-${i}`).sort());
+      // No extra query: the queue, the devices, the claim, the forgetting, the queue again (empty), what's left.
+      expect(budget.used()).toEqual({ queries: 6, calls: 10 });
+      await queue("u1");
+      expect(await N.pushQueued(new RunBudget())).toEqual({ pushed: 1, left: 0 });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(warnings).toEqual([expect.objectContaining({ event: "push devices forgotten", devices: 13, forgotten: 3 })]);
+  });
+
+  it("forgets at most 100 devices in one query; the rest go at the player's next push (#279)", async () => {
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth, created_at) values (?, 'u1', 'k', 'a', ?)");
+    for (let i = 0; i < 147; i++) device.run(`https://push.example/u1-many-${i}`, 2_000_000_000 + i);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await queue("u1");
+      await N.pushQueued(new RunBudget());
+      expect(devicesOf("u1")).toHaveLength(150 - 100);
+      await queue("u1");
+      await N.pushQueued(new RunBudget());
+      expect(devicesOf("u1")).toHaveLength(N.MAX_PUSH_DEVICES);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("an item claimed by an overlapping run is not pushed again", async () => {

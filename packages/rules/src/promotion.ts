@@ -162,7 +162,9 @@ export function placeNewPairs<T extends SeedablePair>(groups: readonly (readonly
 /**
  * The index of the pair that moves up from a group into a hole above it:
  * the best continuing pair, so a new pair stays where it was placed; of
- * equals, the first one. A group of new pairs only gives its best one.
+ * equals, the first one. A group of new pairs only gives its best one:
+ * when the continuing pairs can't fill the groups above, a new pair moves
+ * up so the planned sizes hold (Peter, 2026-11-05, D107f).
  */
 function upwards<T extends SeedablePair>(group: readonly T[], isNew: (pair: T) => boolean): number {
   let at = -1;

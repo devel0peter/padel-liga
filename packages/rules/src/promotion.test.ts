@@ -252,6 +252,25 @@ describe("placeNewPairs (spec 10, D107f: at the bottom of the division)", () => 
     expect(ids(out)[3]).toEqual(expect.arrayContaining(["A", "B"]));
   });
 
+  it("moves the best new pair up only when continuing pairs can't fill the groups above (Peter, D107f): 9 + 4 weak", () => {
+    // 13 plan 4+3+3+3 (Bronz 1, Réz 2–3, Rookie 4); every new pair's entry is
+    // group 4, but 9 continuing pairs can't fill 4+3+3: N1 fills group 3.
+    const weak = [1000, 990, 980, 970].map((elo, i) => p(`N${i + 1}`, elo));
+    const out = placeNewPairs(ladder(3, 3, 3), weak);
+    expect(out.map((g) => g.length)).toEqual([4, 3, 3, 3]);
+    expect(ids(out)[2]).toEqual(["G3P2", "G3P3", "N1"]);
+    expect(ids(out)[3]).toEqual(["N2", "N3", "N4"]);
+  });
+
+  it("moves new pairs up across a division border when they must: 6 continuing (3+3) + 6 new give 4+4+4, two new pairs in Réz", () => {
+    const weak = [1000, 990, 980, 970, 960, 950].map((elo, i) => p(`N${i + 1}`, elo));
+    const out = placeNewPairs(ladder(3, 3), weak);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4]);
+    expect(ids(out)[0]!.some((id) => id.startsWith("N"))).toBe(false);
+    expect(ids(out)[1]).toEqual(expect.arrayContaining(["N1", "N2"]));
+    expect(ids(out)[2]).toEqual(["N3", "N4", "N5", "N6"]);
+  });
+
   it("adds 2 new pairs to 8 as 4+3+3: the stronger first, each at the bottom of its division", () => {
     const out = placeNewPairs(ladder(4, 4), [p("Low", 1000), p("High", 1650)]);
     expect(out.map((g) => g.length)).toEqual([4, 3, 3]);

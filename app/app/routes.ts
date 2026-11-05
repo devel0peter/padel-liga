@@ -27,6 +27,9 @@ export default [
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("matches/:id", "routes/match.tsx"),
+    // Pair and player profiles: for logged-in members only (D112).
+    route("players/:id", "routes/player-profile.tsx"),
+    route("pairs/:id", "routes/pair-profile.tsx"),
     layout("routes/admin.tsx", [
       route("admin", "routes/admin._index.tsx"),
       route("admin/signups", "routes/admin.signups.tsx"),
@@ -50,11 +53,13 @@ export default [
       route("admin/leagues/:league/matches", "routes/admin.league-matches.tsx"),
       route("admin/leagues/:league/matches/:id", "routes/admin.league-match.tsx"),
       route("admin/leagues/:league/disputes", "routes/admin.league-disputes.tsx"),
+      route("admin/leagues/:league/substitutes", "routes/admin.league-substitutes.tsx"),
       route("admin/leagues/:league/matches/:id/decide", "routes/admin.match-decide.tsx"),
     ]),
   ]),
   route("admin/poster", "routes/admin.poster.tsx"),
   route("admin/export.csv", "routes/admin.export.ts"),
+  route("matches/:id/calendar.ics", "routes/match-calendar.ts"),
 
   // Hungarian paths from before 2026-10-04, still in sent emails and shared
   // links. Unsubscribe links are POSTed by mail clients (RFC 8058), which

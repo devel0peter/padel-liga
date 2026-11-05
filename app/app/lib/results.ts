@@ -3,7 +3,7 @@
 // D1 side is results.server.ts, the rules are in packages/rules
 // (results.ts, reporting.ts).
 
-import { flipScore, type MatchOutcome, type MatchScore, type ResultEventKind, type ResultState, type Side } from "@padel-liga/rules";
+import { flipScore, type MatchOutcome, type MatchScore, type ResultEventKind, type ResultState, type RulingKind, type Side } from "@padel-liga/rules";
 
 import { formatDeadline } from "./format";
 import type { StatusView } from "./matches";
@@ -165,19 +165,27 @@ export function resultEventText(e: { kind: ResultEventKind; score?: MatchScore |
   }
 }
 
-// A log line for a ruling (#28, #29).
-export function decisionText(d: { kind: "auto_accepted" | "organizer"; outcome: MatchOutcome; reason: string | null }, viewer: Side): string {
+// A log line for a ruling (#28, #29; the deadline's, #11).
+export function decisionText(d: { kind: RulingKind; outcome: MatchOutcome; reason: string | null }, viewer: Side): string {
   if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
+  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${outcomeText(d.outcome, viewer)}`;
   return `A szervező döntött: ${outcomeText(d.outcome, viewer)}. Indoklás: ${d.reason ?? ""}`;
 }
 
 // A ruling for the organizer, naming the pairs (#29).
 export function neutralDecisionText(
-  d: { kind: "auto_accepted" | "organizer"; outcome: MatchOutcome; reason: string | null },
+  d: { kind: RulingKind; outcome: MatchOutcome; reason: string | null },
   names: { a: string; b: string },
 ): string {
   if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
+  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${neutralOutcomeText(d.outcome, names)}`;
   return `Döntés: ${neutralOutcomeText(d.outcome, names)}. Indoklás: ${d.reason ?? ""}`;
+}
+
+// How a final match is labelled for the organizer: decided by them, settled
+// at the deadline (#11), or played.
+export function finalLabel(how: "confirmed" | RulingKind): string {
+  return how === "organizer" ? "Döntés" : how === "deadline" ? "Határidő" : "Lejátszva";
 }
 
 /** The note a disputing pair may add for the organizer. */

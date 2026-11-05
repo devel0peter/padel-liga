@@ -24,6 +24,9 @@ const { pairCandidates } = await import("~/lib/pairs.server");
 const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
 const { sendLoginCode } = await import("~/lib/auth/login-code.server");
+const { updateElo } = await import("~/lib/elo.server");
+const { ladderPage } = await import("~/lib/ladder.server");
+const { pairProfile, playerProfile } = await import("~/lib/profiles.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 // During phase 1 (9–29 Nov) and after it.
@@ -246,6 +249,57 @@ describe("deleting an account (#152)", () => {
     expect(one("select revision from groups where id = 1").revision).toBe(1);
   });
 
+  it("anonymizing takes the organizer's substitute reasons off the player's pairs' requests (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'S', 1)`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at, reason)
+      values (1, 1, 'b', 's', 'rejected', 1, 'Lábsérülés miatt nem.'), (1, 2, 'd', 's', 'rejected', 1, 'Másik pár oka.')`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(all("select pair_id, reason from match_substitutes order by pair_id")).toEqual([
+      { pair_id: 1, reason: null },
+      { pair_id: 2, reason: "Másik pár oka." },
+    ]);
+  });
+
+  it("anonymizing takes the organizer's no-show reasons off the player's pairs' matches, in the report and the ruling (#33)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into no_show_reports (match_id, pair_id, status, reported_at, reason) values (1, 2, 'confirmed', 1, 'Beteg volt a párja.')`);
+    h.raw.exec(`insert into match_decisions (match_id, kind, outcome, reason, at) values
+      (1, 'organizer', '{"kind":"walkover","winner":"b"}', 'Nem jöttek el: a szervező jóváhagyta a bejelentést. Beteg volt a párja.', 1),
+      (1, 'organizer', '{"kind":"unplayed"}', 'A klub lemondta a pályát.', 2)`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(one("select reason from no_show_reports")).toEqual({ reason: null });
+    expect(all("select reason from match_decisions order by id").map((r: any) => r.reason)).toEqual([
+      "Nem jöttek el: a szervező jóváhagyta a bejelentést.",
+      // An ordinary ruling's reason stays, as before.
+      "A klub lemondta a pályát.",
+    ]);
+  });
+
+  it("anonymizes, never removes, an approved substitute, so the Elo replay still rates who played (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);
+    h.raw.exec(`update matches set status = 'final', outcome = '{"kind":"played","score":{"sets":[[4,1],[4,2]]}}' where id = 1`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (1, 1, 'b', 's', 'approved', 1)`);
+    expect(await D.deleteAccount("admin", "s", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(one("select substitute_id, status from match_substitutes")).toEqual({ substitute_id: "s", status: "approved" });
+    expect(one("select name, email from users where id = 's'")).toEqual({ name: DELETED_NAME, email: "deleted-s@deleted.invalid" });
+    await updateElo(AFTER);
+    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "c", "d", "s"].map((user_id) => ({ user_id })));
+    expect(n("select elo from users where id = 'b'")).toBeNull();
+    expect(n("select elo from users where id = 's'")).toBeGreaterThan(1000);
+  });
+
+  it("removes a substitute who was never approved, with their requests (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at)
+      values (1, 1, 'b', 's', 'requested', 1), (1, 2, 'd', 's', 'rejected', 1)`);
+    expect(await D.deleteAccount("admin", "s", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(n("select count(*) from match_substitutes")).toBe(0);
+    expect(n("select count(*) from users where id = 's'")).toBe(0);
+  });
+
   it("anonymizes an account with history; groups and matches stay", async () => {
     publishPairOne();
     expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
@@ -309,5 +363,120 @@ describe("deleting an account (#152)", () => {
     expect([...during.history].sort()).toEqual(["a", "b", "c", "d"]);
     expect([...during.playing].sort()).toEqual(["a", "b", "c", "d"]);
     expect([...(await D.deletionFacts(AFTER)).playing]).toEqual([]);
+  });
+
+  it("plans one account with the same answer as the user list's facts (#38)", async () => {
+    publishPairOne();
+    // 'c' was an approved substitute once: history without a pair of theirs there.
+    h.raw.exec(`delete from group_pairs where pair_id = 2`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at)
+      select id, 1, 'b', 'c', 'approved', 'a', 1 from matches limit 1`);
+    for (const at of [DURING, AFTER]) {
+      const facts = await D.deletionFacts(at);
+      for (const id of ["a", "b", "c", "d"]) {
+        const expected = facts.playing.has(id)
+          ? { ok: false, refusal: "playing" }
+          : { ok: true, mode: facts.history.has(id) ? "anonymize" : "remove" };
+        expect(await D.planDeletion("admin", id, at), `${id} ${at.toISOString()}`).toEqual(expected);
+      }
+    }
+    expect(await D.planDeletion("admin", "c", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(await D.planDeletion("admin", "d", AFTER)).toEqual({ ok: true, mode: "remove" });
+  });
+});
+
+// "Fiók törlése" on the player's own profile (#38): the same deletion, the
+// account itself as the actor, every session gone.
+describe("a player deleting their own account (#38)", () => {
+  const OLD = { name: "Anna Teszt", email: "a@x.hu", phone: "+36309999999" };
+
+  beforeEach(() => {
+    freshDb();
+    // A second device, and a phone number nobody else has.
+    h.raw.exec(`insert into sessions (id_hash, user_id, expires_at) values ('s-a2', 'a', 9999999999)`);
+    h.raw.prepare("update users set phone = ? where id = 'a'").run(OLD.phone);
+  });
+  afterEach(() => expect(h.mails).toEqual([]));
+
+  // Every row of every table, without the mail that is someone else's
+  // (105: anna@x.hu; 106, 109: a namesake's own; 107: a longer name).
+  function everything(): string {
+    const tables = all("select name from sqlite_master where type = 'table' and name not like 'sqlite_%'") as { name: string }[];
+    return tables
+      .flatMap((t) => all(`select * from "${t.name}"`).filter((r: any) => !(t.name === "email_messages" && [105, 106, 107, 109].includes(r.id))))
+      .map((r) => JSON.stringify(r))
+      .join("\n");
+  }
+
+  function nowhere(text: string) {
+    expect(text).not.toContain(OLD.name);
+    expect(text).not.toMatch(/(^|[^a-z0-9._%+-])a@x\.hu/i);
+    expect(text).not.toContain(OLD.phone);
+  }
+
+  it("removes an account without history; every device is logged out; the account is the actor", async () => {
+    expect(await D.planOwnDeletion("a", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(await D.deleteOwnAccount("a", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(n("select count(*) from users where id = 'a'")).toBe(0);
+    expect(personalRowsLeft()).toEqual(NONE);
+    interestListAfter();
+    // Written by the account before it went; the row's delete cleared the
+    // actor, so Napló shows "Törölt játékos".
+    expect(all("select actor_id, action, target, detail from audit_log where action like 'account.%'")).toEqual([
+      { actor_id: null, action: "account.delete", target: "user:a", detail: null },
+    ]);
+    nowhere(everything());
+    // Logging in again finds no account: the address starts a new registration.
+    expect(await findUserIdByEmail(OLD.email)).toBeNull();
+  });
+
+  it("anonymizes an account with history: tables and results unchanged, old name, email and phone nowhere", async () => {
+    publishPairOne();
+    // Pair 1 (a + b) won its match by walkover.
+    h.raw.exec(`update matches set status = 'final', outcome = '{"kind":"walkover","winner":"a"}' where pair_a = 1 and pair_b = 2`);
+    const table = async () => {
+      const page = await ladderPage("gyor", AFTER);
+      if (page?.kind !== "ladder") throw new Error("no ladder");
+      return page;
+    };
+    const points = (page: Awaited<ReturnType<typeof table>>) =>
+      page.bands.flatMap((b) => b.groups.flatMap((g) => g.rows.map((r) => [r.points, r.matches])));
+    const before = await table();
+    expect(JSON.stringify(before)).toContain(OLD.name);
+
+    expect(await D.planOwnDeletion("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(await D.deleteOwnAccount("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+
+    const after = await table();
+    expect(points(after)).toEqual(points(before));
+    expect(points(after)).toContainEqual([3, 1]);
+    expect(JSON.stringify(after)).toContain(DELETED_NAME);
+    expect(n("select count(*) from matches where status = 'final'")).toBe(1);
+    const pair = JSON.stringify(await pairProfile(1, AFTER));
+    expect(pair).toContain(DELETED_NAME);
+    expect(await playerProfile("a", AFTER)).toBeNull();
+    // No session on any device, no login, no Szervező rights, no contact data.
+    expect(personalRowsLeft()).toEqual(NONE);
+    expect(await findUserIdByEmail(OLD.email)).toBeNull();
+    for (const text of [JSON.stringify(after), pair, everything()]) nowhere(text);
+    expect(one("select status, dissolved_by from pairs where id = 1")).toEqual({ status: "dissolved", dissolved_by: "a" });
+    expect(all("select actor_id, action, target from audit_log where action like 'account.%' or action like 'pair.%' order by id")).toEqual([
+      { actor_id: "a", action: "account.anonymize", target: "user:a" },
+      { actor_id: "a", action: "pair.dissolve", target: "pair:1" },
+    ]);
+  });
+
+  it("is refused like the Admin's while the pair plays, said to the player; nothing changes", async () => {
+    publishPairOne();
+    expect(await D.planOwnDeletion("a", DURING)).toEqual({ ok: false, refusal: "ownPlaying" });
+    expect(await D.deleteOwnAccount("a", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.ownPlaying });
+    expect(one("select name, email, phone from users where id = 'a'")).toEqual(OLD);
+    expect(n("select count(*) from sessions where user_id = 'a'")).toBe(2);
+    expect(n("select count(*) from audit_log where action like 'account.%'")).toBe(0);
+  });
+
+  it("is refused for the Admin", async () => {
+    expect(await D.deleteOwnAccount("admin", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.ownAdmin });
+    expect(n("select count(*) from users where id = 'admin' and deleted_at is null")).toBe(1);
   });
 });

@@ -102,6 +102,7 @@ describe("sidebar", () => {
       "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
+      "/admin/leagues/gyor/substitutes",
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -130,7 +131,7 @@ describe("sidebar", () => {
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
-    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták", "Helyettesek"]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 

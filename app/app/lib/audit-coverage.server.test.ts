@@ -40,6 +40,10 @@ const SIGNUPS = await import("~/lib/signups-admin.server");
 const SOLO = await import("~/lib/solo-pairing.server");
 const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
+const DEADLINE = await import("~/lib/deadline.server");
+const STRIKES = await import("~/lib/strikes.server");
+const SUBSTITUTES = await import("~/lib/substitutes.server");
+const NOSHOWS = await import("~/lib/no-shows.server");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs.
@@ -141,6 +145,11 @@ const STEPS: Step[] = [
   { action: "groups.draft", actor: ORG, run: () => expectOk(GROUPS.generateDraft(1, ORG)) },
   { action: "groups.move", actor: ORG, run: () => expectOk(GROUPS.moveDraftPair(1, firstPairOfGroup(1), 2, ORG)) },
   { action: "groups.publish", actor: ORG, run: () => expectOk(GROUPS.publishGroups(1, ORG, PUBLISHED)) },
+  { action: "substitute.approve", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "approve", "", IN_PHASE))) },
+  { action: "substitute.revoke", actor: ORG, run: () => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, lastRequest(), "revoke", "Mégsem.", IN_PHASE)) },
+  { action: "substitute.reject", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "reject", "", IN_PHASE))) },
+  { action: "match.no_show_confirm", actor: ORG, run: () => noShowReport(3).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "confirm", "", IN_PHASE))) },
+  { action: "match.no_show_reject", actor: ORG, run: () => noShowReport(4).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "reject", "", IN_PHASE))) },
   {
     action: "match.decide",
     actor: ORG,
@@ -158,6 +167,14 @@ const STEPS: Step[] = [
     },
   },
   { action: "season_entry.withdraw", actor: ORG, run: () => expectOk(ENTRIES.withdrawPairMidPhase({ id: ORG }, 1, 7, 1, "Sérülés.", IN_PHASE)) },
+  // One match resolved after the deadline (#11): nobody scheduled it, so both
+  // pairs' players get a strike (#294), which the organizer then cancels.
+  { action: "match.deadline", actor: null, run: () => DEADLINE.resolveDeadlines(AFTER_PHASE, undefined, 1).then((r) => expect(r.resolved).toBe(1)) },
+  {
+    action: "strike.cancel",
+    actor: ORG,
+    run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
+  },
   { action: "signup.update", actor: ADMIN, run: () => SIGNUPS.updateSignup(3, { status: "contacted", adminNote: "hívd fel" }, ADMIN) },
   { action: "signup.delete", actor: ADMIN, run: () => SIGNUPS.deleteSignup(3, ADMIN) },
   { action: "solo.pair", actor: ORG, run: () => SOLO.pairSolos(ORG, 1, 1, 2, "gyor", "Győr").then((e) => expect(e).toBeNull()) },
@@ -184,6 +201,24 @@ const springId = () => one("select id from seasons where name like 'Tavasz%'").i
 const pairOf = (player: string) => one("select id from pairs where player_a = ? order by id desc", player).id as number;
 const firstPairOfGroup = (n: number) => one("select gp.pair_id from group_pairs gp join groups g on g.id = gp.group_id where g.number = ? order by gp.seed", n).pair_id as number;
 const matchIds = () => all("select id from matches order by id").map((r: any) => r.id as number);
+// A player of the third match's first pair asks for q1 (free, no signup)
+// instead of their partner; no entry of its own (a player's step).
+const lastRequest = () => one("select max(id) as id from match_substitutes").id as number;
+async function substituteRequest(): Promise<number> {
+  const id = matchIds()[2]!;
+  const p = one("select p.player_a, p.player_b from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+  await expectOk(SUBSTITUTES.requestSubstitute(p.player_a, id, { absentId: p.player_b, substituteId: "q1" }, IN_PHASE));
+  return lastRequest();
+}
+// A player of the nth match's first pair reports, after its agreed slot
+// (PLAYED), that the other pair didn't come; no entry of its own (a player's step).
+async function noShowReport(n: number): Promise<number> {
+  const id = matchIds()[n]!;
+  h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = ?").run(sec(PLAYED.toISOString()), id);
+  const p = one("select p.player_a from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+  await expectOk(NOSHOWS.reportNoShow(p.player_a, id, IN_PHASE));
+  return one("select max(id) as id from no_show_reports").id as number;
+}
 async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
   expect(await p).toMatchObject({ ok: true });
 }
@@ -199,14 +234,15 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.cities.tsx": ["city.create", "city.update", "city.delete"],
   "admin.clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
-  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw"],
+  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
   "admin.league-solos.tsx": ["pair.create", "solo.pair", "solo.unpair"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
-  "admin.match-decide.tsx": ["match.decide"],
+  "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
   "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
+  "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
 };
 
@@ -235,7 +271,7 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/@/);
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/\+?36\d{6,}/);
     }
-    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo)\./.test(r.action));
+    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|strike|substitute)\./.test(r.action));
     for (const r of leagueActions) expect(r.league_id, r.action).not.toBeNull();
   });
 

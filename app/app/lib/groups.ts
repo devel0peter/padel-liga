@@ -11,6 +11,10 @@ import { addDays, budapestDay, groupProblems, groupSizes, type PhaseMatch } from
 
 import { formatShortDate } from "./format";
 
+// The first phase of a season: drafted from the entries (#24); every later
+// phase comes from a round switch (#35).
+export const FIRST_PHASE = 1;
+
 export type PlayerName = { name: string };
 
 // "Kiss Anna – Nagy Béla": a pair's two names, as on the entries page.

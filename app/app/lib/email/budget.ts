@@ -28,7 +28,8 @@ export type MessageKind =
   | "match_result"
   | "stuck_reminder"
   | "match_digest"
-  | "match_tomorrow";
+  | "match_tomorrow"
+  | "strike_warning";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

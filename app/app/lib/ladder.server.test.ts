@@ -235,7 +235,7 @@ describe("ladderPage", () => {
     expect(before.phase).toBe(1);
   });
 
-  it("carries no email, phone or internal id (user, pair, group or match)", async () => {
+  it("carries no email, phone or internal id but the pair's, for its profile link (#36)", async () => {
     publish(1, 3);
     h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where week = 1").run(sec("2026-11-10T17:30:00Z"));
     const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
@@ -248,7 +248,10 @@ describe("ladderPage", () => {
       if (key) keys.add(key);
       return this[key];
     });
-    expect([...keys].filter((k) => /(^|[a-z])id$/i.test(k))).toEqual([]);
+    // The one id: a table row's pair, for /pairs/<id> (#36). No user, group or match id.
+    expect([...keys].filter((k) => /(^|[a-z])id$/i.test(k))).toEqual(["pairId"]);
+    const rows = page?.kind === "ladder" ? page.bands.flatMap((b) => b.groups.flatMap((g) => g.rows)) : [];
+    expect(rows.map((r) => r.pairId).sort()).toEqual([1011, 1012, 1013, 1021, 1022, 1023, 1031, 1032, 1033]);
   });
 
   it("is null for a league whose city is not listed (drafts and test leagues stay hidden)", async () => {

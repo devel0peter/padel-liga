@@ -12,6 +12,10 @@ import {
   leagueAdminInvites,
   leagueAdmins,
   loginCodes,
+  matchDecisions,
+  matches,
+  matchSubstitutes,
+  noShowReports,
   notificationOptOuts,
   groupPairs,
   notifications,
@@ -26,8 +30,10 @@ import {
   users,
 } from "~/db/schema";
 import { partnerNoticeSubject } from "~/lib/email/templates";
-import { auditIfChanged } from "~/lib/audit.server";
+import { NO_SHOW_DECISION_PREFIX, noShowDecisionReason } from "~/lib/no-shows";
+import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { dissolveStatements } from "~/lib/pairs.server";
+import { clearStrikeReasons } from "~/lib/strikes.server";
 
 import {
   anonymizedEmail,
@@ -36,6 +42,7 @@ import {
   deletionPlan,
   mailNamesPerson,
   PARTNER_NOTICE_SUBJECT_REMOVED,
+  type DeletionBy,
   type DeletionMode,
   type DeletionPlan,
 } from "./account-deletion";
@@ -60,29 +67,50 @@ function inPublishedGroup(u: SQLWrapper | string, now?: Date) {
     where (p.player_a = ${u} or p.player_b = ${u}) and g.published_at is not null ${running})`;
 }
 
+// An approved substitute appearance of `u` (#37): history too, so the Elo
+// replay can still tell who played.
+const approvedSubstitute = (u: SQLWrapper | string) =>
+  sql`exists (select 1 from match_substitutes ms where ms.substitute_id = ${u} and ms.status = 'approved')`;
+
 // Who has history and who plays now, for every account at once (whole
 // tables, no id lists: D1 binds at most 100 parameters).
 export async function deletionFacts(now = new Date()): Promise<DeletionFacts> {
   const rows = await db
     .select({ id: users.id, playing: sql<number>`${inPublishedGroup(users.id, now)}` })
     .from(users)
-    .where(and(isNull(users.deletedAt), inPublishedGroup(users.id)));
+    .where(and(isNull(users.deletedAt), or(inPublishedGroup(users.id), approvedSubstitute(users.id))));
   return { history: new Set(rows.map((r) => r.id)), playing: new Set(rows.filter((r) => !!r.playing).map((r) => r.id)) };
 }
 
 type Target = { id: string; email: string; name: string; platformRole: "player" | "superadmin" };
 
-async function target(userId: string): Promise<Target | undefined> {
+// The account, with the same history and playing checks as deletionFacts,
+// for this one account only (a Profil load asks for it, #38).
+async function target(userId: string, now = new Date()): Promise<(Target & { history: boolean; playing: boolean }) | undefined> {
   const [row] = await db
-    .select({ id: users.id, email: users.email, name: users.name, platformRole: users.platformRole })
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      platformRole: users.platformRole,
+      history: sql<number>`(${inPublishedGroup(users.id)} or ${approvedSubstitute(users.id)})`,
+      playing: sql<number>`${inPublishedGroup(users.id, now)}`,
+    })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)));
-  return row;
+  return row && { ...row, history: !!row.history, playing: !!row.playing };
 }
 
-export async function planDeletion(actorId: string, userId: string, now = new Date()): Promise<DeletionPlan> {
-  const [row, facts] = await Promise.all([target(userId), deletionFacts(now)]);
-  return deletionPlan({ actorId, target: row ?? null, history: facts.history.has(userId), playing: facts.playing.has(userId) });
+const planFor = (actorId: string, row: Awaited<ReturnType<typeof target>>, by: DeletionBy) =>
+  deletionPlan({ actorId, target: row ?? null, history: !!row?.history, playing: !!row?.playing }, by);
+
+export async function planDeletion(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionPlan> {
+  return planFor(actorId, await target(userId, now), by);
+}
+
+// The player's own "Fiók törlése" (#38): what it would do now.
+export function planOwnDeletion(userId: string, now = new Date()): Promise<DeletionPlan> {
+  return planDeletion(userId, userId, now, "own");
 }
 
 const lower = (column: SQLWrapper) => sql`lower(${column})`;
@@ -194,9 +222,12 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
 export type DeletionResult = { ok: true; mode: DeletionMode } | { ok: false; error: string };
 
 // "Törlés" on Felhasználók. `actorId`: the Admin (the route checks the
-// permission; the rules here check whom).
-export async function deleteAccount(actorId: string, userId: string, now = new Date()): Promise<DeletionResult> {
-  const [row, plan] = await Promise.all([target(userId), planDeletion(actorId, userId, now)]);
+// permission; the rules here check whom). With `by` "own", the player's
+// own deletion (deleteOwnAccount): the same statements, the account itself
+// as the actor.
+export async function deleteAccount(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionResult> {
+  const row = await target(userId, now);
+  const plan = planFor(actorId, row, by);
   if (!plan.ok || !row) return { ok: false, error: DELETION_REFUSALS[plan.ok ? "gone" : plan.refusal] };
   const email = row.email.toLowerCase();
   const mail = await mailContext(email, row.name);
@@ -206,10 +237,16 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
   const done = plan.mode === "remove" ? await remove(actorId, userId, email, mail) : await anonymize(actorId, userId, email, mail, now);
   if (!done) {
     // Something changed since the check: say why from the state now.
-    const again = await planDeletion(actorId, userId, now);
+    const again = await planDeletion(actorId, userId, now, by);
     return { ok: false, error: again.ok ? CHANGED : DELETION_REFUSALS[again.refusal] };
   }
   return { ok: true, mode: plan.mode };
+}
+
+// "Fiók törlése" on the player's own profile (#38). Its sessions go in the
+// batch, so every device is logged out; the route clears this one's cookie.
+export function deleteOwnAccount(userId: string, now = new Date()): Promise<DeletionResult> {
+  return deleteAccount(userId, userId, now, "own");
 }
 
 // No history: the pairs (none was ever in a published group, checked in the
@@ -217,7 +254,11 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
 // them (entries, draft group places, sessions, login methods, devices,
 // notifications, pair links, partner search). If a pair of theirs got into a
 // published group in the meantime it stays, and the account's delete fails
-// on its foreign key, so the whole batch rolls back.
+// on its foreign key, so the whole batch rolls back. Their substitute
+// requests (#37) that were not approved go with them (a waiting one simply
+// disappears from the match page and Helyettesek; the pair can ask for
+// someone else); an approval in the meantime stays and fails the delete the
+// same way (restrict).
 async function remove(actorId: string, userId: string, email: string, mail: MailContext): Promise<boolean> {
   const theirPairs = db
     .select({ id: pairs.id })
@@ -239,8 +280,12 @@ async function remove(actorId: string, userId: string, email: string, mail: Mail
               where gp.pair_id = ${pairs.id} and g.published_at is not null)`,
           ),
         ),
+      db.delete(matchSubstitutes).where(and(eq(matchSubstitutes.substituteId, userId), ne(matchSubstitutes.status, "approved"))),
+      // Before the account's delete, so a player's own deletion (#38) can
+      // name them as the actor (the row then sets it to null: Napló shows
+      // "Törölt játékos"). A failed delete rolls the entry back with it.
+      auditWhen(sql`exists (select 1 from users where users.id = ${userId})`, { actorId, action: "account.delete", target: `user:${userId}` }),
       db.delete(users).where(eq(users.id, userId)),
-      auditIfChanged({ actorId, action: "account.delete", target: `user:${userId}` }),
       ...personalDataStatements(userId, email, mail, sql`1`),
     ] as unknown as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   } catch (e) {
@@ -264,6 +309,10 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
     .select({ id: pairs.id })
     .from(pairs)
     .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  const theirMatches = db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(or(inArray(matches.pairA, theirPairs), inArray(matches.pairB, theirPairs)));
   return [
     db
       .update(notifications)
@@ -285,6 +334,29 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
       .update(groupPairs)
       .set({ withdrawalReason: null })
       .where(and(isNotNull(groupPairs.withdrawalReason), inArray(groupPairs.pairId, theirPairs), guard)),
+    // The organizer's reason for rejecting or revoking a substitute (#37) is
+    // free text about the pair too (an absence, an injury): gone with it.
+    db
+      .update(matchSubstitutes)
+      .set({ reason: null })
+      .where(and(isNotNull(matchSubstitutes.reason), inArray(matchSubstitutes.pairId, theirPairs), guard)),
+    // The organizer's reason on a no-show decision (#33) is free text about a
+    // pair's absence too: gone from the report and from its copy in the
+    // ruling's reason, on every match a pair of theirs played in.
+    db
+      .update(noShowReports)
+      .set({ reason: null })
+      .where(and(isNotNull(noShowReports.reason), inArray(noShowReports.matchId, theirMatches), guard)),
+    db
+      .update(matchDecisions)
+      .set({ reason: noShowDecisionReason("") })
+      .where(
+        and(
+          sql`substr(${matchDecisions.reason}, 1, length(${NO_SHOW_DECISION_PREFIX})) = ${NO_SHOW_DECISION_PREFIX}`,
+          inArray(matchDecisions.matchId, theirMatches),
+          guard,
+        ),
+      ),
   ];
 }
 
@@ -319,6 +391,7 @@ async function anonymize(
     ...active.flatMap((p) => dissolveStatements(actorId, p.id, now, gone, { leagueId: p.leagueId, detail: "account deleted" })),
     ...personalDataStatements(userId, email, mail, gone),
     ...withdrawalReasonStatements(userId, gone),
+    ...clearStrikeReasons(userId, gone),
   ]);
   return updated.length > 0 ? active : false;
 }

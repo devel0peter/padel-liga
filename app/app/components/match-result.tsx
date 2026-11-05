@@ -164,7 +164,13 @@ export function ResultSection({ m, feedback }: { m: View; feedback: Feedback }) 
       {r.status === "final" && (
         <p className="rounded-lg border p-4 text-sm sm:p-6">
           <span className="font-semibold">Végeredmény:</span> {outcomeText(r.outcome, m.side)}
-          {r.how === "auto_accepted" ? " (48 óra után magától elfogadva)" : r.how === "organizer" ? " (a szervező döntése)" : ""}
+          {r.how === "auto_accepted"
+            ? " (48 óra után magától elfogadva)"
+            : r.how === "organizer"
+              ? " (a szervező döntése)"
+              : r.how === "deadline"
+                ? " (lejárt a határidő, a meccsnapló alapján)"
+                : ""}
         </p>
       )}
 

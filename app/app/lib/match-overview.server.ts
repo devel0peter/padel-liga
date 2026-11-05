@@ -258,8 +258,8 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       ...results.decisions.map((d) => ({
         id: -d.id,
         at: d.at,
-        who: d.kind === "auto_accepted" ? "Padelpárbaj" : d.userName || "Szervező",
-        pair: d.kind === "auto_accepted" ? "automatikus" : "szervező",
+        who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+        pair: d.kind === "organizer" ? "szervező" : "automatikus",
         text: neutralDecisionText(d, names),
       })),
     ].sort((x, y) => x.at.getTime() - y.at.getTime() || Number(x.id < 0) - Number(y.id < 0) || Math.abs(x.id) - Math.abs(y.id)),

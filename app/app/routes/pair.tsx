@@ -1,4 +1,4 @@
-import type { ShouldRevalidateFunctionArgs } from "react-router";
+import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
 import { PairLinkBox } from "~/components/pair-link";
@@ -11,6 +11,8 @@ import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED } from "~/lib/pairs";
 import { pairLeagues, pairOverview } from "~/lib/pairs.server";
+import { pairPath } from "~/lib/profiles";
+import { profilePairIds } from "~/lib/profiles.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { waitingMessage } from "~/lib/signup-partners";
 import { missingPartnerEmails, partnerEmailAction, waitingPartners } from "~/lib/signup-partners.server";
@@ -52,10 +54,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     partnerSearchState(user, leagues),
   ]);
   const origin = new URL(request.url).origin;
+  // The pair's profile (#36, members only: D112), once it has been in a published group.
+  const open = await profilePairIds(pairs.flatMap((o) => (o.pair ? [o.pair.id] : [])));
   const overview = pairs.map((o) => {
     const link = o.pair ? undefined : links.find((l) => l.league.id === o.league.id);
     return {
       ...o,
+      profile: o.pair && open.has(o.pair.id) ? pairPath(o.pair.id) : null,
       waiting: o.pair ? null : (waiting.get(o.league.id) ?? null),
       missingEmail: o.pair ? null : (missing.find((m) => m.leagueId === o.league.id) ?? null),
       link: link ? origin + pairLinkPath(link.token) : null,
@@ -122,13 +127,20 @@ function Entries({ entries }: { entries: Entry[] }) {
   );
 }
 
-function ActivePair({ pair }: { pair: NonNullable<Overview["pair"]> }) {
+function ActivePair({ pair, profile }: { pair: NonNullable<Overview["pair"]>; profile: string | null }) {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
         <CardDescription>A párod</CardDescription>
         <CardTitle className="font-display text-xl">{pair.partnerName}</CardTitle>
       </CardHeader>
+      {profile && (
+        <CardContent className="text-sm">
+          <Link to={profile} className="font-semibold underline">
+            A párotok oldala
+          </Link>
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -179,7 +191,7 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
       {d.overview.map((o) => (
         <section key={o.league.id} className="grid gap-4">
           {d.multi && <h2 className="font-display text-lg font-bold">{o.league.name}</h2>}
-          {o.pair && <ActivePair pair={o.pair} />}
+          {o.pair && <ActivePair pair={o.pair} profile={o.profile} />}
           {o.pair && d.entries.some((e) => e.leagueId === o.league.id) && (
             <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
           )}

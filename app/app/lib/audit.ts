@@ -36,7 +36,7 @@ export const AUDIT_ACTIONS = {
   "pair.link": "Pár párlinkkel",
   "season_entry.enter": "Benevezés",
   "season_entry.remove": "Kivétel a szezonból",
-  "season_entry.withdraw": "Kivétel futó körből",
+  "season_entry.withdraw": "Kivétel kihirdetett csoportból",
   "partner_search.on": "Párkeresés be",
   "partner_search.off": "Párkeresés ki",
   // Interest list
@@ -47,6 +47,13 @@ export const AUDIT_ACTIONS = {
   // Matches
   "match.decide": "Meccs eldöntése",
   "result.auto_accept": "Eredmény automatikus elfogadása",
+  "match.deadline": "Határidős döntés",
+  "match.no_show_confirm": "Nem jöttek el: jóváhagyás",
+  "match.no_show_reject": "Nem jöttek el: elutasítás",
+  "strike.cancel": "Fekete pont törlése",
+  "substitute.approve": "Helyettes jóváhagyása",
+  "substitute.reject": "Helyettes elutasítása",
+  "substitute.revoke": "Helyettes visszavonása",
   // Emails and reminders
   "broadcast.send": "Körlevél küldése",
   "registration_invites.send": "Regisztrációs meghívók",
@@ -68,7 +75,7 @@ export const SYSTEM_ACTOR = "Rendszer";
 
 // The actions written without an account: the cron and the command line.
 // Any other entry without an actor lost it when its account was deleted.
-export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
+export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "match.deadline", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
 
 export function isSystemAction(code: string): boolean {
   return SYSTEM_ACTIONS.includes(code);

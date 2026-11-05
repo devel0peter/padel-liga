@@ -9,7 +9,7 @@
 // started (or once its groups are out) joins at the next phase. "pending"
 // and "rejected" are left from the approval step: nothing writes them now.
 
-import { isLevel, pairElo, startingElo } from "@padel-liga/rules";
+import { currentElo, pairElo } from "@padel-liga/rules";
 
 import type { Season, StoredPhase } from "./seasons";
 
@@ -72,11 +72,17 @@ export function checkEntry(c: EntryCheck): EntryRefusal | null {
   return null;
 }
 
-// The pair's starting rating: the average of the two players' starting Elo
-// (spec section 11); null while a level is missing.
-export function averageStartingElo(a: string | null, b: string | null): number | null {
-  if (!a || !b || !isLevel(a) || !isLevel(b)) return null;
-  return pairElo(startingElo(a), startingElo(b));
+// A player's rating as stored: users.elo (null until their first rated
+// match) and their level.
+export type PlayerRating = { elo: number | null; level: string | null };
+
+// The pair's current rating (#13, spec section 11): the average of the two
+// players' current Elo, each the rating from their played matches or, before
+// the first one, their level's starting value; null while one has neither.
+export function averageElo(a: PlayerRating, b: PlayerRating): number | null {
+  const x = currentElo(a.elo, a.level);
+  const y = currentElo(b.elo, b.level);
+  return x === null || y === null ? null : pairElo(x, y);
 }
 
 // "az 1. körtől", "a 2. körtől": "az" before a number read with a vowel.
@@ -206,4 +212,4 @@ export function withdrawalReasonError(reason: string): string | null {
   return null;
 }
 
-export const NOT_IN_RUNNING_PHASE = "Ez a pár most nem játszik futó körben. Frissítsd az oldalt.";
+export const NOT_IN_RUNNING_PHASE = "Ez a pár most nem játszik kihirdetett csoportban. Frissítsd az oldalt.";

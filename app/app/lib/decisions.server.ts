@@ -11,9 +11,10 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import { pairName } from "./groups";
 import { eventText } from "./matches";
 import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matches.server";
+import { updateElo } from "./elo.server";
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
-import { neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
+import { finalLabel, neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
 import { logError } from "~/lib/log";
 
 // The organizer's side of results (#29): the league's disputes and matches,
@@ -88,7 +89,7 @@ function organizerLabel(m: { result: ResultState; status: string; a: string; b: 
     case "disputed":
       return "Vitatott eredmény";
     case "final":
-      return `${r.how === "organizer" ? "Döntés" : "Lejátszva"}: ${neutralOutcomeText(r.outcome, m)}`;
+      return `${finalLabel(r.how)}: ${neutralOutcomeText(r.outcome, m)}`;
     case "none":
       return m.status === "scheduled" ? "Lefixálva" : "Egyeztetés alatt";
   }
@@ -213,8 +214,8 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       key: `d${d.id}`,
       id: Number.MAX_SAFE_INTEGER,
       at: d.at,
-      who: d.kind === "auto_accepted" ? "Padelpárbaj" : d.userName || "Szervező",
-      role: d.kind === "auto_accepted" ? "automatikus" : "szervező",
+      who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+      role: d.kind === "organizer" ? "szervező" : "automatikus",
       text: neutralDecisionText(d, names),
     })),
   ]
@@ -292,6 +293,8 @@ export async function decideMatch(
     if (lostRace(e)) return { ok: false, error: CHANGED };
     throw e;
   }
+  // A played outcome changes Elo; overriding one replays it in place (#13).
+  await updateElo(now);
   try {
     await notifyPlayers(
       "match_decided",

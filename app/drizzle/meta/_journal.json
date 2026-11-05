@@ -288,6 +288,41 @@
       "when": 1793824009071,
       "tag": "0044_push_stats_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1793862819890,
+      "tag": "0045_strikes",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1793863473558,
+      "tag": "0046_elo_ratings",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1793889419679,
+      "tag": "0050_match_substitutes",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1793895620306,
+      "tag": "0051_no_show_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1793901527634,
+      "tag": "0052_round_switch",
+      "breakpoints": true
     }
   ]
 }

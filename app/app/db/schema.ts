@@ -1,6 +1,6 @@
 import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
-import { type AnySQLiteColumn, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
@@ -72,6 +72,7 @@ export const emailMessages = sqliteTable(
         "match_digest",
         "match_tomorrow",
         "match_result",
+        "strike_warning",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -161,6 +162,11 @@ export const users = sqliteTable("users", {
   // starting Elo. Required on the first-login page; null only for accounts
   // from before it was asked (the home page prompts them).
   level: text("level", { enum: ["kezdo", "kozephalado", "halado", "versenyzo"] }),
+  // The current Elo (#13, spec 11), unrounded; null until the first rated
+  // match, while the level's starting value counts (packages/rules
+  // currentElo). Written only by lib/elo.server.ts, which replays every
+  // rated match.
+  elo: real("elo"),
   // Hungarian phone number in E.164 ("+36301234567"), required on the profile
   // form since 2026-10-28 (older accounts may lack it). Personal data:
   // never on a public page; only the current phase's opponents will see it.
@@ -262,6 +268,10 @@ export const leagues = sqliteTable("leagues", {
   // When the league's Szervező or the Admin switched on the automatic
   // reminders for people stuck before entering (#155); null: off.
   remindersOnAt: integer("reminders_on_at", { mode: "timestamp" }),
+  // How many round switches of the league's first season are fast
+  // calibration switches (spec 10, #12): 2 pairs swap at a border of two
+  // groups of 4. Default 1: the switch after phase 1 only.
+  fastSwitches: integer("fast_switches").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -419,6 +429,14 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "strike",
+        "substitute_requested",
+        "substitute_approved",
+        "substitute_rejected",
+        "substitute_revoked",
+        "no_show_reported",
+        "no_show_confirmed",
+        "no_show_rejected",
         "test",
       ],
     }).notNull(),
@@ -691,6 +709,11 @@ export const groups = sqliteTable(
     // Bumped by every move into or out of the group, so publishing can tell
     // that the draft it checked is still the one it locks.
     revision: integer("revision").notNull().default(0),
+    // A round switch draft (#35): the draft the system computed, before the
+    // organizer's moves, as sorted pair ids per group ("1,2,5,6|3,4,7,8"),
+    // so publishing can tell that the ending phase's results or pairs have
+    // changed since. Null for phase 1.
+    basis: text("basis"),
     publishedAt: integer("published_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -823,7 +846,9 @@ export const matchDecisions = sqliteTable(
     matchId: integer("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["auto_accepted", "organizer"] }).notNull(),
+    // "deadline": the cron resolved an unplayed match after the deadline
+    // (#11, D103; user_id null).
+    kind: text("kind", { enum: ["auto_accepted", "deadline", "organizer"] }).notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     // Sides as pair_a/pair_b.
     outcome: text("outcome", { mode: "json" }).$type<MatchOutcome>().notNull(),
@@ -848,6 +873,39 @@ export const jobRuns = sqliteTable("job_runs", {
   doneAt: integer("done_at", { mode: "timestamp" }).notNull(),
 });
 
+// Strikes ("fekete pont", spec 8, #294, D103): one row per player and
+// strike, given by the deadline resolution (#11) or a confirmed no-show
+// (#33). They count per player per season (packages/rules strikes.ts), so a
+// partner change keeps them and a new season starts from zero. The organizer
+// can cancel one with a reason; the row stays, the count leaves it out.
+// Personal data: the reason may name an illness; anonymizing the player's
+// account clears it.
+export const strikes = sqliteTable(
+  "strikes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // The pair the player played in when it was given.
+    pairId: integer("pair_id").references(() => pairs.id, { onDelete: "set null" }),
+    matchId: integer("match_id").references(() => matches.id, { onDelete: "set null" }),
+    source: text("source", { enum: ["deadline", "no_show"] }).notNull(),
+    at: integer("at", { mode: "timestamp" }).notNull(),
+    cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
+    cancelledBy: text("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+    cancelReason: text("cancel_reason"),
+  },
+  (t) => [
+    index("strikes_season_user_idx").on(t.seasonId, t.userId),
+    // One strike per player per match and source: a re-run gives none twice.
+    uniqueIndex("strikes_match_user_source_idx").on(t.matchId, t.userId, t.source),
+  ],
+);
+
 export const matchReminders = sqliteTable(
   "match_reminders",
   {
@@ -859,4 +917,112 @@ export const matchReminders = sqliteTable(
     sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.kind, t.slot] })],
+);
+
+// Every player's Elo change in every rated match (#13, spec 11): a played
+// match that is final. Rewritten by lib/elo.server.ts from a replay of all
+// rated matches in the order they first became final, so an organizer's
+// later ruling changes the history as if it had been there from the start.
+// `at`: when the match first became final (the replay order). For the
+// profile's history (#36).
+export const eloChanges = sqliteTable(
+  "elo_changes",
+  {
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ratingBefore: real("rating_before").notNull(),
+    ratingAfter: real("rating_after").notNull(),
+    delta: real("delta").notNull(),
+    // The side's K: the average of its two players' K (D104).
+    k: real("k").notNull(),
+    at: integer("at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.userId] }), index("elo_changes_user_idx").on(t.userId, t.at)],
+);
+
+// A substitute for an absent player in one match (#37, spec 4, D109). A
+// player of the pair asks before the match starts, the league's organizer
+// approves or rejects it (optional reason) and may revoke an approval until
+// the start. Only an approved row changes who played: Elo (elo.server.ts)
+// rates the substitute instead of the absent player. One live row
+// (requested or approved) per absent player per match.
+// Personal data: who asked and who decided (set null when the account is
+// deleted); the reason is for the pair and the organizer only.
+export const matchSubstitutes = sqliteTable(
+  "match_substitutes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The asking pair, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    // Restrict: who played stays resolvable (Elo). An account named here in
+    // an approved request counts as history and is anonymized, never removed
+    // (account-deletion.server.ts, D60); a removal deletes its other requests.
+    absentId: text("absent_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    substituteId: text("substitute_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: text("status", { enum: ["requested", "approved", "rejected", "withdrawn", "revoked"] }).notNull().default("requested"),
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
+    requestedAt: integer("requested_at", { mode: "timestamp" }).notNull(),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    // The organizer's optional reason for a rejection or a revocation.
+    reason: text("reason"),
+  },
+  (t) => [
+    uniqueIndex("match_substitutes_live_idx")
+      .on(t.matchId, t.absentId)
+      .where(sql`${t.status} in ('requested', 'approved')`),
+    // A person is named once per match.
+    uniqueIndex("match_substitutes_live_substitute_idx")
+      .on(t.matchId, t.substituteId)
+      .where(sql`${t.status} in ('requested', 'approved')`),
+    index("match_substitutes_match_idx").on(t.matchId),
+    index("match_substitutes_status_idx").on(t.status),
+  ],
+);
+
+// No-show reports (#33, spec 8, D108): a player of the pair that showed up
+// at an accepted slot reports that the other didn't; the league's organizer
+// confirms (a walkover in match_decisions, a strike in strikes) or rejects
+// it. One waiting report per match; the reporter can withdraw it before a
+// decision. The deadline resolution leaves a match with a waiting report to
+// the organizer.
+export const noShowReports = sqliteTable(
+  "no_show_reports",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The pair that showed up and reports it, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["open", "withdrawn", "confirmed", "rejected"] }).notNull().default("open"),
+    reportedBy: text("reported_by").references(() => users.id, { onDelete: "set null" }),
+    reportedAt: integer("reported_at", { mode: "timestamp" }).notNull(),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    // The organizer's optional reason, shown to both pairs on the match page.
+    reason: text("reason"),
+  },
+  (t) => [
+    uniqueIndex("no_show_reports_open_idx")
+      .on(t.matchId)
+      .where(sql`${t.status} = 'open'`),
+    index("no_show_reports_match_idx").on(t.matchId),
+    index("no_show_reports_status_idx").on(t.status),
+  ],
 );

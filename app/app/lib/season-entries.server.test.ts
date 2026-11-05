@@ -102,6 +102,13 @@ describe("season entries on real SQLite", () => {
     expect(entry()).toMatchObject({ status: "approved", joins_phase: 2 });
   });
 
+  it("#35: entered once a later phase's groups are published, before it starts (a break): joins the phase after it", async () => {
+    // Phase 3 starts on 4 Jan after the holiday break; its groups went out on 21 Dec.
+    h.raw.exec(`insert into groups (season_id, phase, number, published_at) values (1, 3, 1, ${sec("2026-12-21T08:00:00Z")})`);
+    expect(await E.applyToSeason(user("a"), 1, new Date("2026-12-28T10:00:00Z"))).toEqual({ ok: true, joins: { phase: 4, startsAt: at(PHASES[3]) } });
+    expect(entry()).toMatchObject({ status: "approved", joins_phase: 4 });
+  });
+
   it("a pair can't enter twice, from either player; no second notice", async () => {
     await E.applyToSeason(user("a"), 1, DURING_REGISTRATION);
     expect(await E.applyToSeason(user("a"), 1, DURING_REGISTRATION)).toMatchObject({ ok: false, error: expect.stringContaining("már neveztetek") });

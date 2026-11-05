@@ -1,0 +1,80 @@
+import { Link } from "react-router";
+
+import type { Route } from "./+types/player-profile";
+import { AppPage } from "~/components/app-page";
+import { Card, EloChart, MatchList } from "~/components/profile-parts";
+import { requireUser } from "~/lib/auth/session.server";
+import { pairName, pairPath } from "~/lib/profiles";
+import { playerProfile } from "~/lib/profiles.server";
+import { SITE_NAME } from "~/lib/site";
+
+// A player's profile (#36, spec sections 11, 14, 17): name, current
+// értékszám, its history and the final matches. For logged-in members only
+// (D112): a visitor goes to the login page and comes back. Names and ratings
+// only: no email or phone is selected on the way here. A deleted or
+// anonymized account has none (404).
+export async function loader({ request, params }: Route.LoaderArgs) {
+  await requireUser(request);
+  const profile = await playerProfile(params.id ?? "");
+  if (!profile) throw new Response("Nincs ilyen játékos.", { status: 404 });
+  return profile;
+}
+
+// Not for search engines or link previews (D112): a title only.
+export function meta({ loaderData }: Route.MetaArgs) {
+  const name = loaderData?.player.name ?? "Játékos";
+  return [{ title: `${name} – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
+}
+
+export default function PlayerProfile({ loaderData: d }: Route.ComponentProps) {
+  return (
+    <AppPage
+      title={d.player.name}
+      description={
+        d.elo != null ? (
+          <span className="text-base text-foreground" data-testid="player-elo">
+            Értékszám: <strong className="font-display text-lg font-extrabold">{d.elo}</strong>
+          </span>
+        ) : (
+          "Játékos"
+        )
+      }
+    >
+      <div className="grid max-w-4xl gap-6">
+        <Card title={d.pairs.length > 1 ? "Párjai" : "Párja"}>
+          <ul className="grid gap-3">
+            {d.pairs.map((p) => (
+              <li key={p.pair.id} className="grid gap-1">
+                {/* The partner's name leads to the pair's page. */}
+                <Link
+                  to={pairPath(p.pair.id)}
+                  className="font-semibold underline decoration-court/40 underline-offset-2 hover:decoration-court"
+                >
+                  {p.pair.players.find((x) => x.id !== d.player.id)?.name ?? pairName(p.pair)}
+                </Link>
+                <span className="text-sm text-muted-foreground">
+                  {p.league}, {p.latest.season}, {p.latest.phase}. kör: {p.latest.group}. csoport ({p.latest.division})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        {d.started ? (
+          <>
+            {d.eloHistory.length > 1 && (
+              <Card title="Értékszám alakulása">
+                <EloChart points={d.eloHistory} />
+              </Card>
+            )}
+            <Card title="Meccsek">
+              <MatchList matches={d.matches} empty="Még nincs lejátszott meccse." />
+            </Card>
+          </>
+        ) : (
+          <p className="text-muted-foreground">Az eredmények és az értékszám a liga indulása után látszanak itt.</p>
+        )}
+      </div>
+    </AppPage>
+  );
+}

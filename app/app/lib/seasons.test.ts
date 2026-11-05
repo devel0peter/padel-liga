@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { homeSeasons, parseSeason, previewPhases, registrationWindow, seasonActions, seasonEnd, type Season } from "./seasons";
+import { currentSeason, homeSeasons, parseSeason, previewPhases, registrationWindow, seasonActions, seasonEnd, type Season } from "./seasons";
 
 const form = (fields: Record<string, string | string[]>) => {
   const f = new FormData();
@@ -213,5 +213,22 @@ describe("seasonEnd and homeSeasons", () => {
 
   it("shows nothing when every season is over", () => {
     expect(homeSeasons([first], new Date("2028-01-01T00:00:00Z"))).toEqual([]);
+  });
+});
+
+// The public table's season and the strikes on Párok (#294: strikes reset
+// each season, so the next season shows none of the last one's).
+describe("currentSeason", () => {
+  const first = season(1, 1, "2026-11-09"); // ends 14 Feb 2027
+  const next = season(2, 1, "2027-03-01");
+
+  it("the earliest season that hasn't ended; once it has, the next one, even before it starts", () => {
+    expect(currentSeason([next, first], new Date("2027-01-10T12:00:00Z"))?.id).toBe(1);
+    expect(currentSeason([next, first], new Date("2027-02-20T12:00:00Z"))?.id).toBe(2);
+  });
+
+  it("the latest once every season is over, and none without seasons", () => {
+    expect(currentSeason([next, first], new Date("2028-01-01T00:00:00Z"))?.id).toBe(2);
+    expect(currentSeason([], new Date())).toBeUndefined();
   });
 });

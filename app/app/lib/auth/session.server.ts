@@ -112,8 +112,14 @@ export async function requireAccount(request: Request): Promise<User> {
 // then goes on where it was going.
 export async function requireUser(request: Request): Promise<User> {
   const user = await requireAccount(request);
-  if (!user.consentAt || !user.sex) loginRedirect(request, "/welcome");
+  if (!finishedFirstLogin(user)) loginRedirect(request, "/welcome");
   return user;
+}
+
+// Done with the first-login page (name, privacy consent, sex): a member, who
+// may see what is for logged-in members only (profiles, ratings; D112).
+export function finishedFirstLogin(user: Pick<User, "consentAt" | "sex">): boolean {
+  return !!user.consentAt && !!user.sex;
 }
 
 // Ends this session; returns the Set-Cookie header that clears the cookie.

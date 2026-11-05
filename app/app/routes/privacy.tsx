@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 02.";
+const EFFECTIVE_FROM = "2026. 11. 05.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -123,7 +123,11 @@ export default function Privacy() {
             </ul>
             <p>
               Amikor elindul a liga, ehhez jön még a meccseid története
-              (kivel, mikor és milyen eredménnyel játszottál) és az értékszámod.
+              (kivel, mikor és milyen eredménnyel játszottál), az értékszámod,
+              és ha kapsz, a fekete pontjaid (mikor és miért; ha a szervező
+              töröl egyet, az indoka is). A fekete pontjaidat csak te és a
+              szervező látja; ha törlöd a fiókodat, a törlések indokát is
+              töröljük.
             </p>
           </Section>
 
@@ -143,7 +147,8 @@ export default function Privacy() {
               levelet kapsz, a többit az oldalon és push értesítésben látod. A
               meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
               meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
-              nem.
+              nem. A fekete pontról az oldalon és push értesítésben szólunk; a
+              másodiknál egy figyelmeztető levelet is küldünk.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
@@ -169,9 +174,15 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
-                és a csoportod tabellája a ligaoldalon; a liga indulása után az
-                eredményeitek és az értékszámok is.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved,
+                a párod neve és a csoportod tabellája a ligaoldalon; a liga
+                indulása után a meccsek eredménye is.
+              </li>
+              <li>
+                <strong>Csak a belépett játékosok látják:</strong> a pár és a
+                játékos profilját (a csoportjaitokat, a liga indulása után az
+                eredményeiteket), és az értékszámodat meg annak alakulását.
+                Ezek nyilvánosan nem jelennek meg.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
@@ -201,6 +212,25 @@ export default function Privacy() {
                 amit mindkét pár lát.
               </li>
               <li>
+                <strong>A helyettes kérést</strong> (ki kérte, ki helyett ki
+                játszana, és a szervező döntése) a pár és a liga szervezője meg
+                az oldal adminja látja; a szervező a két játékos Elóját is,
+                hogy dönthessen. A jóváhagyott helyettes nevét az ellenfeleid is
+                látják a meccs oldalán. A szervező indoklását csak a pár látja,
+                és ha törlöd a fiókodat, töröljük. Ha regisztráltál, a neved
+                (csak a neved, soha az e-mail-címed vagy a telefonszámod)
+                megjelenhet a ligád játékosainak helyettes-választó listájában,
+                amikor egy meccsükre helyettest kérnek.
+              </li>
+              <li>
+                <strong>A „nem jöttek el” bejelentést</strong> (melyik pár
+                jelezte és mikor, és a szervező döntése az indoklásával) mindkét
+                pár, a liga szervezője és az oldal adminja látja. Ha a szervező
+                jóváhagyja, a döntése a nevével és idejével a meccs naplójába is
+                bekerül, a másik pár játékosai pedig fekete pontot kapnak. A
+                szervező indoklását, ha törlöd a fiókodat, töröljük.
+              </li>
+              <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
                 kerül belőle nyilvánosságra. A városod ligájának szervezője az
                 egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol
@@ -213,7 +243,7 @@ export default function Privacy() {
                 telefonszámotokat nem.
               </li>
               <li>
-                Ha a szervező kör közben visszaléptet egy párt, az indokát csak a
+                Ha a szervező visszaléptet egy párt a kihirdetett csoportból, az indokát csak a
                 szervező, az admin és a pár két tagja látja. A csoport többi
                 párja és a nyilvános tabella csak azt, hogy a pár visszalépett.
               </li>
@@ -357,9 +387,10 @@ export default function Privacy() {
                 végén töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
-                <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem
-                játszottál kihirdetett csoportban, a fiókodat mindenestül
-                töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
+                <strong>Fiókok:</strong> amíg nem törlöd (a Profil oldalon) vagy
+                nem kéred a törlést. Ha még nem
+                játszottál kihirdetett csoportban, és jóváhagyott helyettes sem
+                voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
                 játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
                 lehessen hozzád kötni őket. Az e-mail-címedet, a
                 telefonszámodat, a nemedet, a belépéseidet és az eszközeidet
@@ -398,13 +429,17 @@ export default function Privacy() {
               Bármikor kérheted, hogy megmutassuk, javítsuk vagy töröljük az
               adataidat, és visszavonhatod a hozzájárulásodat. Ehhez elég egy
               e-mail a {mail} címre, és legkésőbb egy hónapon belül intézzük.
+              A fiókodat te magad is törölheted a Profil oldalon („Fiók
+              törlése”): ugyanaz történik, mint ha mi törölnénk, és minden
+              eszközön kiléptetünk.
             </p>
             <p>
               Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
               neked szóló leveleket, és a neved meg a címed mások
-              jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
-              közben kéred, amikor a párod kihirdetett csoportban játszik, a
-              kör végén törlünk. A címedhez tartozó minden tárolt adatot
+              jelentkezéséből és a nekik szóló levelekből is. Amíg a párod
+              kihirdetett csoportban játszik, és a kör még nem ért véget, a
+              Profil oldalon nem tudod törölni a fiókodat; ha ilyenkor kéred
+              e-mailben, a kör végén törlünk. A címedhez tartozó minden tárolt adatot
               törlünk, a leiratkozásodat vagy a visszapattanó levelek
               nyomát is. Csak a régi eredményekben marad meg a neved
               névtelenítve („Törölt játékos”). Ha később újra regisztrálsz

@@ -63,7 +63,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -92,6 +92,8 @@ function leagueItems(league: LeagueRef): NavItem[] {
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
     // Disputed results and decisions on any match (#29).
     { label: "Viták", to: `${base}/disputes`, icon: "disputes", permission: { kind: "league.manage", league: league.slug } },
+    // Substitute requests to approve (#37, D109).
+    { label: "Helyettesek", to: `${base}/substitutes`, icon: "substitutes", permission: { kind: "league.manage", league: league.slug } },
   ];
 }
 

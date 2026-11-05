@@ -16,7 +16,7 @@ export const SOURCE_LABELS: Record<PairSource, string> = {
   link: "linkkel",
 };
 
-export const DISSOLVE_REFUSED = "Kör közben nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
+export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
 
 // Párom for a player with no pair, under the pair link and the "Párt
 // keresek" switch (partner-search.ts); the contact address follows the text.

@@ -19,6 +19,14 @@ export const NOTIFICATION_KINDS = {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
   },
+  substitute_requested: {
+    label: "Helyettes kérés",
+    description: "Ha egy pár helyettest kér a ligád egy meccsére, és te hagyod jóvá.",
+  },
+  no_show_reported: {
+    label: "Nem jöttek el",
+    description: "Ha egy pár jelzi, hogy az ellenfele nem jött el a ligád egy meccsére, és te döntesz róla.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -51,7 +59,23 @@ export type PlayerKind =
   | "match_result_disputed"
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
-  | "pair_withdrawn";
+  | "pair_withdrawn"
+  // A strike (#294, spec 13), with the count; from the 3rd on that the pair
+  // leaves at the end of the phase. In the app and by push; the 2nd also
+  // sends the warning email (strike_warning). Not a digest item: that email
+  // is its own.
+  | "strike"
+  // Substitutes (#37, D109), in the app and by push only, never by email:
+  // the asking pair on approval, rejection and revocation; the opponents on
+  // approval and revocation. The organizers' kind is `substitute_requested`.
+  | "substitute_approved"
+  | "substitute_rejected"
+  | "substitute_revoked"
+  // No-shows (#33, D108): the organizer's decision on a report, to both
+  // pairs, in the app and by push only, never by email. The organizers' kind
+  // is `no_show_reported`; the strike's notice is its own kind.
+  | "no_show_confirmed"
+  | "no_show_rejected";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -73,7 +97,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested", "no_show_reported"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -358,6 +382,84 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
   };
 }
 
+// --- Substitutes (#37, D109) ------------------------------------------------
+
+// To the league's Szervezők and the Admins (app and push, never email), the
+// asking player left out. No names: the list shows them.
+export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Helyettes kérés · ${input.leagueName}`,
+    body: `Egy pár helyettest kér a ${input.week}. heti meccsére. A jóváhagyás rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/substitutes`,
+  };
+}
+
+export type SubstituteNotice = { matchId: number; substitute: string; absent: string };
+
+// The organizer's answer to the asking pair. The reason is on the match page only.
+export function substituteDecidedMessage(input: SubstituteNotice & { approved: boolean }): Message {
+  return input.approved
+    ? {
+        title: "Jóváhagyták a helyettest",
+        body: `${input.substitute} játszhat ${input.absent} helyett. Az ellenfeleitek is látják.`,
+        url: matchUrl(input.matchId),
+      }
+    : {
+        title: "Nem hagyták jóvá a helyettest",
+        body: `${input.substitute} nem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`,
+        url: matchUrl(input.matchId),
+      };
+}
+
+// To the opponents once a substitute is approved.
+export function substituteAnnouncedMessage(input: SubstituteNotice): Message {
+  return {
+    title: "Helyettes az ellenfeleteknél",
+    body: `${input.absent} helyett ${input.substitute} játszik a meccseteken.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// An approval revoked before the match: to both pairs.
+export function substituteRevokedMessage(input: SubstituteNotice & { ours: boolean }): Message {
+  return {
+    title: "Visszavonták a helyettest",
+    body: input.ours
+      ? `${input.substitute} mégsem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`
+      : `${input.absent} helyett mégsem ${input.substitute} játszik a meccseteken.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// --- No-shows (#33, D108) ---------------------------------------------------
+
+// To the league's Szervezők and the Admins (app and push, never email), the
+// reporting player left out. No names: the decision page shows them.
+export function noShowReportedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Nem jöttek el · ${input.leagueName}`,
+    body: `Egy pár jelezte, hogy az ellenfele nem jött el a ${input.week}. heti meccsre. A döntés rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
+  };
+}
+
+// The organizer's decision, to each pair from its own side: `reported` is
+// the pair that made the report. The reason is on the match page only.
+export function noShowDecidedMessage(input: { matchId: number; confirmed: boolean; reported: boolean }): Message {
+  const url = matchUrl(input.matchId);
+  if (input.confirmed)
+    return input.reported
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4-0 4-0-val megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      : {
+          title: "A szervező szerint nem jöttetek el",
+          body: "A meccs 0-4 0-4-es vereség nektek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          url,
+        };
+  return input.reported
+    ? { title: "A szervező elutasította a bejelentésed", body: "A meccs ott tart, ahol a bejelentés előtt. Az indoklást a meccs oldalán látod.", url }
+    : { title: "A szervező elutasította az ellenfeleitek bejelentését", body: "Nem kaptok érte semmit: a meccs ott tart, ahol előtte.", url };
+}
+
 // To both pairs: the organizer decided or overrode the outcome (digest item).
 // The reason is on the match page only.
 export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
@@ -365,6 +467,41 @@ export function matchDecidedMessage(input: { matchId: number; outcome: string })
     title: "A szervező döntött a meccsetekről",
     body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
     url: matchUrl(input.matchId),
+  };
+}
+
+// To each player of the pair that ended the phase unplayed (#11, D103): the
+// outcome the deadline set, from this pair's side. Digest item.
+export function matchResolvedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "Lejárt a határidő: eldőlt a meccsetek",
+    body: `${input.outcome}. A részletek a meccs oldalán.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// A strike (#294, spec 8 and 13), with the season's count. `leaving`: a
+// player of the pair has 3 (maybe the partner, after a partner change), so
+// the pair leaves at the end of the phase. No names: a lock screen is not a
+// private place.
+export function strikeMessage(input: { count: number; leaving: boolean; source: "deadline" | "no_show"; matchId: number | null }): Message {
+  const why =
+    input.source === "no_show"
+      ? "Nem jelentetek meg egy lefixált meccsen."
+      : "A határidőig nem próbáltatok egyeztetni a meccsre (vagy 24 órán belül lemondtátok, és nem pótoltátok).";
+  const url = input.matchId ? matchUrl(input.matchId) : "/home";
+  const out = "A párod és te a kör végén kikerültök a ligából; a kör eredményei maradnak. A következő szezonban újra nevezhettek.";
+  if (input.count >= 3) return { title: `${input.count}. fekete pont: a kör végén kikerültök`, body: `${why} ${out}`, url };
+  if (input.leaving)
+    return {
+      title: "Fekete pontot kaptál: a kör végén kikerültök",
+      body: `${why} Ebben a szezonban ${input.count} fekete pontod van, a párodnak már 3. ${out}`,
+      url,
+    };
+  return {
+    title: input.count === 2 ? "2. fekete pont: figyelmeztetés" : "Fekete pontot kaptál",
+    body: `${why} Ebben a szezonban ${input.count} fekete pontod van; a 3.-nál a párod és te a kör végén kikerültök. Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.`,
+    url,
   };
 }
 

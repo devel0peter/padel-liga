@@ -8,8 +8,8 @@ import { cities, groupPairs, groups, matches, pairs, users } from "~/db/schema";
 import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague } from "./leagues.server";
-import { averageStartingElo } from "./season-entries";
-import type { Season } from "./seasons";
+import { averageElo } from "./season-entries";
+import { currentSeason } from "./seasons";
 import { listSeasons } from "./seasons.server";
 
 // What the public league page needs (#30). Only names leave this module: the
@@ -36,13 +36,6 @@ export type LadderPage = {
     }
 );
 
-// The season on show: the earliest one that has not ended, else the latest.
-function currentSeason(seasons: readonly Season[], now: Date): Season | undefined {
-  const byStart = [...seasons].sort((a, b) => (a.firstPhaseStart < b.firstPhaseStart ? -1 : 1));
-  const ongoing = byStart.find((s) => s.phases.length > 0 && s.phases[s.phases.length - 1]!.deadline >= now);
-  return ongoing ?? byStart[byStart.length - 1];
-}
-
 const playerA = alias(users, "ladder_player_a");
 const playerB = alias(users, "ladder_player_b");
 
@@ -64,8 +57,10 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       withdrawnAt: groupPairs.withdrawnAt,
       nameA: playerA.name,
       levelA: playerA.level,
+      eloA: playerA.elo,
       nameB: playerB.name,
       levelB: playerB.level,
+      eloB: playerB.elo,
     })
     .from(groupPairs)
     .innerJoin(pairs, eq(pairs.id, groupPairs.pairId))
@@ -95,8 +90,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       .map((m) => ({
         id: m.pairId,
         names: [m.nameA || "Névtelen", m.nameB || "Névtelen"] as [string, string],
-        // Until Elo is kept the rating is the average starting Elo (D20).
-        elo: averageStartingElo(m.levelA, m.levelB) ?? 0,
+        // The pair's current Elo (#13), the last tiebreak (D20).
+        elo: averageElo({ elo: m.eloA, level: m.levelA }, { elo: m.eloB, level: m.levelB }) ?? 0,
         // Withdrawn mid-phase (#34): buildLadder drops it and its matches.
         withdrawn: m.withdrawnAt !== null,
       })),

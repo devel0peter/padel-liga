@@ -121,11 +121,8 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
 - **A liga első szezonjának első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. Ha a határ egyik oldalán 3 páros csoport van, ott ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
-- **Új párok a szezon közben** (később nevezők és párcsere után):
-  - Az értékszámotok alapján soroljuk be a párt. Aki még nem játszott értékelt meccset, annál 100 ponttal kevesebbel számolunk, mert a szintje még csak saját becslés.
-  - Új pár nem kerülhet a legfelső csoportba, oda fel kell jutni.
-  - Először a szabad helyekre kerültök (3 páros csoport, visszalépett pár helye), a szinteteken vagy alatta.
-  - Ha nincs szabad hely, a csoportotokból és az alattatok lévő csoportokból a legalacsonyabb értékszámú pár egy csoporttal lejjebb kerül. A felettetek lévő csoportok nem változnak.
+- **Új párok a szezon közben** (később nevezők, párcsere után és visszatérők):
+  - Ha szezon közben csatlakozol, vagy szünet után visszatérsz, a szinted (ha már játszottál, az értékszámod) szerinti divízió legalsó csoportjába kerülsz. Ha ott nincs hely, onnan lefelé a csoportok leggyengébb párja egy csoporttal lejjebb kerül.
   - A beosztást a kör indulása előtt a szervező átnézi.
 
 ## 8. Egyéni értékszám (Élő)
@@ -133,7 +130,7 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Minden játékosnak saját értékszáma van. A pár értékszáma a két játékos átlaga.
 - A kezdő értékszám a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
 - A szintedet a profilodon addig módosíthatod, amíg nem játszottál szezonban. Amint egy párod bekerül egy kihirdetett csoportba, a szinted lezárul: onnantól a liga eredményei döntik el, hol tartasz, ezt az értékszámod mutatja.
-- **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik.
+- **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik, ha a két pár `K`-ja egyezik; a pár `K`-ja a két játékos `K`-jának átlaga (40, 30 vagy 20).
   - Esély: `E = 1 / (1 + 10^((ellenfél − ti) / 400))`
   - Változás: `K × (eredmény − E)`, ahol az eredmény győzelemnél 1, vereségnél 0.
   - `K` = 40 az első 10 meccseden, utána 20.

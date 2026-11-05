@@ -1,4 +1,5 @@
 import { deleteStaleLoginCodes, STALE_CODE_BATCH } from "~/lib/auth/login-code.server";
+import { resolveDeadlines } from "~/lib/deadline.server";
 import { DELIVER_MIN, deliver } from "~/lib/email/outbox.server";
 import { beginInvocation, logError, logInfo, logWarn } from "~/lib/log";
 import { runMatchReminders } from "~/lib/match-reminders.server";
@@ -6,12 +7,16 @@ import { pushQueued } from "~/lib/notifications.server";
 import { PUSH_STATS_QUERIES, recordPushStats } from "~/lib/push-stats.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
 import { autoAcceptResults } from "~/lib/results.server";
+import { draftRoundSwitches } from "~/lib/round-switch.server";
 import { RunBudget, type Usage } from "~/lib/run-usage";
 
 // The cron, every 10 minutes (workers/app.ts, app/wrangler.jsonc; #183,
 // #185, #188). The steps run one after the other, in this order, each from
 // the run's scheduled time: stale login code records are deleted (#168),
-// results waiting 48 hours are accepted (#28), the match reminders and the
+// results waiting 48 hours are accepted (#28), from 06:00 the morning after a
+// phase's deadline its unplayed matches are resolved and the strikes given
+// (#11, #294, deadline.server.ts), and once they are settled the next phase's
+// groups drafted for the organizer (#35, round-switch.server.ts), the match reminders and the
 // daily digest when their hour comes (#31), the reminders for people stuck
 // before entering (#155), then the queued pushes and whatever email waits,
 // and last the day's push count (push-stats.server.ts, D100) when the run has
@@ -35,6 +40,9 @@ const plus = (a: Usage, b: Usage): Usage => ({ queries: a.queries + b.queries, c
 const PUSH_MIN: Usage = { queries: 5, calls: 1 };
 const AFTER_STUCK = plus(PUSH_MIN, DELIVER_MIN);
 const AFTER_MATCH = plus({ queries: STUCK_QUERIES, calls: 0 }, AFTER_STUCK);
+// The match reminders' own lookups (running matches and one batch), so a
+// long deadline run never starves them.
+const AFTER_DEADLINE = plus({ queries: 6, calls: 0 }, AFTER_MATCH);
 
 export const CRON_STEPS: readonly CronStep[] = [
   {
@@ -49,11 +57,29 @@ export const CRON_STEPS: readonly CronStep[] = [
     },
   },
   {
+    // Up to AUTO_ACCEPT_BATCH results, then one Elo replay when any was
+    // accepted (ELO_REPLAY_QUERIES, more on a retry; #13). The later steps
+    // check what is left with fits().
     name: "auto-accept",
     run: async (now) => {
       const n = await autoAcceptResults(now);
       return n ? `auto-accepted ${n} results` : null;
     },
+  },
+  {
+    name: "deadline resolution",
+    run: async (now, run) => {
+      const { resolved, left } = await resolveDeadlines(now, { run, keep: AFTER_DEADLINE });
+      if (left) return `resolved ${resolved} matches at the deadline; more left for the next run`;
+      return resolved ? `resolved ${resolved} matches at the deadline` : null;
+    },
+  },
+  {
+    // After the resolution, so the draft reads settled tables; it waits for
+    // a run where no match of the ending phase is left to resolve. Keeps the
+    // same room for the steps after it as the resolution does.
+    name: "round switch draft",
+    run: (now, run) => draftRoundSwitches(now, { run, keep: AFTER_DEADLINE }),
   },
   {
     name: "match reminders",

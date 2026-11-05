@@ -99,6 +99,16 @@ export async function giveStrikes(input: StrikeGrant): Promise<Map<string, numbe
   const stored = new Set(
     (await db.insert(strikes).values(strikeRows([grant])).onConflictDoNothing().returning({ userId: strikes.userId })).map((r) => r.userId),
   );
+  return tellStruck(grant, stored);
+}
+
+/**
+ * After a grant's strikes are stored (by giveStrikes, or by strikeInserts in
+ * the caller's own batch, as a confirmed no-show does): the players' new
+ * counts, and the notices to those in `stored` (the players whose strike was
+ * stored now), as giveStrikes sends them. A failed notice is logged, never thrown.
+ */
+export async function tellStruck(grant: StrikeGrant, stored: ReadonlySet<string>): Promise<Map<string, number>> {
   const counts = await liveCounts(grant.players, [grant.seasonId]);
   const out = new Map(grant.players.map((id) => [id, counts.get(`${grant.seasonId}:${id}`) ?? 0]));
   if (stored.size === 0) return out;

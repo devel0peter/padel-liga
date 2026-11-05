@@ -10,15 +10,18 @@ import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { decideMatch, decisionPage } from "~/lib/decisions.server";
-import { formatDateTime, formatDeadline } from "~/lib/format";
+import { formatDateTime, formatDeadline, formatSlot } from "~/lib/format";
+import { NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS } from "~/lib/no-shows";
+import { decideNoShow, leagueNoShows } from "~/lib/no-shows.server";
 import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
 import { MATCH_LOST_BOTH_TEXT, neutralScoreText, parseOutcome, versusText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
-// the league, played or not, with a required reason. Both pairs' versions
-// and the full log are shown. The league's Szervező and the Admin only; a
+// the league, played or not, with a required reason; and a waiting no-show
+// report (#33), confirmed or rejected with an optional reason. Both pairs'
+// versions and the full log are shown. The league's Szervező and the Admin only; a
 // match of another league is 404.
 
 export function meta({}: Route.MetaArgs) {
@@ -40,14 +43,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, id } = await scope(request, params);
   const page = await decisionPage(league.id, id);
   if (!page) throw data(NOT_FOUND, { status: 404 });
-  return { slug: league.slug, page };
+  // A waiting no-show report on this match (#33), if any.
+  const [noShow] = await leagueNoShows(league.id, id);
+  return { slug: league.slug, page, noShow: noShow ?? null };
 }
 
 type ActionResult = { intent: string; ok: boolean; message: string };
+const NO_SHOW_INTENTS = { "no-show-confirm": "confirm", "no-show-reject": "reject" } as const;
 
 export async function action({ request, params }: Route.ActionArgs) {
   const { league, actor, id } = await scope(request, params);
   const form = await request.formData();
+  const intent = String(form.get("intent") ?? "");
+  // Confirming or rejecting a no-show report (#33, D108).
+  if (intent === "no-show-confirm" || intent === "no-show-reject") {
+    const report = Number(form.get("report"));
+    // Only this match's waiting report: decided or withdrawn meanwhile, it's gone.
+    const [waiting] = await leagueNoShows(league.id, id);
+    if (!waiting || waiting.id !== report) return data<ActionResult>({ intent: "no-show", ok: false, message: NO_SHOW_REFUSALS.not_open }, { status: 400 });
+    const done = await decideNoShow(actor.id, league.id, report, NO_SHOW_INTENTS[intent], String(form.get("reason") ?? ""));
+    if (done.ok) return data<ActionResult>({ intent: "no-show", ok: true, message: done.notice });
+    if (done.notFound) throw data(NOT_FOUND, { status: 404 });
+    return data<ActionResult>({ intent: "no-show", ok: false, message: done.error }, { status: 400 });
+  }
   const outcome = parseOutcome(form);
   if (!outcome) return data<ActionResult>({ intent: "decide", ok: false, message: "Válassz, mi legyen a meccs kimenetele." }, { status: 400 });
   const done = await decideMatch(actor.id, league.id, id, outcome, String(form.get("reason") ?? ""));
@@ -57,7 +75,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function MatchDecide({ loaderData, actionData }: Route.ComponentProps) {
-  const { slug, page: m } = loaderData;
+  const { slug, page: m, noShow } = loaderData;
   const busy = useNavigation().state !== "idle";
   const r = m.result;
   const choices: { value: OutcomeChoice; label: string }[] = [
@@ -100,6 +118,41 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
           </>
         )}
       </section>
+
+      {noShow && (
+        <Card className="max-w-2xl border-primary">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Nem jöttek el: döntés</CardTitle>
+            <CardDescription className="break-words">
+              {noShow.reporting} jelezte, hogy {noShow.absent} nem jött el a lefixált időpontra
+              {noShow.slot ? ` (${formatSlot(noShow.slot)})` : ""}. Bejelentve: {formatDateTime(noShow.reportedAt)}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form key={`ns${noShow.id}`} method="post" className="grid gap-3">
+              <input type="hidden" name="report" value={noShow.id} />
+              <p className="text-sm">
+                Ha jóváhagyod: 4-0 4-0 a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
+                bejelentés előtt. Mindkét pár értesítést kap.
+              </p>
+              <div className="grid gap-1.5">
+                <Label htmlFor="no-show-reason">Indoklás (nem kötelező, mindkét pár látja)</Label>
+                <Textarea id="no-show-reason" name="reason" maxLength={NO_SHOW_REASON_MAX} rows={2} />
+              </div>
+              <FormFeedback result={actionData as ActionResult | undefined} intent="no-show" />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" name="intent" value="no-show-confirm" disabled={busy}>
+                  Jóváhagyom
+                </Button>
+                <Button type="submit" name="intent" value="no-show-reject" variant="outline" disabled={busy}>
+                  Elutasítom
+                </Button>
+              </div>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
+      {!noShow && <FormFeedback result={actionData as ActionResult | undefined} intent="no-show" />}
 
       {m.voided ? (
         <p className="max-w-2xl text-sm text-muted-foreground">

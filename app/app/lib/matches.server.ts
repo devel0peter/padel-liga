@@ -394,6 +394,7 @@ export type MatchContext = {
   leagueSlug: string;
   city: string;
   season: string;
+  seasonId: number;
   phase: number;
   phaseStartsAt: Date;
   pairs: { a: PairPlayers; b: PairPlayers };
@@ -437,6 +438,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     leagueSlug: row.leagueSlug,
     city: row.city,
     season: row.season,
+    seasonId: row.seasonId,
     phase: row.phase,
     phaseStartsAt: row.phaseStartsAt,
     pairs: { a, b },

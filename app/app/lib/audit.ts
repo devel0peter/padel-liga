@@ -48,6 +48,8 @@ export const AUDIT_ACTIONS = {
   "match.decide": "Meccs eldöntése",
   "result.auto_accept": "Eredmény automatikus elfogadása",
   "match.deadline": "Határidős döntés",
+  "match.no_show_confirm": "Nem jöttek el: jóváhagyás",
+  "match.no_show_reject": "Nem jöttek el: elutasítás",
   "strike.cancel": "Fekete pont törlése",
   "substitute.approve": "Helyettes jóváhagyása",
   "substitute.reject": "Helyettes elutasítása",

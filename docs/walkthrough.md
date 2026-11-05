@@ -512,6 +512,23 @@ The same deletion as step 30, by the player (#38, README decision log D111).
   - After it: the home page with "Töröltük a fiókodat, és minden eszközön kiléptettünk.", logged out; the other browser is on the login page; logging in with the address starts a new registration. Nothing new in the terminal or on Kimenő levelek. Napló has "Fiók törlése" by "Törölt játékos".
   - The player in a published group: "Most nem törölheted: a párod kihirdetett csoportban játszik…" and no delete button. The Admin: "Adminként a saját fiókodat nem törölheted."
 
+### 36. A pair reports a no-show; the Szervező confirms the walkover (side path, after step 11)
+
+Spec section 8, README decision log D108 (#33). A past slot can't be proposed, so put an agreed slot two hours ago on a match of step 17 by hand; `app/e2e/25-no-show.spec.ts` runs the same steps.
+
+- Do: `npx wrangler d1 execute DB --local --command "update matches set status = 'scheduled', scheduled_at = unixepoch() - 7200, revision = revision + 1 where id = <match id>"` (from `app/`).
+- Page: `/matches/<match id>`, then `/admin/leagues/minta/disputes` ("Viták"), then the match's decision page
+- Accounts: a player of the match, then `szervezo@example.test`, then a player of the other pair
+- Do: on the match, under "Nem jött el az ellenfél?", press "Nem jöttek el", then "Jelzem". As the Szervező, open Viták, press "Döntök" on the report, write a reason and press "Jóváhagyom".
+- Expect:
+  - Before the slot's start the card isn't there (and a hand-made request gets "Csak a meccs kezdete után jelezheted, hogy nem jöttek el.").
+  - "Elküldtük a szervezőnek. Szólunk, ha döntött." and "Jeleztétek, hogy az ellenfeletek nem jött el (…)", with "Visszavonom a bejelentést" for the reporter only; the other pair sees "Az ellenfeletek jelezte, hogy nem jöttetek el (…)". No second report on the match.
+  - The Szervező and the Admin get "Nem jöttek el · <liga>" in Értesítések (no names, no email; switchable on Profil as "Nem jöttek el"); the reporter doesn't.
+  - Viták: "Nem jöttek el (1)" with the season, round, group and week, "<pár> szerint <pár> nem jött el", the slot and when it was reported. The decision page shows "Nem jöttek el: döntés" above the override form.
+  - "Jóváhagyom": the match is final, a 4-0 4-0 walkover for the reporting pair (the group table and the public league page count it); the log has "Nem jöttek el: a szervező jóváhagyta a bejelentést. <indok>". The other pair's two players get a strike ("Nem jelentetek meg egy lefixált meccsen."), which Párok lists with "Nem jelent meg". Both pairs are told in the app and by push; no email (a 2nd strike sends its own warning).
+  - "Elutasítom" instead: nothing changes on the match; both pairs see "A szervező elutasította …" with the reason on the match page, and a new report can be made.
+  - Napló lists "Nem jöttek el: jóváhagyás" (or "elutasítás") with the match. The deadline resolution leaves a match with a waiting report alone until the Szervező decides.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

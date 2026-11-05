@@ -430,6 +430,9 @@ export const notifications = sqliteTable(
         "substitute_approved",
         "substitute_rejected",
         "substitute_revoked",
+        "no_show_reported",
+        "no_show_confirmed",
+        "no_show_rejected",
         "test",
       ],
     }).notNull(),
@@ -978,5 +981,39 @@ export const matchSubstitutes = sqliteTable(
       .where(sql`${t.status} in ('requested', 'approved')`),
     index("match_substitutes_match_idx").on(t.matchId),
     index("match_substitutes_status_idx").on(t.status),
+  ],
+);
+
+// No-show reports (#33, spec 8, D108): a player of the pair that showed up
+// at an accepted slot reports that the other didn't; the league's organizer
+// confirms (a walkover in match_decisions, a strike in strikes) or rejects
+// it. One waiting report per match; the reporter can withdraw it before a
+// decision. The deadline resolution leaves a match with a waiting report to
+// the organizer.
+export const noShowReports = sqliteTable(
+  "no_show_reports",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The pair that showed up and reports it, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["open", "withdrawn", "confirmed", "rejected"] }).notNull().default("open"),
+    reportedBy: text("reported_by").references(() => users.id, { onDelete: "set null" }),
+    reportedAt: integer("reported_at", { mode: "timestamp" }).notNull(),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    // The organizer's optional reason, shown to both pairs on the match page.
+    reason: text("reason"),
+  },
+  (t) => [
+    uniqueIndex("no_show_reports_open_idx")
+      .on(t.matchId)
+      .where(sql`${t.status} = 'open'`),
+    index("no_show_reports_match_idx").on(t.matchId),
+    index("no_show_reports_status_idx").on(t.status),
   ],
 );

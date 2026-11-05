@@ -12,7 +12,10 @@ import {
   leagueAdminInvites,
   leagueAdmins,
   loginCodes,
+  matchDecisions,
+  matches,
   matchSubstitutes,
+  noShowReports,
   notificationOptOuts,
   groupPairs,
   notifications,
@@ -27,6 +30,7 @@ import {
   users,
 } from "~/db/schema";
 import { partnerNoticeSubject } from "~/lib/email/templates";
+import { NO_SHOW_DECISION_PREFIX, noShowDecisionReason } from "~/lib/no-shows";
 import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { dissolveStatements } from "~/lib/pairs.server";
 import { clearStrikeReasons } from "~/lib/strikes.server";
@@ -305,6 +309,10 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
     .select({ id: pairs.id })
     .from(pairs)
     .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  const theirMatches = db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(or(inArray(matches.pairA, theirPairs), inArray(matches.pairB, theirPairs)));
   return [
     db
       .update(notifications)
@@ -332,6 +340,23 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
       .update(matchSubstitutes)
       .set({ reason: null })
       .where(and(isNotNull(matchSubstitutes.reason), inArray(matchSubstitutes.pairId, theirPairs), guard)),
+    // The organizer's reason on a no-show decision (#33) is free text about a
+    // pair's absence too: gone from the report and from its copy in the
+    // ruling's reason, on every match a pair of theirs played in.
+    db
+      .update(noShowReports)
+      .set({ reason: null })
+      .where(and(isNotNull(noShowReports.reason), inArray(noShowReports.matchId, theirMatches), guard)),
+    db
+      .update(matchDecisions)
+      .set({ reason: noShowDecisionReason("") })
+      .where(
+        and(
+          sql`substr(${matchDecisions.reason}, 1, length(${NO_SHOW_DECISION_PREFIX})) = ${NO_SHOW_DECISION_PREFIX}`,
+          inArray(matchDecisions.matchId, theirMatches),
+          guard,
+        ),
+      ),
   ];
 }
 

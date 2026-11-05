@@ -34,6 +34,7 @@ import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
 import { substituteLine } from "~/lib/substitutes";
 import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
+import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
 // A match (#25, #26): status, the opponents' phones, scheduling (propose,
 // accept, counter-propose, record and confirm an agreed time) and the log.
@@ -55,8 +56,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const ctx = await loadMatch(matchId(params));
   const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
-  // Substitutes (#37): only for the four players, like the rest of the page.
-  return { ...page, substitutes: await substitutePanel(ctx, page.side, user.id, now) };
+  // Substitutes (#37) and no-shows (#33): only for the four players, like the rest of the page.
+  const [substitutes, noShow] = await Promise.all([substitutePanel(ctx, page.side, user.id, now), noShowPanel(ctx, page.side, user.id, now)]);
+  return { ...page, substitutes, noShow };
 }
 
 const NONE = "none";
@@ -101,6 +103,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       intent === "substitute-request"
         ? await requestSubstitute(user.id, id, { absentId: String(form.get("absent") ?? ""), substituteId: String(form.get("substitute") ?? "") })
         : await withdrawSubstitute(user.id, id, Number(form.get("request")));
+    if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
+    if (done.notFound) throw new Response(NOT_FOUND, { status: 404 });
+    return fail(done.error);
+  }
+
+  // The other pair didn't show up at the agreed slot (#33, D108).
+  if (intent === "no-show-report" || intent === "no-show-withdraw") {
+    const done = intent === "no-show-report" ? await reportNoShow(user.id, id) : await withdrawNoShow(user.id, id, Number(form.get("report")));
     if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
     if (done.notFound) throw new Response(NOT_FOUND, { status: 404 });
     return fail(done.error);
@@ -455,6 +465,89 @@ function SubstituteSection({ s, deadline, result }: { s: SubstitutePanel; deadli
   );
 }
 
+// Nem jöttek el (#33, spec 8, D108): after the agreed slot's start a player
+// of the pair that showed up reports it; the organizer confirms (4-0 4-0 and
+// a strike for the other pair) or rejects it. Both pairs see a waiting
+// report and the decision with its reason; only the reporter can withdraw.
+function NoShowSection({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
+  const busy = useNavigation().state !== "idle";
+  const submit = useSubmit();
+  if (!s.canReport && !s.open && s.decided.length === 0) return null;
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">{s.canReport ? "Nem jött el az ellenfél?" : "Nem jöttek el"}</CardTitle>
+        {s.canReport && (
+          <CardDescription>
+            Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4-0 4-0-val nyertek, és ők fekete pontot kapnak.
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {s.open && (
+          <div className="grid gap-2 text-sm" role="status">
+            <p className="break-words">
+              {s.open.ours
+                ? `Jeleztétek, hogy az ellenfeletek nem jött el (${formatDateTime(s.open.at)}). A szervező dönt róla.`
+                : `Az ellenfeletek jelezte, hogy nem jöttetek el (${formatDateTime(s.open.at)}). A szervező dönt róla; ha nem így volt, szólj neki.`}
+            </p>
+            {s.open.canWithdraw && (
+              <Form method="post">
+                <input type="hidden" name="intent" value="no-show-withdraw" />
+                <input type="hidden" name="report" value={s.open.id} />
+                <Button type="submit" variant="outline" size="sm" disabled={busy}>
+                  Visszavonom a bejelentést
+                </Button>
+              </Form>
+            )}
+          </div>
+        )}
+        {s.decided.length > 0 && (
+          <ul className="grid gap-2 text-sm" aria-label="A szervező döntései">
+            {s.decided.map((d) => (
+              <li key={d.id} className="grid gap-1 rounded-md border p-3">
+                <span className="break-words">
+                  {d.confirmed
+                    ? d.ours
+                      ? "A szervező jóváhagyta a bejelentéseteket: 4-0 4-0 nektek."
+                      : "A szervező jóváhagyta, hogy nem jöttetek el: 0-4 0-4, és fekete pontot kaptatok."
+                    : d.ours
+                      ? "A szervező elutasította a bejelentéseteket."
+                      : "A szervező elutasította az ellenfeleitek bejelentését."}{" "}
+                  <span className="text-muted-foreground">({formatDateTime(d.at)})</span>
+                </span>
+                {d.reason && <span className="break-words text-muted-foreground">A szervező indoklása: {d.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {s.canReport && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-fit" disabled={busy}>
+                Nem jöttek el
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Biztosan nem jöttek el?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4-0 4-0-val nyertek, az ellenfeletek fekete pontot kap. Amíg nem döntött, visszavonhatod.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Mégse</AlertDialogCancel>
+                <AlertDialogAction onClick={() => submit({ intent: "no-show-report" }, { method: "post" })}>Jelzem</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+        <Feedback result={result} intent={["no-show-report", "no-show-withdraw"]} />
+      </CardContent>
+    </Card>
+  );
+}
+
 // Add the fixed time to the calendar (#192, D106): a Google Calendar link and
 // an .ics file. The file keeps one entry per match: a new download replaces
 // the old one, and after a cancellation it removes it. An entry added with the
@@ -624,6 +717,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
       )}
 
       {!resultFirst && resultSection}
+
+      <NoShowSection s={m.noShow} result={result} />
 
       <SubstituteSection key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
 

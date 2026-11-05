@@ -119,9 +119,14 @@ The system resolves a match with no result at 06:00 Budapest the morning after t
 | Both active, no agreement | Unplayed: 0 points for both sides, no Elo change, not counted in set and game difference. The organizer may award a walkover if the log shows one side clearly blocked the match |
 | Neither side active | Both sides get a loss, recorded as 0-4 0-4 for each (counts in set and game difference, 0 points) |
 | Late cancellation, then not played by the deadline | The cancelling side counts as inactive: walkover for the other side (section 6) |
-| Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover |
+| Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover (see below) |
 
 The organizer can always override the outcome manually.
+
+### No-show reports (README decision log, 2026-11-05, D108, #33)
+- **Report:** a player of either pair, on the match page ("Nem jöttek el"), once the agreed slot has started and until the deadline resolution's time (06:00 Budapest the morning after the deadline); only on a match that is scheduled, has no result recorded and counts (no withdrawn pair). Before the slot's start it is refused. One waiting report per match; the player who made it can withdraw it until the organizer decides, and then a new one can be made.
+- **Decision:** the league's organizer (or an Admin) confirms or rejects it on the match's decision page (listed on "Viták"), with an optional reason both pairs see. Confirming stores a 4-0 4-0 walkover for the reporting pair as the organizer's ruling (the match final, so the tables count it) and gives a strike to both players of the other pair (source "no-show"; never a substitute). Rejecting changes nothing on the match. A match already final can't be confirmed (the organizer overrides it instead). Both are in the audit log (D91).
+- **The deadline resolution** leaves a match with a waiting report alone; after a rejection the next run resolves it as usual.
 
 ### Strikes ("fekete pont", README decision log, 2026-10-05)
 - **A strike goes to both players of a pair** when:
@@ -215,10 +220,13 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 - A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
 - A disputed result in their league (Admins: any league), at once, linking to the match's decision page; the league's Szervezők and every Admin, once each, accounts being deleted and the player who disputed left out (D96, #221). No names, scores or contact details in the text. They can switch this kind ("Vitatott eredmény") off on the profile (README decision log, 2026-11-03, #178, D86).
 - A substitute request in their league (Admins: any league), linking to "Helyettesek"; the same recipients, the asking player left out, no names. Kind "Helyettes kérés", switchable on the profile (D109, #37).
+- A no-show report in their league (Admins: any league), linking to the match's decision page; the same recipients, the reporting player left out, no names. Kind "Nem jöttek el", switchable on the profile (D108, #33).
 
 **A pair withdrawn mid-phase** (section 4, D87; in the app and by push, no email): its players, with the organizer's reason; the group's other pairs, with no names and no reason.
 
 **Substitutes** (section 4, D109; in the app and by push, no email): a new request to the league's Szervezők and every Admin (the asking player left out; no names; a kind they can switch off, "Helyettes kérés"); an approval to the asking pair and the opponents (who plays instead of whom); a rejection to the asking pair; a revoked approval to both pairs. The reason is never in the notice, only on the match page.
+
+**No-show decisions** (section 8, D108; in the app and by push, no email): a confirmation or a rejection to both pairs, each from its own side; the reason only on the match page. The strike's notice is its own (below).
 
 **Daily digest** (one email in the morning, only on days with something in it; push gets the same items one by one). The email is off for now (D83): the items are in the app and pushed as below, and no digest email goes out:
 - A slot was accepted, a time was cancelled, a result was confirmed.

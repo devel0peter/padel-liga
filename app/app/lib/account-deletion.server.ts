@@ -27,7 +27,7 @@ import {
   users,
 } from "~/db/schema";
 import { partnerNoticeSubject } from "~/lib/email/templates";
-import { auditIfChanged } from "~/lib/audit.server";
+import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { dissolveStatements } from "~/lib/pairs.server";
 
 import {
@@ -37,6 +37,7 @@ import {
   deletionPlan,
   mailNamesPerson,
   PARTNER_NOTICE_SUBJECT_REMOVED,
+  type DeletionBy,
   type DeletionMode,
   type DeletionPlan,
 } from "./account-deletion";
@@ -86,9 +87,14 @@ async function target(userId: string): Promise<Target | undefined> {
   return row;
 }
 
-export async function planDeletion(actorId: string, userId: string, now = new Date()): Promise<DeletionPlan> {
+export async function planDeletion(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionPlan> {
   const [row, facts] = await Promise.all([target(userId), deletionFacts(now)]);
-  return deletionPlan({ actorId, target: row ?? null, history: facts.history.has(userId), playing: facts.playing.has(userId) });
+  return deletionPlan({ actorId, target: row ?? null, history: facts.history.has(userId), playing: facts.playing.has(userId) }, by);
+}
+
+// The player's own "Fiók törlése" (#38): what it would do now.
+export function planOwnDeletion(userId: string, now = new Date()): Promise<DeletionPlan> {
+  return planDeletion(userId, userId, now, "own");
 }
 
 const lower = (column: SQLWrapper) => sql`lower(${column})`;
@@ -200,9 +206,11 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
 export type DeletionResult = { ok: true; mode: DeletionMode } | { ok: false; error: string };
 
 // "Törlés" on Felhasználók. `actorId`: the Admin (the route checks the
-// permission; the rules here check whom).
-export async function deleteAccount(actorId: string, userId: string, now = new Date()): Promise<DeletionResult> {
-  const [row, plan] = await Promise.all([target(userId), planDeletion(actorId, userId, now)]);
+// permission; the rules here check whom). With `by` "own", the player's
+// own deletion (deleteOwnAccount): the same statements, the account itself
+// as the actor.
+export async function deleteAccount(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionResult> {
+  const [row, plan] = await Promise.all([target(userId), planDeletion(actorId, userId, now, by)]);
   if (!plan.ok || !row) return { ok: false, error: DELETION_REFUSALS[plan.ok ? "gone" : plan.refusal] };
   const email = row.email.toLowerCase();
   const mail = await mailContext(email, row.name);
@@ -212,10 +220,16 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
   const done = plan.mode === "remove" ? await remove(actorId, userId, email, mail) : await anonymize(actorId, userId, email, mail, now);
   if (!done) {
     // Something changed since the check: say why from the state now.
-    const again = await planDeletion(actorId, userId, now);
+    const again = await planDeletion(actorId, userId, now, by);
     return { ok: false, error: again.ok ? CHANGED : DELETION_REFUSALS[again.refusal] };
   }
   return { ok: true, mode: plan.mode };
+}
+
+// "Fiók törlése" on the player's own profile (#38). Its sessions go in the
+// batch, so every device is logged out; the route clears this one's cookie.
+export function deleteOwnAccount(userId: string, now = new Date()): Promise<DeletionResult> {
+  return deleteAccount(userId, userId, now, "own");
 }
 
 // No history: the pairs (none was ever in a published group, checked in the
@@ -250,8 +264,11 @@ async function remove(actorId: string, userId: string, email: string, mail: Mail
           ),
         ),
       db.delete(matchSubstitutes).where(and(eq(matchSubstitutes.substituteId, userId), ne(matchSubstitutes.status, "approved"))),
+      // Before the account's delete, so a player's own deletion (#38) can
+      // name them as the actor (the row then sets it to null: Napló shows
+      // "Törölt játékos"). A failed delete rolls the entry back with it.
+      auditWhen(sql`exists (select 1 from users where users.id = ${userId})`, { actorId, action: "account.delete", target: `user:${userId}` }),
       db.delete(users).where(eq(users.id, userId)),
-      auditIfChanged({ actorId, action: "account.delete", target: `user:${userId}` }),
       ...personalDataStatements(userId, email, mail, sql`1`),
     ] as unknown as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   } catch (e) {

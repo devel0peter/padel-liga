@@ -3,6 +3,8 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { OWN_DELETED } from "~/lib/account-deletion";
 import { SignupForm, type SignupActionData } from "~/components/signup-form";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import {
@@ -65,8 +67,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     pairs: pairs.get(slug) ?? null,
     league: league.get(slug) ?? null,
   }));
-  const ref = landingSource(new URL(request.url).searchParams, request.headers.get("Referer"));
-  return { ref, cities, turnstileSiteKey: turnstileSiteKey() };
+  const params = new URL(request.url).searchParams;
+  const ref = landingSource(params, request.headers.get("Referer"));
+  // Back from the player's own "Fiók törlése" (#38), logged out.
+  const accountDeleted = params.get("accountDeleted") === "1";
+  return { ref, cities, turnstileSiteKey: turnstileSiteKey(), accountDeleted };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
@@ -188,6 +193,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="pt-10 pb-16">
           <Wrap className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
             <div className="grid gap-6">
+              {loaderData.accountDeleted && (
+                <Alert role="status">
+                  <AlertDescription>{OWN_DELETED}</AlertDescription>
+                </Alert>
+              )}
               <h1 className="font-display text-[clamp(2.4rem,6vw,4.25rem)] font-black tracking-tight">
                 Ki a legjobb páros a városban?
               </h1>

@@ -1,7 +1,18 @@
-import { data, Form, Link, useFetcher, useNavigation } from "react-router";
+import { data, Form, Link, redirect, useFetcher, useNavigation } from "react-router";
 
 import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { ProfileFields } from "~/components/profile-fields";
 import { RatingInfo } from "~/components/rating-info";
@@ -13,7 +24,9 @@ import { hasGoogleLogin, updateProfile } from "~/lib/auth/accounts.server";
 import { getActor } from "~/lib/auth/admin.server";
 import { roleLabel } from "~/lib/auth/permissions";
 import { initials, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
-import { requireUser } from "~/lib/auth/session.server";
+import { destroySession, requireUser } from "~/lib/auth/session.server";
+import { DELETION_REFUSALS, OWN_DELETION_EFFECTS, ownDeletionNote } from "~/lib/account-deletion";
+import { deleteOwnAccount, planOwnDeletion } from "~/lib/account-deletion.server";
 import { channelEnabled, CHANNELS, isChannel, isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
 import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
@@ -24,7 +37,7 @@ import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
 // (the phone is never shown to anyone else on this page or any public page),
-// notification settings, logout everywhere.
+// notification settings, logout everywhere, deleting the account (#38).
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Profil – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -33,12 +46,17 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const [disabled, levelLocked, publicProfile] = await Promise.all([
+  const [disabled, levelLocked, publicProfile, deletion] = await Promise.all([
     disabledKindsFor(user.id),
     hasTakenPartInSeason(user.id),
     hasPublicProfile(user.id),
+    planOwnDeletion(user.id),
   ]);
   return {
+    // Fiók törlése (#38): what it would do now, or why it can't.
+    deletion: deletion.ok
+      ? { effect: `${OWN_DELETION_EFFECTS[deletion.mode]} ${ownDeletionNote(actor.leagues.length > 0)}` }
+      : { refused: DELETION_REFUSALS[deletion.refusal] },
     name: user.name,
     email: user.email,
     imageUrl: user.imageUrl,
@@ -68,6 +86,13 @@ export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
   const form = await request.formData();
+  if (form.get("intent") === "delete-account") {
+    // The same deletion as the Admin's (#152, D60); it ends every session
+    // of the account, and this response clears this device's cookie.
+    const result = await deleteOwnAccount(user.id);
+    if (!result.ok) return data({ deleteError: result.error }, { status: 409 });
+    return redirect("/?accountDeleted=1", { headers: { "Set-Cookie": await destroySession(request) } });
+  }
   if (form.get("intent") === "profile") {
     // A missing phone field must not clear the saved number.
     if (!form.has("phone")) return data({ saved: false, errors: {} as ProfileErrors }, { status: 400 });
@@ -242,6 +267,50 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
           </Button>
         </Form>
       </div>
+
+      <DeleteAccount deletion={d.deletion} />
     </AppPage>
+  );
+}
+
+// Fiók törlése (#38): the dialog says what happens, or why it can't now.
+// A deletion that works lands on the home page, logged out.
+function DeleteAccount({ deletion }: { deletion: { effect: string } | { refused: string } }) {
+  const fetcher = useFetcher<typeof action>({ key: "account-delete" });
+  const refused = "refused" in deletion ? deletion.refused : null;
+  const error = fetcher.state === "idle" && fetcher.data && "deleteError" in fetcher.data ? fetcher.data.deleteError : null;
+  return (
+    <section id="fiok-torlese" className="grid max-w-2xl scroll-mt-6 gap-3 border-t pt-6">
+      <h2 className="font-display text-lg font-extrabold">Fiók törlése</h2>
+      <p className="text-sm text-muted-foreground">
+        Ha már nem akarsz játszani, törölheted a fiókodat és az adataidat. A régi eredmények megmaradnak, de nem köthetők hozzád.
+      </p>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" className="justify-self-start" disabled={fetcher.state !== "idle"}>
+            Fiók törlése
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{refused ? "Most nem törölheted a fiókodat" : "Törlöd a fiókodat?"}</AlertDialogTitle>
+            <AlertDialogDescription>{refused ?? ("effect" in deletion ? deletion.effect : "")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{refused ? "Rendben" : "Mégse"}</AlertDialogCancel>
+            {!refused && (
+              <AlertDialogAction variant="destructive" onClick={() => fetcher.submit({ intent: "delete-account" }, { method: "post" })}>
+                Fiók törlése
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {error && (
+        <p role="alert" className="text-sm font-semibold text-destructive">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }

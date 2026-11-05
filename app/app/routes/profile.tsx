@@ -32,7 +32,7 @@ import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } f
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
-import { hasPublicProfile } from "~/lib/profiles.server";
+import { hasProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
@@ -46,10 +46,10 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const [disabled, levelLocked, publicProfile, deletion] = await Promise.all([
+  const [disabled, levelLocked, withProfile, deletion] = await Promise.all([
     disabledKindsFor(user.id),
     hasTakenPartInSeason(user.id),
-    hasPublicProfile(user.id),
+    hasProfile(user.id),
     planOwnDeletion(user.id),
   ]);
   return {
@@ -65,8 +65,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     levelLocked,
     rating: ratingFor(user.level, user.elo),
     rated: user.elo !== null,
-    // The public profile (#36), once the player has been in a published group.
-    profilePath: publicProfile ? `/players/${user.id}` : null,
+    // The profile (#36, members only: D112), once the player has been in a published group.
+    profilePath: withProfile ? `/players/${user.id}` : null,
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -190,10 +190,10 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
         {d.profilePath && (
           <p className="text-sm">
             <Link to={d.profilePath} className="font-semibold underline">
-              Nyilvános profilod
+              A profilod
             </Link>
             <span className="text-muted-foreground">
-              : ezt látja rólad bárki (az eredményeidet és az értékszámodat a liga indulása után).
+              : ezt látják rólad a belépett játékosok (az eredményeidet és az értékszámodat a liga indulása után).
             </span>
           </p>
         )}

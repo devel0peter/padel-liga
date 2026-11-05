@@ -12,7 +12,7 @@ import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.serve
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED } from "~/lib/pairs";
 import { pairLeagues, pairOverview } from "~/lib/pairs.server";
 import { pairPath } from "~/lib/profiles";
-import { publicPairIds } from "~/lib/profiles.server";
+import { profilePairIds } from "~/lib/profiles.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { waitingMessage } from "~/lib/signup-partners";
 import { missingPartnerEmails, partnerEmailAction, waitingPartners } from "~/lib/signup-partners.server";
@@ -54,8 +54,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     partnerSearchState(user, leagues),
   ]);
   const origin = new URL(request.url).origin;
-  // The pair's public profile (#36), once it has been in a published group.
-  const open = await publicPairIds(pairs.flatMap((o) => (o.pair ? [o.pair.id] : [])));
+  // The pair's profile (#36, members only: D112), once it has been in a published group.
+  const open = await profilePairIds(pairs.flatMap((o) => (o.pair ? [o.pair.id] : [])));
   const overview = pairs.map((o) => {
     const link = o.pair ? undefined : links.find((l) => l.league.id === o.league.id);
     return {
@@ -137,7 +137,7 @@ function ActivePair({ pair, profile }: { pair: NonNullable<Overview["pair"]>; pr
       {profile && (
         <CardContent className="text-sm">
           <Link to={profile} className="font-semibold underline">
-            A párotok nyilvános oldala
+            A párotok oldala
           </Link>
         </CardContent>
       )}

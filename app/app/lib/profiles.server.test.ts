@@ -1,5 +1,5 @@
 // profiles.server.ts on a real SQLite with every migration applied
-// (~/test/sqlite): who has a public profile, what shows before and after the
+// (~/test/sqlite): who has a profile, what shows before and after the
 // league starts, final results only, Elo history, deleted accounts, and that
 // no email or phone leaves the module (#36).
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { hasPublicProfile, pairProfile, playerProfile, publicPairIds } = await import("~/lib/profiles.server");
+const { hasProfile, pairProfile, playerProfile, profilePairIds } = await import("~/lib/profiles.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
@@ -81,12 +81,12 @@ beforeEach(() => {
   g1 = group(1, 1, [1, 2, 3]);
 });
 
-describe("who has a public profile", () => {
+describe("who has a profile", () => {
   it("a pair in a published group, and its players", async () => {
     expect(await pairProfile(1, DURING)).not.toBeNull();
     expect(await playerProfile("ua", DURING)).not.toBeNull();
-    expect(await hasPublicProfile("ua")).toBe(true);
-    expect([...(await publicPairIds([1, 2, 99]))].sort()).toEqual([1, 2]);
+    expect(await hasProfile("ua")).toBe(true);
+    expect([...(await profilePairIds([1, 2, 99]))].sort()).toEqual([1, 2]);
   });
 
   it("nobody before the groups are published: a draft is not public", async () => {
@@ -96,15 +96,15 @@ describe("who has a public profile", () => {
     group(1, 2, [4], false);
     expect(await pairProfile(4, DURING)).toBeNull();
     expect(await playerProfile("ux", DURING)).toBeNull();
-    expect(await hasPublicProfile("ux")).toBe(false);
-    expect(await publicPairIds([4])).toEqual(new Set());
+    expect(await hasProfile("ux")).toBe(false);
+    expect(await profilePairIds([4])).toEqual(new Set());
   });
 
   it("nobody in a league whose city is not listed", async () => {
     h.raw.exec("update cities set listed = 0 where slug = 'gyor'");
     expect(await pairProfile(1, DURING)).toBeNull();
     expect(await playerProfile("ua", DURING)).toBeNull();
-    expect(await hasPublicProfile("ua")).toBe(false);
+    expect(await hasProfile("ua")).toBe(false);
   });
 
   it("no such pair or player, or a malformed id", async () => {

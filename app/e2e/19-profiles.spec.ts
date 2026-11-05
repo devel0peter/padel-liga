@@ -1,12 +1,14 @@
-// Walkthrough step 33 (#36): public pair and player profiles. Runs after
-// 19-ladder-results: Anna's pair has a confirmed win (step 27, rated) and a
-// "both lose" decision (step 28, not rated). In the walkthrough round 1 has
-// not started yet, so a profile shows names and groups only (spec 17); for
-// the results the test moves round 1's start into the past and puts it back.
-// A visitor reaches the pair from the league page's table, then a player
-// from the pair page; neither page shows an email or phone. Anna finds the
-// links on Profil and Párom.
-import { expect, test, type Page } from "@playwright/test";
+// Walkthrough step 33 (#36): pair and player profiles, for logged-in members
+// only (D112). Runs after 19-ladder-results: Anna's pair has a confirmed win
+// (step 27, rated) and a "both lose" decision (step 28, not rated). In the
+// walkthrough round 1 has not started yet, so a profile shows names and
+// groups only (spec 17); for the results the test moves round 1's start into
+// the past and puts it back. A visitor sees the league page's names as plain
+// text and is sent to the login page from a profile's address; a member
+// reaches the pair from the league page's table, then a player from the pair
+// page; neither page shows an email or phone. Anna finds the links on Profil
+// and Párom.
+import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { PAIRS, as, content, d1, d1Update, visit } from "./support";
 
@@ -16,27 +18,55 @@ const partner = PAIRS.p1[1];
 // Round 1 of the seeded league's season(s).
 const ROUND_1 = `season_id in (select s.id from seasons s join leagues l on l.id = s.league_id where l.slug = 'minta') and number = 1`;
 
-async function openPairFromLeague(page: Page): Promise<void> {
-  await visit(page, "/league/minta");
-  const group = content(page)
+// Anna's row in her group's table on the league page.
+function annaRow(page: Page) {
+  return content(page)
     .getByRole("region", { name: /^\d+\. csoport$/ })
+    .filter({ hasText: anna.name })
+    .locator("tbody tr")
     .filter({ hasText: anna.name });
-  await group.locator("tbody tr").filter({ hasText: anna.name }).getByRole("link").click();
+}
+
+// A logged-in member (Anna) on the league page, then her pair's profile.
+async function openPairFromLeague(browser: Browser) {
+  const { context, page } = await as(browser, anna);
+  await visit(page, "/league/minta");
+  await annaRow(page).getByRole("link").click();
   await expect(page).toHaveURL(/\/pairs\/\d+$/);
+  return { context, page };
 }
 
 // The whole HTML: the text, the title and meta tags, and the loader data
 // React Router writes into the page. The footer's contact address
-// (@padelparbaj.hu) is the site's own, not a player's.
+// (@padelparbaj.hu) is the site's own, not a player's; the logged-in viewer's
+// own address is in the app shell's account menu, so it is left out too.
 async function noContactData(page: Page): Promise<void> {
-  const html = (await page.content()).replace(/[\w.+-]+@padelparbaj\.hu/g, "");
+  const html = (await page.content()).replace(/[\w.+-]+@padelparbaj\.hu/g, "").replaceAll(anna.email, "");
   expect(html).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+|\+36|example\.test/);
   expect(await content(page).innerText()).not.toContain("@");
 }
 
-test("33. before round 1 starts a profile shows names and groups only", async ({ browser }) => {
+test("33. a visitor sees plain names on the league page and must log in for a profile", async ({ browser }) => {
+  const { context, page: member } = await openPairFromLeague(browser);
+  const pairPath = new URL(member.url()).pathname;
+  await context.close();
+
   const page = await browser.newPage();
-  await openPairFromLeague(page);
+  await visit(page, "/league/minta");
+  await expect(annaRow(page)).toContainText(anna.name);
+  await expect(annaRow(page).getByRole("link")).toHaveCount(0);
+  await expect(content(page).locator('a[href^="/pairs/"], a[href^="/players/"]')).toHaveCount(0);
+  await expect(content(page)).not.toContainText(/értékszám/i);
+
+  await page.goto(pairPath);
+  await page.waitForURL(/\/login\?/);
+  const at = new URL(page.url());
+  expect(at.pathname + at.search).toBe(`/login?returnTo=${encodeURIComponent(pairPath)}`);
+  await page.close();
+});
+
+test("33. before round 1 starts a profile shows names and groups only", async ({ browser }) => {
+  const { context, page } = await openPairFromLeague(browser);
   const main = content(page);
   await expect(main.getByRole("heading", { level: 1 })).toContainText(anna.name);
   await expect(main.getByRole("heading", { level: 1 })).toContainText(partner.name);
@@ -51,7 +81,7 @@ test("33. before round 1 starts a profile shows names and groups only", async ({
   await expect(content(page).getByTestId("player-elo")).toHaveCount(0);
   await expect(content(page).getByRole("region", { name: "Párja" })).toContainText(partner.name);
   await noContactData(page);
-  await page.close();
+  await context.close();
 });
 
 test("33. once round 1 has started: the results, the értékszám and its change", async ({ browser }) => {
@@ -59,8 +89,7 @@ test("33. once round 1 has started: the results, the értékszám and its change
   expect(original.length).toBeGreaterThan(0);
   d1Update(`update season_phases set starts_at = ${Math.floor(Date.now() / 1000) - 86_400} where ${ROUND_1}`);
   try {
-    const page = await browser.newPage();
-    await openPairFromLeague(page);
+    const { context, page } = await openPairFromLeague(browser);
     const main = content(page);
     await expect(main.getByRole("region", { name: "Csoportok" })).toContainText(/\d+\. hely/);
     const matches = main.getByRole("region", { name: "Meccsek" });
@@ -79,9 +108,10 @@ test("33. once round 1 has started: the results, the értékszám and its change
     await expect(lines.filter({ hasText: "Győzelem" }).getByTestId("elo-change")).toHaveText(/^Értékszám: \+\d+ → \d+$/);
     await expect(lines.filter({ hasText: "Mindkét pár" }).getByTestId("elo-change")).toHaveCount(0);
     await noContactData(page);
-    // A link preview like the league page's.
-    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", `${anna.name} – Padelpárbaj`);
-    await page.close();
+    // Not for search engines, and no link preview (D112).
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+    await expect(page.locator('meta[property="og:title"]')).toHaveCount(0);
+    await context.close();
   } finally {
     for (const row of original) {
       d1Update(`update season_phases set starts_at = ${row.starts_at} where season_id = ${row.season_id} and number = 1`);
@@ -89,24 +119,24 @@ test("33. once round 1 has started: the results, the értékszám and its change
   }
 });
 
-test("33. an unknown pair or player is a 404", async ({ browser }) => {
-  const page = await browser.newPage();
+test("33. an unknown pair or player is a 404 for a member", async ({ browser }) => {
+  const { context, page } = await as(browser, anna);
   for (const path of ["/pairs/999999", "/pairs/abc", "/players/nincs-ilyen"]) {
     const response = await page.goto(path);
     expect(response?.status()).toBe(404);
     await expect(page.getByText("Ez az oldal nem létezik.")).toBeVisible();
   }
-  await page.close();
+  await context.close();
 });
 
-test("33. Anna finds her public profile on Profil and the pair's on Párom", async ({ browser }) => {
+test("33. Anna finds her profile on Profil and the pair's on Párom", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/profile");
-  await content(page).getByRole("link", { name: "Nyilvános profilod" }).click();
+  await content(page).getByRole("link", { name: "A profilod" }).click();
   await expect(page).toHaveURL(/\/players\/[0-9a-f-]+$/);
   await expect(content(page).getByRole("heading", { level: 1 })).toHaveText(anna.name);
   await visit(page, "/pair");
-  await content(page).getByRole("link", { name: "A párotok nyilvános oldala" }).click();
+  await content(page).getByRole("link", { name: "A párotok oldala" }).click();
   await expect(page).toHaveURL(/\/pairs\/\d+$/);
   await expect(content(page).getByRole("heading", { level: 1 })).toContainText(partner.name);
   await context.close();

@@ -2,8 +2,8 @@ import { Link } from "react-router";
 
 import { pairPath, playerPath, type ProfileMatchView, type ProfilePair, type ProfilePerson } from "~/lib/profiles";
 
-// Shared pieces of the public pair and player profiles (#36), in the league
-// page's look: cards on the site layout.
+// Shared pieces of the pair and player profiles (#36; members only, D112),
+// in the league page's look: cards.
 
 export function PersonLink({ person }: { person: ProfilePerson }) {
   const path = playerPath(person);

@@ -1,4 +1,5 @@
-// Public pair and player profiles (#36, spec sections 11, 14 and 17). Pure:
+// Pair and player profiles (#36, spec sections 11, 14 and 17; logged-in
+// members only, D112). Pure:
 // profiles.server.ts reads the database and hands in what is stored. Names,
 // results and ratings only: nothing here can carry an email or phone.
 

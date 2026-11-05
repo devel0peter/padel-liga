@@ -16,8 +16,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const R = await import("~/lib/round-switch.server");
-const { DISPUTES_FIRST, NOT_READY } = await import("~/lib/round-switch");
-const { STALE_DRAFT } = await import("~/lib/groups");
+const { DISPUTES_FIRST, NOT_READY, OUTDATED_DRAFT } = await import("~/lib/round-switch");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -196,6 +195,17 @@ describe("roundSwitch (#12, #35)", () => {
     expect(ids(s.draft)).toEqual([[1, 2, 3, 6]]);
   });
 
+  it("places a pair withdrawn mid-phase and entered again as a new pair, not as leaving", async () => {
+    finishAll();
+    h.raw.exec("update group_pairs set withdrawn_at = 1, withdrawal_reason = 'sérülés' where pair_id = 7");
+    // The organizer entered it again: it joins at the next phase.
+    h.raw.exec("update season_entries set joins_phase = 2 where pair_id = 7");
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(s.leaving).toEqual([]);
+    expect(s.newPairs.map((n) => n.pair.pairId)).toEqual([7]);
+    expect(s.origins.get(7)).toEqual({ kind: "new" });
+  });
+
   it("places a pair entered for phase 2 (interim: at the bottom)", async () => {
     addPair(9, { joinsPhase: 2 });
     finishAll();
@@ -266,11 +276,42 @@ describe("generateRoundSwitchDraft and publishRoundSwitch (#35)", () => {
     expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
   });
 
+  it("refuses an outdated draft: a dispute settled since changes who goes up; a rebuild fixes it", async () => {
+    h.raw.exec("update leagues set fast_switches = 0");
+    const m = matchOf(5, 6);
+    finishAll([m]);
+    h.raw.prepare("update matches set status = 'disputed' where id = ?").run(m);
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    // Without that match 5 tops group 2 (on Elo) and goes up.
+    expect(groupsOf(2)[0]).toContain(5);
+    // Settled for 6: now 6 tops group 2.
+    const { pair_a } = all("select pair_a from matches where id = ?", m)[0];
+    const sixWins = JSON.stringify({ kind: "played", score: { sets: pair_a === 6 ? [[4, 1], [4, 1]] : [[1, 4], [1, 4]] } });
+    h.raw.prepare("update matches set status = 'final', outcome = ? where id = ?").run(sixWins, m);
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(R.draftOutdated(await G.phaseGroups(1, 2), s)).toBe(true);
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: OUTDATED_DRAFT });
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(groupsOf(2)[0]).toContain(6);
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
+  });
+
+  it("keeps a draft with the organizer's moves current while nothing it came from changes", async () => {
+    finishAll();
+    await R.generateRoundSwitchDraft(1, 2, "o", AFTER);
+    await G.moveDraftPair(1, 4, 1, "o", 2);
+    await G.moveDraftPair(1, 6, 2, "o", 2);
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(R.draftOutdated(await G.phaseGroups(1, 2), s)).toBe(false);
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(groupsOf(2)[0]).toContain(4);
+  });
+
   it("refuses a stale draft: a pair entered since", async () => {
     finishAll();
     await R.generateRoundSwitchDraft(1, 2, "o", AFTER);
     addPair(9, { joinsPhase: 2 });
-    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: STALE_DRAFT });
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: false, error: OUTDATED_DRAFT });
   });
 });
 
@@ -302,7 +343,26 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
     const { RunBudget } = await import("~/lib/run-usage");
     finishAll();
     const run = new RunBudget();
-    expect(await R.draftRoundSwitches(AFTER, { run, keep: { queries: 49, calls: 0 } })).toMatch(/left for the next/);
+    expect(await R.draftRoundSwitches(AFTER, { run, keep: { queries: 50, calls: 0 } })).toMatch(/left for the next/);
+    expect(run.used().queries).toBe(0);
+    // Room for the lookup, not for a draft: deferred, nothing replayed or written.
+    const tight = new RunBudget();
+    expect(await R.draftRoundSwitches(AFTER, { run: tight, keep: { queries: 50 - R.ROUND_LOOKUP_QUERIES - 1, calls: 0 } })).toMatch(/left for the next run/);
+    expect(tight.used().queries).toBe(R.ROUND_LOOKUP_QUERIES);
     expect(groupsOf(2)).toEqual([]);
+  });
+
+  it("costs one query, no Elo replay, while seasons still wait for the resolution", async () => {
+    const { RunBudget } = await import("~/lib/run-usage");
+    // A second league and season on the same calendar, also not settled.
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'gyor', 'gyor-2', 'Második')`);
+    addSeason(2, 2);
+    h.raw.exec(`insert into groups (season_id, phase, number, published_at) values (2, 1, 1, ${sec("2026-11-07T10:00:00Z")})`);
+    h.raw.exec(`insert into matches (group_id, pair_a, pair_b, week, deadline) select id, 1, 2, 1, 0 from groups where season_id = 2`);
+    finishAll([matchOf(1, 2)]);
+    h.raw.exec("update matches set status = 'open', outcome = null where group_id in (select id from groups where season_id = 2)");
+    const run = new RunBudget();
+    expect(await R.draftRoundSwitches(AFTER, { run, keep: { queries: 0, calls: 0 } })).toBeNull();
+    expect(run.used().queries).toBe(1);
   });
 });

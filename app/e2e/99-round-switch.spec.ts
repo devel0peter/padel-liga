@@ -51,10 +51,16 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
   await test.info().attach("round 2 draft, 390px", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.setViewportSize({ width: 1280, height: 800 });
 
-  // Settled: the draft can go out.
+  // Settled. If the result changes who moves, the draft is outdated and
+  // can't go out until it is rebuilt from the final tables (D107).
   d1Update(`update matches set status = 'final', outcome = ${won} where id = ${disputed}`);
   await visit(page, `${season}/groups?phase=2`);
   await expect(block).toHaveCount(0);
+  const outdated = page.getByRole("alert").filter({ hasText: "Előbb számold újra a tervezetet." });
+  if ((await outdated.count()) > 0) await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
+  await page.getByRole("button", { name: "Tervezet újraszámolása" }).click();
+  await expect(page.getByRole("status")).toContainText("Újraszámoltuk a tervezetet");
+  await expect(outdated).toHaveCount(0);
   await page.getByRole("button", { name: "Közzététel" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Közzététel" }).click();
   await expect(page.getByRole("status")).toContainText("Közzétetted a csoportokat.");

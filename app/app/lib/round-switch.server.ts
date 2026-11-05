@@ -10,7 +10,7 @@ import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
 import { resultsOf } from "./result-log.server";
-import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin } from "./round-switch";
+import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin, OUTDATED_DRAFT } from "./round-switch";
 import { getSeason } from "./seasons.server";
 import { pairsLeavingAfterPhase } from "./strikes.server";
 
@@ -177,12 +177,31 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
       pairs: [pairById.get(m.pairA)!, pairById.get(m.pairB)!] as [GroupPair, GroupPair],
     }));
 
-  return { endingPhase, nextPhase, state, fast, tables, leaving, newPairs, draft, origins, disputes };
+  // A pair withdrawn mid-phase and entered again plays on as a new pair, so
+  // it is not listed as leaving.
+  const placed = new Set(newPairs.map((n) => n.pair.pairId));
+  const shownLeaving = leaving.filter((l) => !placed.has(l.pair.pairId));
+  return { endingPhase, nextPhase, state, fast, tables, leaving: shownLeaving, newPairs, draft, origins, disputes };
 }
 
 /** The pairs a phase-n draft must hold exactly: the continuing pairs that stay and the new pairs. */
 export function draftPairIds(s: RoundSwitch): number[] {
   return s.draft.flat().map((p) => p.pairId);
+}
+
+/**
+ * The draft the system computes, as a string stored with the draft groups
+ * ("1,2,5,6|3,4,7,8"). When the current results and pairs give another one,
+ * the stored draft is outdated: a dispute or no-show settled, a result
+ * overridden, a strike cancelled, a pair entered or gone (#35).
+ */
+export function draftBasis(s: RoundSwitch): string {
+  return s.draft.map((g) => g.map((p) => p.pairId).join(",")).join("|");
+}
+
+/** Whether a stored phase-n draft no longer matches what the switch computes now. */
+export function draftOutdated(stored: readonly { basis: string | null }[], s: RoundSwitch): boolean {
+  return stored.length > 0 && stored[0]!.basis !== draftBasis(s);
 }
 
 /**
@@ -199,43 +218,49 @@ export async function generateRoundSwitchDraft(seasonId: number, nextPhase: numb
   if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
   if (s.draft.length === 0) return { ok: false, error: NOTHING_TO_DRAFT };
-  return writeDraft(seasonId, nextPhase, s.draft, actorId, actorId ? undefined : now);
+  return writeDraft(seasonId, nextPhase, s.draft, actorId, actorId ? undefined : now, draftBasis(s));
 }
 
 /**
  * "Közzététel" of a phase-n draft: refused while the ending phase has a
- * disputed result (the page lists them) or the draft no longer holds the
- * pairs the switch has now; then as phase 1 (publishPhase).
+ * disputed result or a waiting no-show report (the page lists them), and
+ * when the draft is outdated (the results or pairs it was computed from
+ * have changed: rebuild it first); then as phase 1 (publishPhase).
  */
 export async function publishRoundSwitch(seasonId: number, nextPhase: number, actorId: string, now = new Date()): Promise<Result> {
-  const s = await roundSwitch(seasonId, nextPhase, now);
+  const [s, stored] = await Promise.all([roundSwitch(seasonId, nextPhase, now), phaseGroups(seasonId, nextPhase)]);
   if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
   if (s.disputes.length > 0) return { ok: false, error: DISPUTES_FIRST };
+  if (stored.length > 0 && !stored.some((g) => g.publishedAt) && draftOutdated(stored, s)) return { ok: false, error: OUTDATED_DRAFT };
   return publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
 }
 
 // --- The cron step -----------------------------------------------------------
 
-// One run drafts at most one switch: the candidates lookup, the Elo replay,
-// the switch's reads (season 2, groups 2, league, first season, matches,
-// entries, strikes 2, recorded results, no-show reports), the write batch
-// and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: 1 + ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
+// The lookup of the switches that can be drafted: one query, every run.
+export const ROUND_LOOKUP_QUERIES = 1;
+
+// One run drafts at most one switch: the Elo replay, the switch's reads
+// (season 2, groups 2, league, first season, matches, entries, strikes 2,
+// recorded results, no-show reports), the write batch and the job mark.
+export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 
 /**
  * The cron step after the deadline resolution (#35): for one season whose
- * phase has ended, is published and settled, and whose next phase has no
- * groups yet (and hasn't ended), writes the next phase's draft, unpublished.
- * Each switch is drafted once (job_runs); a switch whose matches still wait
- * for the resolution is tried again on the next run. Returns what it did.
+ * phase has ended, is published and settled (no counting match left open
+ * or scheduled, except one with a waiting no-show report, which the
+ * organizer decides), and whose next phase has no groups yet (and hasn't
+ * ended), writes the next phase's draft, unpublished. One lookup finds such
+ * switches, so a run before the resolution costs one query and no Elo
+ * replay; at most one draft per run, only when its whole cost fits after
+ * `keep`. Each switch is drafted once (job_runs). Returns what it did.
  */
 export async function draftRoundSwitches(now: Date, budget?: { run: RunBudget; keep: Usage }): Promise<string | null> {
-  if (budget && !budget.run.fits({ queries: budget.keep.queries + ROUND_DRAFT_MIN.queries, calls: budget.keep.calls })) {
-    return "round switch draft: no room in this run; left for the next one";
-  }
+  const fits = (queries: number) => !budget || budget.run.fits({ queries: budget.keep.queries + queries, calls: budget.keep.calls });
+  if (!fits(ROUND_LOOKUP_QUERIES)) return "round switch draft: no room in this run; left for the next one";
   const next = alias(seasonPhases, "next_phase");
   const candidates = await db
     .select({ seasonId: seasonPhases.seasonId, phase: next.number })
@@ -248,12 +273,19 @@ export async function draftRoundSwitches(now: Date, budget?: { run: RunBudget; k
         sql`exists (select 1 from ${groups} g where g.season_id = ${seasonPhases.seasonId} and g.phase = ${seasonPhases.number} and g.published_at is not null)`,
         sql`not exists (select 1 from ${groups} g where g.season_id = ${seasonPhases.seasonId} and g.phase = ${next.number})`,
         sql`not exists (select 1 from ${jobRuns} j where j.key = 'round-draft:' || ${seasonPhases.seasonId} || ':' || ${next.number})`,
+        // Settled: the same rule as roundSwitch's state.
+        sql`not exists (select 1 from ${matches} m join ${groups} g on g.id = m.group_id
+          where g.season_id = ${seasonPhases.seasonId} and g.phase = ${seasonPhases.number} and m.status in ('open', 'scheduled')
+            and not exists (select 1 from group_pairs wp where wp.group_id = m.group_id and wp.pair_id in (m.pair_a, m.pair_b) and wp.withdrawn_at is not null)
+            and not exists (select 1 from ${noShowReports} nr where nr.match_id = m.id and nr.status = 'open'))`,
       ),
     )
     .orderBy(asc(seasonPhases.deadline), asc(seasonPhases.seasonId));
   for (const c of candidates) {
+    if (!fits(ROUND_DRAFT_MIN.queries)) return `round switch draft: phase ${c.phase} of season ${c.seasonId} left for the next run (run limits)`;
     const result = await generateRoundSwitchDraft(c.seasonId, c.phase, null, now);
-    if (!result.ok && result.error === NOT_READY) continue;
+    // Changed since the lookup (a match reopened): the next run looks again.
+    if (!result.ok && result.error === NOT_READY) return null;
     await db.insert(jobRuns).values({ key: jobKey(c.seasonId, c.phase), doneAt: now }).onConflictDoNothing();
     return result.ok
       ? `drafted phase ${c.phase} of season ${c.seasonId}`

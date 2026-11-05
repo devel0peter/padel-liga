@@ -58,7 +58,8 @@ export function shownPhase(
 export const DISPUTES_BLOCK = "Közzététel előtt döntsd el ezeket:";
 export const DISPUTES_FIRST = "Előbb döntsd el a vitatott eredményeket és a meg nem jelenés bejelentéseket.";
 export const BLOCKER_KINDS = { disputed: "vitatott eredmény", no_show: "meg nem jelenés bejelentése" } as const;
-export const RECOMPUTE_HINT = "Ha közben rendeztél egy vitát vagy változtak a párok, számold újra a tervezetet. Az áthelyezéseid ilyenkor elvesznek.";
+export const RECOMPUTE_HINT = "Az újraszámolás a mostani eredményekből készül, az áthelyezéseid ilyenkor elvesznek.";
+export const OUTDATED_DRAFT = "Az eredmények vagy a párok változtak a tervezet óta. Előbb számold újra a tervezetet.";
 export const NOT_READY = "A kör még nem zárult le, a tervezet még nem készíthető el.";
 export const NOTHING_TO_DRAFT = "Nincs pár a következő körre.";
 export const LAST_PHASE = "Ez a szezon utolsó köre: a következő szezon beosztása később jön.";

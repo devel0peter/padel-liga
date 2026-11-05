@@ -48,7 +48,7 @@ export type GroupPair = {
   withdrawalReason: string | null;
 };
 
-export type StoredGroup = { id: number; number: number; revision: number; publishedAt: Date | null; pairs: GroupPair[] };
+export type StoredGroup = { id: number; number: number; revision: number; basis: string | null; publishedAt: Date | null; pairs: GroupPair[] };
 
 const pairColumns = {
   pairId: pairs.id,
@@ -148,7 +148,7 @@ export async function enteredPairs(seasonId: number): Promise<(GroupPair & { joi
 // A phase's groups (draft or published), 1. csoport first, each by seed.
 export async function phaseGroups(seasonId: number, phase = FIRST_PHASE): Promise<StoredGroup[]> {
   const list = await db
-    .select({ id: groups.id, number: groups.number, revision: groups.revision, publishedAt: groups.publishedAt })
+    .select({ id: groups.id, number: groups.number, revision: groups.revision, basis: groups.basis, publishedAt: groups.publishedAt })
     .from(groups)
     .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase)))
     .orderBy(asc(groups.number));
@@ -204,7 +204,7 @@ export async function publishedPhases(): Promise<Map<number, number[]>> {
 
 // D1 allows at most 100 bound parameters per statement. Drizzle binds a
 // column's default too (revision 0), so count every column it writes.
-const GROUP_CHUNK = 20; // 4 per row: season, phase, number, revision
+const GROUP_CHUNK = 16; // 5 per row: season, phase, number, basis, revision
 const PAIR_CHUNK = 15; // 5 per row: the group id subquery binds 3
 const MATCH_CHUNK = 13; // 7 per row (the status and revision defaults are bound), plus 4 for the claim check in the first
 
@@ -276,8 +276,9 @@ export async function writeDraft(
   drafted: readonly (readonly { pairId: number }[])[],
   actorId: string | null,
   at?: Date,
+  basis: string | null = null,
 ): Promise<Result> {
-  const groupRows = drafted.map((_, i) => ({ seasonId, phase, number: i + 1 }));
+  const groupRows = drafted.map((_, i) => ({ seasonId, phase, number: i + 1, basis }));
   const pairRows = drafted.flatMap((g, i) => g.map((p, seed) => ({ groupId: groupIdOf(seasonId, phase, i + 1), pairId: p.pairId, seed: seed + 1 })));
   const count = drafted.reduce((n, g) => n + g.length, 0);
   // One batch (a transaction in D1).

@@ -51,11 +51,12 @@ import {
   movement,
   type Origin,
   originText,
+  OUTDATED_DRAFT,
   RECOMPUTE_HINT,
   shownPhase,
   waitingText,
 } from "~/lib/round-switch";
-import { draftPairIds, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch } from "~/lib/round-switch.server";
+import { draftOutdated, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch } from "~/lib/round-switch.server";
 import { seasonOfLeague } from "~/lib/season-entries.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -156,8 +157,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // A later round: the switch from the round before it.
   const s = publishedAt ? null : await roundSwitch(season.id, number, now);
-  const stale = draft && !!s && draftIsStale(stored.flatMap((g) => g.pairs.map((p) => p.pairId)), draftPairIds(s));
-  const sizesBlocker = draft ? publishBlocker({ sizes: stored.map((g) => g.pairs.length), stale }) : null;
+  // Outdated: the results or pairs the draft came from have changed.
+  const stale = draft && !!s && draftOutdated(stored, s);
+  const sizesBlocker = draft ? (stale ? OUTDATED_DRAFT : publishBlocker({ sizes: stored.map((g) => g.pairs.length), stale: false })) : null;
   return {
     ...head,
     publishedAt,

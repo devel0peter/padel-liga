@@ -201,6 +201,14 @@ export default function Privacy() {
                 amit mindkét pár lát.
               </li>
               <li>
+                <strong>A helyettes kérést</strong> (ki kérte, ki helyett ki
+                játszana, és a szervező döntése) a pár és a liga szervezője meg
+                az oldal adminja látja; a szervező a két játékos Elóját is,
+                hogy dönthessen. A jóváhagyott helyettes nevét az ellenfeleid is
+                látják a meccs oldalán. A szervező indoklását csak a pár látja,
+                és ha törlöd a fiókodat, töröljük.
+              </li>
+              <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
                 kerül belőle nyilvánosságra. A városod ligájának szervezője az
                 egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol

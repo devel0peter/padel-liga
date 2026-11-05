@@ -12,6 +12,7 @@ import {
   leagueAdminInvites,
   leagueAdmins,
   loginCodes,
+  matchSubstitutes,
   notificationOptOuts,
   groupPairs,
   notifications,
@@ -285,6 +286,12 @@ function withdrawalReasonStatements(userId: string, guard: SQL) {
       .update(groupPairs)
       .set({ withdrawalReason: null })
       .where(and(isNotNull(groupPairs.withdrawalReason), inArray(groupPairs.pairId, theirPairs), guard)),
+    // The organizer's reason for rejecting or revoking a substitute (#37) is
+    // free text about the pair too (an absence, an injury): gone with it.
+    db
+      .update(matchSubstitutes)
+      .set({ reason: null })
+      .where(and(isNotNull(matchSubstitutes.reason), inArray(matchSubstitutes.pairId, theirPairs), guard)),
   ];
 }
 

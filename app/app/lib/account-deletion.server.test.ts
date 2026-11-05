@@ -246,6 +246,18 @@ describe("deleting an account (#152)", () => {
     expect(one("select revision from groups where id = 1").revision).toBe(1);
   });
 
+  it("anonymizing takes the organizer's substitute reasons off the player's pairs' requests (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'S', 1)`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at, reason)
+      values (1, 1, 'b', 's', 'rejected', 1, 'Lábsérülés miatt nem.'), (1, 2, 'd', 's', 'rejected', 1, 'Másik pár oka.')`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(all("select pair_id, reason from match_substitutes order by pair_id")).toEqual([
+      { pair_id: 1, reason: null },
+      { pair_id: 2, reason: "Másik pár oka." },
+    ]);
+  });
+
   it("anonymizes an account with history; groups and matches stay", async () => {
     publishPairOne();
     expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });

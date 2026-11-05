@@ -47,6 +47,9 @@ export const AUDIT_ACTIONS = {
   // Matches
   "match.decide": "Meccs eldöntése",
   "result.auto_accept": "Eredmény automatikus elfogadása",
+  "substitute.approve": "Helyettes jóváhagyása",
+  "substitute.reject": "Helyettes elutasítása",
+  "substitute.revoke": "Helyettes visszavonása",
   // Emails and reminders
   "broadcast.send": "Körlevél küldése",
   "registration_invites.send": "Regisztrációs meghívók",

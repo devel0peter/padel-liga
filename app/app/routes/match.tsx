@@ -28,10 +28,12 @@ import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ResultSection } from "~/components/match-result";
 import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, parseSlot, parseSlots, statusView } from "~/lib/matches";
-import { matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { loadMatch, matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
 import { parseScore, resultStatusView } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
+import { substituteLine } from "~/lib/substitutes";
+import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
 
 // A match (#25, #26): status, the opponents' phones, scheduling (propose,
 // accept, counter-propose, record and confirm an agreed time) and the log.
@@ -49,9 +51,12 @@ function matchId(params: { id: string }): number {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  const page = await matchPage(matchId(params), user.id);
-  if (!page) throw new Response(NOT_FOUND, { status: 404 });
-  return page;
+  const now = new Date();
+  const ctx = await loadMatch(matchId(params));
+  const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
+  if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
+  // Substitutes (#37): only for the four players, like the rest of the page.
+  return { ...page, substitutes: await substitutePanel(ctx, page.side, user.id, now) };
 }
 
 const NONE = "none";
@@ -87,6 +92,17 @@ export async function action({ request, params }: Route.ActionArgs) {
     const done = await resultStep(user.id, id, input);
     if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
     if (done.error === NOT_FOUND) throw new Response(NOT_FOUND, { status: 404 });
+    return fail(done.error);
+  }
+
+  // A substitute for an absent player of the pair (#37, D109).
+  if (intent === "substitute-request" || intent === "substitute-withdraw") {
+    const done =
+      intent === "substitute-request"
+        ? await requestSubstitute(user.id, id, { absentId: String(form.get("absent") ?? ""), substituteId: String(form.get("substitute") ?? "") })
+        : await withdrawSubstitute(user.id, id, Number(form.get("request")));
+    if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
+    if (done.notFound) throw new Response(NOT_FOUND, { status: 404 });
     return fail(done.error);
   }
 
@@ -338,6 +354,107 @@ function CancelCard({ late }: { late: boolean }) {
   );
 }
 
+// Helyettes (#37, spec 4, D109): either player of the pair asks for a
+// substitute for an absent player until the match starts; the organizer
+// approves. Approved substitutes show to all four players; the pair's own
+// requests (with the organizer's reason) only to the pair.
+function SubstituteSection({ s, deadline, result }: { s: SubstitutePanel; deadline: Date; result?: ActionResult }) {
+  const busy = useNavigation().state !== "idle";
+  if (!s.form && s.approved.length === 0 && s.ours.length === 0) return null;
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">Helyettes</CardTitle>
+        {s.form && (
+          <CardDescription>
+            Ha valamelyikőtök nem tud játszani, kérjetek helyettest {s.closesAt.getTime() === deadline.getTime() ? "a határidőig" : "a meccs kezdetéig"}. A
+            szervező hagyja jóvá. A helyettes legyen nagyjából azonos vagy gyengébb szintű, és nem játszhat másik párban a csoportban.
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {s.approved.length > 0 && (
+          <ul className="grid gap-1 text-sm" aria-label="Jóváhagyott helyettesek">
+            {s.approved.map((a) => (
+              <li key={`${a.absent}-${a.substitute}`}>
+                <span className="font-medium">{substituteLine(a)}</span> játszik {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
+              </li>
+            ))}
+          </ul>
+        )}
+        {s.ours.length > 0 && (
+          <ul className="grid gap-2 text-sm" aria-label="Kéréseitek">
+            {s.ours.map((r) => (
+              <li key={r.id} className="grid gap-1 rounded-md border p-3">
+                <span className="break-words">
+                  {substituteLine(r)}: <span className="font-medium">{r.label}</span>
+                </span>
+                {r.reason && <span className="break-words text-muted-foreground">A szervező indoklása: {r.reason}</span>}
+                {r.canWithdraw && (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="substitute-withdraw" />
+                    <input type="hidden" name="request" value={r.id} />
+                    <Button type="submit" variant="outline" size="sm" disabled={busy}>
+                      Visszavonom a kérést
+                    </Button>
+                  </Form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {s.form && (
+          <Form method="post" className="grid gap-3">
+            <input type="hidden" name="intent" value="substitute-request" />
+            <div className="grid gap-1.5">
+              <Label htmlFor="substitute-absent">Ki nem tud játszani?</Label>
+              <Select name="absent" defaultValue={s.form.absent.length === 1 ? s.form.absent[0]!.id : undefined} required>
+                <SelectTrigger id="substitute-absent" className="w-full sm:w-72">
+                  <SelectValue placeholder="Válassz" />
+                </SelectTrigger>
+                <SelectContent>
+                  {s.form.absent.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="substitute-player">Ki helyettesít?</Label>
+              {s.form.candidates.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Most nincs olyan regisztrált játékos, aki helyettesíthetne.</p>
+              ) : (
+                <Select name="substitute" required>
+                  <SelectTrigger id="substitute-player" className="w-full sm:w-72">
+                    <SelectValue placeholder="Válassz játékost" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {s.form.candidates.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">Csak regisztrált játékost választhatsz. Ha nincs a listán, előbb regisztráljon.</p>
+            </div>
+            <Feedback result={result} intent="substitute-request" />
+            <div>
+              <Button type="submit" variant="outline" disabled={busy || s.form.candidates.length === 0}>
+                Helyettest kérek
+              </Button>
+            </div>
+          </Form>
+        )}
+        <Feedback result={result} intent="substitute-withdraw" />
+      </CardContent>
+    </Card>
+  );
+}
+
 // Add the fixed time to the calendar (#192, D106): a Google Calendar link and
 // an .ics file. The file keeps one entry per match: a new download replaces
 // the old one, and after a cancellation it removes it. An entry added with the
@@ -507,6 +624,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
       )}
 
       {!resultFirst && resultSection}
+
+      <SubstituteSection key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
 
       <section className="grid max-w-2xl gap-2" aria-labelledby="naplo">
         <h2 id="naplo" className="font-display text-lg font-bold">

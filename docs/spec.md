@@ -62,6 +62,10 @@ Organizer and platform admin are roles on a normal player account, inside the ap
   - The substitute's level should be similar to or lower than the absent player's; the organizer judges.
   - The result counts for the pair as normal (standings, set and game difference).
   - Without an approved substitute, the unplayed-match rules apply (section 8).
+  - **How** (README decision log, 2026-11-05, D109, #37): either player of the pair asks on the match page ("Helyettes"), naming the absent player of their pair and the substitute, before the match's agreed start (before the deadline while no time is agreed) and while it has no result. The substitute is picked by name from the league's registered players (D93, not deleted; no email shown), never one of the match's four players or a player of another pair of the group that is not withdrawn. One live (waiting or approved) substitute per absent player per match, so both players of a pair can be replaced; a person is named once per match. The asking player can withdraw a waiting request.
+  - The league's organizer (or the Admin) approves or rejects it, with an optional reason (at most 300 characters, only the pair sees it), on "Helyettesek" (`/admin/leagues/:league/substitutes`), where the absent player's and the substitute's current Elo stand side by side. The organizer can revoke an approval until the match starts. Each decision is audited (D91). A waiting request lapses when the match starts. Nothing is approved automatically.
+  - The match page shows approved substitutes to all four players; the pair's own requests and their state (with the reason) only to the pair. The substitute gets no notice and no access to the match page. Public pages, tables and the calendar file keep the pair's names unchanged.
+  - Elo (section 11): the approved substitute is rated instead of the absent player; the match counts as a rated match for the substitute.
 - **Match:** 2 pairs, a scheduled week, a deadline, a status, proposals, a result, and a venue (one of the city's clubs).
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.
@@ -205,8 +209,11 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 **Szervezők and Admins** (in the app and by push, no email):
 - A new interest signup in their city (Admins: any city). City, pair or solo, level and the running counts only; no names or contact details.
 - A disputed result in their league (Admins: any league), at once, linking to the match's decision page; the league's Szervezők and every Admin, once each, accounts being deleted and the player who disputed left out (D96, #221). No names, scores or contact details in the text. They can switch this kind ("Vitatott eredmény") off on the profile (README decision log, 2026-11-03, #178, D86).
+- A substitute request in their league (Admins: any league), linking to "Helyettesek"; the same recipients, the asking player left out, no names. Kind "Helyettes kérés", switchable on the profile (D109, #37).
 
 **A pair withdrawn mid-phase** (section 4, D87; in the app and by push, no email): its players, with the organizer's reason; the group's other pairs, with no names and no reason.
+
+**Substitutes** (section 4, D109; in the app and by push, no email): a new request to the league's Szervezők and every Admin (the asking player left out; no names; a kind they can switch off, "Helyettes kérés"); an approval to the asking pair and the opponents (who plays instead of whom); a rejection to the asking pair; a revoked approval to both pairs. The reason is never in the notice, only on the match page.
 
 **Daily digest** (one email in the morning, only on days with something in it; push gets the same items one by one). The email is off for now (D83): the items are in the app and pushed as below, and no digest email goes out:
 - A slot was accepted, a time was cancelled, a result was confirmed.

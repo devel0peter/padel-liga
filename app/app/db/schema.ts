@@ -424,6 +424,10 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "substitute_requested",
+        "substitute_approved",
+        "substitute_rejected",
+        "substitute_revoked",
         "test",
       ],
     }).notNull(),
@@ -889,4 +893,46 @@ export const eloChanges = sqliteTable(
     at: integer("at", { mode: "timestamp" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.userId] }), index("elo_changes_user_idx").on(t.userId, t.at)],
+);
+
+// A substitute for an absent player in one match (#37, spec 4, D109). A
+// player of the pair asks before the match starts, the league's organizer
+// approves or rejects it (optional reason) and may revoke an approval until
+// the start. Only an approved row changes who played: Elo (elo.server.ts)
+// rates the substitute instead of the absent player. One live row
+// (requested or approved) per absent player per match.
+// Personal data: who asked and who decided (set null when the account is
+// deleted); the reason is for the pair and the organizer only.
+export const matchSubstitutes = sqliteTable(
+  "match_substitutes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The asking pair, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    absentId: text("absent_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    substituteId: text("substitute_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["requested", "approved", "rejected", "withdrawn", "revoked"] }).notNull().default("requested"),
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
+    requestedAt: integer("requested_at", { mode: "timestamp" }).notNull(),
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    // The organizer's optional reason for a rejection or a revocation.
+    reason: text("reason"),
+  },
+  (t) => [
+    uniqueIndex("match_substitutes_live_idx")
+      .on(t.matchId, t.absentId)
+      .where(sql`${t.status} in ('requested', 'approved')`),
+    index("match_substitutes_match_idx").on(t.matchId),
+    index("match_substitutes_status_idx").on(t.status),
+  ],
 );

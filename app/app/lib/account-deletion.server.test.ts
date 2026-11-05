@@ -24,6 +24,7 @@ const { pairCandidates } = await import("~/lib/pairs.server");
 const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
 const { sendLoginCode } = await import("~/lib/auth/login-code.server");
+const { updateElo } = await import("~/lib/elo.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 // During phase 1 (9–29 Nov) and after it.
@@ -244,6 +245,42 @@ describe("deleting an account (#152)", () => {
     expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: true, mode: "remove" });
     expect(all("select pair_id from group_pairs")).toEqual([{ pair_id: 2 }]);
     expect(one("select revision from groups where id = 1").revision).toBe(1);
+  });
+
+  it("anonymizing takes the organizer's substitute reasons off the player's pairs' requests (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'S', 1)`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at, reason)
+      values (1, 1, 'b', 's', 'rejected', 1, 'Lábsérülés miatt nem.'), (1, 2, 'd', 's', 'rejected', 1, 'Másik pár oka.')`);
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(all("select pair_id, reason from match_substitutes order by pair_id")).toEqual([
+      { pair_id: 1, reason: null },
+      { pair_id: 2, reason: "Másik pár oka." },
+    ]);
+  });
+
+  it("anonymizes, never removes, an approved substitute, so the Elo replay still rates who played (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);
+    h.raw.exec(`update matches set status = 'final', outcome = '{"kind":"played","score":{"sets":[[4,1],[4,2]]}}' where id = 1`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (1, 1, 'b', 's', 'approved', 1)`);
+    expect(await D.deleteAccount("admin", "s", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(one("select substitute_id, status from match_substitutes")).toEqual({ substitute_id: "s", status: "approved" });
+    expect(one("select name, email from users where id = 's'")).toEqual({ name: DELETED_NAME, email: "deleted-s@deleted.invalid" });
+    await updateElo(AFTER);
+    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "c", "d", "s"].map((user_id) => ({ user_id })));
+    expect(n("select elo from users where id = 'b'")).toBeNull();
+    expect(n("select elo from users where id = 's'")).toBeGreaterThan(1000);
+  });
+
+  it("removes a substitute who was never approved, with their requests (#37)", async () => {
+    publishPairOne();
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at)
+      values (1, 1, 'b', 's', 'requested', 1), (1, 2, 'd', 's', 'rejected', 1)`);
+    expect(await D.deleteAccount("admin", "s", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(n("select count(*) from match_substitutes")).toBe(0);
+    expect(n("select count(*) from users where id = 's'")).toBe(0);
   });
 
   it("anonymizes an account with history; groups and matches stay", async () => {

@@ -1,4 +1,4 @@
-// Walkthrough step 32 (#36): public pair and player profiles. Runs after
+// Walkthrough step 33 (#36): public pair and player profiles. Runs after
 // 19-ladder-results: Anna's pair has a confirmed win (step 27, rated) and a
 // "both lose" decision (step 28, not rated). In the walkthrough round 1 has
 // not started yet, so a profile shows names and groups only (spec 17); for
@@ -8,7 +8,6 @@
 // links on Profil and Párom.
 import { expect, test, type Page } from "@playwright/test";
 
-import { CONTACT_EMAIL } from "../app/lib/site";
 import { PAIRS, as, content, d1, d1Update, visit } from "./support";
 
 const anna = PAIRS.p1[0];
@@ -27,15 +26,15 @@ async function openPairFromLeague(page: Page): Promise<void> {
 }
 
 // The whole HTML: the text, the title and meta tags, and the loader data
-// React Router writes into the page. The footer's contact address is the
-// site's own, not a player's.
+// React Router writes into the page. The footer's contact address
+// (@padelparbaj.hu) is the site's own, not a player's.
 async function noContactData(page: Page): Promise<void> {
-  const html = (await page.content()).replaceAll(CONTACT_EMAIL, "");
+  const html = (await page.content()).replace(/[\w.+-]+@padelparbaj\.hu/g, "");
   expect(html).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+|\+36|example\.test/);
   expect(await content(page).innerText()).not.toContain("@");
 }
 
-test("32. before round 1 starts a profile shows names and groups only", async ({ browser }) => {
+test("33. before round 1 starts a profile shows names and groups only", async ({ browser }) => {
   const page = await browser.newPage();
   await openPairFromLeague(page);
   const main = content(page);
@@ -55,7 +54,7 @@ test("32. before round 1 starts a profile shows names and groups only", async ({
   await page.close();
 });
 
-test("32. once round 1 has started: the results, the értékszám and its change", async ({ browser }) => {
+test("33. once round 1 has started: the results, the értékszám and its change", async ({ browser }) => {
   const original = d1(`select season_id, starts_at from season_phases where ${ROUND_1}`) as { season_id: number; starts_at: number }[];
   expect(original.length).toBeGreaterThan(0);
   d1Update(`update season_phases set starts_at = ${Math.floor(Date.now() / 1000) - 86_400} where ${ROUND_1}`);
@@ -90,7 +89,7 @@ test("32. once round 1 has started: the results, the értékszám and its change
   }
 });
 
-test("32. an unknown pair or player is a 404", async ({ browser }) => {
+test("33. an unknown pair or player is a 404", async ({ browser }) => {
   const page = await browser.newPage();
   for (const path of ["/pairs/999999", "/pairs/abc", "/players/nincs-ilyen"]) {
     const response = await page.goto(path);
@@ -100,7 +99,7 @@ test("32. an unknown pair or player is a 404", async ({ browser }) => {
   await page.close();
 });
 
-test("32. Anna finds her public profile on Profil and the pair's on Párom", async ({ browser }) => {
+test("33. Anna finds her public profile on Profil and the pair's on Párom", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/profile");
   await content(page).getByRole("link", { name: "Nyilvános profilod" }).click();

@@ -175,8 +175,10 @@ export default function Privacy() {
             <ul className={list}>
               <li>
                 <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
-                és a csoportod tabellája a ligaoldalon; a liga indulása után az
-                eredményeitek és az értékszámok is.
+                és a csoportod tabellája a ligaoldalon, a párod neve és a
+                csoportjaitok a pár és a játékos nyilvános profilján; a liga
+                indulása után az eredményeitek és az értékszámok (és azok
+                alakulása) is.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a

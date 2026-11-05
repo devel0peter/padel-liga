@@ -8,11 +8,13 @@ import { signed } from "~/lib/format";
 import type { LadderBand, LadderGroup, LadderMatchView } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { ladderPage } from "~/lib/ladder.server";
+import { pairPath } from "~/lib/profiles";
 import { pageMeta } from "~/lib/site";
 
 // The public league page (#30, spec section 14): the phase's groups top-down
 // in division bands, each group's table and this week's matches. Names only:
-// no email or phone is selected anywhere on the way here.
+// no email or phone is selected anywhere on the way here. A pair's name in
+// the table leads to its public profile (#36).
 export async function loader({ params }: Route.LoaderArgs) {
   const page = await ladderPage(params.league ?? "");
   if (!page) throw new Response("Nincs ilyen liga.", { status: 404 });
@@ -85,7 +87,9 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
             <TableRow key={row.rank}>
               <TableCell className="px-1 font-bold">{row.rank}.</TableCell>
               <TableCell className="px-1 whitespace-normal">
-                <PairNames names={row.names} />
+                <Link to={pairPath(row.pairId)} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
+                  <PairNames names={row.names} />
+                </Link>
               </TableCell>
               <TableCell className="px-1 text-right">{row.matches}</TableCell>
               <TableCell className="px-1 text-right font-bold">{row.points}</TableCell>

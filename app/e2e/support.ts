@@ -186,6 +186,18 @@ export function d1Insert(sql: string): void {
   });
 }
 
+// One fixture update in the suite's local D1, for a state no page can reach
+// at the time of the run (a round that has started, #36). Put the row back
+// in the same spec, so later specs see the walkthrough's state.
+export function d1Update(sql: string): void {
+  if (!/^\s*update\b/i.test(sql)) throw new Error("d1Update() only updates.");
+  execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--command", sql])], {
+    cwd: APP_DIR,
+    env: { ...process.env, FORCE_COLOR: "0" },
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+}
+
 // The seeded season's id, from the Szezonok page's links.
 export async function seasonPath(page: Page): Promise<string> {
   await page.goto("/admin/leagues/minta/seasons");

@@ -40,7 +40,7 @@ export type LadderGroupInput = { id: number; number: number; pairs: LadderPair[]
 
 export type LadderRow = {
   rank: number;
-  /** The pair's public profile is /pairs/<pairId> (#36): the one id on the page. */
+  /** The pair's profile is /pairs/<pairId> (#36), linked for members only (D112): the one id on the page. */
   pairId: number;
   names: [string, string];
   matches: number;

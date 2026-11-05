@@ -174,11 +174,15 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved
-                és a csoportod tabellája a ligaoldalon, a párod neve és a
-                csoportjaitok a pár és a játékos nyilvános profilján; a liga
-                indulása után az eredményeitek és az értékszámok (és azok
-                alakulása) is.
+                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved,
+                a párod neve és a csoportod tabellája a ligaoldalon; a liga
+                indulása után a meccsek eredménye is.
+              </li>
+              <li>
+                <strong>Csak a belépett játékosok látják:</strong> a pár és a
+                játékos profilját (a csoportjaitokat, a liga indulása után az
+                eredményeiteket), és az értékszámodat meg annak alakulását.
+                Ezek nyilvánosan nem jelennek meg.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a

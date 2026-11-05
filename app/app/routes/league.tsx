@@ -7,18 +7,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { signed } from "~/lib/format";
 import type { LadderBand, LadderGroup, LadderMatchView } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
+import { finishedFirstLogin, getUser } from "~/lib/auth/session.server";
 import { ladderPage } from "~/lib/ladder.server";
 import { pairPath } from "~/lib/profiles";
 import { pageMeta } from "~/lib/site";
 
 // The public league page (#30, spec section 14): the phase's groups top-down
 // in division bands, each group's table and this week's matches. Names only:
-// no email or phone is selected anywhere on the way here. A pair's name in
-// the table leads to its public profile (#36).
-export async function loader({ params }: Route.LoaderArgs) {
+// no email or phone is selected anywhere on the way here, and no rating
+// (D112). For a logged-in member a pair's name in the table leads to its
+// profile (#36); a visitor sees plain names, since profiles are for members
+// only (D112).
+export async function loader({ request, params }: Route.LoaderArgs) {
   const page = await ladderPage(params.league ?? "");
   if (!page) throw new Response("Nincs ilyen liga.", { status: 404 });
-  return page;
+  const user = await getUser(request);
+  return { ...page, member: !!user && finishedFirstLogin(user) };
 }
 
 export function meta({ loaderData, location }: Route.MetaArgs) {
@@ -59,7 +63,7 @@ function MatchLine({ match }: { match: LadderMatchView }) {
   );
 }
 
-function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: number; weekRange: string }) {
+function GroupCard({ group, week, weekRange, member }: { group: LadderGroup; week: number; weekRange: string; member: boolean }) {
   return (
     <section aria-label={`${group.number}. csoport`} className="grid gap-3 rounded-2xl border bg-background p-4 text-foreground sm:p-5">
       <h3 className="font-display text-xl font-extrabold">{group.number}. csoport</h3>
@@ -87,9 +91,13 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
             <TableRow key={row.rank}>
               <TableCell className="px-1 font-bold">{row.rank}.</TableCell>
               <TableCell className="px-1 whitespace-normal">
-                <Link to={pairPath(row.pairId)} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
+                {member ? (
+                  <Link to={pairPath(row.pairId)} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
+                    <PairNames names={row.names} />
+                  </Link>
+                ) : (
                   <PairNames names={row.names} />
-                </Link>
+                )}
               </TableCell>
               <TableCell className="px-1 text-right">{row.matches}</TableCell>
               <TableCell className="px-1 text-right font-bold">{row.points}</TableCell>
@@ -134,7 +142,7 @@ function GroupCard({ group, week, weekRange }: { group: LadderGroup; week: numbe
   );
 }
 
-function Band({ band, week, weekRange }: { band: LadderBand; week: number; weekRange: string }) {
+function Band({ band, week, weekRange, member }: { band: LadderBand; week: number; weekRange: string; member: boolean }) {
   const colors = BAND[band.division];
   return (
     <section aria-label={band.label} className={`grid gap-4 rounded-3xl border-2 p-3 sm:p-5 ${colors.band}`}>
@@ -145,7 +153,7 @@ function Band({ band, week, weekRange }: { band: LadderBand; week: number; weekR
         </a>
       </header>
       {band.groups.map((g) => (
-        <GroupCard key={g.number} group={g} week={week} weekRange={weekRange} />
+        <GroupCard key={g.number} group={g} week={week} weekRange={weekRange} member={member} />
       ))}
     </section>
   );
@@ -211,7 +219,13 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
                   : `${page.phase}. kör, indul ${page.startsOn}. Itt az 1. hét meccsei látszanak (${page.weekFrom} – ${page.weekTo}).`}
               </p>
               {page.bands.map((band) => (
-                <Band key={band.division} band={band} week={page.week} weekRange={`${page.weekFrom} – ${page.weekTo}`} />
+                <Band
+                  key={band.division}
+                  band={band}
+                  week={page.week}
+                  weekRange={`${page.weekFrom} – ${page.weekTo}`}
+                  member={page.member}
+                />
               ))}
               <Explainer />
             </>

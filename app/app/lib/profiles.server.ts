@@ -22,7 +22,8 @@ import {
 } from "./profiles";
 import { averageElo } from "./season-entries";
 
-// The public pair and player profiles (#36, spec sections 11, 14 and 17).
+// The pair and player profiles (#36, spec sections 11, 14 and 17), for
+// logged-in members only (D112; the routes check the login).
 // A profile exists for a pair that has been in a published group of a league
 // in a listed city (like the league page), and for a player of such a pair
 // whose account is not deleted or anonymized: before the groups are published
@@ -193,7 +194,7 @@ function matchInputs(
 export type PairProfile = {
   pair: ProfilePair;
   league: { name: string; slug: string };
-  /** Results are public: the league has started (spec 17). */
+  /** Results show: the league has started (spec 17). */
   started: boolean;
   groups: GroupHistoryRow[];
   matches: ProfileMatchView[];
@@ -223,13 +224,13 @@ export async function pairProfile(pairId: number, now = new Date()): Promise<Pai
 
 export type PlayerProfile = {
   player: ProfilePerson;
-  /** Ratings and results are public: one of the player's leagues has started (spec 17). */
+  /** Ratings and results show: one of the player's leagues has started (spec 17). */
   started: boolean;
   /** The current rating, rounded; null before the league starts. */
   elo: number | null;
   /** The rating before the first rated match and after each one, oldest first. */
   eloHistory: number[];
-  /** The player's pairs with a public profile, newest group first, with that group. */
+  /** The player's pairs with a profile, newest group first, with that group. */
   pairs: { pair: ProfilePair; league: string; latest: GroupHistoryRow }[];
   matches: ProfileMatchView[];
 };
@@ -290,8 +291,8 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
   };
 }
 
-/** Which of `pairIds` have a public profile (a published group in a listed city's league). */
-export async function publicPairIds(pairIds: number[]): Promise<Set<number>> {
+/** Which of `pairIds` have a profile (a published group in a listed city's league). */
+export async function profilePairIds(pairIds: number[]): Promise<Set<number>> {
   if (pairIds.length === 0) return new Set();
   const rows = await db
     .selectDistinct({ pairId: groupPairs.pairId })
@@ -304,11 +305,11 @@ export async function publicPairIds(pairIds: number[]): Promise<Set<number>> {
   return new Set(rows.map((r) => r.pairId));
 }
 
-/** Whether the player has a public profile: the link on their own pages shows only then. */
-export async function hasPublicProfile(userId: string): Promise<boolean> {
+/** Whether the player has a profile: the link on their own pages shows only then. */
+export async function hasProfile(userId: string): Promise<boolean> {
   const theirs = await db
     .select({ id: pairs.id })
     .from(pairs)
     .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
-  return (await publicPairIds(theirs.map((p) => p.id))).size > 0;
+  return (await profilePairIds(theirs.map((p) => p.id))).size > 0;
 }

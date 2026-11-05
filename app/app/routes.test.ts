@@ -25,6 +25,16 @@ describe("routes", () => {
     expect(matchRoutes(toObjects(routes as Entry[]), "/health")).toHaveLength(1);
   });
 
+  it("serves the pair and player profiles inside the login shell (D112)", () => {
+    for (const [path, file] of [
+      ["/players/abc", "routes/player-profile.tsx"],
+      ["/pairs/1", "routes/pair-profile.tsx"],
+    ]) {
+      const ids = matchRoutes(toObjects(routes as Entry[]), path)?.map((m) => m.route.id);
+      expect(ids).toEqual(["routes/app.tsx", file]);
+    }
+  });
+
   it("has no pair invite page any more: /pair/invite/<token> is a 404 (#97)", () => {
     expect(fileFor("/pair/invite/" + "a".repeat(43))).toBeNull();
   });

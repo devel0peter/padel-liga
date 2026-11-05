@@ -6,8 +6,6 @@ export default [
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("league/:league", "routes/league.tsx"),
-  route("players/:id", "routes/player-profile.tsx"),
-  route("pairs/:id", "routes/pair-profile.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
@@ -29,6 +27,9 @@ export default [
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("matches/:id", "routes/match.tsx"),
+    // Pair and player profiles: for logged-in members only (D112).
+    route("players/:id", "routes/player-profile.tsx"),
+    route("pairs/:id", "routes/pair-profile.tsx"),
     layout("routes/admin.tsx", [
       route("admin", "routes/admin._index.tsx"),
       route("admin/signups", "routes/admin.signups.tsx"),

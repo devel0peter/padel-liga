@@ -500,6 +500,18 @@ The deadline resolution (#11) gives strikes from the cron at 06:00 the morning a
   - "Törlés" asks for a reason (the button stays off without one); after it the row says "Törölve (Teszt Szervező): <indok>" and the badge "1 fekete pont". Napló has "Fekete pont törlése" with the reason.
   - As that player, Kezdőlap's season card says "Fekete pontjaid ebben a szezonban: 1." The public league page shows no strikes. Nothing new on Kimenő levelek (only a 2nd strike given by the cron sends the warning email).
 
+### 35. A player deletes their own account (side path)
+
+The same deletion as step 30, by the player (#38, README decision log D111).
+
+- Page: `/profile`, section "Fiók törlése" at the bottom
+- Account: the player of step 15 (`uj.jatekos@example.test`; skip step 30, which deletes them), logged in on two browsers; then a player whose pair is in a published group (after step 11); then `admin@example.test`
+- Do: press "Fiók törlése", read the dialog, press "Fiók törlése" in it; then reload the page on the other browser.
+- Expect:
+  - The dialog says everything goes, because there is no history ("Még nem szerepeltél a ligában…"), that every device is logged out, and "Nem vonható vissza."
+  - After it: the home page with "Töröltük a fiókodat, és minden eszközön kiléptettünk.", logged out; the other browser is on the login page; logging in with the address starts a new registration. Nothing new in the terminal or on Kimenő levelek. Napló has "Fiók törlése" by "Törölt játékos".
+  - The player in a published group: "Most nem törölheted: a párod kihirdetett csoportban játszik…" and no delete button. The Admin: "Adminként a saját fiókodat nem törölheted."
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

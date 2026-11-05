@@ -17,6 +17,13 @@ describe("ratingFor", () => {
     expect(ratingFor("")).toBeNull();
     expect(ratingFor("constructor")).toBeNull();
   });
+
+  it("is the rating from played matches once there is one, rounded (#13)", () => {
+    expect(ratingFor("kezdo", 1023.6)).toBe(1024);
+    expect(ratingFor("halado", 1389.4)).toBe(1389);
+    expect(ratingFor(null, 1100)).toBe(1100);
+    expect(ratingFor("halado", null)).toBe(1400);
+  });
 });
 
 describe("resolveLevel", () => {

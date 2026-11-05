@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   borderSwaps,
   DEFAULT_FAST_SWITCHES,
+  entryGroup,
   isFastSwitch,
-  placementRating,
   placeNewPairs,
   promoteAndRelegate,
   recut,
   roundSwitchDraft,
   switchSizes,
-  UNRATED_DISCOUNT,
+  targetGroup,
 } from "./promotion";
 import { groupStandings, type GroupMatch } from "./standings";
 
@@ -155,51 +155,138 @@ describe("recut (spec 8 and 10: leavers go after promotion and relegation, pairs
   });
 });
 
-describe("placementRating (spec 10 step 1)", () => {
-  it("averages the two players' Elo", () => {
-    expect(placementRating({ elo: 1300, rated: true }, { elo: 1100, rated: true })).toBe(1200);
+/** A ladder of full groups: group g (1-based) holds G<g>P1..P4, Elo 1800 - 100g down by 1 a place, so averages fall by 100 a group. */
+function ladder(...sizes: number[]): Pair[][] {
+  return sizes.map((n, g) => Array.from({ length: n }, (_, i) => p(`G${g + 1}P${i + 1}`, 1700 - 100 * g - i)));
+}
+
+describe("targetGroup (spec 10: by rating, never the top group)", () => {
+  const groups = ladder(4, 4, 4); // averages 1698.5, 1598.5, 1498.5
+
+  it("never picks the top group, however high the rating", () => {
+    expect(targetGroup(groups, 2000)).toBe(1);
   });
 
-  it("counts a player without a rated match 100 lower", () => {
-    expect(UNRATED_DISCOUNT).toBe(100);
-    expect(placementRating({ elo: 1400, rated: false }, { elo: 1200, rated: true })).toBe(1250);
-    expect(placementRating({ elo: 1400, rated: false }, { elo: 1400, rated: false })).toBe(1300);
+  it("picks the highest group whose average is at most the rating, with no discount", () => {
+    expect(targetGroup(groups, 1598.5)).toBe(1);
+    expect(targetGroup(groups, 1598)).toBe(2);
+  });
+
+  it("picks the bottom group when no average is low enough, the one group of a single-group league", () => {
+    expect(targetGroup(groups, 900)).toBe(2);
+    expect(targetGroup([groups[0]!], 900)).toBe(0);
+  });
+
+  it("skips a planned group with no pairs yet, but falls back to the planned bottom", () => {
+    expect(targetGroup([...groups, []], 1500)).toBe(2);
+    expect(targetGroup([...groups, []], 900)).toBe(3);
   });
 });
 
-describe("placeNewPairs (interim: new pairs go to the bottom until the placement policy is decided)", () => {
-  const full = (prefix: string, elo: number, n = 4) => Array.from({ length: n }, (_, i) => p(`${prefix}${i + 1}`, elo - i));
-
-  it("fills the bottom group's free spot", () => {
-    expect(ids(placeNewPairs([full("A", 1600), full("B", 1400, 3)], [{ pair: p("N", 1500), rating: 1500 }]))).toEqual([
-      ["A1", "A2", "A3", "A4"],
-      ["B1", "B2", "B3", "N"],
-    ]);
+describe("entryGroup (spec 10: the bottom group of the target's division)", () => {
+  it("is the target's division's bottom group (6 groups: 2 + 2 + 2; 7 groups: 2 + 3 + 2)", () => {
+    expect([0, 1, 2, 3, 4, 5].map((t) => entryGroup(t, 6))).toEqual([1, 1, 3, 3, 5, 5]);
+    expect([1, 2, 3, 4, 5, 6].map((t) => entryGroup(t, 7))).toEqual([1, 4, 4, 4, 6, 6]);
   });
 
-  it("re-cuts the bottom groups to the section 4 sizes when the bottom is full", () => {
-    expect(ids(placeNewPairs([full("A", 1600), full("B", 1400)], [{ pair: p("N", 1000), rating: 1000 }]))).toEqual([
-      ["A1", "A2", "A3"],
-      ["A4", "B1", "B2"],
-      ["B3", "B4", "N"],
-    ]);
+  it("is the target itself with one group per division, or one or two groups", () => {
+    expect([1, 2].map((t) => entryGroup(t, 3))).toEqual([1, 2]);
+    expect(entryGroup(0, 1)).toBe(0);
+    expect(entryGroup(1, 2)).toBe(1);
+  });
+});
+
+describe("placeNewPairs (spec 10, D107f: at the bottom of the division)", () => {
+  it("plans 21 pairs as 4+4+4+3+3+3 and puts a strong new pair at the bottom of its target's division, pushing down from there", () => {
+    // 5 full groups and a new pair rated 1550: target group 3 (average 1498.5),
+    // Réz = groups 3 and 4 of the 6 planned, so it enters group 4.
+    const out = placeNewPairs(ladder(4, 4, 4, 4, 4), [p("New", 1550)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 3, 3, 3]);
+    expect(ids(out).slice(0, 3)).toEqual(ids(ladder(4, 4, 4)));
+    expect(ids(out)[3]).toEqual(["G4P1", "G4P2", "New"]);
+    // Each group over its planned size passes its lowest-Elo pairs down.
+    expect(ids(out)[4]).toEqual(["G5P1", "G4P4", "G4P3"]);
+    expect(ids(out)[5]).toEqual(["G5P4", "G5P3", "G5P2"]);
   });
 
-  it("places the highest rating first, ties in entry order", () => {
-    const out = placeNewPairs(
-      [full("A", 1600, 3)],
-      [
-        { pair: p("N1", 1100), rating: 1100 },
-        { pair: p("N2", 1300), rating: 1300 },
-        { pair: p("N3", 1100), rating: 1100 },
-      ],
-    );
-    expect(ids(out)).toEqual([["A1", "A2", "A3"], ["N2", "N1", "N3"]]);
+  it("takes the nearest real free spot at or below the entry group", () => {
+    // A group of 3 at the bottom: 23 + 1 plan six groups of 4.
+    const out = placeNewPairs(ladder(4, 4, 4, 4, 4, 3), [p("New", 1550)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 4, 4, 4]);
+    expect(ids(out)[5]).toEqual(["G6P1", "G6P2", "G6P3", "New"]);
+    expect(ids(out).slice(0, 5)).toEqual(ids(ladder(4, 4, 4, 4, 4)));
   });
 
-  it("starts a group when nobody continues, and changes nothing without new pairs", () => {
-    expect(ids(placeNewPairs([], [{ pair: p("N"), rating: 1200 }]))).toEqual([["N"]]);
-    const groups = [full("A", 1600)];
+  it("fills a spot above the entry group from below, so the 3s stay at the bottom", () => {
+    // 21 continuing (4+4+4+3+3+3) and a weak pair: the plan for 22 is
+    // 4+4+4+4+3+3, the pair enters the bottom group, the best pairs below
+    // group 4 move up.
+    const out = placeNewPairs(ladder(4, 4, 4, 3, 3, 3), [p("Weak", 900)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 4, 3, 3]);
+    expect(ids(out)[3]).toEqual(["G4P1", "G4P2", "G4P3", "G5P1"]);
+    expect(ids(out)[5]).toContain("Weak");
+  });
+
+  it("never pulls the new pair up out of its entry group: 13 continuing + 1 rated 1450 stays in Rookie", () => {
+    // 4+3+3+3 plan 4+4+3+3 for 14: Bronz 1, Réz 2–3, Rookie 4. Target and
+    // entry: group 4. The holes in groups 2 and 3 take continuing pairs.
+    const out = placeNewPairs(ladder(4, 3, 3, 3), [p("New", 1450)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 3, 3]);
+    expect(ids(out)[1]).toEqual(["G2P1", "G2P2", "G2P3", "G3P1"]);
+    expect(ids(out)[2]).toEqual(["G3P2", "G3P3", "G4P1"]);
+    expect(ids(out)[3]).toEqual(["G4P2", "G4P3", "New"]);
+  });
+
+  it("keeps a pair rated 1350 in its entry group, the bottom of Rookie, with 21 continuing", () => {
+    // 4+4+4+3+3+3 plan 4+4+4+4+3+3 for 22: target group 5, Rookie = 5–6, entry 6.
+    const out = placeNewPairs(ladder(4, 4, 4, 3, 3, 3), [p("New", 1350)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 4, 3, 3]);
+    expect(ids(out)[4]).toEqual(["G5P2", "G5P3", "G6P1"]);
+    expect(ids(out)[5]).toEqual(["G6P2", "G6P3", "New"]);
+  });
+
+  it("places two new pairs each in its own division's bottom, neither pulled up", () => {
+    const out = placeNewPairs(ladder(4, 3, 3, 3), [p("A", 1460), p("B", 1450)]);
+    // 15: 4+4+4+3; Bronz 1, Réz 2–3, Rookie 4. Both target group 4 (1399).
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 3]);
+    expect(ids(out)[3]).toEqual(expect.arrayContaining(["A", "B"]));
+  });
+
+  it("moves the best new pair up only when continuing pairs can't fill the groups above (Peter, D107f): 9 + 4 weak", () => {
+    // 13 plan 4+3+3+3 (Bronz 1, Réz 2–3, Rookie 4); every new pair's entry is
+    // group 4, but 9 continuing pairs can't fill 4+3+3: N1 fills group 3.
+    const weak = [1000, 990, 980, 970].map((elo, i) => p(`N${i + 1}`, elo));
+    const out = placeNewPairs(ladder(3, 3, 3), weak);
+    expect(out.map((g) => g.length)).toEqual([4, 3, 3, 3]);
+    expect(ids(out)[2]).toEqual(["G3P2", "G3P3", "N1"]);
+    expect(ids(out)[3]).toEqual(["N2", "N3", "N4"]);
+  });
+
+  it("moves new pairs up across a division border when they must: 6 continuing (3+3) + 6 new give 4+4+4, two new pairs in Réz", () => {
+    const weak = [1000, 990, 980, 970, 960, 950].map((elo, i) => p(`N${i + 1}`, elo));
+    const out = placeNewPairs(ladder(3, 3), weak);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4]);
+    expect(ids(out)[0]!.some((id) => id.startsWith("N"))).toBe(false);
+    expect(ids(out)[1]).toEqual(expect.arrayContaining(["N1", "N2"]));
+    expect(ids(out)[2]).toEqual(["N3", "N4", "N5", "N6"]);
+  });
+
+  it("adds 2 new pairs to 8 as 4+3+3: the stronger first, each at the bottom of its division", () => {
+    const out = placeNewPairs(ladder(4, 4), [p("Low", 1000), p("High", 1650)]);
+    expect(out.map((g) => g.length)).toEqual([4, 3, 3]);
+    expect(ids(out)[0]).toEqual(["G1P1", "G1P2", "G1P3", "G1P4"]);
+    // High: target group 2 (average 1598.5), Réz = group 2 alone; Low: the bottom.
+    expect(ids(out)[1]).toEqual(["G2P1", "G2P2", "High"]);
+    expect(ids(out)[2]).toEqual(["G2P4", "G2P3", "Low"]);
+  });
+
+  it("places one by one, highest rating first, ties in entry order", () => {
+    const out = placeNewPairs([], [p("N1", 1100), p("N2", 1300), p("N3", 1100)]);
+    expect(ids(out)).toEqual([["N2", "N1", "N3"]]);
+  });
+
+  it("changes nothing without new pairs", () => {
+    const groups = ladder(4, 3);
     expect(placeNewPairs(groups, [])).toEqual(groups);
   });
 });
@@ -210,16 +297,15 @@ describe("roundSwitchDraft (spec 10)", () => {
       tables: tables(4, 4), // G1 1990..1960, G2 1950..1920
       fast: false,
       leaves: none,
-      newPairs: [
-        { pair: p("Low", 1000), rating: 1000 },
-        { pair: p("High", 1955), rating: 1955 },
-      ],
+      newPairs: [p("Low", 1000), p("High", 1955)],
     });
     expect(draft.map((g) => g.length)).toEqual([4, 3, 3]);
+    // High: target group 2, Réz = group 2: it enters there and the two
+    // lowest move down; Low takes the bottom group's free spot.
     expect(ids(draft)).toEqual([
       ["G1P1", "G1P2", "G1P3", "G2P1"],
-      ["G1P4", "G2P2", "G2P3"],
-      ["High", "G2P4", "Low"],
+      ["G1P4", "High", "G2P2"],
+      ["G2P3", "G2P4", "Low"],
     ]);
   });
 
@@ -248,7 +334,7 @@ describe("roundSwitchDraft (spec 10)", () => {
       tables: [],
       fast: false,
       leaves: none,
-      newPairs: [1, 2, 3].map((i) => ({ pair: p(`N${i}`, 1000 + i), rating: 1000 + i })),
+      newPairs: [1, 2, 3].map((i) => p(`N${i}`, 1000 + i)),
     });
     expect(ids(draft)).toEqual([["N3", "N2", "N1"]]);
   });

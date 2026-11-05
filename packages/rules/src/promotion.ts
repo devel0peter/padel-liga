@@ -2,14 +2,12 @@
 // and relegation of the continuing pairs, the pairs that leave (withdrawn,
 // a 3rd strike, dissolved, taken out) removed afterwards with the groups
 // re-cut top-down, then the new pairs placed one by one. Pure: no I/O.
+import { divisionOf } from "./divisions";
 import { seedOrder } from "./groups";
 import { groupSizes, type SeedablePair } from "./seeding";
 
 /** A full group (spec 4). */
 export const FULL_GROUP = 4;
-
-/** A new pair's player without a rated match counts this much lower (spec 10 step 1). */
-export const UNRATED_DISCOUNT = 100;
 
 /** The default number of fast switches of a league (spec 10: the first switch only). */
 export const DEFAULT_FAST_SWITCHES = 1;
@@ -88,38 +86,112 @@ export function recut<T>(groups: readonly (readonly T[])[], leaves: (pair: T) =>
   return cut(order, switchSizes(order.length));
 }
 
-/** A new pair's player: their current Elo and whether they have a rated match (a substitute appearance counts). */
-export interface PlacementPlayer {
-  readonly elo: number;
-  readonly rated: boolean;
-}
-
-/** A new pair's placement rating: the average of its players' Elo, each without a rated match 100 lower (spec 10 step 1). */
-export function placementRating(a: PlacementPlayer, b: PlacementPlayer): number {
-  const own = (p: PlacementPlayer) => p.elo - (p.rated ? 0 : UNRATED_DISCOUNT);
-  return (own(a) + own(b)) / 2;
-}
-
-/** A new pair and its placement rating. */
-export interface NewPair<T> {
-  readonly pair: T;
-  readonly rating: number;
+function average(group: readonly SeedablePair[]): number | null {
+  return group.length === 0 ? null : group.reduce((n, p) => n + p.averageElo, 0) / group.length;
 }
 
 /**
- * Places the new pairs (late entries, re-formed pairs) into the groups of the
- * continuing pairs. INTERIM (Peter, 2026-11-05): the placement policy of spec
- * 10 steps 2–4 (target group, free spot, push-down) is under discussion and
- * may change, so until it is decided every new pair goes to the bottom,
- * highest placement rating first (ties in entry order), and the groups are
- * re-cut top-down to the section 4 sizes: the bottom group's free spots fill
- * first, then the bottom groups are cut again. This is the one function the
- * decided rule replaces. Returns new groups; the input is unchanged.
+ * A new pair's target group (spec 10): the highest group, other than the top
+ * one, whose average pair Elo is at most the pair's rating, else the bottom
+ * group; with a single group, that group. Groups without pairs yet (new ones
+ * in the plan) are skipped in the search. Index 0 = 1. csoport.
  */
-export function placeNewPairs<T>(groups: readonly (readonly T[])[], newPairs: readonly NewPair<T>[]): T[][] {
+export function targetGroup(groups: readonly (readonly SeedablePair[])[], rating: number): number {
+  if (groups.length <= 1) return 0;
+  for (let i = 1; i < groups.length; i++) {
+    const avg = average(groups[i]!);
+    if (avg !== null && avg <= rating) return i;
+  }
+  return groups.length - 1;
+}
+
+/**
+ * The group a new pair enters (spec 10): the bottom group of its target
+ * group's division (spec 4), among `groupCount` groups. Index 0 = 1. csoport.
+ */
+export function entryGroup(target: number, groupCount: number): number {
+  const division = divisionOf(target + 1, groupCount);
+  let bottom = target;
+  while (bottom + 1 < groupCount && divisionOf(bottom + 2, groupCount) === division) bottom++;
+  return bottom;
+}
+
+/** The index of a group's lowest-Elo pair; of equals, the last one. */
+function lowest(group: readonly SeedablePair[]): number {
+  let at = 0;
+  group.forEach((p, i) => {
+    if (p.averageElo <= group[at]!.averageElo) at = i;
+  });
+  return at;
+}
+
+/**
+ * Places the new pairs (late entries, re-formed pairs, returning players)
+ * into the groups of the continuing pairs (spec 10, README decision log
+ * D107f, Peter 2026-11-05). A pair's rating is its average Elo: each
+ * player's current Elo, the level's starting value before a rated match,
+ * with no discount.
+ * 1. The group sizes are planned first, for the final count (spec 4: groups
+ *    of 4, 3s only at the bottom); more pairs can mean more groups.
+ * 2. The pairs go one by one, highest rating first (ties in entry order).
+ * 3. Each enters the bottom group of its target group's division
+ *    (targetGroup, entryGroup, with the planned group count).
+ * 4. The nearest real free spot at or below that group (a group that has
+ *    pairs and fewer than its planned size: a group of 3, a spot left by a
+ *    leaver) takes it. Otherwise it goes into that group, and while a group
+ *    is over its planned size its lowest-Elo pair moves down one group,
+ *    until a group has room.
+ * Returns new groups; the input is unchanged.
+ */
+export function placeNewPairs<T extends SeedablePair>(groups: readonly (readonly T[])[], newPairs: readonly T[]): T[][] {
   if (newPairs.length === 0) return groups.map((g) => [...g]);
-  const order = [...groups.flat(), ...[...newPairs].sort((a, b) => b.rating - a.rating).map((n) => n.pair)];
-  return cut(order, switchSizes(order.length));
+  const sizes = switchSizes(groups.reduce((n, g) => n + g.length, 0) + newPairs.length);
+  // More pairs never mean fewer groups, so every continuing group has a
+  // place in the plan; the new groups start empty at the bottom.
+  const next: T[][] = sizes.map((_, i) => [...(groups[i] ?? [])]);
+  const placed = new Set<T>(newPairs);
+  for (const pair of [...newPairs].sort((a, b) => b.averageElo - a.averageElo)) {
+    const entry = entryGroup(targetGroup(next, pair.averageElo), next.length);
+    const free = next.findIndex((g, i) => i >= entry && g.length > 0 && g.length < sizes[i]!);
+    next[free >= 0 ? free : entry]!.push(pair);
+    fitToPlan(next, sizes, (p) => placed.has(p));
+  }
+  return next;
+}
+
+/**
+ * The index of the pair that moves up from a group into a hole above it:
+ * the best continuing pair, so a new pair stays where it was placed; of
+ * equals, the first one. A group of new pairs only gives its best one:
+ * when the continuing pairs can't fill the groups above, a new pair moves
+ * up so the planned sizes hold (Peter, 2026-11-05, D107f).
+ */
+function upwards<T extends SeedablePair>(group: readonly T[], isNew: (pair: T) => boolean): number {
+  let at = -1;
+  group.forEach((p, i) => {
+    if (!isNew(p) && (at < 0 || p.averageElo > group[at]!.averageElo)) at = i;
+  });
+  if (at >= 0) return at;
+  group.forEach((p, i) => {
+    if (at < 0 || p.averageElo > group[at]!.averageElo) at = i;
+  });
+  return at;
+}
+
+/**
+ * Brings the groups to their planned sizes, top-down, in place: a group over
+ * its size passes its lowest-Elo pair one group down, and a group short of
+ * it (a hole above the entry group, which the plan keeps at 4) takes the
+ * best continuing pair of the group below, so continuing pairs move up into
+ * the hole, a new pair stays in the group it entered (or below, pushed
+ * down), and the 3s stay at the bottom.
+ */
+function fitToPlan<T extends SeedablePair>(groups: T[][], sizes: readonly number[], isNew: (pair: T) => boolean): void {
+  for (let i = 0; i < groups.length - 1; i++) {
+    const below = groups[i + 1]!;
+    while (groups[i]!.length > sizes[i]!) below.push(groups[i]!.splice(lowest(groups[i]!), 1)[0]!);
+    while (groups[i]!.length < sizes[i]! && below.length > 0) groups[i]!.push(below.splice(upwards(below, isNew), 1)[0]!);
+  }
 }
 
 export interface RoundSwitchInput<T extends SeedablePair> {
@@ -129,8 +201,8 @@ export interface RoundSwitchInput<T extends SeedablePair> {
   readonly fast: boolean;
   /** Pairs of the tables that leave after promotion and relegation: a 3rd strike, dissolved, taken out. */
   readonly leaves: (pair: T) => boolean;
-  /** New pairs (late entries, re-formed pairs), in entry order: it breaks rating ties. */
-  readonly newPairs: readonly NewPair<T>[];
+  /** New pairs (late entries, re-formed pairs, returning players), in entry order: it breaks rating ties. */
+  readonly newPairs: readonly T[];
 }
 
 /**

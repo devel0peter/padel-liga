@@ -1,4 +1,4 @@
-import { isFastSwitch, placementRating, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
+import { isFastSwitch, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
 import { and, asc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
@@ -146,20 +146,16 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
   // organizer entered again after a withdrawal), in entry order.
   const newPairs = entered
     .filter((p) => p.joinsPhase > 1 && p.joinsPhase <= nextPhase && !continuing.has(p.pairId) && !strikes.has(p.pairId))
-    .map((pair) => ({
-      pair,
-      rating: placementRating(
-        { elo: pair.players[0].elo, rated: pair.players[0].rated },
-        { elo: pair.players[1].elo, rated: pair.players[1].rated },
-      ),
-    }));
+    // Rated by the pair's average current Elo, the level's starting value for
+    // a player without a rated match, with no discount (D107f).
+    .map((pair) => ({ pair, rating: pair.averageElo }));
 
   const fast = isFastSwitch({ firstSeason: first?.id === seasonId, endingPhase, fastSwitches: league?.fastSwitches ?? 1 });
   const draft = roundSwitchDraft({
     tables: tables.map((t) => t.rows.map((r) => r.pair)),
     fast,
     leaves: (p) => leaves.has(p.pairId),
-    newPairs,
+    newPairs: newPairs.map((n) => n.pair),
   });
 
   const origins = new Map<number, Origin>();

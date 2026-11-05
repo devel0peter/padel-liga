@@ -228,6 +228,8 @@ describe("approving, rejecting and revoking (#37 requirement 2, D91)", () => {
     expect((await panel("a")).approved).toEqual([{ ours: true, absent: "Játékos B", substitute: "Játékos S" }]);
     // The opponents don't see the other pair's requests themselves.
     expect((await panel("c")).ours).toEqual([]);
+    // Nor the asking pair twice: the approval is listed once, in `approved`.
+    expect((await panel("a")).ours).toEqual([]);
     expect((await S.leagueSubstitutes(1, NOW)).approved).toHaveLength(1);
   });
 

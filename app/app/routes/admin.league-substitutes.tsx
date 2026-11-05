@@ -84,9 +84,8 @@ function Request({ r, children }: { r: SubstituteRequest; children: React.ReactN
     <li className="grid gap-3 rounded-lg border p-4 text-sm">
       <div className="grid gap-0.5">
         <p className="text-xs text-muted-foreground">{where(r)}</p>
-        <p className="font-medium break-words">
-          {r.pair} – {r.opponents} ellen
-        </p>
+        <p className="font-medium break-words">Kéri: {r.pair}</p>
+        <p className="break-words">Ellenfél: {r.opponents}</p>
         <p className="text-muted-foreground">{when(r)}</p>
       </div>
       <Players r={r} />

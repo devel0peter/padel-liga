@@ -1,5 +1,5 @@
-import { RefreshCw, Send, Sparkles } from "lucide-react";
-import { data, Form, useNavigation, useSubmit } from "react-router";
+import { ArrowDown, ArrowUp, RefreshCw, Send, Sparkles } from "lucide-react";
+import { data, Form, Link, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/admin.season-groups";
 import { AppPage } from "~/components/app-page";
@@ -29,16 +29,44 @@ import {
   publishBlocker,
   sizeWarning,
   STALE_DRAFT,
+  withArticle,
 } from "~/lib/groups";
-import { eligiblePairs, FIRST_PHASE, generateDraft, moveDraftPair, phaseGroups, publishGroups } from "~/lib/groups.server";
+import {
+  eligiblePairs,
+  FIRST_PHASE,
+  generateDraft,
+  type GroupPair,
+  moveDraftPair,
+  phaseGroups,
+  phasesWithGroups,
+  publishGroups,
+  type StoredGroup,
+} from "~/lib/groups.server";
 import { getLeague } from "~/lib/leagues.server";
+import {
+  DISPUTES_BLOCK,
+  LAST_PHASE,
+  LEAVE_REASONS,
+  movement,
+  type Origin,
+  originText,
+  RECOMPUTE_HINT,
+  shownPhase,
+  waitingText,
+} from "~/lib/round-switch";
+import { draftPairIds, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch } from "~/lib/round-switch.server";
 import { seasonOfLeague } from "~/lib/season-entries.server";
 import { SITE_NAME } from "~/lib/site";
 
-// The first phase's groups for the league's Szervezők (#24, D20-D22): a
-// draft from the approved pairs by Elo, moves between groups, then publish,
-// which creates the matches, emails every player and locks the groups.
-// Names and Elo only, no contact details.
+// A season's groups for the league's Szervezők, one round at a time.
+// Round 1 (#24, D20-D22): a draft from the entered pairs by Elo, moves
+// between groups, then publish, which creates the matches, emails every
+// player and locks the groups. Every later round (#35, D107): the cron
+// drafts it from the ending round's tables after the deadline (promotion,
+// relegation, leavers, new pairs); the organizer sees where each pair comes
+// from and who leaves, moves pairs, rebuilds it from the current results,
+// and publishes once no disputed result is left. Names and Elo only, no
+// contact details.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Csoportok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -55,39 +83,97 @@ async function scope(request: Request, params: Route.LoaderArgs["params"]) {
   return { league, actor, season };
 }
 
+function phaseParam(value: FormDataEntryValue | string | null): number | null {
+  const n = Number(value || 0);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// Only names and ratings leave the server.
+function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, origins?: Map<number, Origin>) {
+  const average = groupAverage(g.pairs);
+  return {
+    number: g.number,
+    average: average === null ? null : formatElo(average),
+    warning: sizeWarning(g.pairs.length),
+    pairs: g.pairs.map((p) => {
+      const origin = origins?.get(p.pairId);
+      return {
+        id: p.pairId,
+        name: pairName(p.players),
+        elo: formatElo(p.averageElo),
+        active: p.active,
+        withdrawn: p.withdrawn,
+        withdrawalReason: p.withdrawalReason,
+        origin: origin ? { text: originText(origin), move: movement(origin, g.number) } : null,
+      };
+    }),
+  };
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, season } = await scope(request, params);
-  const [stored, eligible] = await Promise.all([phaseGroups(season.id), eligiblePairs(season.id)]);
-  const publishedAt = stored.find((g) => g.publishedAt)?.publishedAt ?? null;
-  const draft = stored.length > 0 && !publishedAt;
-  const stale =
-    draft &&
-    draftIsStale(
-      stored.flatMap((g) => g.pairs.map((p) => p.pairId)),
-      eligible.map((p) => p.pairId),
-    );
-  const phase = season.phases.find((p) => p.number === FIRST_PHASE) ?? null;
-  return {
+  const now = new Date();
+  const withGroups = await phasesWithGroups(season.id);
+  const number = shownPhase(season.phases, withGroups, phaseParam(new URL(request.url).searchParams.get("phase")), now);
+  const phase = season.phases.find((p) => p.number === number) ?? null;
+  const head = {
     league: { name: league.name, slug: league.slug },
     season: { id: season.id, name: season.name },
+    number,
+    // Links to every round with groups, and the one shown.
+    rounds: [...new Set([...withGroups.map((w) => w.phase), number])].sort((a, b) => a - b),
     phase: phase && { startsAt: phase.startsAt, deadline: phase.deadline },
+    lastPhase: number === Math.max(...season.phases.map((p) => p.number)),
+  };
+
+  const stored = await phaseGroups(season.id, number);
+  const publishedAt = stored.find((g) => g.publishedAt)?.publishedAt ?? null;
+  const draft = stored.length > 0 && !publishedAt;
+  const players = stored.reduce((n, g) => n + 2 * g.pairs.length, 0);
+
+  if (number === FIRST_PHASE) {
+    const eligible = await eligiblePairs(season.id);
+    const stale =
+      draft &&
+      draftIsStale(
+        stored.flatMap((g) => g.pairs.map((p) => p.pairId)),
+        eligible.map((p) => p.pairId),
+      );
+    return {
+      ...head,
+      publishedAt,
+      draft,
+      stale,
+      eligibleCount: eligible.length,
+      splitProblem: cannotSplit(eligible.length),
+      blocker: draft ? publishBlocker({ sizes: stored.map((g) => g.pairs.length), stale }) : null,
+      players,
+      groups: stored.map((g) => groupView(g)),
+      switch: null,
+    };
+  }
+
+  // A later round: the switch from the round before it.
+  const s = publishedAt ? null : await roundSwitch(season.id, number, now);
+  const stale = draft && !!s && draftIsStale(stored.flatMap((g) => g.pairs.map((p) => p.pairId)), draftPairIds(s));
+  const sizesBlocker = draft ? publishBlocker({ sizes: stored.map((g) => g.pairs.length), stale }) : null;
+  return {
+    ...head,
     publishedAt,
     draft,
     stale,
-    eligibleCount: eligible.length,
-    splitProblem: cannotSplit(eligible.length),
-    blocker: draft ? publishBlocker({ sizes: stored.map((g) => g.pairs.length), stale }) : null,
-    players: stored.reduce((n, g) => n + 2 * g.pairs.length, 0),
-    // Only names and ratings leave the server.
-    groups: stored.map((g) => {
-      const average = groupAverage(g.pairs);
-      return {
-        number: g.number,
-        average: average === null ? null : formatElo(average),
-        warning: sizeWarning(g.pairs.length),
-        pairs: g.pairs.map((p) => ({ id: p.pairId, name: pairName(p.players), elo: formatElo(p.averageElo), active: p.active, withdrawn: p.withdrawn, withdrawalReason: p.withdrawalReason })),
-      };
-    }),
+    eligibleCount: 0,
+    splitProblem: null,
+    blocker: sizesBlocker ?? (s && s.disputes.length > 0 ? DISPUTES_BLOCK : null),
+    players,
+    groups: stored.map((g) => groupView(g, s?.origins)),
+    switch: s && {
+      endingPhase: s.endingPhase,
+      state: s.state,
+      fast: s.fast,
+      leaving: s.leaving.map((l) => ({ id: l.pair.pairId, name: pairName(l.pair.players), reason: LEAVE_REASONS[l.reason] })),
+      disputes: s.disputes.map((d) => ({ matchId: d.matchId, group: d.group, names: d.pairs.map((p) => pairName(p.players)).join(" – ") })),
+    },
   };
 }
 
@@ -97,20 +183,26 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
   const { actor, season } = await scope(request, params);
   const form = await request.formData();
   const intent = form.get("intent");
+  const phase = phaseParam(form.get("phase")) ?? FIRST_PHASE;
+  if (!season.phases.some((p) => p.number === phase)) throw new Response("Hibás kérés.", { status: 400 });
   if (intent === "generate") {
-    const result = await generateDraft(season.id, actor.id);
-    return result.ok ? { notice: "Kész a javaslat. Áthelyezhetsz párokat, aztán közzéteheted." } : { error: result.error };
+    if (phase === FIRST_PHASE) {
+      const result = await generateDraft(season.id, actor.id);
+      return result.ok ? { notice: "Kész a javaslat. Áthelyezhetsz párokat, aztán közzéteheted." } : { error: result.error };
+    }
+    const result = await generateRoundSwitchDraft(season.id, phase, actor.id);
+    return result.ok ? { notice: "Újraszámoltuk a tervezetet a mostani eredményekből." } : { error: result.error };
   }
   if (intent === "move") {
     const pair = Number(form.get("pair") || 0);
     const group = Number(form.get("group") || 0);
     if (!Number.isInteger(pair) || pair <= 0 || !Number.isInteger(group) || group <= 0)
       throw new Response("Hibás kérés.", { status: 400 });
-    const result = await moveDraftPair(season.id, pair, group, actor.id);
+    const result = await moveDraftPair(season.id, pair, group, actor.id, phase);
     return result.ok ? {} : { error: result.error };
   }
   if (intent === "publish") {
-    const result = await publishGroups(season.id, actor.id);
+    const result = phase === FIRST_PHASE ? await publishGroups(season.id, actor.id) : await publishRoundSwitch(season.id, phase, actor.id);
     return result.ok
       ? { notice: "Közzétetted a csoportokat. A játékosok most kapják meg az e-mailt." }
       : { error: result.error };
@@ -121,7 +213,7 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
 type LoaderData = Route.ComponentProps["loaderData"];
 type Group = LoaderData["groups"][number];
 
-function MovePair({ pair, from, groups }: { pair: Group["pairs"][number]; from: number; groups: Group[] }) {
+function MovePair({ pair, from, groups, phase }: { pair: Group["pairs"][number]; from: number; groups: Group[]; phase: number }) {
   const submit = useSubmit();
   const busy = useNavigation().state !== "idle";
   return (
@@ -129,7 +221,7 @@ function MovePair({ pair, from, groups }: { pair: Group["pairs"][number]; from: 
       value=""
       disabled={busy}
       onValueChange={(group) =>
-        submit({ intent: "move", pair: String(pair.id), group }, { method: "post", preventScrollReset: true })
+        submit({ intent: "move", pair: String(pair.id), group, phase: String(phase) }, { method: "post", preventScrollReset: true })
       }
     >
       <SelectTrigger size="sm" aria-label={`Áthelyezés: ${pair.name}`} className="w-36">
@@ -148,7 +240,17 @@ function MovePair({ pair, from, groups }: { pair: Group["pairs"][number]; from: 
   );
 }
 
-function GroupCard({ group, groups, editable }: { group: Group; groups: Group[]; editable: boolean }) {
+function OriginBadge({ origin }: { origin: NonNullable<Group["pairs"][number]["origin"]> }) {
+  return (
+    <Badge variant={origin.move === "stay" ? "outline" : "secondary"} className="ml-2">
+      {origin.move === "up" && <ArrowUp aria-label="feljutott" />}
+      {origin.move === "down" && <ArrowDown aria-label="kiesett" />}
+      {origin.text}
+    </Badge>
+  );
+}
+
+function GroupCard({ group, groups, editable, phase }: { group: Group; groups: Group[]; editable: boolean; phase: number }) {
   return (
     <Card>
       <CardHeader>
@@ -184,12 +286,17 @@ function GroupCard({ group, groups, editable }: { group: Group; groups: Group[];
                       </Badge>
                     )}
                   </span>
-                  <span className="text-xs text-muted-foreground">Elo: {p.elo}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Elo: {p.elo}
+                    {p.origin && <OriginBadge origin={p.origin} />}
+                  </span>
                   {p.withdrawalReason && (
                     <span className="text-xs break-words text-muted-foreground">Indok: {p.withdrawalReason}</span>
                   )}
                 </div>
-                {editable && groups.length > 1 && <MovePair key={`${p.id}-${group.number}`} pair={p} from={group.number} groups={groups} />}
+                {editable && groups.length > 1 && (
+                  <MovePair key={`${p.id}-${group.number}`} pair={p} from={group.number} groups={groups} phase={phase} />
+                )}
               </li>
             ))}
           </ol>
@@ -199,7 +306,7 @@ function GroupCard({ group, groups, editable }: { group: Group; groups: Group[];
   );
 }
 
-function PublishDialog({ players, disabled }: { players: number; disabled: boolean }) {
+function PublishDialog({ players, disabled, phase }: { players: number; disabled: boolean; phase: number }) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
@@ -211,6 +318,7 @@ function PublishDialog({ players, disabled }: { players: number; disabled: boole
       <AlertDialogContent>
         <Form method="post" className="grid gap-4">
           <input type="hidden" name="intent" value="publish" />
+          <input type="hidden" name="phase" value={phase} />
           <AlertDialogHeader>
             <AlertDialogTitle>Közzéteszed a csoportokat?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -229,11 +337,12 @@ function PublishDialog({ players, disabled }: { players: number; disabled: boole
   );
 }
 
-function GenerateButton({ label, variant }: { label: string; variant: "default" | "outline" }) {
+function GenerateButton({ label, variant, phase }: { label: string; variant: "default" | "outline"; phase: number }) {
   const busy = useNavigation().state !== "idle";
   return (
     <Form method="post">
       <input type="hidden" name="intent" value="generate" />
+      <input type="hidden" name="phase" value={phase} />
       <Button type="submit" variant={variant} disabled={busy}>
         {variant === "default" ? <Sparkles /> : <RefreshCw />}
         {label}
@@ -242,23 +351,101 @@ function GenerateButton({ label, variant }: { label: string; variant: "default" 
   );
 }
 
-export default function SeasonGroups({ loaderData: d, actionData }: Route.ComponentProps) {
+function Actions({ d }: { d: LoaderData }) {
   const busy = useNavigation().state !== "idle";
+  if (d.publishedAt) return null;
   const empty = d.groups.length === 0;
-  const actions = d.publishedAt ? null : empty ? (
-    !d.splitProblem && <GenerateButton label="Csoportok javaslata" variant="default" />
+  if (d.number === FIRST_PHASE) {
+    return empty ? (
+      !d.splitProblem && <GenerateButton label="Csoportok javaslata" variant="default" phase={d.number} />
+    ) : (
+      <>
+        <GenerateButton label="Újragenerálás" variant="outline" phase={d.number} />
+        <PublishDialog players={d.players} disabled={busy || !!d.blocker} phase={d.number} />
+      </>
+    );
+  }
+  if (d.switch?.state !== "ready") return null;
+  return empty ? (
+    <GenerateButton label="Tervezet készítése" variant="default" phase={d.number} />
   ) : (
     <>
-      <GenerateButton label="Újragenerálás" variant="outline" />
-      <PublishDialog players={d.players} disabled={busy || !!d.blocker} />
+      <GenerateButton label="Tervezet újraszámolása" variant="outline" phase={d.number} />
+      <PublishDialog players={d.players} disabled={busy || !!d.blocker} phase={d.number} />
     </>
   );
+}
+
+// The ending round's open disputes, which block publishing, and the pairs
+// that leave at the switch.
+function SwitchPanel({ d }: { d: LoaderData }) {
+  const s = d.switch;
+  if (!s || d.publishedAt) return null;
+  return (
+    <div className="grid gap-4">
+      {s.disputes.length > 0 && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">{DISPUTES_BLOCK}</p>
+          <ul className="mt-2 grid gap-1">
+            {s.disputes.map((m) => (
+              <li key={m.matchId}>
+                <Link to={`/admin/leagues/${d.league.slug}/matches/${m.matchId}`} className="underline underline-offset-2">
+                  {m.group}. csoport: {m.names}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {s.state === "ready" && d.groups.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {s.fast && <>Gyors körváltás: két 4 páros csoport között 2-2 pár cserél helyet. </>}
+          {RECOMPUTE_HINT}
+        </p>
+      )}
+      {s.leaving.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Kimaradnak</CardTitle>
+            <CardDescription>Ezek a párok {withArticle(s.endingPhase)} kör után nem játszanak tovább.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-1.5">
+              {s.leaving.map((l) => (
+                <li key={l.id} className="flex flex-wrap gap-x-2">
+                  <span className="font-medium">{l.name}</span>
+                  <span className="text-muted-foreground">{l.reason}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function emptyText(d: LoaderData): string {
+  if (d.number === FIRST_PHASE)
+    return (
+      d.splitProblem ??
+      `${d.eligibleCount} nevezett pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`
+    );
+  const s = d.switch;
+  if (!s) return `${withArticle(d.number - 1).replace(/^a/, "A")} kör csoportjai még nincsenek kint.`;
+  if (s.state !== "ready") return waitingText(s.state, s.endingPhase);
+  return "Még nincs tervezet. Elkészítheted most a mostani eredményekből.";
+}
+
+export default function SeasonGroups({ loaderData: d, actionData }: Route.ComponentProps) {
+  const empty = d.groups.length === 0;
+  const path = `/admin/leagues/${d.league.slug}/seasons/${d.season.id}/groups`;
   return (
     <AppPage
       title={`Csoportok: ${d.season.name}`}
       description={
         <>
-          {d.league.name}: az 1. kör csoportjai
+          {d.league.name}: {withArticle(d.number)} kör csoportjai
           {d.phase && (
             <>
               , kezdés {formatDate(new Date(d.phase.startsAt))}, határidő {formatDeadline(new Date(d.phase.deadline))}
@@ -268,8 +455,19 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
         </>
       }
       back={{ to: `/admin/leagues/${d.league.slug}/seasons`, label: "Szezonok" }}
-      actions={actions}
+      actions={<Actions d={d} />}
     >
+      {d.rounds.length > 1 && (
+        <nav aria-label="Körök" className="flex flex-wrap gap-2">
+          {d.rounds.map((n) => (
+            <Button key={n} asChild size="sm" variant={n === d.number ? "secondary" : "outline"}>
+              <Link to={`${path}?phase=${n}`} aria-current={n === d.number ? "page" : undefined}>
+                {n}. kör
+              </Link>
+            </Button>
+          ))}
+        </nav>
+      )}
       {actionData?.notice && (
         <p role="status" className="rounded-md border border-nav-active bg-nav-active-bg p-3 text-sm font-medium">
           {actionData.notice}
@@ -284,14 +482,13 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
       {d.publishedAt ? (
         <p className="text-sm text-muted-foreground">
           Közzétéve: {formatDateTime(new Date(d.publishedAt))}. A csoportok már nem módosíthatók.
+          {d.lastPhase && d.number > FIRST_PHASE && <> {LAST_PHASE}</>}
         </p>
       ) : empty ? (
-        <p className="py-6 text-center text-muted-foreground">
-          {d.splitProblem ??
-            `${d.eligibleCount} nevezett pár van. Kérj javaslatot: Elo szerint osztjuk csoportokba őket, utána áthelyezhetsz párokat.`}
-        </p>
+        <p className="py-6 text-center text-muted-foreground">{emptyText(d)}</p>
       ) : (
-        d.blocker && (
+        d.blocker &&
+        d.blocker !== DISPUTES_BLOCK && (
           <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm font-medium text-destructive">
             {d.blocker}
             {d.stale && d.blocker === STALE_DRAFT && d.splitProblem && <> {d.splitProblem}</>}
@@ -299,10 +496,12 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
         )
       )}
 
+      <SwitchPanel d={d} />
+
       {!empty && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {d.groups.map((g) => (
-            <GroupCard key={g.number} group={g} groups={d.groups} editable={d.draft} />
+            <GroupCard key={g.number} group={g} groups={d.groups} editable={d.draft} phase={d.number} />
           ))}
         </div>
       )}

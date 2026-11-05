@@ -459,6 +459,19 @@ Every organizer and system change leaves an entry (#225, #226, README decision l
   - Each filter narrows the list and stays in the address, so the reload shows the same list. 50 entries a page, "Régebbiek" for the next.
   - Nothing on the page changes an entry. A Szervező or a player opening `/admin/log` gets the 403 page, and has no Napló in the sidebar.
 
+### 32. A visitor opens a pair's and a player's profile (after step 29)
+
+Public profiles (#36, README decision log D110).
+
+- Page: `/league/minta`, then a pair's name in a group table
+- Account: none (logged out); then the player of step 27 on Profil and Párom
+- Do: press the player's pair in their group table, then one of the two names on the pair page.
+- Expect:
+  - The pair page (`/pairs/<id>`): both names (each a link), "Csoportok" with "<season>, 1. kör: <n>. csoport (<division>)" and the pair's place in the table, the same as on the league page, and "Meccsek" with the step 27 win and the step 28 decision from the pair's side ("Győzelem · 4:1, 2:4, szuper tie-break 10:8", "Vereség · Mindkét pár vereséget kap (0:4, 0:4)"). A result still waiting or disputed is not listed.
+  - The player page (`/players/<id>`): the name, "Értékszám" (a whole number), "Párja" with the pair and its group, and the matches; the step 27 win has an "Értékszám: +… → …" line, the decision has none (no Elo change). After two rated matches a small chart shows the rating.
+  - No email address or phone number on either page. An unknown id, or a deleted player's page, is the 404 page ("Ez az oldal nem létezik."); a deleted player is "Törölt játékos" without a link.
+  - Logged in: Profil shows "Nyilvános profilod" and Párom "A párotok nyilvános oldala", both leading to these pages, once the pair is in a published group.
+
 ## Start over
 
 Run `npm run db:seed:local -w app` again. It resets the fake rows, including every account, session, pair, entry, group, match and email of the walkthrough, and refreshes the season dates. Rows that are not on `@example.test` and not in the city "Mintaváros" are left alone.

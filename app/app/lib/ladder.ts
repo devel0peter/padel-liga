@@ -40,6 +40,8 @@ export type LadderGroupInput = { id: number; number: number; pairs: LadderPair[]
 
 export type LadderRow = {
   rank: number;
+  /** The pair's public profile is /pairs/<pairId> (#36): the one id on the page. */
+  pairId: number;
   names: [string, string];
   matches: number;
   points: number;
@@ -103,7 +105,7 @@ export function countedOutcome(m: { status: string; outcome: MatchOutcome | null
 export function groupTable(
   pairs: readonly { id: number; elo: number; withdrawn?: boolean }[],
   matches: readonly { a: number; b: number; outcome: MatchOutcome | null }[],
-): (Omit<LadderRow, "names"> & { pairId: number })[] {
+): Omit<LadderRow, "names">[] {
   const decided: GroupMatch[] = matches.flatMap((m) => (m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : []));
   return groupStandings(
     pairs.map((p) => ({ id: String(p.id), elo: p.elo, withdrawn: !!p.withdrawn })),
@@ -141,7 +143,7 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number): 
     });
     bands.get(divisionOf(index + 1, ordered.length))!.push({
       number: group.number,
-      rows: standings.map(({ pairId, ...r }) => ({ ...r, names: names(pairId) })),
+      rows: standings.map((r) => ({ ...r, names: names(r.pairId) })),
       weekMatches: shown.filter((m) => m.week === week).map(view),
       // A result is listed once: a played match of the week shown is already
       // under "meccsei" (#202).

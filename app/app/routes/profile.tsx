@@ -19,6 +19,7 @@ import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } f
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
+import { hasPublicProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
@@ -32,7 +33,11 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const [disabled, levelLocked] = await Promise.all([disabledKindsFor(user.id), hasTakenPartInSeason(user.id)]);
+  const [disabled, levelLocked, publicProfile] = await Promise.all([
+    disabledKindsFor(user.id),
+    hasTakenPartInSeason(user.id),
+    hasPublicProfile(user.id),
+  ]);
   return {
     name: user.name,
     email: user.email,
@@ -42,6 +47,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     levelLocked,
     rating: ratingFor(user.level, user.elo),
     rated: user.elo !== null,
+    // The public profile (#36), once the player has been in a published group.
+    profilePath: publicProfile ? `/players/${user.id}` : null,
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -155,6 +162,14 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
       <section id="adatok" className="grid max-w-2xl scroll-mt-6 gap-4">
         <h2 className="font-display text-lg font-extrabold">Adataid</h2>
         {d.rating != null && <RatingInfo rating={d.rating} rated={d.rated} />}
+        {d.profilePath && (
+          <p className="text-sm">
+            <Link to={d.profilePath} className="font-semibold underline">
+              Nyilvános profilod
+            </Link>{" "}
+            <span className="text-muted-foreground">(név, értékszám, eredmények: ezt látja rólad bárki)</span>
+          </p>
+        )}
         {!d.level && (
           <p role="status" className="rounded-md border border-dashed p-3 text-sm">
             Még nem adtad meg a szinted. Kell a jelentkezéshez.

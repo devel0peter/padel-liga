@@ -375,7 +375,8 @@ export default function Privacy() {
                 végén töröljük, kivéve, ha regisztráltál.
               </li>
               <li>
-                <strong>Fiókok:</strong> amíg nem kéred a törlést. Ha még nem
+                <strong>Fiókok:</strong> amíg nem törlöd (a Profil oldalon) vagy
+                nem kéred a törlést. Ha még nem
                 játszottál kihirdetett csoportban, és jóváhagyott helyettes sem
                 voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
                 játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
@@ -416,13 +417,17 @@ export default function Privacy() {
               Bármikor kérheted, hogy megmutassuk, javítsuk vagy töröljük az
               adataidat, és visszavonhatod a hozzájárulásodat. Ehhez elég egy
               e-mail a {mail} címre, és legkésőbb egy hónapon belül intézzük.
+              A fiókodat te magad is törölheted a Profil oldalon („Fiók
+              törlése”): ugyanaz történik, mint ha mi törölnénk, és minden
+              eszközön kiléptetünk.
             </p>
             <p>
               Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
               neked szóló leveleket, és a neved meg a címed mások
-              jelentkezéséből és a nekik szóló levelekből is. Ha épp egy kör
-              közben kéred, amikor a párod kihirdetett csoportban játszik, a
-              kör végén törlünk. A címedhez tartozó minden tárolt adatot
+              jelentkezéséből és a nekik szóló levelekből is. Amíg a párod
+              kihirdetett csoportban játszik, és a kör még nem ért véget, a
+              Profil oldalon nem tudod törölni a fiókodat; ha ilyenkor kéred
+              e-mailben, a kör végén törlünk. A címedhez tartozó minden tárolt adatot
               törlünk, a leiratkozásodat vagy a visszapattanó levelek
               nyomát is. Csak a régi eredményekben marad meg a neved
               névtelenítve („Törölt játékos”). Ha később újra regisztrálsz

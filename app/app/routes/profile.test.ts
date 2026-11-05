@@ -1,11 +1,16 @@
 // The profile page's level lock and értékszám (#135) on a real SQLite
 // (~/test/sqlite) with the real session lookup.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any }));
+const h = vi.hoisted(() => ({ raw: null as any, mails: [] as unknown[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+// Deleting the account (#38) must queue no mail.
+vi.mock("~/lib/email/outbox.server", () => ({
+  queueSeasonEntryDecision: async (...a: unknown[]) => h.mails.push(a),
+  queueGroupsPublished: async (...a: unknown[]) => h.mails.push(a),
+}));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const { createSession } = await import("~/lib/auth/session.server");
@@ -72,5 +77,92 @@ describe("Profil: level lock and értékszám", () => {
     expect(await P.loader(args(get(free)))).toMatchObject({ rating: 1200 });
     const nolevel = (await createSession("nolevel")).split(";")[0]!;
     expect(await P.loader(args(get(nolevel)))).toMatchObject({ rating: null });
+  });
+});
+
+// Fiók törlése (#38): the dialog's text comes from the loader; the action
+// runs the Admin's deletion (#152) on the player's own account, ends every
+// session and lands logged out on the home page.
+describe("Profil: Fiók törlése", () => {
+  const del = (cookie: string) =>
+    new Request("http://localhost/profile", { method: "POST", headers: { Cookie: cookie }, body: new URLSearchParams({ intent: "delete-account" }) });
+  const count = (q: string) => h.raw.prepare(q).get().n as number;
+  let free: string;
+  let placed: string;
+
+  afterEach(() => expect(h.mails).toEqual([]));
+
+  beforeEach(async () => {
+    h.raw = migratedDatabase();
+    h.mails = [];
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Győr')`);
+    h.raw.exec(`insert into users (id, email, name, level, phone, sex, consent_at, platform_role) values
+      ('free', 'f@x.hu', 'Kis Fanni', 'kezdo', '+36301234569', 'female', 1, 'player'),
+      ('placed', 'p@x.hu', 'Nagy Anna', 'halado', '+36301234567', 'female', 1, 'player'),
+      ('mate', 'm@x.hu', 'Kis Béla', 'kezdo', '+36301234568', 'male', 1, 'player'),
+      ('admin', 'a@x.hu', 'Admin', 'halado', '+36301234560', 'male', 1, 'superadmin')`);
+    h.raw.exec(`insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start)
+      values (1, 1, 'Tél', 1, 2, '2026-11-09')`);
+    // Phase 1 ended long ago: a pair placed in it is history, not playing.
+    h.raw.exec(`insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, 1, 2)`);
+    h.raw.exec(`insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, 1000)`);
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b, status) values (1, 1, 'placed', 'mate', 'active')`);
+    h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1)`);
+    // 'free' is a Szervező.
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'free')`);
+    free = (await createSession("free")).split(";")[0]!;
+    placed = (await createSession("placed")).split(";")[0]!;
+  });
+
+  it("says what happens: everything goes without history, the name stays anonymized with it", async () => {
+    const f: any = await P.loader(args(get(free)));
+    expect(f.deletion.effect).toMatch(/^Még nem szerepeltél a ligában, ezért minden adatod törlődik/);
+    expect(f.deletion.effect).toContain("A szervezői jogaid is megszűnnek.");
+    expect(f.deletion.effect).toContain("Nem vonható vissza.");
+    const p: any = await P.loader(args(get(placed)));
+    expect(p.deletion.effect).toMatch(/^Már szerepeltél a ligában, ezért a fiókod névtelen lesz: a neved helyén „Törölt játékos” áll/);
+    expect(p.deletion.effect).not.toContain("szervezői");
+  });
+
+  it("deletes the account, ends every session and lands logged out on the home page", async () => {
+    const other = (await createSession("free")).split(";")[0]!;
+    const res = (await P.action(args(del(free)))) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/?accountDeleted=1");
+    expect(res.headers.get("Set-Cookie")).toMatch(/Max-Age=0/);
+    expect(count("select count(*) n from users where id = 'free'")).toBe(0);
+    expect(count("select count(*) n from league_admins")).toBe(0);
+    // Neither device is logged in any more.
+    for (const cookie of [free, other]) {
+      const thrown: any = await P.loader(args(get(cookie))).catch((e) => e);
+      expect(thrown).toBeInstanceOf(Response);
+      expect(thrown.headers.get("Location")).toMatch(/^\/login\?/);
+    }
+  });
+
+  it("anonymizes an account with history; the pair's group place stays", async () => {
+    // A second device: only the batch's session delete logs it out.
+    const other = (await createSession("placed")).split(";")[0]!;
+    const res = (await P.action(args(del(placed)))) as Response;
+    expect(res.headers.get("Location")).toBe("/?accountDeleted=1");
+    expect(h.raw.prepare("select name, email, phone from users where id = 'placed'").get()).toEqual({
+      name: "Törölt játékos",
+      email: "deleted-placed@deleted.invalid",
+      phone: null,
+    });
+    expect(count("select count(*) n from group_pairs where pair_id = 1")).toBe(1);
+    expect(count("select count(*) n from sessions where user_id = 'placed'")).toBe(0);
+    const thrown: any = await P.loader(args(get(other))).catch((e) => e);
+    expect(thrown.headers.get("Location")).toMatch(/^\/login\?/);
+  });
+
+  it("refuses the Admin, in Hungarian, and changes nothing", async () => {
+    const admin = (await createSession("admin")).split(";")[0]!;
+    const shown: any = await P.loader(args(get(admin)));
+    expect(shown.deletion).toEqual({ refused: "Adminként a saját fiókodat nem törölheted." });
+    const refused: any = await P.action(args(del(admin)));
+    expect(refused.init.status).toBe(409);
+    expect(refused.data.deleteError).toBe("Adminként a saját fiókodat nem törölheted.");
+    expect(count("select count(*) n from sessions where user_id = 'admin'")).toBe(1);
   });
 });

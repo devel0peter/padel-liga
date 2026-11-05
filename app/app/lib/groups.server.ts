@@ -11,6 +11,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 
 import { auditEntry, auditWhen, leagueOfSeason } from "./audit.server";
 import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
+import { updateElo } from "./elo.server";
 import { averageElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
 
@@ -216,6 +217,9 @@ const groupIdOf = (seasonId: number, number: number) =>
 // one from the approved pairs (spec section 10, seedGroups). Earlier moves are
 // lost. Nothing is stored when the pairs can't be split (0, 1, 2 or 5).
 export async function generateDraft(seasonId: number, actorId: string): Promise<Result> {
+  // Seeding reads the current Elo: a replay first, in case the one after the
+  // last final match failed (#13). The round switch draft (#35) does the same.
+  await updateElo();
   if (await groupsPublished(seasonId)) return { ok: false, error: LOCKED };
   const eligible = await eligiblePairs(seasonId);
   const seeded = seedGroups(eligible);

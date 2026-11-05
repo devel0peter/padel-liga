@@ -16,9 +16,10 @@ import { logError, logWarn } from "~/lib/log";
 // is stored is written: users.elo and elo_changes.
 //
 // Called after every write that makes a match final (a confirmed result,
-// the cron's auto-accept, an organizer's ruling). One replay is about four
-// queries and one batch; a failed one is logged and the next one puts
-// everything right, since it replays from the start.
+// the cron's auto-accept, an organizer's ruling) and before the groups draft
+// reads the ratings (groups.server.ts). One replay is ELO_REPLAY_QUERIES; a
+// failed one is logged and the next one puts everything right, since it
+// replays from the start.
 
 const pairA = alias(pairs, "elo_pair_a");
 const pairB = alias(pairs, "elo_pair_b");
@@ -168,6 +169,9 @@ async function replayOnce(now: Date): Promise<boolean> {
 }
 
 const ATTEMPTS = 3;
+
+/** One replay's D1 queries (four reads and the write batch); a retry costs as much again. */
+export const ELO_REPLAY_QUERIES = 5;
 
 /**
  * Brings every player's Elo up to date with the final matches. Never

@@ -32,7 +32,8 @@ vi.mock("~/lib/email/outbox.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { updateElo } = await import("~/lib/elo.server");
+const { ELO_REPLAY_QUERIES, updateElo } = await import("~/lib/elo.server");
+const { RunBudget } = await import("~/lib/run-usage");
 const R = await import("~/lib/results.server");
 const D = await import("~/lib/decisions.server");
 const E = await import("~/lib/season-entries.server");
@@ -150,6 +151,29 @@ describe("updateElo after a confirmed result (#13)", () => {
     await updateElo(T2);
     expect(wrote).toBe(false);
     expect(changes()).toEqual(before);
+  });
+});
+
+describe("updateElo's cost (#13)", () => {
+  it("is ELO_REPLAY_QUERIES with something to write, one less without", async () => {
+    await confirmed(1, WIN_A, T1);
+    h.raw.exec("update users set elo = 1000 where id = 'a'");
+    let run = new RunBudget();
+    await updateElo(T2);
+    expect(run.used().queries).toBe(ELO_REPLAY_QUERIES);
+    expect(elo("a")).toBe(1420);
+    run = new RunBudget();
+    await updateElo(T2);
+    expect(run.used().queries).toBe(ELO_REPLAY_QUERIES - 1);
+  });
+});
+
+describe("updateElo before the groups draft (#13)", () => {
+  it("mends ratings a failed replay left stale before seeding reads them", async () => {
+    await confirmed(1, WIN_A, T1);
+    h.raw.exec("update users set elo = null where id in ('a', 'b')");
+    await G.generateDraft(1, "o");
+    expect([elo("a"), elo("b")]).toEqual([1420, 1420]);
   });
 });
 

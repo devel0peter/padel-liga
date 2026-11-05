@@ -219,6 +219,13 @@ export default function Privacy() {
                 amikor egy meccsükre helyettest kérnek.
               </li>
               <li>
+                <strong>A „nem jöttek el” bejelentést</strong> (melyik pár
+                jelezte és mikor, és a szervező döntése az indoklásával) mindkét
+                pár, a liga szervezője és az oldal adminja látja. Ha a szervező
+                jóváhagyja, a döntése a nevével és idejével a meccs naplójába is
+                bekerül, a másik pár játékosai pedig fekete pontot kapnak.
+              </li>
+              <li>
                 A jelentkezési listát csak a szervező látja, semmi nem
                 kerül belőle nyilvánosságra. A városod ligájának szervezője az
                 egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol

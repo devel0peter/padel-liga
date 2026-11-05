@@ -23,6 +23,10 @@ export const NOTIFICATION_KINDS = {
     label: "Helyettes kérés",
     description: "Ha egy pár helyettest kér a ligád egy meccsére, és te hagyod jóvá.",
   },
+  no_show_reported: {
+    label: "Nem jöttek el",
+    description: "Ha egy pár jelzi, hogy az ellenfele nem jött el a ligád egy meccsére, és te döntesz róla.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -66,7 +70,12 @@ export type PlayerKind =
   // approval and revocation. The organizers' kind is `substitute_requested`.
   | "substitute_approved"
   | "substitute_rejected"
-  | "substitute_revoked";
+  | "substitute_revoked"
+  // No-shows (#33, D108): the organizer's decision on a report, to both
+  // pairs, in the app and by push only, never by email. The organizers' kind
+  // is `no_show_reported`; the strike's notice is its own kind.
+  | "no_show_confirmed"
+  | "no_show_rejected";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -88,7 +97,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested", "no_show_reported"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -424,6 +433,35 @@ export function substituteRevokedMessage(input: SubstituteNotice & { ours: boole
 
 // To both pairs: the organizer decided or overrode the outcome (digest item).
 // The reason is on the match page only.
+// --- No-shows (#33, D108) ---------------------------------------------------
+
+// To the league's Szervezők and the Admins (app and push, never email), the
+// reporting player left out. No names: the decision page shows them.
+export function noShowReportedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Nem jöttek el · ${input.leagueName}`,
+    body: `Egy pár jelezte, hogy az ellenfele nem jött el a ${input.week}. heti meccsre. A döntés rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
+  };
+}
+
+// The organizer's decision, to each pair from its own side: `reported` is
+// the pair that made the report. The reason is on the match page only.
+export function noShowDecidedMessage(input: { matchId: number; confirmed: boolean; reported: boolean }): Message {
+  const url = matchUrl(input.matchId);
+  if (input.confirmed)
+    return input.reported
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4-0 4-0-val megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      : {
+          title: "A szervező szerint nem jöttetek el",
+          body: "A meccs 0-4 0-4-es vereség nektek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          url,
+        };
+  return input.reported
+    ? { title: "A szervező elutasította a bejelentésed", body: "A meccs ott tart, ahol a bejelentés előtt. Az indoklást a meccs oldalán látod.", url }
+    : { title: "A szervező elutasította az ellenfeleitek bejelentését", body: "Nem kaptok érte semmit: a meccs ott tart, ahol előtte.", url };
+}
+
 export function matchDecidedMessage(input: { matchId: number; outcome: string }): Message {
   return {
     title: "A szervező döntött a meccsetekről",

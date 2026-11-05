@@ -499,7 +499,7 @@ The same deletion as step 30, by the player (#38, README decision log D111).
 - Expect:
   - The dialog says everything goes, because there is no history ("Még nem szerepeltél a ligában…"), that every device is logged out, and "Nem vonható vissza."
   - After it: the home page with "Töröltük a fiókodat, és minden eszközön kiléptettünk.", logged out; the other browser is on the login page; logging in with the address starts a new registration. Nothing new in the terminal or on Kimenő levelek. Napló has "Fiók törlése" by "Törölt játékos".
-  - The player in a published group: "Most nem törölheted a fiókodat" with the reason and no delete button. The Admin: "Adminként a saját fiókodat nem törölheted."
+  - The player in a published group: "Most nem törölheted: a párod kihirdetett csoportban játszik…" and no delete button. The Admin: "Adminként a saját fiókodat nem törölheted."
 
 ## Start over
 

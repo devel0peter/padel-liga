@@ -293,7 +293,7 @@ function DeleteAccount({ deletion }: { deletion: { effect: string } | { refused:
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{refused ? "Most nem törölheted a fiókodat" : "Törlöd a fiókodat?"}</AlertDialogTitle>
+            <AlertDialogTitle>{refused ? "Fiók törlése" : "Törlöd a fiókodat?"}</AlertDialogTitle>
             <AlertDialogDescription>{refused ?? ("effect" in deletion ? deletion.effect : "")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

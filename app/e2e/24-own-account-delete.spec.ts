@@ -57,8 +57,7 @@ test("Fiók törlése: refused while the pair plays, and for the Admin", async (
   await visit(player.page, "/profile");
   await content(player.page).getByRole("button", { name: "Fiók törlése" }).click();
   const dialog = player.page.getByRole("alertdialog");
-  await expect(dialog).toContainText("Most nem törölheted a fiókodat");
-  await expect(dialog).toContainText("a párod kihirdetett csoportban játszik");
+  await expect(dialog).toContainText("Most nem törölheted: a párod kihirdetett csoportban játszik");
   await expect(dialog.getByRole("button", { name: "Fiók törlése" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Rendben" }).click();
   await player.context.close();

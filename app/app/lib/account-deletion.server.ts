@@ -29,6 +29,7 @@ import {
 import { partnerNoticeSubject } from "~/lib/email/templates";
 import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { dissolveStatements } from "~/lib/pairs.server";
+import { clearStrikeReasons } from "~/lib/strikes.server";
 
 import {
   anonymizedEmail,
@@ -353,6 +354,7 @@ async function anonymize(
     ...active.flatMap((p) => dissolveStatements(actorId, p.id, now, gone, { leagueId: p.leagueId, detail: "account deleted" })),
     ...personalDataStatements(userId, email, mail, gone),
     ...withdrawalReasonStatements(userId, gone),
+    ...clearStrikeReasons(userId, gone),
   ]);
   return updated.length > 0 ? active : false;
 }

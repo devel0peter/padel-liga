@@ -9,7 +9,7 @@ import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague } from "./leagues.server";
 import { averageElo } from "./season-entries";
-import type { Season } from "./seasons";
+import { currentSeason } from "./seasons";
 import { listSeasons } from "./seasons.server";
 
 // What the public league page needs (#30). Only names leave this module: the
@@ -35,13 +35,6 @@ export type LadderPage = {
       bands: LadderBand[];
     }
 );
-
-// The season on show: the earliest one that has not ended, else the latest.
-function currentSeason(seasons: readonly Season[], now: Date): Season | undefined {
-  const byStart = [...seasons].sort((a, b) => (a.firstPhaseStart < b.firstPhaseStart ? -1 : 1));
-  const ongoing = byStart.find((s) => s.phases.length > 0 && s.phases[s.phases.length - 1]!.deadline >= now);
-  return ongoing ?? byStart[byStart.length - 1];
-}
 
 const playerA = alias(users, "ladder_player_a");
 const playerB = alias(users, "ladder_player_b");

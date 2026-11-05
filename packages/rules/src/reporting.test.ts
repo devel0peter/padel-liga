@@ -125,6 +125,14 @@ describe("rulings (#28 auto-accept, #29 organizer)", () => {
     });
   });
 
+  it("the deadline resolution makes an unplayed match final, and the organizer can still override it (#11, D78)", () => {
+    const resolved = [ruling("deadline", { kind: "walkover", winner: "a" })];
+    expect(resultState([], resolved)).toMatchObject({ status: "final", how: "deadline", outcome: { kind: "walkover", winner: "a" } });
+    expect(resultActions(resultState([], resolved), "b")).toEqual({ record: false, confirm: false, dispute: false });
+    const overridden = [...resolved, ruling("organizer", { kind: "unplayed" }, at("2026-11-30", 9))];
+    expect(resultState([], overridden)).toMatchObject({ status: "final", how: "organizer", outcome: { kind: "unplayed" } });
+  });
+
   it("the organizer sets an outcome without any result (both inactive)", () => {
     expect(resultState([], [ruling("organizer", { kind: "both-inactive" })])).toMatchObject({ status: "final", outcome: { kind: "both-inactive" } });
   });

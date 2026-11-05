@@ -489,7 +489,18 @@ Public profiles (#36, README decision log D110).
   - No email address or phone number on either page. An unknown id, or a deleted player's page, is the 404 page ("Ez az oldal nem létezik."); a deleted player is "Törölt játékos" without a link.
   - Logged in: Profil shows "Nyilvános profilod" and Párom "A párotok nyilvános oldala", both leading to these pages, once the pair is in a published group.
 
-### 34. A player deletes their own account (side path)
+### 34. A player gets strikes; the Szervező cancels one (side path)
+
+The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/24-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (README decision log D103, D103a):
+
+- Do: `npx wrangler d1 execute DB --local --command "insert into strikes (season_id, user_id, pair_id, source, at) select g.season_id, p.player_a, p.id, 'deadline', unixepoch() from group_pairs gp join groups g on g.id = gp.group_id join pairs p on p.id = gp.pair_id where g.published_at is not null limit 1"` (in `app/`), twice.
+- Page: `/admin/leagues/minta/pairs` as `szervezo@example.test`.
+- Expect:
+  - The player's row on Párok shows "2 fekete pont"; below the list, "Fekete pontok · <szezon>" lists both, "Határidő: nem próbált egyeztetni", "Érvényes".
+  - "Törlés" asks for a reason (the button stays off without one); after it the row says "Törölve (Teszt Szervező): <indok>" and the badge "1 fekete pont". Napló has "Fekete pont törlése" with the reason.
+  - As that player, Kezdőlap's season card says "Fekete pontjaid ebben a szezonban: 1." The public league page shows no strikes. Nothing new on Kimenő levelek (only a 2nd strike given by the cron sends the warning email).
+
+### 35. A player deletes their own account (side path)
 
 The same deletion as step 30, by the player (#38, README decision log D111).
 
@@ -510,4 +521,4 @@ Run `npm run db:seed:local -w app` again. It resets the fake rows, including eve
 - Google login (needs real credentials), web push and the Turnstile widget.
 - Production behavior: real delivery through the Google SMTP relay or Resend, the daily limit in a live account, DNS and the deploy. Email is checked here only up to the terminal output.
 - Milestone 2 and later: standings.
-- The 48-hour auto-accept of a result (#28): the cron doesn't run on its own in local dev; the unit tests cover it.
+- The 48-hour auto-accept of a result (#28) and the deadline resolution (#11): the cron doesn't run on its own in local dev; the unit tests cover them.

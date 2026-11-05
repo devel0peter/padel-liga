@@ -56,6 +56,11 @@ export type PlayerKind =
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
   | "pair_withdrawn"
+  // A strike (#294, spec 13), with the count; from the 3rd on that the pair
+  // leaves at the end of the phase. In the app and by push; the 2nd also
+  // sends the warning email (strike_warning). Not a digest item: that email
+  // is its own.
+  | "strike"
   // Substitutes (#37, D109), in the app and by push only, never by email:
   // the asking pair on approval, rejection and revocation; the opponents on
   // approval and revocation. The organizers' kind is `substitute_requested`.
@@ -424,6 +429,41 @@ export function matchDecidedMessage(input: { matchId: number; outcome: string })
     title: "A szervező döntött a meccsetekről",
     body: `${input.outcome}. Az indoklást a meccs oldalán látod.`,
     url: matchUrl(input.matchId),
+  };
+}
+
+// To each player of the pair that ended the phase unplayed (#11, D103): the
+// outcome the deadline set, from this pair's side. Digest item.
+export function matchResolvedMessage(input: { matchId: number; outcome: string }): Message {
+  return {
+    title: "Lejárt a határidő: eldőlt a meccsetek",
+    body: `${input.outcome}. A részletek a meccs oldalán.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// A strike (#294, spec 8 and 13), with the season's count. `leaving`: a
+// player of the pair has 3 (maybe the partner, after a partner change), so
+// the pair leaves at the end of the phase. No names: a lock screen is not a
+// private place.
+export function strikeMessage(input: { count: number; leaving: boolean; source: "deadline" | "no_show"; matchId: number | null }): Message {
+  const why =
+    input.source === "no_show"
+      ? "Nem jelentetek meg egy lefixált meccsen."
+      : "A határidőig nem próbáltatok egyeztetni a meccsre (vagy 24 órán belül lemondtátok, és nem pótoltátok).";
+  const url = input.matchId ? matchUrl(input.matchId) : "/home";
+  const out = "A párod és te a kör végén kikerültök a ligából; a kör eredményei maradnak. A következő szezonban újra nevezhettek.";
+  if (input.count >= 3) return { title: `${input.count}. fekete pont: a kör végén kikerültök`, body: `${why} ${out}`, url };
+  if (input.leaving)
+    return {
+      title: "Fekete pontot kaptál: a kör végén kikerültök",
+      body: `${why} Ebben a szezonban ${input.count} fekete pontod van, a párodnak már 3. ${out}`,
+      url,
+    };
+  return {
+    title: input.count === 2 ? "2. fekete pont: figyelmeztetés" : "Fekete pontot kaptál",
+    body: `${why} Ebben a szezonban ${input.count} fekete pontod van; a 3.-nál a párod és te a kör végén kikerültök. Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.`,
+    url,
   };
 }
 

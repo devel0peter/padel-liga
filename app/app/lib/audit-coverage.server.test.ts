@@ -40,6 +40,8 @@ const SIGNUPS = await import("~/lib/signups-admin.server");
 const SOLO = await import("~/lib/solo-pairing.server");
 const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
+const DEADLINE = await import("~/lib/deadline.server");
+const STRIKES = await import("~/lib/strikes.server");
 const SUBSTITUTES = await import("~/lib/substitutes.server");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
@@ -162,6 +164,14 @@ const STEPS: Step[] = [
     },
   },
   { action: "season_entry.withdraw", actor: ORG, run: () => expectOk(ENTRIES.withdrawPairMidPhase({ id: ORG }, 1, 7, 1, "Sérülés.", IN_PHASE)) },
+  // One match resolved after the deadline (#11): nobody scheduled it, so both
+  // pairs' players get a strike (#294), which the organizer then cancels.
+  { action: "match.deadline", actor: null, run: () => DEADLINE.resolveDeadlines(AFTER_PHASE, undefined, 1).then((r) => expect(r.resolved).toBe(1)) },
+  {
+    action: "strike.cancel",
+    actor: ORG,
+    run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
+  },
   { action: "signup.update", actor: ADMIN, run: () => SIGNUPS.updateSignup(3, { status: "contacted", adminNote: "hívd fel" }, ADMIN) },
   { action: "signup.delete", actor: ADMIN, run: () => SIGNUPS.deleteSignup(3, ADMIN) },
   { action: "solo.pair", actor: ORG, run: () => SOLO.pairSolos(ORG, 1, 1, 2, "gyor", "Győr").then((e) => expect(e).toBeNull()) },
@@ -212,7 +222,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.cities.tsx": ["city.create", "city.update", "city.delete"],
   "admin.clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
-  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw"],
+  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
   "admin.league-solos.tsx": ["pair.create", "solo.pair", "solo.unpair"],
@@ -249,7 +259,7 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/@/);
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/\+?36\d{6,}/);
     }
-    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|substitute)\./.test(r.action));
+    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|strike|substitute)\./.test(r.action));
     for (const r of leagueActions) expect(r.league_id, r.action).not.toBeNull();
   });
 

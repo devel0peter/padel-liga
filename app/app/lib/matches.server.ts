@@ -35,6 +35,8 @@ import {
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import { eventText, schedulingEmailDue } from "./matches";
+import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } from "./calendar";
+import { SITE_URL } from "./site";
 import { pairName } from "./groups";
 import { COURT_MAX } from "./matches";
 import { countedOutcome, groupTable } from "./ladder";
@@ -483,6 +485,8 @@ export type MatchPage = {
   log: { key: string; at: Date; who: string; ours: boolean; by: "pair" | "organizer" | "auto"; text: string }[];
   // Why the match no longer counts (#34), or null.
   voided: string | null;
+  // Add to calendar (#192): the links, or null while no time was ever fixed.
+  calendar: CalendarLinks | null;
 };
 
 // Once a result is recorded, disputed or final, scheduling is over (#28).
@@ -591,7 +595,42 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     autoAcceptAt: ctx.voided ? null : autoAcceptAt(result),
     log,
     voided: ctx.voided ? voidedText(withdrawnOf(ctx), ours.pairId) : null,
+    // Not once the match has a result or ruling (played or decided: nothing to
+    // plan any more); a voided match keeps the link that removes the entry.
+    calendar: result.status === "none" || ctx.voided ? calendarLinks(calendarEventOf(ctx, side, venues)) : null,
   };
+}
+
+// The match's calendar entry (#192, D106): the fixed time (or the one just
+// cancelled) with the four players' names, the venue and the match page. No
+// contact data: only names are read here. `side`: whose pair is named first.
+export function calendarEventOf(ctx: MatchContext, side: Side, venues: ReadonlyMap<number, string>): CalendarEvent | null {
+  const slot = calendarSlot(ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)), ctx.voided);
+  if (!slot) return null;
+  const [ours, theirs] = side === "a" ? [ctx.pairs.a, ctx.pairs.b] : [ctx.pairs.b, ctx.pairs.a];
+  return {
+    ...slot,
+    matchId: ctx.match.id,
+    pairs: [pairName(ours.players), pairName(theirs.players)],
+    players: [...ours.players, ...theirs.players].map((p) => p.name),
+    venue: slot.clubId ? (venues.get(slot.clubId) ?? null) : null,
+    url: `${SITE_URL}/matches/${ctx.match.id}`,
+  };
+}
+
+// The .ics of a match for its players and the league's organizers (and the
+// Admin); null for anyone else or a match that doesn't exist or never had a
+// time, which the route answers with 404 alike.
+export async function matchCalendarEvent(
+  matchId: number,
+  viewer: { userId: string; manages: (leagueSlug: string) => boolean },
+): Promise<CalendarEvent | null> {
+  const ctx = await loadMatch(matchId);
+  if (!ctx) return null;
+  const side = sideOf(ctx, viewer.userId) ?? (viewer.manages(ctx.leagueSlug) ? "a" : null);
+  if (!side) return null;
+  const venues = await clubNames(ctx.events.map((e) => e.clubId));
+  return calendarEventOf(ctx, side, venues);
 }
 
 // --- Scheduling steps (#26) ---------------------------------------------------

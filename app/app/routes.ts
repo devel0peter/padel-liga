@@ -55,6 +55,7 @@ export default [
   ]),
   route("admin/poster", "routes/admin.poster.tsx"),
   route("admin/export.csv", "routes/admin.export.ts"),
+  route("matches/:id/calendar.ics", "routes/match-calendar.ts"),
 
   // Hungarian paths from before 2026-10-04, still in sent emails and shared
   // links. Unsubscribe links are POSTed by mail clients (RFC 8058), which

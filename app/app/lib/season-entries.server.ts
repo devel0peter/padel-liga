@@ -11,7 +11,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import type { User } from "./auth/session.server";
 import { auditIfChanged } from "./audit.server";
 import {
-  averageStartingElo,
+  averageElo,
   checkEntry,
   ENTRY_REFUSALS,
   entryOpen,
@@ -507,8 +507,10 @@ export async function listSeasonEntries(seasonId: number): Promise<EntryRow[]> {
       pairStatus: pairs.status,
       nameA: playerA.name,
       levelA: playerA.level,
+      eloA: playerA.elo,
       nameB: playerB.name,
       levelB: playerB.level,
+      eloB: playerB.elo,
     })
     .from(seasonEntries)
     .innerJoin(pairs, eq(pairs.id, seasonEntries.pairId))
@@ -528,7 +530,7 @@ export async function listSeasonEntries(seasonId: number): Promise<EntryRow[]> {
       { name: r.nameA, level: r.levelA },
       { name: r.nameB, level: r.levelB },
     ],
-    averageElo: averageStartingElo(r.levelA, r.levelB),
+    averageElo: averageElo({ elo: r.eloA, level: r.levelA }, { elo: r.eloB, level: r.levelB }),
   }));
 }
 

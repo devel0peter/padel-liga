@@ -7,7 +7,7 @@ import { groupPairs, groups, interestSignups, leagues, pairs, seasonEntries, sea
 import { listedCities } from "~/lib/cities.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { auditEntry, auditIfChanged } from "~/lib/audit.server";
-import { averageStartingElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
+import { averageElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
 import { queuePairCreated } from "~/lib/email/outbox.server";
 import { partnerFoundMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
@@ -135,10 +135,12 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       aId: pairs.playerA,
       aName: playerA.name,
       aLevel: playerA.level,
+      aElo: playerA.elo,
       aPhone: playerA.phone,
       bId: pairs.playerB,
       bName: playerB.name,
       bLevel: playerB.level,
+      bElo: playerB.elo,
       bPhone: playerB.phone,
     })
     .from(pairs)
@@ -175,7 +177,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
         { id: r.aId, name: r.aName, level: r.aLevel, phone: !!r.aPhone },
         { id: r.bId, name: r.bName, level: r.bLevel, phone: !!r.bPhone },
       ],
-      elo: averageStartingElo(r.aLevel, r.bLevel),
+      elo: averageElo({ elo: r.aElo, level: r.aLevel }, { elo: r.bElo, level: r.bLevel }),
       source: r.source,
       status: r.status,
       locked: locked.has(r.id),

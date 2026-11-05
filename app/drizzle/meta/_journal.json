@@ -295,6 +295,13 @@
       "when": 1793862819890,
       "tag": "0045_strikes",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1793863473558,
+      "tag": "0046_elo_ratings",
+      "breakpoints": true
     }
   ]
 }

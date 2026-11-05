@@ -40,7 +40,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     level: user.level,
     // Took part in a season: the level is read-only (#135).
     levelLocked,
-    rating: ratingFor(user.level),
+    rating: ratingFor(user.level, user.elo),
+    rated: user.elo !== null,
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -153,7 +154,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
 
       <section id="adatok" className="grid max-w-2xl scroll-mt-6 gap-4">
         <h2 className="font-display text-lg font-extrabold">Adataid</h2>
-        {d.rating != null && <RatingInfo rating={d.rating} />}
+        {d.rating != null && <RatingInfo rating={d.rating} rated={d.rated} />}
         {!d.level && (
           <p role="status" className="rounded-md border border-dashed p-3 text-sm">
             Még nem adtad meg a szinted. Kell a jelentkezéshez.

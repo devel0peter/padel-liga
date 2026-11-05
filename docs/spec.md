@@ -82,6 +82,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
    Simply rejecting is not possible.
 3. **Agreed time (README decision log, 2026-10-05):** if the pairs already agreed on a time elsewhere (Messenger, in person), either pair can record that slot directly, without the 3-slot proposal: any future time before the deadline, no lead time, no time window. Optionally with a venue. The other pair confirms it, which schedules the match as if a slot had been accepted, or declines it, which reopens the proposal process. An unconfirmed agreed time lapses when its start passes.
 4. Once a slot is accepted, whoever books the court records which club and court they booked (manual confirmation; no SportMate integration). Either pair can record or change it, one of the city's active clubs plus an optional court; it notifies nobody (README decision log, 2026-11-02, D74).
+4a. **Calendar (D106, #192):** once a time is accepted or confirmed, and until the match has a result or ruling, the match page offers "Google Naptár" (a new-event link) and an .ics download: 60 minutes, the four players' names, the club and court if recorded, the match page link, never an email address or phone number. The .ics is for the match's players and the league's organizers only, has a stable UID per match and a SEQUENCE that grows with every change of time, club or court and with a cancellation, so a new download replaces the old entry; a cancelled time is STATUS:CANCELLED. No email carries it for now (the digest and "holnap meccs" emails stay off, D83, D106).
 5. Every action is timestamped and logged. This is the evidence for walkovers. The log is shown on the match page to both pairs; how the state follows from it, the slot rules' details and the page: README decision log, 2026-11-02 (D66, D68).
 6. Either side can cancel an accepted or confirmed slot until it starts; this reopens the proposal process. The other pair gets it as a daily-digest item (section 13).
    - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal: only it gets the Teendő, but the other pair isn't blocked from proposing (D74). If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
@@ -177,8 +178,11 @@ A withdrawn pair (section 4) is left out of the table with all of its matches; u
 ## 11. Rating (Elo)
 - Individual Elo, starting value based on self-assessed level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600; the same levels as the signup form).
 - Pair rating = average of the two players.
-- After a match, both players receive the same delta. K = 40 for a player's first 10 rated matches, 20 after (README decision log, 2026-10-05).
-- Walkovers don't change Elo.
+- After a match, both players receive the same delta. K = 40 for a player's first 10 rated matches, 20 after (README decision log, 2026-10-05). A side's K is the average of its two players' K (40, 30 or 20), so a match is zero-sum only when both sides' K are equal (D104).
+- Rated matches: played matches that are final (a confirmed result, the 48-hour auto-accept, an organizer's ruling with a played score). Walkovers, both-inactive and unplayed matches don't change Elo.
+- Ratings are a replay of every rated match from the starting values, in the order the matches first became final. An organizer's later ruling replays its match in place, so the ratings end up as if the new outcome had been there from the start (D104).
+- A pair withdrawn mid-phase keeps the changes of its final matches; its matches not yet final are never rated. No replay on withdrawal (D104).
+- Stored unrounded; the profile shows the rounded number, organizer tables one decimal.
 - Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)

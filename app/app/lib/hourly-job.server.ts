@@ -55,6 +55,9 @@ export const CRON_STEPS: readonly CronStep[] = [
     },
   },
   {
+    // Up to AUTO_ACCEPT_BATCH results, then one Elo replay when any was
+    // accepted (ELO_REPLAY_QUERIES, more on a retry; #13). The later steps
+    // check what is left with fits().
     name: "auto-accept",
     run: async (now) => {
       const n = await autoAcceptResults(now);

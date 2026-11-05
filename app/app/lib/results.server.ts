@@ -25,6 +25,7 @@ import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type Ma
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { neutralScoreText, NOTE_MAX, scoreText } from "./results";
 import { logError } from "~/lib/log";
+import { updateElo } from "./elo.server";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
 // auto-accept run by the cron. The rules are in packages/rules
@@ -130,6 +131,8 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
     throw e;
   }
 
+  // A confirmed result changes the four players' Elo (#13).
+  if (after.status === "final") await updateElo(now);
   await tellPairs(ctx, side, kind, after, userId);
   return { ok: true, notice };
 }
@@ -253,7 +256,11 @@ export async function autoAcceptResults(now = new Date(), limit = AUTO_ACCEPT_BA
       if (!lostRace(e)) throw e;
     }
   }
-  if (accepted.length > 0) await tellAutoAccepted(accepted, now);
+  if (accepted.length > 0) {
+    // One Elo replay for the run's results (#13).
+    await updateElo(now);
+    await tellAutoAccepted(accepted, now);
+  }
   return accepted.length;
 }
 

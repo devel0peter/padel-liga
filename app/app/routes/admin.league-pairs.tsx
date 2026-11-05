@@ -48,6 +48,7 @@ import {
   type PairsFilter,
 } from "~/lib/league-pairs-view";
 import { leaguePairsRows } from "~/lib/league-pairs-view.server";
+import { formatElo } from "~/lib/groups";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, createPair, dissolvePair } from "~/lib/pairs.server";
@@ -590,7 +591,7 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
           </div>
         ))}
       </TableCell>
-      <TableCell>{p.elo ?? "–"}</TableCell>
+      <TableCell>{p.elo === null ? "–" : formatElo(p.elo)}</TableCell>
       <TableCell>{SOURCE_LABELS[p.source]}</TableCell>
       <TableCell>
         <Badge variant={p.status === "active" ? "default" : "outline"}>{p.status === "active" ? "Aktív" : "Felbontva"}</Badge>
@@ -752,7 +753,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Játékosok</TableHead>
-                <TableHead>Kezdő Elo (átlag)</TableHead>
+                <TableHead>Elo (átlag)</TableHead>
                 <TableHead>Forrás</TableHead>
                 <TableHead>Állapot</TableHead>
                 <TableHead>Nevezés</TableHead>

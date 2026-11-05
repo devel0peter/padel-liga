@@ -6,6 +6,7 @@ import { Badge } from "~/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { formatDateTime } from "~/lib/format";
+import { formatElo } from "~/lib/groups";
 import { getLeague } from "~/lib/leagues.server";
 import { fromPhase } from "~/lib/season-entries";
 import { listSeasonEntries, seasonOfLeague } from "~/lib/season-entries.server";
@@ -55,7 +56,7 @@ export default function SeasonEntries({ loaderData: d }: Route.ComponentProps) {
               <TableRow>
                 <TableHead>Pár</TableHead>
                 <TableHead>Szint</TableHead>
-                <TableHead>Kezdő Elo (átlag)</TableHead>
+                <TableHead>Elo (átlag)</TableHead>
                 <TableHead>Nevezett</TableHead>
                 <TableHead>Kezd</TableHead>
               </TableRow>
@@ -72,7 +73,7 @@ export default function SeasonEntries({ loaderData: d }: Route.ComponentProps) {
                     )}
                   </TableCell>
                   <TableCell>{r.players.map((p) => (p.level ? levelLabel(p.level) : "–")).join(" / ")}</TableCell>
-                  <TableCell>{r.averageElo ?? "–"}</TableCell>
+                  <TableCell>{r.averageElo === null ? "–" : formatElo(r.averageElo)}</TableCell>
                   <TableCell>{formatDateTime(new Date(r.appliedAt))}</TableCell>
                   <TableCell>{r.joinsPhase === null ? "következő szezon" : fromPhase(r.joinsPhase)}</TableCell>
                 </TableRow>

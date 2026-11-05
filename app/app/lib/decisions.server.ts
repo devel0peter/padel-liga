@@ -11,6 +11,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 import { pairName } from "./groups";
 import { eventText } from "./matches";
 import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matches.server";
+import { updateElo } from "./elo.server";
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { finalLabel, neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
@@ -292,6 +293,8 @@ export async function decideMatch(
     if (lostRace(e)) return { ok: false, error: CHANGED };
     throw e;
   }
+  // A played outcome changes Elo; overriding one replays it in place (#13).
+  await updateElo(now);
   try {
     await notifyPlayers(
       "match_decided",

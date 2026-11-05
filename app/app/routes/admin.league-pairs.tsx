@@ -603,7 +603,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
     >
       <p className="max-w-2xl text-muted-foreground">
         A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. A kihirdetett csoportban
-        játszó pár nem bontható fel, a kör határidejéig.
+        játszó pár a kör határidejéig nem bontható fel.
       </p>
       <SummaryTable summary={summary} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />

@@ -227,6 +227,31 @@ describe("placeNewPairs (spec 10, D107f: at the bottom of the division)", () => 
     expect(ids(out)[5]).toContain("Weak");
   });
 
+  it("never pulls the new pair up out of its entry group: 13 continuing + 1 rated 1450 stays in Rookie", () => {
+    // 4+3+3+3 plan 4+4+3+3 for 14: Bronz 1, Réz 2–3, Rookie 4. Target and
+    // entry: group 4. The holes in groups 2 and 3 take continuing pairs.
+    const out = placeNewPairs(ladder(4, 3, 3, 3), [p("New", 1450)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 3, 3]);
+    expect(ids(out)[1]).toEqual(["G2P1", "G2P2", "G2P3", "G3P1"]);
+    expect(ids(out)[2]).toEqual(["G3P2", "G3P3", "G4P1"]);
+    expect(ids(out)[3]).toEqual(["G4P2", "G4P3", "New"]);
+  });
+
+  it("keeps a pair rated 1350 in its entry group, the bottom of Rookie, with 21 continuing", () => {
+    // 4+4+4+3+3+3 plan 4+4+4+4+3+3 for 22: target group 5, Rookie = 5–6, entry 6.
+    const out = placeNewPairs(ladder(4, 4, 4, 3, 3, 3), [p("New", 1350)]);
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 4, 3, 3]);
+    expect(ids(out)[4]).toEqual(["G5P2", "G5P3", "G6P1"]);
+    expect(ids(out)[5]).toEqual(["G6P2", "G6P3", "New"]);
+  });
+
+  it("places two new pairs each in its own division's bottom, neither pulled up", () => {
+    const out = placeNewPairs(ladder(4, 3, 3, 3), [p("A", 1460), p("B", 1450)]);
+    // 15: 4+4+4+3; Bronz 1, Réz 2–3, Rookie 4. Both target group 4 (1399).
+    expect(out.map((g) => g.length)).toEqual([4, 4, 4, 3]);
+    expect(ids(out)[3]).toEqual(expect.arrayContaining(["A", "B"]));
+  });
+
   it("adds 2 new pairs to 8 as 4+3+3: the stronger first, each at the bottom of its division", () => {
     const out = placeNewPairs(ladder(4, 4), [p("Low", 1000), p("High", 1650)]);
     expect(out.map((g) => g.length)).toEqual([4, 3, 3]);

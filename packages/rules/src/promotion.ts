@@ -149,20 +149,29 @@ export function placeNewPairs<T extends SeedablePair>(groups: readonly (readonly
   // More pairs never mean fewer groups, so every continuing group has a
   // place in the plan; the new groups start empty at the bottom.
   const next: T[][] = sizes.map((_, i) => [...(groups[i] ?? [])]);
+  const placed = new Set<T>(newPairs);
   for (const pair of [...newPairs].sort((a, b) => b.averageElo - a.averageElo)) {
     const entry = entryGroup(targetGroup(next, pair.averageElo), next.length);
     const free = next.findIndex((g, i) => i >= entry && g.length > 0 && g.length < sizes[i]!);
     next[free >= 0 ? free : entry]!.push(pair);
-    fitToPlan(next, sizes);
+    fitToPlan(next, sizes, (p) => placed.has(p));
   }
   return next;
 }
 
-/** The index of a group's highest-Elo pair; of equals, the first one. */
-function highest(group: readonly SeedablePair[]): number {
-  let at = 0;
+/**
+ * The index of the pair that moves up from a group into a hole above it:
+ * the best continuing pair, so a new pair stays where it was placed; of
+ * equals, the first one. A group of new pairs only gives its best one.
+ */
+function upwards<T extends SeedablePair>(group: readonly T[], isNew: (pair: T) => boolean): number {
+  let at = -1;
   group.forEach((p, i) => {
-    if (p.averageElo > group[at]!.averageElo) at = i;
+    if (!isNew(p) && (at < 0 || p.averageElo > group[at]!.averageElo)) at = i;
+  });
+  if (at >= 0) return at;
+  group.forEach((p, i) => {
+    if (at < 0 || p.averageElo > group[at]!.averageElo) at = i;
   });
   return at;
 }
@@ -170,15 +179,16 @@ function highest(group: readonly SeedablePair[]): number {
 /**
  * Brings the groups to their planned sizes, top-down, in place: a group over
  * its size passes its lowest-Elo pair one group down, and a group short of
- * it (a spot above the entry group, which the plan keeps at 4) takes the
- * best pair of the group below, so pairs below move up into the hole and
- * the 3s stay at the bottom.
+ * it (a hole above the entry group, which the plan keeps at 4) takes the
+ * best continuing pair of the group below, so continuing pairs move up into
+ * the hole, a new pair stays in the group it entered (or below, pushed
+ * down), and the 3s stay at the bottom.
  */
-function fitToPlan<T extends SeedablePair>(groups: T[][], sizes: readonly number[]): void {
+function fitToPlan<T extends SeedablePair>(groups: T[][], sizes: readonly number[], isNew: (pair: T) => boolean): void {
   for (let i = 0; i < groups.length - 1; i++) {
     const below = groups[i + 1]!;
     while (groups[i]!.length > sizes[i]!) below.push(groups[i]!.splice(lowest(groups[i]!), 1)[0]!);
-    while (groups[i]!.length < sizes[i]! && below.length > 0) groups[i]!.push(below.splice(highest(below), 1)[0]!);
+    while (groups[i]!.length < sizes[i]! && below.length > 0) groups[i]!.push(below.splice(upwards(below, isNew), 1)[0]!);
   }
 }
 

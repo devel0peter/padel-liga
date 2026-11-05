@@ -67,9 +67,9 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
   it("ranks by points and shows played, points and the set and game difference", () => {
     const [band] = buildLadder([g], 1);
     expect(band!.groups[0]!.rows).toEqual([
-      { rank: 1, names: ["Játékos 11A", "Játékos 11B"], matches: 2, points: 4, setDiff: 0, gameDiff: 1 },
-      { rank: 2, names: ["Játékos 12A", "Játékos 12B"], matches: 1, points: 3, setDiff: 2, gameDiff: 5 },
-      { rank: 3, names: ["Játékos 13A", "Játékos 13B"], matches: 1, points: 1, setDiff: -2, gameDiff: -6 },
+      { rank: 1, pairId: 11, names: ["Játékos 11A", "Játékos 11B"], matches: 2, points: 4, setDiff: 0, gameDiff: 1 },
+      { rank: 2, pairId: 12, names: ["Játékos 12A", "Játékos 12B"], matches: 1, points: 3, setDiff: 2, gameDiff: 5 },
+      { rank: 3, pairId: 13, names: ["Játékos 13A", "Játékos 13B"], matches: 1, points: 1, setDiff: -2, gameDiff: -6 },
     ]);
   });
 

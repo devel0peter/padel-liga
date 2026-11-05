@@ -136,6 +136,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Account: `admin@example.test`
 - Expect:
   - The header reads "14 jelentkezés · 10 pár · 4 egyéni · 24 játékos".
+  - At 1280 px every column of the list, up to the "Törlés" button, is inside its box: no sideways scroll (#278). At 390 px each signup is a card.
   - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
 - Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
 - Expect:
@@ -245,6 +246,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 - Account: `szervezo@example.test`
 - Expect: every pair of the league with both names and levels, the average starting Elo, the source ("jelentkezésből" or "kézzel"), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
 - Expect, between the intro text and the filter: nothing (no counts table, #298). The filter options show their counts.
+- Expect, at 390px (#278): each pair is a card with both names, Elo, source, state, entry and its buttons; nothing is cut and nothing scrolls sideways. At desktop width it is the table.
 - Do:
   1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".

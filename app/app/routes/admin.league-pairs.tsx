@@ -4,6 +4,7 @@ import { data, Form, Link, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-pairs";
 import { AppPage } from "~/components/app-page";
+import { CARD_CELL, CARD_ROW, CardLabel } from "~/components/card-table";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -36,6 +37,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
+import { cn } from "~/lib/utils";
 import {
   filterPairsRows,
   isFiltered,
@@ -510,8 +512,8 @@ function Filters({ query, counts, slug, canMail, shown }: {
 
 function SoloRow({ player }: { player: Solo }) {
   return (
-    <TableRow>
-      <TableCell className="min-w-56">
+    <TableRow className={CARD_ROW}>
+      <TableCell className={cn("min-w-56", CARD_CELL)}>
         <span className="font-medium">{player.name}</span>
         {player.level && <span className="text-xs text-muted-foreground"> · {levelLabel(player.level)}</span>}
         {player.seeking && (
@@ -520,21 +522,21 @@ function SoloRow({ player }: { player: Solo }) {
           </Badge>
         )}
       </TableCell>
-      <TableCell>–</TableCell>
-      <TableCell>–</TableCell>
-      <TableCell>
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className={CARD_CELL}>
         <StatusChips chips={[{ text: "Nincs párja", tone: "todo" }]} />
       </TableCell>
-      <TableCell>–</TableCell>
-      <TableCell />
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className="max-sm:hidden" />
     </TableRow>
   );
 }
 
 function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Candidate[]; strikes: Record<string, number> }) {
   return (
-    <TableRow className={p.status === "dissolved" ? "text-muted-foreground" : undefined}>
-      <TableCell className="min-w-56">
+    <TableRow className={cn(CARD_ROW, p.status === "dissolved" && "text-muted-foreground")}>
+      <TableCell className={cn("min-w-56", CARD_CELL)}>
         {p.players.map((pl) => (
           <div key={pl.id}>
             <span className="font-medium">{pl.name}</span>
@@ -550,17 +552,24 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
           </div>
         ))}
       </TableCell>
-      <TableCell>{p.elo === null ? "–" : formatElo(p.elo)}</TableCell>
-      <TableCell>{SOURCE_LABELS[p.source]}</TableCell>
-      <TableCell>
+      <TableCell className={CARD_CELL}>
+        <CardLabel>Elo (átlag)</CardLabel>
+        {p.elo === null ? "–" : formatElo(p.elo)}
+      </TableCell>
+      <TableCell className={CARD_CELL}>
+        <CardLabel>Forrás</CardLabel>
+        {SOURCE_LABELS[p.source]}
+      </TableCell>
+      <TableCell className={CARD_CELL}>
         <Badge variant={p.status === "active" ? "default" : "outline"}>{p.status === "active" ? "Aktív" : "Felbontva"}</Badge>
       </TableCell>
-      <TableCell className="text-sm">
+      <TableCell className={cn("text-sm", CARD_CELL)}>
+        <CardLabel>Nevezés</CardLabel>
         {p.status === "active" ? <EntryCell pair={p} /> : p.entry ? `${p.entry.season}: ${ENTRY_STATUS_LABELS[p.entry.status]}` : "–"}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className={cn("text-right max-sm:text-left", CARD_CELL)}>
         {p.status === "active" && (
-          <div className="grid justify-items-end gap-1">
+          <div className="grid justify-items-end gap-1 max-sm:justify-items-start">
             <div className="flex gap-1">
               <ChangeDialog pair={p} candidates={candidates} />
               <DissolveButton pair={p} />
@@ -707,8 +716,8 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table aria-label="Párok listája">
-            <TableHeader>
+          <Table aria-label="Párok listája" className="max-sm:block">
+            <TableHeader className="max-sm:hidden">
               <TableRow>
                 <TableHead>Játékosok</TableHead>
                 <TableHead>Elo (átlag)</TableHead>
@@ -720,7 +729,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="max-sm:block">
               {rows.map((r) =>
                 r.kind === "pair" ? (
                   <PairRow key={`p${r.pair.id}`} pair={r.pair} candidates={candidates} strikes={strikeCounts} />

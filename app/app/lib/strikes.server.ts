@@ -6,7 +6,7 @@ import { db } from "~/db/client.server";
 import { auditLog, groupPairs, groups, leagues, pairs, seasons, strikes, users } from "~/db/schema";
 import { auditIfChanged } from "~/lib/audit.server";
 import { queueStrikeWarnings } from "~/lib/email/outbox.server";
-import { logError } from "~/lib/log";
+import { logError, logWarn } from "~/lib/log";
 import { strikeMessage, type Message } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
@@ -86,9 +86,11 @@ export function strikeNotices(list: readonly StrikeNoticeInput[], season: (userI
  * Only a player whose strike was stored now is told: the same grant again
  * (a retried request) stores and sends nothing. Returns the players' new
  * counts. The deadline resolution gives its strikes in its own batch
- * (deadline.server.ts).
+ * (deadline.server.ts). Only the pair's own players are struck: anyone else
+ * in `players` (a substitute who played, #37) is dropped (spec 8).
  */
-export async function giveStrikes(grant: StrikeGrant): Promise<Map<string, number>> {
+export async function giveStrikes(input: StrikeGrant): Promise<Map<string, number>> {
+  const grant = { ...input, players: await pairPlayersOnly(input.pairId, input.players) };
   if (grant.players.length === 0) return new Map();
   const stored = new Set(
     (await db.insert(strikes).values(strikeRows([grant])).onConflictDoNothing().returning({ userId: strikes.userId })).map((r) => r.userId),
@@ -117,6 +119,16 @@ export async function giveStrikes(grant: StrikeGrant): Promise<Map<string, numbe
     logError("strike notification failed", { pairId: grant.pairId, error });
   }
   return out;
+}
+
+// The players of `pairId` among `players`: a substitute (#37) never gets a
+// strike, the pair's two players do (spec 8).
+async function pairPlayersOnly(pairId: number, players: readonly string[]): Promise<string[]> {
+  const [pair] = await db.select({ a: pairs.playerA, b: pairs.playerB }).from(pairs).where(eq(pairs.id, pairId));
+  const own = new Set(pair ? [pair.a, pair.b] : []);
+  const kept = [...new Set(players)].filter((id) => own.has(id));
+  if (kept.length < new Set(players).size) logWarn("strike skipped for a non-member of the pair", { pairId });
+  return kept;
 }
 
 // --- The round switch (#35) ---------------------------------------------------

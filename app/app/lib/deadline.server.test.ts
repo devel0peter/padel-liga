@@ -336,6 +336,25 @@ describe("strikes (#294)", () => {
     expect(all("select body from notifications where user_id = 'p1a' and kind = 'strike' order by id")[0].body).toMatch(/^Nem jelentetek meg egy lefixált meccsen\. Ebben a szezonban 1 fekete pontod van/);
   });
 
+  it("an approved substitute (#37) never gets a strike: the pair's two players do (spec 8)", async () => {
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('sub', 'sub@x.hu', 'Helyettes', 'halado', 1)`);
+    const id = matchOf(1, 3).id;
+    h.raw
+      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at) values (?, 3, 'p3a', 'sub', 'approved', 'p3b', ?)")
+      .run(id, sec(NOW.toISOString()));
+    // The deadline: neither side active, all four of the pairs' players, not the substitute.
+    await resolveDeadlines(MONDAY_6, undefined, 25);
+    expect(all("select user_id from strikes where match_id = ? order by user_id", id).map((r: any) => r.user_id)).toEqual(["p1a", "p1b", "p3a", "p3b"]);
+    // A no-show (#33) naming who was on court: the substitute is dropped, the absent player is struck.
+    const other = matchOf(3, 4).id;
+    // (Pair 3 did nothing all phase: each of its matches gave a strike above.)
+    const before = all("select count(*) n from strikes where user_id = 'p3b'")[0].n;
+    expect(await S.giveStrikes({ seasonId: 1, pairId: 3, players: ["sub", "p3b"], matchId: other, source: "no_show", at: NOW })).toEqual(new Map([["p3b", before + 1]]));
+    expect(await S.giveStrikes({ seasonId: 1, pairId: 3, players: ["sub"], matchId: id, source: "no_show", at: NOW })).toEqual(new Map());
+    expect(strikesOf("sub")).toEqual([]);
+    expect(all("select count(*) n from notifications where user_id = 'sub'")[0].n).toBe(0);
+  });
+
   it("counts per season: another season's strikes don't count", async () => {
     h.raw.prepare("insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (2, 1, 'Tavasz', 1, 2, '2027-03-01')").run();
     await S.giveStrikes({ seasonId: 2, pairId: 1, players: ["p1a", "p1b"], matchId: null, source: "no_show", at: NOW });

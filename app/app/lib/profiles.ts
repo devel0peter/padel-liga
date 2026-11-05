@@ -9,16 +9,21 @@ import { signed } from "./format";
 import { countedOutcome, groupTable } from "./ladder";
 import { MATCH_LOST_BOTH_TEXT, scoreText, winnerOf } from "./results";
 
-/** A player as a profile names them: a deleted or anonymized account has no profile and no old name. */
-export type ProfilePerson = { id: string; name: string; deleted: boolean };
+/**
+ * A player as a profile names them. A deleted or anonymized account has no
+ * profile, no old name and no id: its account id was public in its old
+ * profile's address, so keeping it would tie the anonymized results back to
+ * the person (D60).
+ */
+export type ProfilePerson = { id: string | null; name: string };
 
 export function personView(p: { id: string; name: string | null; deletedAt: Date | null }): ProfilePerson {
-  if (p.deletedAt) return { id: p.id, name: DELETED_NAME, deleted: true };
-  return { id: p.id, name: p.name || "Névtelen", deleted: false };
+  if (p.deletedAt) return { id: null, name: DELETED_NAME };
+  return { id: p.id, name: p.name || "Névtelen" };
 }
 
 /** Where a player links: their profile, or nowhere for a deleted account. */
-export const playerPath = (p: ProfilePerson) => (p.deleted ? null : `/players/${p.id}`);
+export const playerPath = (p: ProfilePerson) => (p.id ? `/players/${p.id}` : null);
 export const pairPath = (pairId: number) => `/pairs/${pairId}`;
 
 /** A pair named on a profile: its two players and its page. */

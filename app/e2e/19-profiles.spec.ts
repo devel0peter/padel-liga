@@ -8,6 +8,7 @@
 // links on Profil and Párom.
 import { expect, test, type Page } from "@playwright/test";
 
+import { CONTACT_EMAIL } from "../app/lib/site";
 import { PAIRS, as, content, d1, d1Update, visit } from "./support";
 
 const anna = PAIRS.p1[0];
@@ -25,10 +26,13 @@ async function openPairFromLeague(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/pairs\/\d+$/);
 }
 
+// The whole HTML: the text, the title and meta tags, and the loader data
+// React Router writes into the page. The footer's contact address is the
+// site's own, not a player's.
 async function noContactData(page: Page): Promise<void> {
-  for (const text of [await content(page).innerText(), await page.title()]) {
-    expect(text).not.toMatch(/@|\+36|example\.test/);
-  }
+  const html = (await page.content()).replaceAll(CONTACT_EMAIL, "");
+  expect(html).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.-]+|\+36|example\.test/);
+  expect(await content(page).innerText()).not.toContain("@");
 }
 
 test("32. before round 1 starts a profile shows names and groups only", async ({ browser }) => {

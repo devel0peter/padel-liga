@@ -114,18 +114,21 @@ describe("who has a public profile", () => {
     expect(await playerProfile("nincs", DURING)).toBeNull();
   });
 
-  it("a deleted or anonymized account has none, and shows as Törölt játékos without a link", async () => {
+  it("a deleted or anonymized account has none, and shows as Törölt játékos without a link or its id", async () => {
     h.raw.prepare("update users set name = 'Törölt játékos', email = 'x@deleted.invalid', phone = null, deleted_at = ? where id = 'ub'").run(sec("2026-11-12T10:00:00Z"));
     expect(await playerProfile("ub", DURING)).toBeNull();
+    match(g1, 2, 1, 1, "final", played([[4, 1], [4, 2]]));
     const p = await pairProfile(1, DURING);
     expect(p!.pair.players).toEqual([
-      { id: "ua", name: "Anna", deleted: false },
-      { id: "ub", name: "Törölt játékos", deleted: true },
+      { id: "ua", name: "Anna" },
+      { id: null, name: "Törölt játékos" },
     ]);
     // Also where the pair appears as an opponent.
-    match(g1, 2, 1, 1, "final", played([[4, 1], [4, 2]]));
     const cili = await playerProfile("uc", DURING);
-    expect(cili!.matches[0]!.opponents.players[1]).toEqual({ id: "ub", name: "Törölt játékos", deleted: true });
+    expect(cili!.matches[0]!.opponents.players[1]).toEqual({ id: null, name: "Törölt játékos" });
+    // Its account id was public in its old profile's address: nowhere in the data now.
+    const pages = [p, cili, await playerProfile("ua", DURING), await pairProfile(2, DURING)];
+    for (const page of pages) expect(JSON.stringify(page)).not.toContain('"ub"');
   });
 });
 
@@ -136,7 +139,7 @@ describe("before the league starts", () => {
     expect(anna).toMatchObject({ started: false, elo: null, eloHistory: [], matches: [] });
     expect(anna!.pairs).toEqual([
       {
-        pair: { id: 1, players: [{ id: "ua", name: "Anna", deleted: false }, { id: "ub", name: "Bea", deleted: false }] },
+        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }] },
         league: "Padelpárbaj Győr",
         latest: { season: "2026/27 tél", phase: 1, group: 1, division: "Bronz divízió", place: null, withdrawn: false },
       },

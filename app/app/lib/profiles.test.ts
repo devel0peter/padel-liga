@@ -26,9 +26,9 @@ const input = (over: Partial<ProfileMatchInput>): ProfileMatchInput => ({
 const fmt = () => "nov. 10.";
 
 describe("personView and links (#36)", () => {
-  it("a deleted account is Törölt játékos, never its old name, and links nowhere", () => {
+  it("a deleted account is Törölt játékos, never its old name or id, and links nowhere", () => {
     const gone = personView({ id: "x", name: "Régi Név", deletedAt: new Date() });
-    expect(gone).toEqual({ id: "x", name: "Törölt játékos", deleted: true });
+    expect(gone).toEqual({ id: null, name: "Törölt játékos" });
     expect(playerPath(gone)).toBeNull();
   });
 

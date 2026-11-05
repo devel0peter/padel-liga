@@ -621,7 +621,7 @@ const STRIKE_SOURCES = { deadline: "Határidő: nem próbált egyeztetni", no_sh
 function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) {
   if (strikes.length === 0) return null;
   return (
-    <section className="grid gap-3" aria-labelledby="strikes-title">
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="strikes-title">
       <h2 id="strikes-title" className="font-display text-lg font-bold">
         Fekete pontok · {strikes[0]!.season}
       </h2>

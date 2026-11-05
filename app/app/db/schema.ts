@@ -268,6 +268,10 @@ export const leagues = sqliteTable("leagues", {
   // When the league's Szervező or the Admin switched on the automatic
   // reminders for people stuck before entering (#155); null: off.
   remindersOnAt: integer("reminders_on_at", { mode: "timestamp" }),
+  // How many round switches of the league's first season are fast
+  // calibration switches (spec 10, #12): 2 pairs swap at a border of two
+  // groups of 4. Default 1: the switch after phase 1 only.
+  fastSwitches: integer("fast_switches").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -705,6 +709,11 @@ export const groups = sqliteTable(
     // Bumped by every move into or out of the group, so publishing can tell
     // that the draft it checked is still the one it locks.
     revision: integer("revision").notNull().default(0),
+    // A round switch draft (#35): the draft the system computed, before the
+    // organizer's moves, as sorted pair ids per group ("1,2,5,6|3,4,7,8"),
+    // so publishing can tell that the ending phase's results or pairs have
+    // changed since. Null for phase 1.
+    basis: text("basis"),
     publishedAt: integer("published_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

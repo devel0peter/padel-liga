@@ -7,6 +7,7 @@ import { pushQueued } from "~/lib/notifications.server";
 import { PUSH_STATS_QUERIES, recordPushStats } from "~/lib/push-stats.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
 import { autoAcceptResults } from "~/lib/results.server";
+import { draftRoundSwitches } from "~/lib/round-switch.server";
 import { RunBudget, type Usage } from "~/lib/run-usage";
 
 // The cron, every 10 minutes (workers/app.ts, app/wrangler.jsonc; #183,
@@ -14,7 +15,8 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // the run's scheduled time: stale login code records are deleted (#168),
 // results waiting 48 hours are accepted (#28), from 06:00 the morning after a
 // phase's deadline its unplayed matches are resolved and the strikes given
-// (#11, #294, deadline.server.ts), the match reminders and the
+// (#11, #294, deadline.server.ts), and once they are settled the next phase's
+// groups drafted for the organizer (#35, round-switch.server.ts), the match reminders and the
 // daily digest when their hour comes (#31), the reminders for people stuck
 // before entering (#155), then the queued pushes and whatever email waits,
 // and last the day's push count (push-stats.server.ts, D100) when the run has
@@ -71,6 +73,13 @@ export const CRON_STEPS: readonly CronStep[] = [
       if (left) return `resolved ${resolved} matches at the deadline; more left for the next run`;
       return resolved ? `resolved ${resolved} matches at the deadline` : null;
     },
+  },
+  {
+    // After the resolution, so the draft reads settled tables; it waits for
+    // a run where no match of the ending phase is left to resolve. Keeps the
+    // same room for the steps after it as the resolution does.
+    name: "round switch draft",
+    run: (now, run) => draftRoundSwitches(now, { run, keep: AFTER_DEADLINE }),
   },
   {
     name: "match reminders",

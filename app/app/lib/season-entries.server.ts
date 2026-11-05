@@ -27,7 +27,7 @@ import {
 } from "./season-entries";
 import type { Season } from "./seasons";
 import { getSeason } from "./seasons.server";
-import { FIRST_PHASE, groupsPublished, notInRunningGroup, pairInRunningGroup } from "./groups.server";
+import { notInRunningGroup, pairInRunningGroup, phasesWithGroups } from "./groups.server";
 
 // Season entries in D1 (#23). The rules are in season-entries.ts.
 
@@ -168,8 +168,10 @@ async function enter(
   logged?: { actorId: string },
 ): Promise<{ id: number; joins: Joins } | null> {
   const [a, b] = pair.players;
-  // A pair entered once phase 1's groups are out starts at phase 2 (#24).
-  const published = (await groupsPublished(season.id)) ? [FIRST_PHASE] : [];
+  // A pair entered once a phase's groups are out starts at the phase after
+  // it (#24), also when a later phase is published before it starts (a
+  // round switch before a break, #35).
+  const published = (await phasesWithGroups(season.id)).filter((p) => p.published).map((p) => p.phase);
   const phase = joinsPhase(season.phases, now, published);
   const seconds = Math.floor(now.getTime() / 1000);
   // A builder (insert ... select from the pair's row), not a raw statement,
@@ -198,9 +200,9 @@ async function enter(
             where se.season_id = ${season.id} and se.status <> 'withdrawn'
               and ((p.player_a = ${a} and p.player_b = ${b}) or (p.player_a = ${b} and p.player_b = ${a}))
           )
-          and (${phase} is not ${FIRST_PHASE} or not exists (
-            select 1 from groups g where g.season_id = ${season.id} and g.phase = ${FIRST_PHASE} and g.published_at is not null
-          ))`,
+          and not exists (
+            select 1 from groups g where g.season_id = ${season.id} and g.phase = ${phase} and g.published_at is not null
+          )`,
       ),
     )
     .onConflictDoUpdate({

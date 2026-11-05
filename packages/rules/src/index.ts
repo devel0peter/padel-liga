@@ -6,6 +6,7 @@ export * from "./elo";
 export * from "./fixtures";
 export * from "./groups";
 export * from "./no-show";
+export * from "./promotion";
 export * from "./reporting";
 export * from "./results";
 export * from "./scheduling";

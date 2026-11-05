@@ -477,7 +477,7 @@ Spec section 4, README decision log D109 (#37).
 
 ### 33. A player gets strikes; the Szervező cancels one (side path)
 
-The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/23-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (README decision log D103, D103a):
+The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/24-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (README decision log D103, D103a):
 
 - Do: `npx wrangler d1 execute DB --local --command "insert into strikes (season_id, user_id, pair_id, source, at) select g.season_id, p.player_a, p.id, 'deadline', unixepoch() from group_pairs gp join groups g on g.id = gp.group_id join pairs p on p.id = gp.pair_id where g.published_at is not null limit 1"` (in `app/`), twice.
 - Page: `/admin/leagues/minta/pairs` as `szervezo@example.test`.

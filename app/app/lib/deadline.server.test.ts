@@ -345,7 +345,8 @@ describe("strikes (#294)", () => {
     // The deadline: neither side active, all four of the pairs' players, not the substitute.
     await resolveDeadlines(MONDAY_6, undefined, 25);
     expect(all("select user_id from strikes where match_id = ? order by user_id", id).map((r: any) => r.user_id)).toEqual(["p1a", "p1b", "p3a", "p3b"]);
-    // A no-show (#33) naming who was on court: the substitute is dropped, the absent player is struck.
+    // A no-show (#33) passes the pair's two players; a caller that names who was on court
+    // instead (the substitute and the partner) gets the substitute dropped: only p3b is struck.
     const other = matchOf(3, 4).id;
     // (Pair 3 did nothing all phase: each of its matches gave a strike above.)
     const before = all("select count(*) n from strikes where user_id = 'p3b'")[0].n;

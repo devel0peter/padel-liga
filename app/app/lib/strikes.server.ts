@@ -86,8 +86,12 @@ export function strikeNotices(list: readonly StrikeNoticeInput[], season: (userI
  * Only a player whose strike was stored now is told: the same grant again
  * (a retried request) stores and sends nothing. Returns the players' new
  * counts. The deadline resolution gives its strikes in its own batch
- * (deadline.server.ts). Only the pair's own players are struck: anyone else
- * in `players` (a substitute who played, #37) is dropped (spec 8).
+ * (deadline.server.ts).
+ *
+ * Contract: `players` is the pair's two players (`pairs.player_a/player_b`),
+ * also for a no-show where a substitute (#37) was named: the absent player
+ * and the partner get the strike, never the substitute (spec 8). As a guard,
+ * anyone in `players` who isn't one of the pair's two is dropped (and logged).
  */
 export async function giveStrikes(input: StrikeGrant): Promise<Map<string, number>> {
   const grant = { ...input, players: await pairPlayersOnly(input.pairId, input.players) };

@@ -33,7 +33,7 @@ const PERSONAL_KEY =
 // proves (a login or verification code), camelCase or snake_case. Fields that
 // only end in "code" (statusCode, zip_code, error-codes) are not codes.
 const CODE_KEY =
-  /^(otp|(login|verification|verify|confirmation|confirm|auth|otp|one_?time|reset|security|access)?_?code)$/i;
+  /^(otp|(login|verification|verify|confirmation|confirm|auth|otp|one_?time|reset|security|access|pin|sms|mfa|totp|two_?factor)?_?code)$/i;
 const isSecretKey = (key: string) => PERSONAL_KEY.test(key) || CODE_KEY.test(key);
 // Objects whose keys name things rather than fields: "email queued" counts
 // mails per email kind (`kinds: { login_code: 2 }`), and a kind is not a code.
@@ -141,12 +141,14 @@ export function scrub(value: unknown, depth = 0): unknown {
 }
 
 // The keys are names (email kinds): personal keys are still dropped, code
-// names are not; the values are cleaned as usual.
+// names are not while they hold a count (a number): a code name holding
+// anything else is blanked like any code field. The values are cleaned as usual.
 function scrubNamedCounts(value: Fields, depth: number): Fields {
   const out: Fields = {};
   for (const [key, v] of Object.entries(value)) {
     if (v === undefined) continue;
-    out[key] = PERSONAL_KEY.test(key) ? "[redacted]" : scrub(v, depth + 1);
+    const secret = PERSONAL_KEY.test(key) || (CODE_KEY.test(key) && typeof v !== "number");
+    out[key] = secret ? "[redacted]" : scrub(v, depth + 1);
   }
   return out;
 }

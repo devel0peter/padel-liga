@@ -93,7 +93,7 @@ describe("scrub", () => {
   });
 
   it("blanks code fields named exactly, and nothing that only ends in code (#274)", () => {
-    const blanked = ["code", "Code", "loginCode", "login_code", "verificationCode", "verification_code", "verifyCode", "confirmationCode", "authCode", "auth_code", "resetCode", "oneTimeCode", "one_time_code", "otp", "otpCode"];
+    const blanked = ["code", "Code", "loginCode", "login_code", "verificationCode", "verification_code", "verifyCode", "confirmationCode", "authCode", "auth_code", "resetCode", "oneTimeCode", "one_time_code", "otp", "otpCode", "pinCode", "pin_code", "smsCode", "mfaCode", "totpCode", "twoFactorCode", "two_factor_code"];
     const kept = ["statusCode", "status_code", "zipCode", "zip_code", "postalCode", "errorCode", "countryCode", "error-codes", "barcode", "codes", "codeLength", "encode", "unicode"];
     const out = scrub(Object.fromEntries([...blanked, ...kept].map((key) => [key, "123"]))) as Record<string, unknown>;
     for (const key of blanked) expect(out[key], key).toBe("[redacted]");
@@ -106,6 +106,10 @@ describe("scrub", () => {
       kinds: { login_code: 2, signup_confirmation: 1, email: "[redacted]" },
     });
     expect(scrub({ login_code: "042913" })).toEqual({ login_code: "[redacted]" });
+    // Only counts: a code name under `kinds` holding anything else is blanked.
+    expect(scrub({ kinds: { code: "042913", login_code: { value: 1 }, sms_code: 3 } })).toEqual({
+      kinds: { code: "[redacted]", login_code: "[redacted]", sms_code: 3 },
+    });
   });
 
   it("cleans nested objects and arrays", () => {

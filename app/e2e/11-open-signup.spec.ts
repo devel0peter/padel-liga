@@ -42,7 +42,10 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await visit(page, "/pair");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await expect(content(page)).toContainText("a szervező keres neked párt.");
+  // The contact address once, and no "if it changes" line without a pair (#124).
   await expect(content(page).getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
+  await expect(content(page).getByText("hello@padelparbaj.hu")).toHaveCount(1);
+  await expect(content(page)).not.toContainText("Ha változna");
   await context.close();
 });
 

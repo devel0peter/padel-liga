@@ -36,7 +36,7 @@ export const AUDIT_ACTIONS = {
   "pair.link": "Pár párlinkkel",
   "season_entry.enter": "Benevezés",
   "season_entry.remove": "Kivétel a szezonból",
-  "season_entry.withdraw": "Kivétel futó körből",
+  "season_entry.withdraw": "Kivétel kihirdetett csoportból",
   "partner_search.on": "Párkeresés be",
   "partner_search.off": "Párkeresés ki",
   // Interest list

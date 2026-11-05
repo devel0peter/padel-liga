@@ -218,7 +218,7 @@ export default function Privacy() {
                 telefonszámotokat nem.
               </li>
               <li>
-                Ha a szervező kör közben visszaléptet egy párt, az indokát csak a
+                Ha a szervező visszaléptet egy párt a kihirdetett csoportból, az indokát csak a
                 szervező, az admin és a pár két tagja látja. A csoport többi
                 párja és a nyilvános tabella csak azt, hogy a pár visszalépett.
               </li>

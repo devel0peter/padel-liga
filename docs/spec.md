@@ -124,7 +124,7 @@ The organizer can always override the outcome manually.
 - **No strike** when both sides were active but didn't agree, for a cancellation more than 24 hours before the slot, or for matches removed by a withdrawal.
 - A substitute (section 4) never gets a strike; the pair's two players do.
 - Strikes belong to the player and follow them across partner changes. They reset at the start of each season.
-- **2nd strike:** a warning email to the player.
+- **2nd strike:** a warning email to the player, unless the pair already leaves (the partner has 3); then the leaving notice instead (D103a).
 - **3rd strike:** the player's pair leaves the league at the end of the current phase, not immediately, so that phase's results (including the walkovers its opponents won) stand. At the round switch, apply promotion and relegation first, then remove the pair and re-cut the groups top-down so pairs below move up into the hole (as in the season carry-over, section 10). The player's partner may form a new pair (placed as a re-formed pair). The pair may enter the next season like anyone else: no flag and no organizer approval (strikes reset at the season start; README decision log, 2026-11-03, D82).
 - The organizer can cancel a strike with a reason (illness, a club cancelling the court); the cancellation is logged and the count is recomputed. An override of a resolved match leaves its strikes; the organizer cancels them separately.
 - Where they show: the player's own count on their season card on Kezdőlap; the counts and the season's strikes on the organizer's Párok page, with the cancel. Never on a public page (README decision log, 2026-11-05, D103a).
@@ -216,7 +216,7 @@ Every email goes out by itself as soon as it is made, within the daily limit; wh
 - Reminder to both pairs if neither has proposed slots 2 days into the match's scheduled week.
 - Reminder at the end of the scheduled week if the match is still unplayed ("pótoljátok a kör végéig").
 - Reminder 3 days before the deadline if the match is still unscheduled.
-- A 1st or 2nd strike, with the count (the 2nd is the warning). For now in the app and by push, not a digest item; the 2nd also sends one warning email on its own (D103a).
+- A 1st or 2nd strike, with the count (the 2nd is the warning). For now in the app and by push, not a digest item; the 2nd also sends one warning email on its own, unless the pair already leaves (the partner has 3): then the 3rd strike's leaving notice instead, to both players (D103a).
 - Reminder 2 days before the registration window closes, to pairs that haven't re-entered.
 
 **Reminders for people stuck before entering** (email only, README decision log, 2026-11-02, #155, D73). Each situation gets one automatic reminder with the person's own next step, never a second, even if they stay stuck or fall back into it. A person (by address) gets at most one per league season across all four situations (D83): due in two, they get the earlier one's (A before D) and never the other that season; D then goes only to the player not reminded yet:

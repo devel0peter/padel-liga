@@ -467,6 +467,7 @@ Public profiles (#36, README decision log D110).
 - Account: none (logged out); then the player of step 27 on Profil and Párom
 - Do: press the player's pair in their group table, then one of the two names on the pair page.
 - Expect:
+  - While round 1 has not started (the seed's dates): names and groups only. The pair page says "Az eredmények a liga indulása után látszanak itt." and the player page shows no értékszám, although the league page already lists the results. The rest below shows once round 1 has started (the e2e spec moves its start into the past for a moment).
   - The pair page (`/pairs/<id>`): both names (each a link), "Csoportok" with "<season>, 1. kör: <n>. csoport (<division>)" and the pair's place in the table, the same as on the league page, and "Meccsek" with the step 27 win and the step 28 decision from the pair's side ("Győzelem · 4:1, 2:4, szuper tie-break 10:8", "Vereség · Mindkét pár vereséget kap (0:4, 0:4)"). A result still waiting or disputed is not listed.
   - The player page (`/players/<id>`): the name, "Értékszám" (a whole number), "Párja" with the pair and its group, and the matches; the step 27 win has an "Értékszám: +… → …" line, the decision has none (no Elo change). After two rated matches a small chart shows the rating.
   - No email address or phone number on either page. An unknown id, or a deleted player's page, is the 404 page ("Ez az oldal nem létezik."); a deleted player is "Törölt játékos" without a link.

@@ -4,7 +4,7 @@
 export function ratingExplanation(rated: boolean): string[] {
   const sentences = [
     "Az értékszám azt mutatja, mennyire vagy erős: a szintedből indul (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600).",
-    "Minden meccs után változik: erősebb pár ellen nyerve sokat kapsz, gyengébb ellen keveset, vereségnél fordítva.",
+    "Minden lejátszott meccs után változik: erősebb pár ellen nyerve sokat kapsz, gyengébb ellen keveset, vereségnél fordítva.",
   ];
   if (!rated) sentences.push("Most még a kezdő értékszámodat látod.");
   return sentences;

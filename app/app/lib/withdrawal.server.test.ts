@@ -111,6 +111,11 @@ describe("withdrawPairMidPhase", () => {
     expect(row("select withdrawn_at from group_pairs where pair_id = 4").withdrawn_at).toBeNull();
   });
 
+  it("words the refusal without a running round", () => {
+    expect(NOT_IN_RUNNING_PHASE).toBe("Ez a pár most nem játszik kihirdetett csoportban. Frissítsd az oldalt.");
+    expect(NOT_IN_RUNNING_PHASE).not.toMatch(/futó kör/);
+  });
+
   it("refuses a pair that plays in no running group, and one of another league or season", async () => {
     expect(await E.withdrawPairMidPhase(ORG, 1, 5, 1, REASON, NOW)).toEqual({ ok: false, error: NOT_IN_RUNNING_PHASE });
     expect(await E.withdrawPairMidPhase(ORG, 2, 4, 1, REASON, NOW)).toMatchObject({ ok: false });

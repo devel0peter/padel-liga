@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { anonymizedEmail, deletionPlan, isAnonymizedEmail, mailNamesPerson, type DeletionCheck } from "./account-deletion";
+import {
+  anonymizedEmail,
+  DELETION_REFUSALS,
+  deletionPlan,
+  isAnonymizedEmail,
+  mailNamesPerson,
+  OWN_DELETION_EFFECTS,
+  ownDeletionNote,
+  type DeletionCheck,
+} from "./account-deletion";
 
 const check = (over: Partial<DeletionCheck> = {}): DeletionCheck => ({
   actorId: "admin",
@@ -30,6 +39,35 @@ describe("deletionPlan", () => {
 
   it("refuses an account that is gone or already anonymized", () => {
     expect(deletionPlan(check({ target: null }))).toEqual({ ok: false, refusal: "gone" });
+  });
+});
+
+describe("deletionPlan for the player's own account (#38)", () => {
+  const own = (over: Partial<DeletionCheck> = {}) => check({ actorId: "p", ...over });
+
+  it("removes without history and anonymizes with it, as the Admin's does", () => {
+    expect(deletionPlan(own(), "own")).toEqual({ ok: true, mode: "remove" });
+    expect(deletionPlan(own({ history: true }), "own")).toEqual({ ok: true, mode: "anonymize" });
+  });
+
+  it("refuses while their pair plays in a running phase, said to them", () => {
+    expect(deletionPlan(own({ history: true, playing: true }), "own")).toEqual({ ok: false, refusal: "ownPlaying" });
+    expect(DELETION_REFUSALS.ownPlaying).toMatch(/^Most nem törölheted: a párod kihirdetett csoportban játszik/);
+  });
+
+  it("refuses the Admin, and anyone else's account", () => {
+    expect(deletionPlan(own({ actorId: "admin", target: { id: "admin", platformRole: "superadmin" } }), "own")).toEqual({
+      ok: false,
+      refusal: "ownAdmin",
+    });
+    expect(deletionPlan(own({ actorId: "q" }), "own")).toEqual({ ok: false, refusal: "gone" });
+    expect(deletionPlan(own({ target: null }), "own")).toEqual({ ok: false, refusal: "gone" });
+  });
+
+  it("tells a Szervező that the rights go, and everyone that the login goes", () => {
+    expect(ownDeletionNote(true)).toMatch(/^A szervezői jogaid is megszűnnek\. Minden eszközön kilépünk/);
+    expect(ownDeletionNote(false)).toMatch(/^Minden eszközön kilépünk, és ebbe a fiókba többé nem tudsz belépni\./);
+    expect(OWN_DELETION_EFFECTS.anonymize).toContain("„Törölt játékos”");
   });
 });
 

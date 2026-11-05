@@ -1,5 +1,5 @@
-// Deleting an account (#152; the player's own button, #38, will use the same
-// rules). Pure, so every rule is unit tested; the D1 side is
+// Deleting an account: the Admin's "Törlés" (#152) and the player's own
+// "Fiók törlése" on the profile (#38), with the same rules. Pure, so every rule is unit tested; the D1 side is
 // account-deletion.server.ts.
 //
 // - Without history the account goes completely, with everything tied to it.
@@ -10,7 +10,8 @@
 //   devices go, so other players' groups and results don't change.
 // - Never while a pair of theirs plays in a published group whose phase
 //   hasn't ended: the pair has to be withdrawn first (#34).
-// - The Admin can't delete their own account or another Admin's.
+// - The Admin can't delete their own account or another Admin's, on either
+//   path. A Szervező deletes their own like any player and loses the rights.
 
 export const DELETED_NAME = "Törölt játékos";
 
@@ -65,7 +66,7 @@ export function mailNamesPerson(mail: { kind: string; text: string | null }, per
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(name)}($|[^\\p{L}\\p{N}])`, "u").test(text.replace(GREETING, ""));
 }
 
-export type DeletionRefusal = "self" | "admin" | "playing" | "gone";
+export type DeletionRefusal = "self" | "admin" | "playing" | "gone" | "ownAdmin" | "ownPlaying";
 
 export const DELETION_REFUSALS: Record<DeletionRefusal, string> = {
   self: "A saját fiókodat itt nem törölheted.",
@@ -73,9 +74,16 @@ export const DELETION_REFUSALS: Record<DeletionRefusal, string> = {
   playing:
     "Nem törölhető: a párja kihirdetett csoportban játszik, és a kör még nem ért véget. Előbb a párt vissza kell léptetni.",
   gone: "Ez a fiók már nincs meg.",
+  // The player's own button (#38): the same reasons, said to them.
+  ownAdmin: "Adminként a saját fiókodat nem törölheted.",
+  ownPlaying:
+    "Most nem törölheted: a párod kihirdetett csoportban játszik, és a kör még nem ért véget. Előbb a szervezőnek vissza kell léptetnie a párodat.",
 };
 
 export type DeletionMode = "remove" | "anonymize";
+
+// Who deletes: the Admin on Felhasználók, or the player their own account.
+export type DeletionBy = "admin" | "own";
 
 export type DeletionCheck = {
   actorId: string;
@@ -89,11 +97,18 @@ export type DeletionCheck = {
 
 export type DeletionPlan = { ok: true; mode: DeletionMode } | { ok: false; refusal: DeletionRefusal };
 
-export function deletionPlan(c: DeletionCheck): DeletionPlan {
+export function deletionPlan(c: DeletionCheck, by: DeletionBy = "admin"): DeletionPlan {
   if (!c.target) return { ok: false, refusal: "gone" };
-  if (c.target.id === c.actorId) return { ok: false, refusal: "self" };
-  if (c.target.platformRole === "superadmin") return { ok: false, refusal: "admin" };
-  if (c.playing) return { ok: false, refusal: "playing" };
+  if (by === "own") {
+    // Only ever one's own account.
+    if (c.target.id !== c.actorId) return { ok: false, refusal: "gone" };
+    if (c.target.platformRole === "superadmin") return { ok: false, refusal: "ownAdmin" };
+    if (c.playing) return { ok: false, refusal: "ownPlaying" };
+  } else {
+    if (c.target.id === c.actorId) return { ok: false, refusal: "self" };
+    if (c.target.platformRole === "superadmin") return { ok: false, refusal: "admin" };
+    if (c.playing) return { ok: false, refusal: "playing" };
+  }
   return { ok: true, mode: c.history ? "anonymize" : "remove" };
 }
 
@@ -105,3 +120,19 @@ export const DELETION_EFFECTS: Record<DeletionMode, string> = {
 };
 
 export const DELETED = { remove: "A fiók törölve.", anonymize: "A fiók névtelen lett." } as const;
+
+// What the player's own confirmation says (#38), in their words.
+export const OWN_DELETION_EFFECTS: Record<DeletionMode, string> = {
+  remove:
+    "Még nem szerepeltél a ligában, ezért minden adatod törlődik: a fiókod, a párosaid, a nevezéseid, a párkeresésed, az értesítéseid és a jelentkezésed. Ha van párod, ő pár nélkül marad.",
+  anonymize: `Már szerepeltél a ligában, ezért a fiókod névtelen lesz: a neved helyén „${DELETED_NAME}” áll, az e-mail-címed, a telefonszámod és a belépéseid törlődnek. Az eredmények és a tabellák nem változnak. Ha van párod, a párosotok felbomlik.`,
+};
+
+// Said after either effect: the Szervező rights, the login, no way back.
+export function ownDeletionNote(organizer: boolean): string {
+  const rights = organizer ? "A szervezői jogaid is megszűnnek. " : "";
+  return `${rights}Minden eszközön kilépünk, és ebbe a fiókba többé nem tudsz belépni. Ha később újra regisztrálsz, tiszta lappal indulsz. Senki nem kap róla e-mailt. Nem vonható vissza.`;
+}
+
+// The home page's line after the player deleted their own account (#38).
+export const OWN_DELETED = "Töröltük a fiókodat, és minden eszközön kiléptettünk.";

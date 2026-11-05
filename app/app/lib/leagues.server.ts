@@ -60,8 +60,9 @@ export async function organizersByLeague(): Promise<Map<number, { active: Organi
 export type GrantResult = "granted" | "already" | "invited";
 
 // Makes the account with this email a Szervező of the league. An email
-// without an account is invited: it may sign up before registration opens,
-// and becomes Szervező when its account is created.
+// without an account is invited (an account_invites row, which only exempts
+// it from the daily cap on login codes to new addresses, #113), and becomes
+// Szervező when its account is created.
 export async function grantOrganizer(league: LeagueRef, email: string, actorId: string): Promise<GrantResult> {
   const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (user) {

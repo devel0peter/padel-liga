@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { requireUser } from "~/lib/auth/session.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
-import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED } from "~/lib/pairs";
+import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, pairPageDescription } from "~/lib/pairs";
 import { pairLeagues, pairOverview } from "~/lib/pairs.server";
 import { pairPath } from "~/lib/profiles";
 import { profilePairIds } from "~/lib/profiles.server";
@@ -77,6 +77,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Just accepted a pair link.
     joined: new URL(request.url).searchParams.has("joined"),
     multi: leagues.length > 1,
+    hasPair: overview.some((o) => o.pair),
     overview,
     entries: seasons.flatMap((s) => {
       const view = views.get(s.id);
@@ -171,7 +172,7 @@ function Waiting({ name }: { name: string }) {
 
 export default function Pair({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
-    <AppPage title="Párom" description={`Egy ligában egy párod lehet. Ha változna, írj nekünk: ${CONTACT_EMAIL}`}>
+    <AppPage title="Párom" description={pairPageDescription(d.hasPair, CONTACT_EMAIL)}>
       {d.joined && !actionData && (
         <p role="status" className="max-w-2xl rounded-md border border-nav-active bg-nav-active-bg p-3 text-sm font-medium">
           {PAIR_LINK_ACCEPTED}

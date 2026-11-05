@@ -29,6 +29,8 @@ function removeOwnRows() {
 }
 
 test.beforeAll(() => {
+  // Rows a killed run left behind (an e2e:shots --keep state) would clash on the slugs.
+  removeOwnRows();
   d1Insert(`insert into cities (slug, name, listed) values (${q(CITY.slug)}, ${q(CITY.name)}, 1)`);
   d1Insert(`insert into leagues (city, slug, name) values (${q(CITY.slug)}, ${q(LEAGUE.slug)}, ${q(LEAGUE.name)})`);
   d1Insert(

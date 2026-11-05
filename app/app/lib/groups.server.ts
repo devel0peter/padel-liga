@@ -10,7 +10,7 @@ import { groupsPublishedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import { auditEntry, auditWhen, leagueOfSeason } from "./audit.server";
-import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
+import { cannotSplit, draftIsStale, FIRST_PHASE, pairWeeks, publishBlocker, weekRange } from "./groups";
 import { updateElo } from "./elo.server";
 import { averageElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
@@ -22,7 +22,7 @@ import { getSeason } from "./seasons.server";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-export const FIRST_PHASE = 1;
+export { FIRST_PHASE };
 
 const LOCKED = "A csoportok már kint vannak, nem módosíthatók.";
 const CHANGED = "A javaslat közben változott. Frissítsd az oldalt.";

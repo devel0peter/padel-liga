@@ -28,12 +28,12 @@ import {
   pairName,
   publishBlocker,
   sizeWarning,
+  FIRST_PHASE,
   STALE_DRAFT,
   withArticle,
 } from "~/lib/groups";
 import {
   eligiblePairs,
-  FIRST_PHASE,
   generateDraft,
   type GroupPair,
   moveDraftPair,

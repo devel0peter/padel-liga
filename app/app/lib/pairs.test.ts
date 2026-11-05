@@ -43,7 +43,7 @@ describe("canDissolve (#97)", () => {
 
 describe("SOURCE_LABELS", () => {
   it("names every source", () => {
-    expect(SOURCE_LABELS).toEqual({ signup: "jelentkezésből", manual: "kézzel", link: "linkkel" });
+    expect(SOURCE_LABELS).toEqual({ signup: "jelentkezésből", manual: "kézzel", link: "linkkel", search: "Párkeresők" });
   });
 });
 

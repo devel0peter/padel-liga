@@ -120,6 +120,15 @@ function restore(sql: string) {
   return db;
 }
 
+// A plain sqlite3 restore (`sqlite3 new.db < file`): foreign keys off, so no
+// ON DELETE action fires; only the file's own cleanup keeps the links whole.
+function restorePlain(sql: string) {
+  const db = new DatabaseSync(":memory:");
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec(sql);
+  return db;
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("exportStep", () => {
@@ -130,7 +139,7 @@ describe("exportStep", () => {
     const { files, bucket } = fakeBucket(c);
     const { results, calls } = await runAll(raw, c, bucket);
 
-    expect(results.at(-1)).toMatchObject({ status: "finished", key: FILE });
+    expect(results.at(-1)).toMatchObject({ status: "finished", key: FILE, maxParts: LIMITS.maxOps - 7 });
     // The file only, no pieces or state left behind.
     expect([...files.keys()]).toEqual([FILE]);
     expect(Math.max(...calls)).toBeLessThanOrEqual(FREE_CALLS);
@@ -163,6 +172,27 @@ describe("exportStep", () => {
     const restored = restore(files.get(FILE)!);
     expect(tableCounts(restored)).toEqual(tableCounts(raw));
     expect(restored.prepare("SELECT count(*) AS n FROM interest_signups").get()).toEqual({ n: 1501 });
+  });
+
+  it("glues as many pieces as its ceiling says within the run's calls, and stops one piece past it (#282)", async () => {
+    const pieces = async (maxOps: number) => {
+      const raw = migratedDatabase();
+      fill(raw);
+      for (let i = 0; i < 20; i++) raw.exec(`INSERT INTO job_runs (key, done_at) VALUES ('k${i}', 1790000000)`);
+      const c = new Counter();
+      const { bucket } = fakeBucket(c);
+      return runAll(raw, c, bucket, { maxOps, pageRows: 1, stepChars: 1 });
+    };
+    // One row a piece: how many pieces this database makes.
+    const free = (await pieces(200)).results.at(-1);
+    const n = free.parts as number;
+    expect(n).toBeGreaterThan(20);
+    // A run that allows exactly n pieces glues them within its calls.
+    const { results, calls } = await pieces(n + 7);
+    expect(results.at(-1)).toMatchObject({ status: "finished", parts: n, maxParts: n });
+    expect(Math.max(...calls)).toBeLessThanOrEqual(n + 7);
+    // One call fewer: n pieces are past the ceiling, and the export says so.
+    await expect(pieces(n + 6)).rejects.toThrow(`${n} pieces are too many to glue`);
   });
 
   it("builds a bounded amount of SQL per run", async () => {
@@ -279,6 +309,59 @@ describe("exportStep", () => {
     expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
+  it("keeps an audit entry whose author arrived without its account, with no author (#282)", async () => {
+    const raw = migratedDatabase();
+    fill(raw);
+    raw.exec(`INSERT INTO audit_log (actor_id, action, target) VALUES ('u1', 'pair.dissolve', 'pair:1')`);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // An account is made after `users` was read and writes an audit entry
+    // before `audit_log` is read: the entry reaches the file, its author not.
+    let late = false;
+    await runAll(raw, c, bucket, LIMITS, (sql) => {
+      if (late || !sql.includes('FROM "audit_log"')) return;
+      late = true;
+      raw.exec(`INSERT INTO users (id, email) VALUES ('u2', 'late@example.test')`);
+      raw.exec(`INSERT INTO audit_log (actor_id, action, target) VALUES ('u2', 'season.publish', 'season:7')`);
+    });
+    expect(late).toBe(true);
+    for (const restored of [restore(files.get(FILE)!), restorePlain(files.get(FILE)!)]) {
+      expect(restored.prepare("SELECT actor_id, action, target FROM audit_log ORDER BY id").all()).toEqual([
+        { actor_id: "u1", action: "pair.dissolve", target: "pair:1" },
+        { actor_id: null, action: "season.publish", target: "season:7" },
+      ]);
+      expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    }
+  });
+
+  it("keeps a pair dissolved by a dropped duplicate account, without who dissolved it, with or without foreign keys (#179, #282)", async () => {
+    const raw = migratedDatabase();
+    fill(raw);
+    raw.exec(`INSERT INTO users (id, email) VALUES ('u2', 'u2@example.test'), ('u3', 'u3@example.test')`);
+    raw.exec(`INSERT INTO cities (slug, name) VALUES ('teszt', 'Teszt')`);
+    raw.exec(`INSERT INTO leagues (id, city, slug, name) VALUES (91, 'teszt', 'teszt', 'Teszt')`);
+    // u1 (an organizer) dissolved u2 and u3's pair.
+    raw.exec(`INSERT INTO pairs (id, league_id, player_a, player_b, status, dissolved_at, dissolved_by) VALUES (1, 91, 'u2', 'u3', 'dissolved', 1790000000, 'u1')`);
+    const c = new Counter();
+    const { files, bucket } = fakeBucket(c);
+    // As in the #179 case above: u1 gives its address to a new account u9
+    // between two pages of `users`, so users_email_unique drops u1.
+    const gap = betweenPages("users", () => {
+      raw.exec(`UPDATE users SET email = 'uj@example.test' WHERE id = 'u1'`);
+      raw.exec(`INSERT INTO users (id, email) VALUES ('u9', 'a@example.test')`);
+    });
+    await runAll(raw, c, bucket, ONE_PAGE_A_RUN, gap.hook);
+    expect(gap.fired()).toBe(true);
+
+    for (const restored of [restore(files.get(FILE)!), restorePlain(files.get(FILE)!)]) {
+      expect(restored.prepare("SELECT id FROM users ORDER BY id").all()).toEqual([{ id: "u2" }, { id: "u3" }, { id: "u9" }]);
+      expect(restored.prepare("SELECT id, status, dissolved_by FROM pairs").all()).toEqual([{ id: 1, status: "dissolved", dissolved_by: null }]);
+      // u1's session still goes (ON DELETE CASCADE).
+      expect(restored.prepare("SELECT count(*) AS n FROM sessions").get()).toEqual({ n: 0 });
+      expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    }
+  });
+
   it("restores although a primary key was given up and taken again between two steps (#179)", async () => {
     const raw = migratedDatabase();
     for (const k of ["a", "b", "c"]) raw.exec(`INSERT INTO job_runs (key, done_at) VALUES ('${k}', 1790000000)`);
@@ -313,6 +396,23 @@ describe("exportStep", () => {
       found += written;
     }
     expect(found).toBeGreaterThan(30);
+  });
+
+  it("only empties links the real schema lets be empty, so a restore can't fail on the cleanup (#282)", async () => {
+    const { foreignKeys } = await import("./backup");
+    const db = migratedDatabase();
+    const tables = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL").all() as { name: string; sql: string }[];
+    let cleared = 0;
+    for (const t of tables) {
+      const notNull = new Set((db.prepare(`PRAGMA table_info("${t.name}")`).all() as { name: string; notnull: number }[]).filter((c) => c.notnull).map((c) => c.name));
+      for (const fk of foreignKeys(t.sql).filter((k) => k.onDelete === "set null"))
+        for (const column of fk.columns) {
+          expect(notNull.has(column), `${t.name}.${column}`).toBe(false);
+          cleared++;
+        }
+    }
+    // audit_log.actor_id, pairs.dissolved_by, match_decisions.decided_by and the like.
+    expect(cleared).toBeGreaterThan(10);
   });
 
   it("does nothing once the day's file exists", async () => {

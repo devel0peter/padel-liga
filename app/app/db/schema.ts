@@ -710,9 +710,9 @@ export const groups = sqliteTable(
     // that the draft it checked is still the one it locks.
     revision: integer("revision").notNull().default(0),
     // A round switch draft (#35): the draft the system computed, before the
-    // organizer's moves ("1,2,5,6|3,4,7,8"), so publishing can tell that
-    // the ending phase's results or pairs have changed since. Null for
-    // phase 1.
+    // organizer's moves, as sorted pair ids per group ("1,2,5,6|3,4,7,8"),
+    // so publishing can tell that the ending phase's results or pairs have
+    // changed since. Null for phase 1.
     basis: text("basis"),
     publishedAt: integer("published_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })

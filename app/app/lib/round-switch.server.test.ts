@@ -301,7 +301,11 @@ describe("generateRoundSwitchDraft and publishRoundSwitch (#35)", () => {
     await R.generateRoundSwitchDraft(1, 2, "o", AFTER);
     await G.moveDraftPair(1, 4, 1, "o", 2);
     await G.moveDraftPair(1, 6, 2, "o", 2);
+    // An Elo change alone (here: pair 7 now outrates every pair of group 2)
+    // reorders seeds but keeps the groups: still current.
+    h.raw.exec("update users set elo = 1900 where id in ('p7a', 'p7b')");
     const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(s.draft[1]![0]!.pairId).toBe(7);
     expect(R.draftOutdated(await G.phaseGroups(1, 2), s)).toBe(false);
     expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
     expect(groupsOf(2)[0]).toContain(4);

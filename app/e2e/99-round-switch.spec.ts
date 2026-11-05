@@ -51,15 +51,26 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
   await test.info().attach("round 2 draft, 390px", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.setViewportSize({ width: 1280, height: 800 });
 
-  // Settled. If the result changes who moves, the draft is outdated and
-  // can't go out until it is rebuilt from the final tables (D107).
+  // Settled: rebuilt from the final tables, nothing blocks it.
   d1Update(`update matches set status = 'final', outcome = ${won} where id = ${disputed}`);
   await visit(page, `${season}/groups?phase=2`);
   await expect(block).toHaveCount(0);
-  const outdated = page.getByRole("alert").filter({ hasText: "Előbb számold újra a tervezetet." });
-  if ((await outdated.count()) > 0) await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
   await page.getByRole("button", { name: "Tervezet újraszámolása" }).click();
   await expect(page.getByRole("status")).toContainText("Újraszámoltuk a tervezetet");
+  const outdated = page.getByRole("alert").filter({ hasText: "Előbb számold újra a tervezetet." });
+  await expect(outdated).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Közzététel" })).toBeEnabled();
+
+  // A change the draft came from (here the new pair taken out of the
+  // season) makes it outdated: no Közzététel until a rebuild (D107e). Put
+  // back, the draft is current again.
+  const late = d1(`select id from season_entries where season_id = ${id} and joins_phase = 2 and status = 'approved'`)[0]!.id as number;
+  d1Update(`update season_entries set status = 'withdrawn' where id = ${late}`);
+  await visit(page, `${season}/groups?phase=2`);
+  await expect(outdated).toBeVisible();
+  await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
+  d1Update(`update season_entries set status = 'approved' where id = ${late}`);
+  await visit(page, `${season}/groups?phase=2`);
   await expect(outdated).toHaveCount(0);
   await page.getByRole("button", { name: "Közzététel" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Közzététel" }).click();

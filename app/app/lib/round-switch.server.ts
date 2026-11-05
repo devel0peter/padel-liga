@@ -190,13 +190,15 @@ export function draftPairIds(s: RoundSwitch): number[] {
 }
 
 /**
- * The draft the system computes, as a string stored with the draft groups
- * ("1,2,5,6|3,4,7,8"). When the current results and pairs give another one,
- * the stored draft is outdated: a dispute or no-show settled, a result
- * overridden, a strike cancelled, a pair entered or gone (#35).
+ * The draft the system computes, as a string stored with the draft groups:
+ * each group's pair ids, sorted ("1,2,5,6|3,4,7,8"). When the current
+ * results and pairs put other pairs in a group, the stored draft is
+ * outdated: a dispute or no-show settled, a result overridden, a strike
+ * cancelled, a pair entered or gone (#35). The seed order is left out, so an
+ * Elo change alone (a result accepted later) never makes it outdated.
  */
 export function draftBasis(s: RoundSwitch): string {
-  return s.draft.map((g) => g.map((p) => p.pairId).join(",")).join("|");
+  return s.draft.map((g) => g.map((p) => p.pairId).sort((a, b) => a - b).join(",")).join("|");
 }
 
 /** Whether a stored phase-n draft no longer matches what the switch computes now. */

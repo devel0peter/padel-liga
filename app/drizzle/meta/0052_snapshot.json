@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "91087b02-77aa-4460-8035-ddb5dd13ea6c",
-  "prevId": "7ba1211e-f429-4b0f-81c4-13d00b7df6f2",
+  "id": "28d455cf-3cf5-461c-826a-a54f7bae1740",
+  "prevId": "6477c22d-3738-4f54-b848-05600d9adbc5",
   "tables": {
     "account_invites": {
       "name": "account_invites",
@@ -1984,6 +1984,156 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "no_show_reports": {
+      "name": "no_show_reports",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "match_id": {
+          "name": "match_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_id": {
+          "name": "pair_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'open'"
+        },
+        "reported_by": {
+          "name": "reported_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reported_at": {
+          "name": "reported_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "no_show_reports_open_idx": {
+          "name": "no_show_reports_open_idx",
+          "columns": [
+            "match_id"
+          ],
+          "isUnique": true,
+          "where": "\"no_show_reports\".\"status\" = 'open'"
+        },
+        "no_show_reports_match_idx": {
+          "name": "no_show_reports_match_idx",
+          "columns": [
+            "match_id"
+          ],
+          "isUnique": false
+        },
+        "no_show_reports_status_idx": {
+          "name": "no_show_reports_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "no_show_reports_match_id_matches_id_fk": {
+          "name": "no_show_reports_match_id_matches_id_fk",
+          "tableFrom": "no_show_reports",
+          "tableTo": "matches",
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "no_show_reports_pair_id_pairs_id_fk": {
+          "name": "no_show_reports_pair_id_pairs_id_fk",
+          "tableFrom": "no_show_reports",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "no_show_reports_reported_by_users_id_fk": {
+          "name": "no_show_reports_reported_by_users_id_fk",
+          "tableFrom": "no_show_reports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reported_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "no_show_reports_decided_by_users_id_fk": {
+          "name": "no_show_reports_decided_by_users_id_fk",
+          "tableFrom": "no_show_reports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "decided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },

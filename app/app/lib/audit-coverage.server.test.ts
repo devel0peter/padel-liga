@@ -43,6 +43,7 @@ const DELETION = await import("~/lib/account-deletion.server");
 const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
 const SUBSTITUTES = await import("~/lib/substitutes.server");
+const NOSHOWS = await import("~/lib/no-shows.server");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs.
@@ -147,6 +148,8 @@ const STEPS: Step[] = [
   { action: "substitute.approve", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "approve", "", IN_PHASE))) },
   { action: "substitute.revoke", actor: ORG, run: () => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, lastRequest(), "revoke", "Mégsem.", IN_PHASE)) },
   { action: "substitute.reject", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "reject", "", IN_PHASE))) },
+  { action: "match.no_show_confirm", actor: ORG, run: () => noShowReport(3).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "confirm", "", IN_PHASE))) },
+  { action: "match.no_show_reject", actor: ORG, run: () => noShowReport(4).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "reject", "", IN_PHASE))) },
   {
     action: "match.decide",
     actor: ORG,
@@ -207,6 +210,15 @@ async function substituteRequest(): Promise<number> {
   await expectOk(SUBSTITUTES.requestSubstitute(p.player_a, id, { absentId: p.player_b, substituteId: "q1" }, IN_PHASE));
   return lastRequest();
 }
+// A player of the nth match's first pair reports, after its agreed slot
+// (PLAYED), that the other pair didn't come; no entry of its own (a player's step).
+async function noShowReport(n: number): Promise<number> {
+  const id = matchIds()[n]!;
+  h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = ?").run(sec(PLAYED.toISOString()), id);
+  const p = one("select p.player_a from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+  await expectOk(NOSHOWS.reportNoShow(p.player_a, id, IN_PHASE));
+  return one("select max(id) as id from no_show_reports").id as number;
+}
 async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
   expect(await p).toMatchObject({ ok: true });
 }
@@ -227,7 +239,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
   "admin.league-solos.tsx": ["pair.create", "solo.pair", "solo.unpair"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
-  "admin.match-decide.tsx": ["match.decide"],
+  "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
   "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],

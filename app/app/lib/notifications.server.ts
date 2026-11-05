@@ -16,6 +16,7 @@ import {
   resultDisputedMessage,
   substituteRequestedMessage,
   newSignupMessage,
+  noShowReportedMessage,
   pushPayload,
   signupRecipients,
   TEST_MESSAGE,
@@ -420,6 +421,25 @@ export async function notifySubstituteRequested(input: {
     await notify("substitute_requested", (await leagueStaff(input.leagueId, input.requestedBy)).map((userId) => ({ userId, message })));
   } catch (error) {
     logError("notification failed", { kind: "substitute_requested", error });
+  }
+}
+
+// A pair reported a no-show (#33, D108): tell the league's Szervezők and the
+// Admins, in the app and by push, never by email; the reporting player left
+// out. Never throws: the report is already saved.
+export async function notifyNoShowReported(input: {
+  matchId: number;
+  leagueId: number;
+  leagueSlug: string;
+  leagueName: string;
+  week: number;
+  reportedBy: string;
+}): Promise<void> {
+  try {
+    const message = noShowReportedMessage(input);
+    await notify("no_show_reported", (await leagueStaff(input.leagueId, input.reportedBy)).map((userId) => ({ userId, message })));
+  } catch (error) {
+    logError("notification failed", { kind: "no_show_reported", error });
   }
 }
 

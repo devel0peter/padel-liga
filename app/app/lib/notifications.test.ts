@@ -6,6 +6,8 @@ import {
   substituteDecidedMessage,
   substituteRequestedMessage,
   substituteRevokedMessage,
+  noShowDecidedMessage,
+  noShowReportedMessage,
   channelKey,
   followsEmailSwitch,
   groupsPublishedMessage,
@@ -42,8 +44,8 @@ const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 describe("kindsFor", () => {
   it("offers new signups, disputed results and substitute requests to Szervezők and Admins only", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed", "substitute_requested"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed", "substitute_requested"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed", "substitute_requested", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed", "substitute_requested", "no_show_reported"]);
   });
 });
 
@@ -395,5 +397,26 @@ describe("substitute notices (#37, D109)", () => {
 
   it("are not digest items (no email, D83)", () => {
     for (const kind of ["substitute_approved", "substitute_rejected", "substitute_revoked"] as const) expect(DIGEST_KINDS).not.toContain(kind);
+  });
+});
+
+describe("no-show notices (#33, D108)", () => {
+  it("tells the organizers without names, linking to the decision page", () => {
+    expect(noShowReportedMessage({ matchId: 7, leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 2 })).toEqual({
+      title: "Nem jöttek el · Padelpárbaj Győr",
+      body: "Egy pár jelezte, hogy az ellenfele nem jött el a 2. heti meccsre. A döntés rád vár.",
+      url: "/admin/leagues/gyor/matches/7/decide",
+    });
+  });
+
+  it("tells each pair the decision from its own side, never the reason; not digest items", () => {
+    const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true });
+    const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false });
+    expect(won).toMatchObject({ title: "Jóváhagyta a szervező: nem jöttek el", url: "/matches/7" });
+    expect(won.body).toContain("4-0 4-0");
+    expect(lost.body).toContain("fekete pontot");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true }).title).toBe("A szervező elutasította a bejelentésed");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");
+    for (const kind of ["no_show_confirmed", "no_show_rejected"] as const) expect(DIGEST_KINDS).not.toContain(kind);
   });
 });

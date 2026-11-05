@@ -1,9 +1,9 @@
 import { resolutionCutoff, resolveAtDeadline, type Side } from "@padel-liga/rules";
-import { and, asc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { groups, leagues, matchDecisions, matches, pairs, seasons, users } from "~/db/schema";
+import { groups, leagues, matchDecisions, matches, noShowReports, pairs, seasons, users } from "~/db/schema";
 import { auditEntry } from "~/lib/audit.server";
 import { reminderEmailInserts } from "~/lib/email/outbox.server";
 import { matchResolvedMessage, type Message } from "~/lib/notifications";
@@ -28,7 +28,9 @@ import { liveCounts, strikeInserts, strikeNotices } from "./strikes.server";
 // the match's revision: a step taken meanwhile wins and the match waits for
 // the next run. A match with a recorded or disputed result is left to the
 // auto-accept and the organizer; a withdrawn pair's match doesn't count and
-// is never resolved (no strike, spec 8). The organizer can override any
+// is never resolved (no strike, spec 8), nor is one with a no-show report
+// waiting for the organizer (#33): the next run after their decision (a
+// rejection) resolves it as usual. The organizer can override any
 // resolved match (D78); a strike stays until the organizer cancels it.
 
 /** At most this many matches per run, in one D1 batch; the rest go on the next runs (every 10 minutes). */
@@ -87,6 +89,8 @@ export async function resolveDeadlines(
         lt(matches.deadline, resolutionCutoff(now)),
         isNotNull(groups.publishedAt),
         noWithdrawnPair,
+        // A no-show report waiting for the organizer (#33): theirs to decide.
+        noOpenNoShow,
       ),
     )
     .orderBy(asc(matches.id))
@@ -197,6 +201,8 @@ export async function resolveDeadlines(
   }
   return { resolved, left: more || waiting };
 }
+
+const noOpenNoShow = sql`not exists (select 1 from ${noShowReports} where ${noShowReports.matchId} = ${matches.id} and ${noShowReports.status} = 'open')`;
 
 // The revision guard of the ruling's insert (results.server.ts guardedMatchId).
 const lostDecision = (e: unknown) => /NOT NULL constraint failed: match_decisions\.match_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`);

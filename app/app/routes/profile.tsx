@@ -166,8 +166,10 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
           <p className="text-sm">
             <Link to={d.profilePath} className="font-semibold underline">
               Nyilvános profilod
-            </Link>{" "}
-            <span className="text-muted-foreground">(név, értékszám, eredmények: ezt látja rólad bárki)</span>
+            </Link>
+            <span className="text-muted-foreground">
+              : ezt látja rólad bárki (az eredményeidet és az értékszámodat a liga indulása után).
+            </span>
           </p>
         )}
         {!d.level && (

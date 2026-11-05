@@ -1,6 +1,9 @@
+import { Link } from "react-router";
+
 import type { Route } from "./+types/player-profile";
-import { Card, EloChart, MatchList, PairLink } from "~/components/profile-parts";
+import { Card, EloChart, MatchList } from "~/components/profile-parts";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
+import { pairName, pairPath } from "~/lib/profiles";
 import { playerProfile } from "~/lib/profiles.server";
 import { pageMeta } from "~/lib/site";
 
@@ -46,7 +49,13 @@ export default function PlayerProfile({ loaderData: d }: Route.ComponentProps) {
             <ul className="grid gap-3">
               {d.pairs.map((p) => (
                 <li key={p.pair.id} className="grid gap-1">
-                  <PairLink pair={p.pair} />
+                  {/* The partner's name leads to the pair's page. */}
+                  <Link
+                    to={pairPath(p.pair.id)}
+                    className="font-semibold underline decoration-court/40 underline-offset-2 hover:decoration-court"
+                  >
+                    {p.pair.players.find((x) => x.id !== d.player.id)?.name ?? pairName(p.pair)}
+                  </Link>
                   <span className="text-sm text-muted-foreground">
                     {p.league}, {p.latest.season}, {p.latest.phase}. kör: {p.latest.group}. csoport ({p.latest.division})
                   </span>

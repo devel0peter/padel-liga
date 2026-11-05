@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canDissolve, checkNewPair, checkPairLink, NEW_PAIR_REFUSALS, PAIR_LINK_REFUSALS, SOURCE_LABELS } from "./pairs";
+import { canDissolve, checkNewPair, checkPairLink, NEW_PAIR_REFUSALS, pairPageDescription, PAIR_LINK_REFUSALS, SOURCE_LABELS } from "./pairs";
 
 describe("checkNewPair (#97)", () => {
   const ok = { a: "a", b: "b", registered: true, paired: false };
@@ -70,5 +70,17 @@ describe("checkPairLink (2026-10-31)", () => {
 
   it("has a Hungarian message for every refusal", () => {
     expect(Object.keys(PAIR_LINK_REFUSALS).sort()).toEqual(["own", "owner_paired", "you_paired"]);
+  });
+});
+
+describe("pairPageDescription (#124)", () => {
+  it("names the address and the change only for a player with a pair", () => {
+    expect(pairPageDescription(true, "a@b.hu")).toBe("Egy ligában egy párod lehet. Ha változna, írj nekünk: a@b.hu");
+  });
+  it("gives neither the address nor the change line without a pair", () => {
+    const text = pairPageDescription(false, "a@b.hu");
+    expect(text).toBe("Egy ligában egy párod lehet.");
+    expect(text).not.toContain("a@b.hu");
+    expect(text).not.toContain("változna");
   });
 });

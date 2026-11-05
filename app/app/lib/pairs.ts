@@ -24,6 +24,14 @@ export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportba
 // keresek" switch (partner-search.ts); the contact address follows the text.
 export const NO_PAIR_TEXT = "Kérdés esetén írj nekünk:";
 
+// The header line of Párom (#124). The "if it changes" sentence is only for
+// someone who has a pair; without one, the contact address is given once, by
+// the card under the pair link (NO_PAIR_TEXT).
+export function pairPageDescription(hasPair: boolean, contactEmail: string): string {
+  const base = "Egy ligában egy párod lehet.";
+  return hasPair ? `${base} Ha változna, írj nekünk: ${contactEmail}` : base;
+}
+
 // The pair link (2026-10-31): the box on /home and /pair while the player
 // has no pair in the league.
 export const PAIR_LINK_TITLE = "Hívd meg a párodat";

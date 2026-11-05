@@ -61,6 +61,8 @@ export function calendarSlot(events: readonly SchedulingEvent[], voided = false)
   });
   if (!last || !changedAt) return null;
   if (voided && !cancelled) {
+    // The log has no withdrawal time, so DTSTAMP keeps the last logged change;
+    // the SEQUENCE bump is what makes calendars take the cancellation.
     cancelled = true;
     sequence += 1;
   }

@@ -340,10 +340,11 @@ function CancelCard({ late }: { late: boolean }) {
 
 // Add the fixed time to the calendar (#192, D106): a Google Calendar link and
 // an .ics file. The file keeps one entry per match: a new download replaces
-// the old one, and after a cancellation it removes it.
+// the old one, and after a cancellation it removes it. An entry added with the
+// Google link has Google's own id, so that one is changed by hand.
 function CalendarRow({ calendar }: { calendar: CalendarLinks }) {
   return (
-    <div className="grid gap-1.5" aria-label="Naptárba">
+    <div className="grid gap-1.5" role="group" aria-label="Naptárba">
       <p className="text-sm font-medium">{calendar.cancelled ? "Naptár" : "Naptárba"}</p>
       <div className="flex flex-wrap gap-2">
         {calendar.googleUrl && (
@@ -360,9 +361,13 @@ function CalendarRow({ calendar }: { calendar: CalendarLinks }) {
         </Button>
       </div>
       {calendar.cancelled ? (
-        <p className="text-sm text-muted-foreground">Lemondták az időpontot. Töltsd le újra az .ics-t, és a naptáradból is kikerül.</p>
+        <p className="text-sm text-muted-foreground">
+          Lemondták az időpontot. Töltsd le újra az .ics-t, és a naptáradból is kikerül. Ha a Google Naptár gombbal tetted be, ott töröld kézzel.
+        </p>
       ) : (
-        <p className="text-sm text-muted-foreground">Ha változik az időpont, az új .ics lecseréli a régit.</p>
+        <p className="text-sm text-muted-foreground">
+          Ha változik az időpont, az új .ics lecseréli a régit. Ha a Google Naptár gombbal tetted be, ott írd át kézzel.
+        </p>
       )}
     </div>
   );

@@ -229,9 +229,24 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
     const ids = all("select id from matches order by id").map((r: any) => r.id as number);
     h.race = ids[0]!;
     const r = await resolveDeadlines(MONDAY_6, undefined, 25);
-    expect(r.resolved).toBe(8);
-    expect(row(ids[0]!).status).toBe("open");
-    expect((await resolveDeadlines(at("2026-11-30", 6, 10), undefined, 25)).resolved).toBe(1);
+    // Nobody played: every match strikes its four players. The lost match's
+    // players' later matches wait too (their counts took it in); the
+    // matches of the other group go on.
+    const first = one("select pair_a, pair_b, group_id from matches where id = ?", ids[0]);
+    const waiting = all("select id from matches where group_id = ? and status = 'open'", first.group_id).map((m: any) => m.id);
+    expect(waiting).toContain(ids[0]);
+    expect(r).toEqual({ resolved: 9 - waiting.length, left: true });
+    expect(all("select id from matches where group_id != ? and status != 'final'", first.group_id)).toEqual([]);
+    const next = await resolveDeadlines(at("2026-11-30", 6, 10), undefined, 25);
+    expect(next).toEqual({ resolved: waiting.length, left: false });
+    // Each count told once, in order: no "2. fekete pont" twice.
+    for (const u of all("select distinct user_id from strikes").map((x: any) => x.user_id as string)) {
+      const titles = all("select title from notifications where user_id = ? and kind = 'strike' order by id", u).map((x: any) => x.title);
+      expect(titles.length).toBe(strikesOf(u).length);
+      expect(new Set(titles).size).toBe(titles.length);
+    }
+    const warned = all("select to_email from email_messages where kind = 'strike_warning'").map((x: any) => x.to_email);
+    expect(new Set(warned).size).toBe(warned.length);
   });
 
   it("the public table counts the resolved outcomes (walkover 3 points, both losing 0, unplayed nothing)", async () => {

@@ -113,6 +113,8 @@ export async function resolveDeadlines(
   const batches: BatchItem<"sqlite">[][] = [];
   const notices: { kind: "match_decided" | "strike"; messages: { userId: string; message: Message }[] }[][] = [];
   const emails: Parameters<typeof reminderEmailInserts>[0] = [];
+  // Per match, the players (by `${seasonId}:${userId}`) it gives a strike.
+  const struckKeys: string[][] = [];
   for (const plan of plans) {
     const { m, outcome, inactive } = plan;
     const messages: { userId: string; message: Message }[] = [];
@@ -126,6 +128,7 @@ export async function resolveDeadlines(
         return { ...u, key, count, pairId: side(m, s) };
       }),
     );
+    struckKeys.push(given.map((u) => u.key));
     // The pair leaves when either of its players has 3 (spec 13): both are told.
     const pairCount = (pairId: number) => Math.max(...given.filter((u) => u.pairId === pairId).map((u) => u.count));
     const { messages: strikeMessages, warnings } = strikeNotices(
@@ -170,17 +173,29 @@ export async function resolveDeadlines(
   }
   // One of them lost its race and the batch wrote nothing: one batch per
   // match, as far as the run allows; the one that lost waits for the next run.
+  // The counts in the notices of the later matches took the lost match's
+  // strikes in: a later match that strikes one of its players waits too, and
+  // the next run counts again (so nobody hears "2. fekete pont" twice).
   let resolved = 0;
-  for (const statements of each) {
+  let waiting = false;
+  const stale = new Set<string>();
+  for (const [i, statements] of each.entries()) {
+    const keys = struckKeys[i]!;
+    if (keys.some((k) => stale.has(k))) {
+      for (const k of keys) stale.add(k);
+      waiting = true;
+      continue;
+    }
     if (!room()) return { resolved, left: true };
     try {
       await db.batch(statements);
       resolved++;
     } catch (e) {
       if (!lostDecision(e)) throw e;
+      for (const k of keys) stale.add(k);
     }
   }
-  return { resolved, left: more };
+  return { resolved, left: more || waiting };
 }
 
 // The revision guard of the ruling's insert (results.server.ts guardedMatchId).

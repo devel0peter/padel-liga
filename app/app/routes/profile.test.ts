@@ -141,6 +141,8 @@ describe("Profil: Fiók törlése", () => {
   });
 
   it("anonymizes an account with history; the pair's group place stays", async () => {
+    // A second device: only the batch's session delete logs it out.
+    const other = (await createSession("placed")).split(";")[0]!;
     const res = (await P.action(args(del(placed)))) as Response;
     expect(res.headers.get("Location")).toBe("/?accountDeleted=1");
     expect(h.raw.prepare("select name, email, phone from users where id = 'placed'").get()).toEqual({
@@ -150,6 +152,8 @@ describe("Profil: Fiók törlése", () => {
     });
     expect(count("select count(*) n from group_pairs where pair_id = 1")).toBe(1);
     expect(count("select count(*) n from sessions where user_id = 'placed'")).toBe(0);
+    const thrown: any = await P.loader(args(get(other))).catch((e) => e);
+    expect(thrown.headers.get("Location")).toMatch(/^\/login\?/);
   });
 
   it("refuses the Admin, in Hungarian, and changes nothing", async () => {

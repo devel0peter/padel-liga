@@ -349,6 +349,25 @@ describe("deleting an account (#152)", () => {
     expect([...during.playing].sort()).toEqual(["a", "b", "c", "d"]);
     expect([...(await D.deletionFacts(AFTER)).playing]).toEqual([]);
   });
+
+  it("plans one account with the same answer as the user list's facts (#38)", async () => {
+    publishPairOne();
+    // 'c' was an approved substitute once: history without a pair of theirs there.
+    h.raw.exec(`delete from group_pairs where pair_id = 2`);
+    h.raw.exec(`insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at)
+      select id, 1, 'b', 'c', 'approved', 'a', 1 from matches limit 1`);
+    for (const at of [DURING, AFTER]) {
+      const facts = await D.deletionFacts(at);
+      for (const id of ["a", "b", "c", "d"]) {
+        const expected = facts.playing.has(id)
+          ? { ok: false, refusal: "playing" }
+          : { ok: true, mode: facts.history.has(id) ? "anonymize" : "remove" };
+        expect(await D.planDeletion("admin", id, at), `${id} ${at.toISOString()}`).toEqual(expected);
+      }
+    }
+    expect(await D.planDeletion("admin", "c", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(await D.planDeletion("admin", "d", AFTER)).toEqual({ ok: true, mode: "remove" });
+  });
 });
 
 // "Fiók törlése" on the player's own profile (#38): the same deletion, the

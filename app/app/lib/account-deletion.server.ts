@@ -80,17 +80,28 @@ export async function deletionFacts(now = new Date()): Promise<DeletionFacts> {
 
 type Target = { id: string; email: string; name: string; platformRole: "player" | "superadmin" };
 
-async function target(userId: string): Promise<Target | undefined> {
+// The account, with the same history and playing checks as deletionFacts,
+// for this one account only (a Profil load asks for it, #38).
+async function target(userId: string, now = new Date()): Promise<(Target & { history: boolean; playing: boolean }) | undefined> {
   const [row] = await db
-    .select({ id: users.id, email: users.email, name: users.name, platformRole: users.platformRole })
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      platformRole: users.platformRole,
+      history: sql<number>`(${inPublishedGroup(users.id)} or ${approvedSubstitute(users.id)})`,
+      playing: sql<number>`${inPublishedGroup(users.id, now)}`,
+    })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)));
-  return row;
+  return row && { ...row, history: !!row.history, playing: !!row.playing };
 }
 
+const planFor = (actorId: string, row: Awaited<ReturnType<typeof target>>, by: DeletionBy) =>
+  deletionPlan({ actorId, target: row ?? null, history: !!row?.history, playing: !!row?.playing }, by);
+
 export async function planDeletion(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionPlan> {
-  const [row, facts] = await Promise.all([target(userId), deletionFacts(now)]);
-  return deletionPlan({ actorId, target: row ?? null, history: facts.history.has(userId), playing: facts.playing.has(userId) }, by);
+  return planFor(actorId, await target(userId, now), by);
 }
 
 // The player's own "Fiók törlése" (#38): what it would do now.
@@ -211,7 +222,8 @@ export type DeletionResult = { ok: true; mode: DeletionMode } | { ok: false; err
 // own deletion (deleteOwnAccount): the same statements, the account itself
 // as the actor.
 export async function deleteAccount(actorId: string, userId: string, now = new Date(), by: DeletionBy = "admin"): Promise<DeletionResult> {
-  const [row, plan] = await Promise.all([target(userId), planDeletion(actorId, userId, now, by)]);
+  const row = await target(userId, now);
+  const plan = planFor(actorId, row, by);
   if (!plan.ok || !row) return { ok: false, error: DELETION_REFUSALS[plan.ok ? "gone" : plan.refusal] };
   const email = row.email.toLowerCase();
   const mail = await mailContext(email, row.name);

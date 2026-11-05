@@ -5,6 +5,7 @@ import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { OWN_DELETED } from "~/lib/account-deletion";
+import { getUser } from "~/lib/auth/session.server";
 import { SignupForm, type SignupActionData } from "~/components/signup-form";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import {
@@ -69,8 +70,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   }));
   const params = new URL(request.url).searchParams;
   const ref = landingSource(params, request.headers.get("Referer"));
-  // Back from the player's own "Fiók törlése" (#38), logged out.
-  const accountDeleted = params.get("accountDeleted") === "1";
+  // Back from the player's own "Fiók törlése" (#38), logged out. Only for a
+  // visitor without a session, so a link with it can't tell a logged-in
+  // player their account is gone.
+  const accountDeleted = params.get("accountDeleted") === "1" && !(await getUser(request));
   return { ref, cities, turnstileSiteKey: turnstileSiteKey(), accountDeleted };
 }
 

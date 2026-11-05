@@ -52,38 +52,6 @@ test("search and the Nincs a ligában filter, kept in the address", async ({ bro
   await context.close();
 });
 
-test("the counts table: the whole league, each number what its filter lists, a label opens it (#237)", async ({ browser }) => {
-  const { context, page } = await as(browser, ORGANIZER.email);
-  await visit(page, PAGE);
-  const summary = page.getByRole("table", { name: "Párok és játékosok állapot szerint" });
-  // By the exact label: "Nevezett" is also in "Nem nevezett".
-  const cells = (label: string) =>
-    summary.getByRole("row").filter({ has: page.getByRole("cell", { name: label, exact: true }) }).getByRole("cell");
-  const numbers = async () => (await summary.locator("tbody").innerText()).replace(/\s+/g, " ");
-  const before = await numbers();
-  const listRows = page.getByRole("table", { name: "Párok listája" }).locator("tbody tr");
-  for (const [label, entry] of [
-    ["Nevezett", "entered"],
-    ["Nincs párja", "no_pair"],
-    ["Felbontott párok", "dissolved"],
-  ] as const) {
-    const n = entry === "no_pair" ? await cells(label).nth(2).innerText() : await cells(label).nth(1).innerText();
-    await summary.getByRole("link", { name: label, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`entry=${entry}`));
-    if (n === "0") await expect(listRows).toHaveCount(0);
-    else await expect(listRows).toHaveCount(Number(n));
-    // A filter doesn't change the table.
-    expect(await numbers()).toBe(before);
-  }
-  // Nor does a search.
-  await visit(page, `${PAGE}?q=${encodeURIComponent(PAIRS.p1[0].name)}`);
-  expect(await numbers()).toBe(before);
-  await expect(cells("Összesen")).toHaveCount(3);
-  // Numbers only.
-  await expect(summary).not.toContainText(PAIRS.p1[0].name);
-  await context.close();
-});
-
 test("Levél nekik opens the broadcast page with the players shown; nothing is sent", async ({ browser }) => {
   const anna = PAIRS.p1[0];
   const akos = WAITING_SOLOS[1];

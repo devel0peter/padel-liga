@@ -50,6 +50,7 @@ export default [
       route("admin/leagues/:league/matches", "routes/admin.league-matches.tsx"),
       route("admin/leagues/:league/matches/:id", "routes/admin.league-match.tsx"),
       route("admin/leagues/:league/disputes", "routes/admin.league-disputes.tsx"),
+      route("admin/leagues/:league/substitutes", "routes/admin.league-substitutes.tsx"),
       route("admin/leagues/:league/matches/:id/decide", "routes/admin.match-decide.tsx"),
     ]),
   ]),

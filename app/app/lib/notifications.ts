@@ -19,6 +19,10 @@ export const NOTIFICATION_KINDS = {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
   },
+  substitute_requested: {
+    label: "Helyettes kérés",
+    description: "Ha egy pár helyettest kér a ligád egy meccsére, és te hagyod jóvá.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -51,7 +55,13 @@ export type PlayerKind =
   | "match_result_disputed"
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
-  | "pair_withdrawn";
+  | "pair_withdrawn"
+  // Substitutes (#37, D109), in the app and by push only, never by email:
+  // the asking pair on approval, rejection and revocation; the opponents on
+  // approval and revocation. The organizers' kind is `substitute_requested`.
+  | "substitute_approved"
+  | "substitute_rejected"
+  | "substitute_revoked";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -73,7 +83,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -355,6 +365,55 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
     title: `Vitatott eredmény · ${input.leagueName}`,
     body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
+  };
+}
+
+// --- Substitutes (#37, D109) ------------------------------------------------
+
+// To the league's Szervezők and the Admins (app and push, never email), the
+// asking player left out. No names: the list shows them.
+export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
+  return {
+    title: `Helyettes kérés · ${input.leagueName}`,
+    body: `Egy pár helyettest kér a ${input.week}. heti meccsére. A jóváhagyás rád vár.`,
+    url: `/admin/leagues/${input.leagueSlug}/substitutes`,
+  };
+}
+
+export type SubstituteNotice = { matchId: number; substitute: string; absent: string };
+
+// The organizer's answer to the asking pair. The reason is on the match page only.
+export function substituteDecidedMessage(input: SubstituteNotice & { approved: boolean }): Message {
+  return input.approved
+    ? {
+        title: "Jóváhagyták a helyettest",
+        body: `${input.substitute} játszhat ${input.absent} helyett. Az ellenfeleitek is látják.`,
+        url: matchUrl(input.matchId),
+      }
+    : {
+        title: "Nem hagyták jóvá a helyettest",
+        body: `${input.substitute} nem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`,
+        url: matchUrl(input.matchId),
+      };
+}
+
+// To the opponents once a substitute is approved.
+export function substituteAnnouncedMessage(input: SubstituteNotice): Message {
+  return {
+    title: "Helyettes az ellenfeleteknél",
+    body: `${input.absent} helyett ${input.substitute} játszik a meccseteken.`,
+    url: matchUrl(input.matchId),
+  };
+}
+
+// An approval revoked before the match: to both pairs.
+export function substituteRevokedMessage(input: SubstituteNotice & { ours: boolean }): Message {
+  return {
+    title: "Visszavonták a helyettest",
+    body: input.ours
+      ? `${input.substitute} mégsem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`
+      : `${input.absent} helyett mégsem ${input.substitute} játszik a meccseteken.`,
+    url: matchUrl(input.matchId),
   };
 }
 

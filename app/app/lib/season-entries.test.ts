@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  averageStartingElo,
+  averageElo,
   checkEntry,
   ENTRY_REFUSALS,
   entryOpen,
@@ -112,15 +112,22 @@ describe("checkEntry (D18)", () => {
   });
 });
 
-describe("averageStartingElo (spec section 11)", () => {
-  it("averages the two players' starting Elo", () => {
-    expect(averageStartingElo("kezdo", "kozephalado")).toBe(1100);
-    expect(averageStartingElo("versenyzo", "versenyzo")).toBe(1600);
+describe("averageElo (spec section 11, #13)", () => {
+  const lvl = (level: string | null) => ({ elo: null, level });
+
+  it("averages the two players' starting Elo before any rated match", () => {
+    expect(averageElo(lvl("kezdo"), lvl("kozephalado"))).toBe(1100);
+    expect(averageElo(lvl("versenyzo"), lvl("versenyzo"))).toBe(1600);
   });
 
-  it("is unknown while a level is missing or unknown", () => {
-    expect(averageStartingElo(null, "halado")).toBeNull();
-    expect(averageStartingElo("halado", "profi")).toBeNull();
+  it("uses a player's current rating once they have one", () => {
+    expect(averageElo({ elo: 1030.5, level: "kezdo" }, lvl("kozephalado"))).toBe(1115.25);
+    expect(averageElo({ elo: 1180, level: "halado" }, { elo: 1220, level: "kezdo" })).toBe(1200);
+  });
+
+  it("is unknown while a level is missing or unknown and there is no rating", () => {
+    expect(averageElo(lvl(null), lvl("halado"))).toBeNull();
+    expect(averageElo(lvl("halado"), lvl("profi"))).toBeNull();
   });
 });
 

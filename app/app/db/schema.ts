@@ -1,6 +1,6 @@
 import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
-import { type AnySQLiteColumn, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Phase 0 interest list from the landing page. Personal data: see spec section 17.
 export const interestSignups = sqliteTable("interest_signups", {
@@ -161,6 +161,11 @@ export const users = sqliteTable("users", {
   // starting Elo. Required on the first-login page; null only for accounts
   // from before it was asked (the home page prompts them).
   level: text("level", { enum: ["kezdo", "kozephalado", "halado", "versenyzo"] }),
+  // The current Elo (#13, spec 11), unrounded; null until the first rated
+  // match, while the level's starting value counts (packages/rules
+  // currentElo). Written only by lib/elo.server.ts, which replays every
+  // rated match.
+  elo: real("elo"),
   // Hungarian phone number in E.164 ("+36301234567"), required on the profile
   // form since 2026-10-28 (older accounts may lack it). Personal data:
   // never on a public page; only the current phase's opponents will see it.
@@ -859,4 +864,29 @@ export const matchReminders = sqliteTable(
     sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.kind, t.slot] })],
+);
+
+// Every player's Elo change in every rated match (#13, spec 11): a played
+// match that is final. Rewritten by lib/elo.server.ts from a replay of all
+// rated matches in the order they first became final, so an organizer's
+// later ruling changes the history as if it had been there from the start.
+// `at`: when the match first became final (the replay order). For the
+// profile's history (#36).
+export const eloChanges = sqliteTable(
+  "elo_changes",
+  {
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ratingBefore: real("rating_before").notNull(),
+    ratingAfter: real("rating_after").notNull(),
+    delta: real("delta").notNull(),
+    // The side's K: the average of its two players' K (D104).
+    k: real("k").notNull(),
+    at: integer("at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.userId] }), index("elo_changes_user_idx").on(t.userId, t.at)],
 );

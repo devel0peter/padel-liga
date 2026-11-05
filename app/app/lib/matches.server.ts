@@ -41,7 +41,7 @@ import { countedOutcome, groupTable } from "./ladder";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
-import { averageStartingElo } from "./season-entries";
+import { averageElo } from "./season-entries";
 import { logError } from "~/lib/log";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
@@ -65,7 +65,9 @@ const pairPlayerColumns = {
   aEmail: playerA.email,
   aPhone: playerA.phone,
   aLevel: playerA.level,
+  aElo: playerA.elo,
   bLevel: playerB.level,
+  bElo: playerB.elo,
   bId: playerB.id,
   bName: playerB.name,
   bEmail: playerB.email,
@@ -96,7 +98,7 @@ export async function groupMembers(groupIds: number[]): Promise<Map<number, Pair
     list.push({
       pairId: r.pairId,
       seed: r.seed,
-      elo: averageStartingElo(r.aLevel, r.bLevel) ?? 0,
+      elo: averageElo({ elo: r.aElo, level: r.aLevel }, { elo: r.bElo, level: r.bLevel }) ?? 0,
       players: toPlayers(r),
       withdrawn: r.withdrawnAt !== null,
     });

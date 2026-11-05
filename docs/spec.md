@@ -174,8 +174,11 @@ A withdrawn pair (section 4) is left out of the table with all of its matches; u
 ## 11. Rating (Elo)
 - Individual Elo, starting value based on self-assessed level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600; the same levels as the signup form).
 - Pair rating = average of the two players.
-- After a match, both players receive the same delta. K = 40 for a player's first 10 rated matches, 20 after (README decision log, 2026-10-05).
-- Walkovers don't change Elo.
+- After a match, both players receive the same delta. K = 40 for a player's first 10 rated matches, 20 after (README decision log, 2026-10-05). A side's K is the average of its two players' K (40, 30 or 20), so a match is zero-sum only when both sides' K are equal (D104).
+- Rated matches: played matches that are final (a confirmed result, the 48-hour auto-accept, an organizer's ruling with a played score). Walkovers, both-inactive and unplayed matches don't change Elo.
+- Ratings are a replay of every rated match from the starting values, in the order the matches first became final. An organizer's later ruling replays its match in place, so the ratings end up as if the new outcome had been there from the start (D104).
+- A pair withdrawn mid-phase keeps the changes of its final matches; its matches not yet final are never rated. No replay on withdrawal (D104).
+- Stored unrounded; the profile shows the rounded number, organizer tables one decimal.
 - Substitutes: Elo is computed from the players who actually played. The substitute's rating changes, the absent player's doesn't.
 
 ## 12. League configuration (per league, for multi-city)

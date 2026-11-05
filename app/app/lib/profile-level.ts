@@ -4,16 +4,18 @@
 // (szabályzat section 8). Once they took part in a season the league's
 // results decide, so the level is locked (spec section 3).
 
-import { isLevel, startingElo } from "@padel-liga/rules";
+import { currentElo } from "@padel-liga/rules";
 
 export const LEVEL_LOCKED_NOTE =
   "A szinted lezárult: mostantól a liga eredményei döntik el, hol tartasz. Ezt az értékszámod mutatja.";
 export const LEVEL_LOCKED_ERROR = "A szintedet már nem módosíthatod: a liga eredményei döntik el.";
 
-// The értékszám to show: until the Élő updates exist (#13) it is the
-// starting value of the level. Null without a (known) level.
-export function ratingFor(level: string | null | undefined): number | null {
-  return level && isLevel(level) ? startingElo(level) : null;
+// The értékszám to show, rounded: the rating from the player's played
+// matches (#13), before the first one the starting value of the level. Null
+// without either.
+export function ratingFor(level: string | null | undefined, elo: number | null = null): number | null {
+  const rating = currentElo(elo, level ?? null);
+  return rating === null ? null : Math.round(rating);
 }
 
 // Which level the profile form may save. A locked level stays as it is: the

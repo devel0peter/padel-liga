@@ -11,7 +11,7 @@ import { notifyPlayers } from "~/lib/notifications.server";
 
 import { auditEntry, auditWhen, leagueOfSeason } from "./audit.server";
 import { cannotSplit, draftIsStale, pairWeeks, publishBlocker, weekRange } from "./groups";
-import { averageStartingElo } from "./season-entries";
+import { averageElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
 
 // First-phase groups in D1 (#24, D20-D22). The rules are in groups.ts and
@@ -50,10 +50,12 @@ const pairColumns = {
   idA: playerA.id,
   nameA: playerA.name,
   levelA: playerA.level,
+  eloA: playerA.elo,
   emailA: playerA.email,
   idB: playerB.id,
   nameB: playerB.name,
   levelB: playerB.level,
+  eloB: playerB.elo,
   emailB: playerB.email,
 };
 
@@ -63,10 +65,12 @@ type PairRow = {
   idA: string;
   nameA: string;
   levelA: string | null;
+  eloA: number | null;
   emailA: string;
   idB: string;
   nameB: string;
   levelB: string | null;
+  eloB: number | null;
   emailB: string;
 };
 
@@ -77,9 +81,9 @@ function groupPair(r: PairRow): GroupPair {
       { id: r.idA, name: r.nameA, level: r.levelA, email: r.emailA },
       { id: r.idB, name: r.nameB, level: r.levelB, email: r.emailB },
     ],
-    // Both levels are required to enter (D18); until Elo exists the pair's
-    // rating is the average starting Elo of its levels (D20).
-    averageElo: averageStartingElo(r.levelA, r.levelB) ?? 0,
+    // Both levels are required to enter (D18); the pair's rating is the
+    // average current Elo (#13), the starting value before a rated match (D20).
+    averageElo: averageElo({ elo: r.eloA, level: r.levelA }, { elo: r.eloB, level: r.levelB }) ?? 0,
     active: r.pairStatus === "active",
     withdrawn: false,
     withdrawalReason: null,

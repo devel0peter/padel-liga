@@ -133,7 +133,7 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Minden játékosnak saját értékszáma van. A pár értékszáma a két játékos átlaga.
 - A kezdő értékszám a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
 - A szintedet a profilodon addig módosíthatod, amíg nem játszottál szezonban. Amint egy párod bekerül egy kihirdetett csoportba, a szinted lezárul: onnantól a liga eredményei döntik el, hol tartasz, ezt az értékszámod mutatja.
-- **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik.
+- **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik, ha a két pár `K`-ja egyezik; a pár `K`-ja a két játékosé átlaga (40, 30 vagy 20).
   - Esély: `E = 1 / (1 + 10^((ellenfél − ti) / 400))`
   - Változás: `K × (eredmény − E)`, ahol az eredmény győzelemnél 1, vereségnél 0.
   - `K` = 40 az első 10 meccseden, utána 20.

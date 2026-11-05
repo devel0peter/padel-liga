@@ -391,6 +391,14 @@ describe("strikes (#294)", () => {
     expect(await S.myStrikes("p1a")).toEqual([]);
   });
 
+  it("the player's own 3rd strike says the pair leaves even outside a group (a withdrawn pair)", async () => {
+    earlier("p3a", 3);
+    h.raw.exec("update group_pairs set withdrawn_at = 1 where pair_id = 3");
+    expect(await S.myStrikes("p3a")).toEqual([{ seasonId: 1, count: 3, leaving: true }]);
+    // The partner of a withdrawn pair isn't in a group of the phase any more.
+    expect(await S.myStrikes("p3b")).toEqual([]);
+  });
+
   it("anonymizing a player clears the reasons of their cancelled strikes, in the rows and the audit log", async () => {
     await S.giveStrikes({ seasonId: 1, pairId: 1, players: ["p1a", "p1b"], matchId: matchOf(1, 3).id, source: "no_show", at: NOW });
     const id = one("select id from strikes where user_id = 'p1a'").id;

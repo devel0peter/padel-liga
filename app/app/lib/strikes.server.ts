@@ -153,7 +153,8 @@ export async function pairsLeavingAfterPhase(seasonId: number, phase: number): P
  * A player's own live strikes per season they have any in, newest season
  * first, and whether their pair leaves at the end of the phase (Kezdőlap
  * card): a player of their pair in the season's newest published phase they
- * play has 3 (maybe the partner alone, after a partner change: spec 8, 13).
+ * play has 3 (maybe the partner alone, after a partner change: spec 8, 13),
+ * and always when the player has 3 themselves.
  * A season where only the partner has strikes is listed with 0 when the pair
  * leaves. Three queries.
  */
@@ -179,11 +180,11 @@ export async function myStrikes(userId: string): Promise<{ seasonId: number; cou
     current.map((r) => r.partner),
     current.map((r) => r.seasonId),
   );
-  const leaving = new Set(
-    current
-      .filter((r) => Math.max(own.get(r.seasonId) ?? 0, partners.get(`${r.seasonId}:${r.partner}`) ?? 0) >= STRIKE_LIMIT)
-      .map((r) => r.seasonId),
-  );
+  // The player's own 3rd always counts, in a group or not (a withdrawn pair, D87).
+  const leaving = new Set([
+    ...[...own].filter(([, n]) => n >= STRIKE_LIMIT).map(([seasonId]) => seasonId),
+    ...current.filter((r) => (partners.get(`${r.seasonId}:${r.partner}`) ?? 0) >= STRIKE_LIMIT).map((r) => r.seasonId),
+  ]);
   return [...new Set([...own.keys(), ...leaving])]
     .sort((x, y) => y - x)
     .map((seasonId) => ({ seasonId, count: own.get(seasonId) ?? 0, leaving: leaving.has(seasonId) }));

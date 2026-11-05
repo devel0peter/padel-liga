@@ -173,7 +173,7 @@ function WithdrawDialog({ pair, action }: { pair: Pair; action: NonNullable<Pair
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Visszaléptetés kör közben: {a.name} – {b.name}
+            Visszaléptetés a csoportból: {a.name} – {b.name}
           </DialogTitle>
           <DialogDescription>
             A pár kihirdetett csoportban játszik. Ha visszalépteted, minden meccse kikerül a csoport tabellájából, a
@@ -603,8 +603,8 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
       actions={<CreateDialog candidates={candidates} />}
     >
       <p className="max-w-2xl text-muted-foreground">
-        A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. Kör közben a csoportban
-        játszó pár nem bontható fel, a kör határidejéig.
+        A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. A kihirdetett csoportban
+        játszó pár a kör határidejéig nem bontható fel.
       </p>
       <SummaryTable summary={summary} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />

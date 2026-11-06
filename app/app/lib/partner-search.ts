@@ -32,3 +32,17 @@ export function defaultSeekers<T extends Solo>(rows: readonly T[], city: string,
   }
   return out;
 }
+
+// A registered player's solo signup in the city, by lowercased email (not
+// withdrawn; the newest wins): the home club shown for a pair from
+// Regisztráltak in Összehozott párok (#297), as Regisztráltak showed it.
+export function soloSignupsByEmail<T extends Solo>(rows: readonly T[], city: string): Map<string, T> {
+  const out = new Map<string, T>();
+  for (const r of rows) {
+    if (r.mode !== "solo" || r.city !== city || r.status === "withdrawn") continue;
+    const key = r.email1.toLowerCase();
+    const seen = out.get(key);
+    if (!seen || seen.id < r.id) out.set(key, r);
+  }
+  return out;
+}

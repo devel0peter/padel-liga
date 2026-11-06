@@ -16,7 +16,7 @@ test("Felhasználók: status chips and, for the Admin, the last login", async ({
   await expect(row).toContainText("Regisztrált");
   await expect(row).toContainText(`Pár: ${partner.name}`);
   await expect(row).toContainText(ENTERED);
-  // The phone number, tap to call (D123).
+  // The phone number, tap to call (D126).
   await expect(row.getByRole("link", { name: "+36 30 123 4567" }).first()).toHaveAttribute("href", "tel:+36301234567");
   // Logged in during the walkthrough: a date, not the dash.
   await expect(row.getByRole("cell").nth(6)).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
@@ -48,7 +48,7 @@ test("Párok and Párkeresők: entries, pairs made elsewhere, phones but no emai
   await visit(page, "/admin/leagues/minta/pairs");
   const p1 = page.getByRole("row").filter({ hasText: PAIRS.p1[0].name }).filter({ hasText: PAIRS.p1[1].name });
   await expect(p1).toContainText(ENTERED);
-  // Both players' phones, tap to call (D123).
+  // Both players' phones, tap to call (D126).
   await expect(p1.locator('a[href="tel:+36301234567"]')).toHaveCount(2);
 
   // The solos paired in step 13 split in step 14: the page says so.

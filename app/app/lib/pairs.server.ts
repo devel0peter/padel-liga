@@ -94,7 +94,7 @@ export async function pairOverview(user: User, list: PairLeague[]): Promise<Pair
 export type LeaguePairRow = {
   id: number;
   // phone: formatted ("+36 30 123 4567"), "" when none. The league's
-  // Szervező and the Admin call players from Párok (D123); never public.
+  // Szervező and the Admin call players from Párok (D126); never public.
   players: { id: string; name: string; level: string | null; phone: string }[];
   elo: number | null;
   source: PairSource;
@@ -205,7 +205,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
   });
 }
 
-// phone: formatted, "" when none; for Párok's rows only (D123), never in the
+// phone: formatted, "" when none; for Párok's rows only (D126), never in the
 // player choices.
 export type PairCandidate = { id: string; name: string; level: string | null; phone: string };
 

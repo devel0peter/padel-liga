@@ -38,7 +38,7 @@ import {
 
 // Every account (Admin only). Roles are shown, not edited: Szervezők are
 // appointed on Ligák, the Admin only by the CLI. Phone numbers tap to call
-// (D123).
+// (D126).
 // "Utolsó belépés" and "Törlés" (#152) only for the Admin, even if the page
 // is ever opened to others.
 

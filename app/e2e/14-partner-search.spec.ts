@@ -63,7 +63,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   await expect(content(kristof.page)).toContainText("A szervező látja, hogy párt keresel");
   await kristof.context.close();
 
-  // The Szervező: both under Regisztráltak, with their phones to call (D123), no email address.
+  // The Szervező: both under Regisztráltak, with their phones to call (D126), no email address.
   const org = await as(browser, ORGANIZER.email);
   await visit(org.page, "/admin/leagues/minta/solos");
   const registered = org.page.getByRole("region", { name: "Regisztráltak", exact: true });

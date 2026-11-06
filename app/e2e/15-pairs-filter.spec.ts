@@ -43,7 +43,7 @@ test("search and the Nincs a ligában filter, kept in the address", async ({ bro
   await page.getByRole("link", { name: "Szűrők törlése" }).click();
   await expect(bodyRows.filter({ hasText: anna.name })).toHaveCount(1);
 
-  // Never an email address; phone numbers tap to call (D123).
+  // Never an email address; phone numbers tap to call (D126).
   await expect(content(page)).not.toContainText("@example.test");
   await expect(bodyRows.filter({ hasText: anna.name }).locator('a[href="tel:+36301234567"]').first()).toBeVisible();
   // The broadcast page is the Admin's: the Szervező has no "Levél nekik".

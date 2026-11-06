@@ -46,7 +46,7 @@ describe("Párt keresek on real SQLite (D59)", () => {
     expect(cecil).toMatchObject({ name: "Cecil", level: "kezdo", phone: "", fromSignup: true, note: "hétvégén" });
   });
 
-  it("gives the organizer each seeker's phone number, formatted (D123)", async () => {
+  it("gives the organizer each seeker's phone number, formatted (D126)", async () => {
     h.raw.exec(`update users set phone = '+36301234567' where id = 'c'`);
     const [cecil] = await S.leagueSeekers(LEAGUE);
     expect(cecil.phone).toBe("+36 30 123 4567");

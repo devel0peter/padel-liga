@@ -72,7 +72,7 @@ import { cancelStrike, countsBySeason, leagueStrikes } from "~/lib/strikes.serve
 // Registered players without a pair are rows too; the list can be searched
 // by name and filtered by entry, in the address, and the Admin can open the
 // broadcast page for the players shown (#148). Names, levels and phone
-// numbers (tap to call, D123); never an email address.
+// numbers (tap to call, D126); never an email address.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];

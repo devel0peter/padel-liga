@@ -15,7 +15,7 @@ import { listSignups } from "./signups-admin.server";
 // "Párt keresek" in D1 (D59). Párom sets it per league; Párkeresők lists the
 // registered players who look for a partner and have none in the league.
 // Names, levels and, for the league's Szervező and the Admin, phone numbers
-// (D123); never an email address.
+// (D126); never an email address.
 
 const LEVEL_ORDER: string[] = Object.keys(LEVELS);
 const levelRank = (level: string) => (LEVEL_ORDER.includes(level) ? LEVEL_ORDER.indexOf(level) : LEVEL_ORDER.length);
@@ -65,7 +65,7 @@ export type Seeker = {
   id: string;
   name: string;
   level: string;
-  // Formatted, "" when none (D123: Párkeresők, organizers only).
+  // Formatted, "" when none (D126: Párkeresők, organizers only).
   phone: string;
   // Signed up alone on the interest list (the default is on for them).
   fromSignup: boolean;
@@ -129,7 +129,7 @@ export async function pairSeekers(
   return createPair(actorId, league.id, a, b, "search");
 }
 
-// phone: formatted, "" when none (D123).
+// phone: formatted, "" when none (D126).
 export type SearchPairPlayer = { id: string; name: string; email: string; level: string; phone: string };
 
 // Összehozott párok (#297): the league's active pairs made from Regisztráltak

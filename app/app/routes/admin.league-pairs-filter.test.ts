@@ -102,7 +102,7 @@ describe("Párok search and filter (#148)", () => {
     expect((await pairsPage("?q=kovacs", cookie)).query).toEqual({ entry: null, q: "kovacs" });
   });
 
-  it("shows no email address; phone numbers only on the rows, to call (D123)", async () => {
+  it("shows no email address; phone numbers only on the rows, to call (D126)", async () => {
     for (const cookie of [await cookieFor("admin", "superadmin"), await cookieFor("szervezo", "player", 1)]) {
       const page = await pairsPage("?entry=not_in_league", cookie);
       expect(JSON.stringify(page)).not.toContain("@");

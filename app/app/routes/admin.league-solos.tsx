@@ -50,7 +50,7 @@ import { cn } from "~/lib/utils";
 // Solos from the interest list who haven't registered yet are paired as
 // before: both get an email with each other's name and address (pairIntro),
 // and the pair forms once both have registered. No email addresses shown;
-// registered players' phone numbers are, so the organizer can call (D123).
+// registered players' phone numbers are, so the organizer can call (D126).
 // Összehozott párok lists both kinds: the solo pairs (undone here) and the
 // active pairs made from Regisztráltak (dissolved on Párok; D113, #297).
 
@@ -87,7 +87,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   ]);
   const row = (r: SignupRow) => publicRow(r, clubs, statuses, league.id);
   // A pair from Regisztráltak: name, level and home club (from their solo
-  // signup, as Regisztráltak showed it), phone (D123) and status; never email.
+  // signup, as Regisztráltak showed it), phone (D126) and status; never email.
   const solos = soloSignupsByEmail(signups, league.city);
   const person = (p: SearchPairPlayer) => {
     const email = p.email.toLowerCase();
@@ -164,7 +164,7 @@ function Folded({ note, label, at }: { note: string | null; label: string; at: D
   );
 }
 
-// phone: only registered players have one here (D123).
+// phone: only registered players have one here (D126).
 type Person = Pick<Row, "name" | "level" | "plays" | "status"> & { phone?: string };
 
 function Who({ row }: { row: Person }) {

@@ -159,7 +159,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     signup("other", "d@x.hu");
     expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "o"]);
     expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c", "o"]);
-    // No address leaves the server; the phone is for Párok's rows (D123).
+    // No address leaves the server; the phone is for Párok's rows (D126).
     expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado", phone: "" });
   });
 
@@ -306,7 +306,7 @@ describe("pairs.server on real SQLite (#97)", () => {
         season: "Tél",
       },
     ]);
-    // Never an email address on the page's data; the phone only formatted, to call (D123).
+    // Never an email address on the page's data; the phone only formatted, to call (D126).
     expect(JSON.stringify(rows)).not.toContain("@");
     expect(JSON.stringify(rows)).not.toContain("+36301234567");
   });

@@ -13,7 +13,7 @@ import { userFacts, type UserFacts } from "./users-filter";
 
 // The Admin's user list (/admin/users). Never shown to anyone else: it has
 // email addresses and phone numbers (CLAUDE.md: no contact details on public
-// pages; D123: the Admin calls players from here).
+// pages; D126: the Admin calls players from here).
 export type UserRow = {
   id: string;
   name: string;

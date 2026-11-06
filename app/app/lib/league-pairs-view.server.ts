@@ -11,7 +11,7 @@ import { leagueSeekers } from "./partner-search.server";
 // Párok's rows in D1 (#148, D64): every pair of the league, then every
 // registered player without an active pair in it, with whether their "Párt
 // keresek" switch is on (D59). Names, levels and phone numbers on the page
-// (the organizer calls players from here, D123); the addresses are read only
+// (the organizer calls players from here, D126); the addresses are read only
 // for the broadcast page ("Levél nekik").
 
 export type SoloRow = { id: string; name: string; level: string | null; phone: string; seeking: boolean };

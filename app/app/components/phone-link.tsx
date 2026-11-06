@@ -3,7 +3,7 @@ import { Phone } from "lucide-react";
 import { telHref } from "~/lib/matches";
 import { cn } from "~/lib/utils";
 
-// A player's phone number on an organizer page (D123): tap to call. Only on
+// A player's phone number on an organizer page (D126): tap to call. Only on
 // pages behind `league.manage` or the Admin's; never on a public page.
 // Nothing when the player has no number (the "Nincs telefonszáma" chip says so).
 export function PhoneLink({ phone, className }: { phone: string; className?: string }) {

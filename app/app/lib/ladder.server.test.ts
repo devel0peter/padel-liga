@@ -179,9 +179,13 @@ describe("ladderPage", () => {
 
     it("the table holds exactly the confirmed, auto-accepted and walkover results", async () => {
       playSeason();
-      const { rows } = await tableOf();
+      const { rows, group } = await tableOf();
       // 1011: win 3 + loss 1; 1012: loss 1 + walkover win 3; 1013: win 3 + walkover loss 0; 1014: nothing yet.
       expect(rows).toEqual({ "1011": [4, 2], "1012": [4, 2], "1013": [3, 2], "1014": [0, 0] });
+      // Sets and games, the walkover as 4:0 4:0 (spec 9). 1011: 2:0 8:3 and 0:2 3:8;
+      // 1012: 0:2 3:8 and 2:0 8:0; 1013: 2:0 8:3 and 0:2 0:8.
+      const diffs = Object.fromEntries(group.rows.map((r) => [r.names[0].slice(-5, -1), [r.setDiff, r.gameDiff]]));
+      expect(diffs).toEqual({ "1011": [0, 0], "1012": [0, 3], "1013": [0, -3], "1014": [0, 0] });
     });
 
     it("a waiting or disputed result stays out whatever outcome is stored on the match", async () => {
@@ -212,6 +216,30 @@ describe("ladderPage", () => {
       expect(group.results).toHaveLength(3);
     });
 
+    it("skips a match whose stored outcome is invalid, logs one warning and still renders (D115)", async () => {
+      playSeason();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        // A score no write would accept (sets go to 4) and a kind the app doesn't know.
+        setMatch(1012, 1014, "final", played([[6, 1], [6, 2]]));
+        setMatch(1011, 1014, "final", { kind: "forfeit" });
+        const { rows, group } = await tableOf();
+        // Neither counts: the table is the one without them.
+        expect(rows).toEqual({ "1011": [4, 2], "1012": [4, 2], "1013": [3, 2], "1014": [0, 0] });
+        // Week 2's 1012-1014 is shown without a result; the results list skips week 3's 1011-1014.
+        expect(group.weekMatches.map((m) => m.result)).toEqual(["1:4, 2:4", null]);
+        expect(group.results.map((m) => m.result)).toEqual(["4:1, 4:2", "kontumác"]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        const line = warn.mock.calls[0]![0] as Record<string, unknown>;
+        const ids = h.raw.prepare("select id from matches where pair_b = 1014 and pair_a in (1011, 1012) order by id").all();
+        expect(line).toMatchObject({ level: "warn", event: "league page skipped invalid outcomes", count: 2 });
+        expect([...(line.matchIds as number[])].sort()).toEqual(ids.map((r: { id: number }) => r.id));
+        expect(JSON.stringify(line)).not.toMatch(/Játékos|titkos|@|\+36/);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it("the played matches show their scores for the week and in the results list", async () => {
       playSeason();
       const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z")); // week 1
@@ -238,7 +266,18 @@ describe("ladderPage", () => {
   it("carries no email, phone or internal id but the pair's, for its profile link (#36)", async () => {
     publish(1, 3);
     h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where week = 1").run(sec("2026-11-10T17:30:00Z"));
-    const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
+    // A page with scores (#190): group 1's week-1 and week-2 matches are final.
+    const final = h.raw.prepare("update matches set status = 'final', outcome = ? where pair_a = ? and pair_b = ?");
+    final.run(JSON.stringify({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [10, 7] } }), 1011, 1012);
+    final.run(JSON.stringify({ kind: "walkover", winner: "b" }), 1011, 1013);
+    const page = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
+    const group = page?.kind === "ladder" ? page.bands[0]!.groups[0]! : null;
+    expect(group?.rows.map((r) => [r.names[0], r.points, r.setDiff, r.gameDiff])).toEqual([
+      ["Játékos 1013A", 3, 2, 8],
+      ["Játékos 1011A", 3, -1, -6],
+      ["Játékos 1012A", 1, -1, -2],
+    ]);
+    expect([...group!.weekMatches, ...group!.results].map((m) => m.result)).toEqual(["kontumác", "4:1, 2:4, szuper tie-break 10:7"]);
     const text = JSON.stringify(page);
     expect(text).not.toMatch(/titkos\.example|@|\+36|30123|"u1\d+/);
     expect(text).toContain("Játékos 1011A");

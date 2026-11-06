@@ -198,6 +198,18 @@ export function d1Update(sql: string): void {
   });
 }
 
+// One fixture delete in the suite's local D1: a spec that brought its own rows
+// (a league of its own, #181) removes them again, so later specs see the
+// walkthrough's state.
+export function d1Delete(sql: string): void {
+  if (!/^\s*delete\b/i.test(sql)) throw new Error("d1Delete() only deletes.");
+  execFileSync("npx", ["--no-install", ...wranglerLocal(["d1", "execute", "DB", "--command", sql])], {
+    cwd: APP_DIR,
+    env: { ...process.env, FORCE_COLOR: "0" },
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+}
+
 // The seeded season's id, from the Szezonok page's links.
 export async function seasonPath(page: Page): Promise<string> {
   await page.goto("/admin/leagues/minta/seasons");

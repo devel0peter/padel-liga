@@ -2,10 +2,9 @@
 //   [--click "Name"] [--label name] <path>...` (#103). What the e2e-tester agent
 // uses to look at changed pages: it starts the suite's own dev server (the same
 // local D1 and guards as `npm run e2e`; E2E_PORT or a free port, #169), logs in
-// as seeded accounts with the code the server prints, opens every path as
-// every role, notes the
-// status, the final URL, script errors and a sideways scroll at phone width,
-// and saves a desktop and a 390px screenshot of each into
+// as seeded accounts with the code the server prints, opens every path as every
+// role, notes the status, the final URL, script errors and a sideways scroll at
+// phone width, and saves a desktop and a 390px screenshot of each into
 // app/e2e/.reports/shots/<label>/. Exit code 1 when a page answers 5xx or
 // throws; a 4xx or a redirect is reported, not failed (a refused page is
 // supposed to refuse).
@@ -56,14 +55,23 @@ async function startServer(a: ShotsArgs): Promise<ChildProcess> {
   });
   let out = "";
   let err = "";
-  child.stdout?.on("data", (d) => (out += d));
-  child.stderr?.on("data", (d) => (err += d));
+  const keepOut = (d: Buffer) => (out += d);
+  const keepErr = (d: Buffer) => (err += d);
+  child.stdout?.on("data", keepOut);
+  child.stderr?.on("data", keepErr);
   let exited: number | null = null;
   child.on("exit", (code) => (exited = code ?? 0));
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (exited !== null) throw new Error(`The e2e server stopped (exit ${exited}).\n${err.split("\n").slice(-20).join("\n")}`);
-    if (READY_PATTERN.test(out)) return child;
+    if (READY_PATTERN.test(out)) {
+      // Started: its output is no longer kept (#284), only drained, so the
+      // server never blocks on a full pipe.
+      child.stdout?.off("data", keepOut).resume();
+      child.stderr?.off("data", keepErr).resume();
+      out = err = "";
+      return child;
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   stopServer(child);

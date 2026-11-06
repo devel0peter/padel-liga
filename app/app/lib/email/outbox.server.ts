@@ -504,8 +504,9 @@ async function markInvited(emails: string[], invitedAt: Date | null): Promise<Se
 // Queues the registration invite for everyone pending. The addresses are
 // claimed first (invited_at), so a second send running at the same time gets
 // none of them and nobody is invited twice. Then, in one D1 batch (a
-// transaction): the emails and the account_invites rows (so the link works
-// before registration opens). If that fails, the claim is released. Then
+// transaction): the emails and the account_invites rows (since #113 they
+// only exempt the address from the daily cap on login codes to new
+// addresses). If that fails, the claim is released. Then
 // they are sent after the response, within the daily limit (#112, #140).
 // Returns how many were queued.
 // `only`: just these (lowercase) addresses, e.g. the partner's address a

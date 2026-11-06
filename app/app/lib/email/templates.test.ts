@@ -494,8 +494,14 @@ describe("daily digest and holnap meccs (#31, spec 13)", () => {
   });
 });
 
-describe("pairCreated (#260)", () => {
-  const input = { to: "Nagy Anna", partnerName: "Kovács Béla", league: "Padelpárbaj Győr" };
+describe("pairCreated (#260, D121)", () => {
+  const input = {
+    to: "Nagy Anna",
+    partnerName: "Kovács Béla",
+    partnerEmail: "bela@example.com",
+    partnerPhone: "+36 30 123 4567",
+    league: "Padelpárbaj Győr",
+  };
 
   it("names the partner and the league, and links Párom", () => {
     const e = pairCreated(input);
@@ -506,14 +512,22 @@ describe("pairCreated (#260)", () => {
     expect(e.html).toContain('href="https://padelparbaj.hu/pair"');
   });
 
-  it("never carries an email address or phone number besides ours", () => {
+  it("gives the partner's email and phone, so the two can reach each other (D121)", () => {
     const e = pairCreated(input);
+    expect(e.text).toContain("Így éred el:\nE-mail: bela@example.com\nTelefon: +36 30 123 4567");
+    expect(e.html).toContain("E-mail: bela@example.com<br>Telefon: +36 30 123 4567");
     const addresses = (e.text.match(/[\w.+-]+@[\w.-]+/g) ?? []).filter((a) => !a.startsWith("hello@") && !a.startsWith("info@"));
-    expect(addresses).toEqual([]);
-    expect(e.text).not.toMatch(/\+36/);
+    expect(addresses).toEqual(["bela@example.com"]);
+  });
+
+  it("leaves the phone line out when the partner has none", () => {
+    const e = pairCreated({ ...input, partnerPhone: "" });
+    expect(e.text).toContain("Így éred el:\nE-mail: bela@example.com\n\n");
+    expect(e.text).not.toContain("Telefon");
   });
 
   it("escapes names in the HTML", () => {
     expect(pairCreated({ ...input, partnerName: "<b>Béla</b>" }).html).toContain("&lt;b&gt;Béla&lt;/b&gt;");
+    expect(pairCreated({ ...input, partnerEmail: "<x>@example.com" }).html).toContain("&lt;x&gt;@example.com");
   });
 });

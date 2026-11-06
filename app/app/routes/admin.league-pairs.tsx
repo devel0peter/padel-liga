@@ -4,6 +4,7 @@ import { data, Form, Link, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-pairs";
 import { AppPage } from "~/components/app-page";
+import { CARD_CELL, CARD_ROW, CardLabel } from "~/components/card-table";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -36,13 +37,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
+import { cn } from "~/lib/utils";
 import {
   filterPairsRows,
   isFiltered,
   PAIRS_FILTERS,
   pairsFilterCounts,
-  pairsSummary,
-  type PairsSummary,
   pairsQueryString,
   parsePairsQuery,
   type PairsFilter,
@@ -103,7 +103,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     slug: league.slug,
     rows: filterPairsRows(all, query),
     counts: pairsFilterCounts(all, query.q),
-    summary: pairsSummary(all),
     query,
     activePairs: all.filter((r) => r.kind === "pair" && r.pair.status === "active").length,
     candidates,
@@ -458,44 +457,6 @@ function ChangeDialog({ pair, candidates }: { pair: Pair; candidates: Candidate[
   );
 }
 
-// The counts at the top (#237): the whole league, whatever the search or the
-// filter; a label opens the list with that filter (and no search).
-function SummaryTable({ summary }: { summary: PairsSummary }) {
-  const num = (n: number | null) => (n === null ? "–" : n);
-  return (
-    <div className="w-full rounded-lg border sm:w-fit">
-      <Table className="tabular-nums">
-        <caption className="sr-only">Párok és játékosok állapot szerint</caption>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Állapot</TableHead>
-            <TableHead className="text-right">Párok</TableHead>
-            <TableHead className="text-right">Játékosok</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {summary.rows.map((r) => (
-            <TableRow key={r.filter}>
-              <TableCell>
-                <Link to={`?entry=${r.filter}`} className="underline-offset-4 hover:underline">
-                  {PAIRS_FILTERS[r.filter]}
-                </Link>
-              </TableCell>
-              <TableCell className="text-right">{num(r.pairs)}</TableCell>
-              <TableCell className="text-right">{num(r.players)}</TableCell>
-            </TableRow>
-          ))}
-          <TableRow className="font-medium">
-            <TableCell>Összesen</TableCell>
-            <TableCell className="text-right">{summary.total.pairs}</TableCell>
-            <TableCell className="text-right">{summary.total.players}</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
 // Search by name and the entry filter, both in the address (#148).
 function Filters({ query, counts, slug, canMail, shown }: {
   query: Route.ComponentProps["loaderData"]["query"];
@@ -551,8 +512,8 @@ function Filters({ query, counts, slug, canMail, shown }: {
 
 function SoloRow({ player }: { player: Solo }) {
   return (
-    <TableRow>
-      <TableCell className="min-w-56">
+    <TableRow className={CARD_ROW}>
+      <TableCell className={cn("min-w-56", CARD_CELL)}>
         <span className="font-medium">{player.name}</span>
         {player.level && <span className="text-xs text-muted-foreground"> · {levelLabel(player.level)}</span>}
         {player.seeking && (
@@ -561,21 +522,21 @@ function SoloRow({ player }: { player: Solo }) {
           </Badge>
         )}
       </TableCell>
-      <TableCell>–</TableCell>
-      <TableCell>–</TableCell>
-      <TableCell>
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className={CARD_CELL}>
         <StatusChips chips={[{ text: "Nincs párja", tone: "todo" }]} />
       </TableCell>
-      <TableCell>–</TableCell>
-      <TableCell />
+      <TableCell className="max-sm:hidden">–</TableCell>
+      <TableCell className="max-sm:hidden" />
     </TableRow>
   );
 }
 
 function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Candidate[]; strikes: Record<string, number> }) {
   return (
-    <TableRow className={p.status === "dissolved" ? "text-muted-foreground" : undefined}>
-      <TableCell className="min-w-56">
+    <TableRow className={cn(CARD_ROW, p.status === "dissolved" && "text-muted-foreground")}>
+      <TableCell className={cn("min-w-56", CARD_CELL)}>
         {p.players.map((pl) => (
           <div key={pl.id}>
             <span className="font-medium">{pl.name}</span>
@@ -591,17 +552,24 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
           </div>
         ))}
       </TableCell>
-      <TableCell>{p.elo === null ? "–" : formatElo(p.elo)}</TableCell>
-      <TableCell>{SOURCE_LABELS[p.source]}</TableCell>
-      <TableCell>
+      <TableCell className={CARD_CELL}>
+        <CardLabel>Elo (átlag)</CardLabel>
+        {p.elo === null ? "–" : formatElo(p.elo)}
+      </TableCell>
+      <TableCell className={CARD_CELL}>
+        <CardLabel>Forrás</CardLabel>
+        {SOURCE_LABELS[p.source]}
+      </TableCell>
+      <TableCell className={CARD_CELL}>
         <Badge variant={p.status === "active" ? "default" : "outline"}>{p.status === "active" ? "Aktív" : "Felbontva"}</Badge>
       </TableCell>
-      <TableCell className="text-sm">
+      <TableCell className={cn("text-sm", CARD_CELL)}>
+        <CardLabel>Nevezés</CardLabel>
         {p.status === "active" ? <EntryCell pair={p} /> : p.entry ? `${p.entry.season}: ${ENTRY_STATUS_LABELS[p.entry.status]}` : "–"}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className={cn("text-right max-sm:text-left", CARD_CELL)}>
         {p.status === "active" && (
-          <div className="grid justify-items-end gap-1">
+          <div className="grid justify-items-end gap-1 max-sm:justify-items-start">
             <div className="flex gap-1">
               <ChangeDialog pair={p} candidates={candidates} />
               <DissolveButton pair={p} />
@@ -634,8 +602,8 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
         értesítjük, a számot az oldalán látja.
       </p>
       <div className="rounded-lg border">
-        <Table aria-label="Fekete pontok">
-          <TableHeader>
+        <Table aria-label="Fekete pontok" className="max-sm:block">
+          <TableHeader className="max-sm:hidden">
             <TableRow>
               <TableHead>Játékos</TableHead>
               <TableHead>Mikor</TableHead>
@@ -646,12 +614,16 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="max-sm:block">
             {strikes.map((s) => (
-              <TableRow key={s.id} className={s.cancelledAt ? "text-muted-foreground" : undefined}>
-                <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell className="whitespace-nowrap">{formatDeadline(new Date(s.at))}</TableCell>
-                <TableCell className="min-w-48 whitespace-normal">
+              <TableRow key={s.id} className={cn(CARD_ROW, s.cancelledAt && "text-muted-foreground")}>
+                <TableCell className={cn("font-medium", CARD_CELL)}>{s.name}</TableCell>
+                <TableCell className={cn("whitespace-nowrap", CARD_CELL)}>
+                  <CardLabel>Mikor</CardLabel>
+                  {formatDeadline(new Date(s.at))}
+                </TableCell>
+                <TableCell className={cn("min-w-48 whitespace-normal", CARD_CELL)}>
+                  <CardLabel>Miért</CardLabel>
                   {STRIKE_SOURCES[s.source]}
                   {s.matchId && (
                     <>
@@ -662,10 +634,11 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
                     </>
                   )}
                 </TableCell>
-                <TableCell className="min-w-48 whitespace-normal">
+                <TableCell className={cn("min-w-48 whitespace-normal", CARD_CELL)}>
+                  <CardLabel>Állapot</CardLabel>
                   {s.cancelledAt ? `Törölve (${s.cancelledBy ?? "szervező"}): ${s.cancelReason ?? ""}` : "Érvényes"}
                 </TableCell>
-                <TableCell className="text-right">{!s.cancelledAt && <CancelStrikeDialog strike={s} />}</TableCell>
+                <TableCell className={cn("text-right max-sm:text-left", CARD_CELL)}>{!s.cancelledAt && <CancelStrikeDialog strike={s} />}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -730,7 +703,7 @@ function CancelStrikeDialog({ strike }: { strike: Strike }) {
 }
 
 export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
-  const { name, slug, rows, counts, summary, query, activePairs, candidates, canMail, strikes, strikeCounts } = loaderData;
+  const { name, slug, rows, counts, query, activePairs, candidates, canMail, strikes, strikeCounts } = loaderData;
   return (
     <AppPage
       title="Párok"
@@ -741,7 +714,6 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. A kihirdetett csoportban
         játszó pár a kör határidejéig nem bontható fel.
       </p>
-      <SummaryTable summary={summary} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />
       {rows.length === 0 ? (
         <p className="py-10 text-center text-muted-foreground">
@@ -749,8 +721,8 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table aria-label="Párok listája">
-            <TableHeader>
+          <Table aria-label="Párok listája" className="max-sm:block">
+            <TableHeader className="max-sm:hidden">
               <TableRow>
                 <TableHead>Játékosok</TableHead>
                 <TableHead>Elo (átlag)</TableHead>
@@ -762,7 +734,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="max-sm:block">
               {rows.map((r) =>
                 r.kind === "pair" ? (
                   <PairRow key={`p${r.pair.id}`} pair={r.pair} candidates={candidates} strikes={strikeCounts} />

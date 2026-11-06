@@ -1,14 +1,59 @@
-# Checks every PR (typecheck, tests, build, browser suite, commitlint) and push; on main, applies D1 migrations and deploys.
+# Checks every ready PR (typecheck, tests, build, browser suite, commitlint) and push to main; on main, applies D1 migrations and deploys. Drafts and docs-only PRs skip the expensive jobs (D117).
 # Secrets (repo settings → Secrets → Actions): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
 name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
+# Save Actions minutes (D117): a newer push to the same PR cancels the older
+# run. Runs on main are never cancelled (they deploy), so they get a group of
+# their own per commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Decides whether a PR needs `check` and `e2e` (D117). A draft PR runs
+  # nothing but this skip; "Ready for review" starts the full run. A PR that
+  # only changes documentation skips both. Markdown the app or the tests read
+  # counts as code: docs/szabalyzat.md (the /rules page), docs/walkthrough.md
+  # (seed test) and .claude/agents/e2e-tester.md (e2e spec 00).
+  changes:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.files.outputs.code }}
+    steps:
+      - id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # On any error (a huge PR, an API hiccup) run everything.
+          if ! files=$(gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only); then
+            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          code=$(printf '%s\n' "$files" | grep -v '^$' | grep -vE '^(README\.md|CLAUDE\.md|docs/.+\.md)$' | head -1 || true)
+          code+=$(printf '%s\n' "$files" | grep -E '^docs/(szabalyzat|walkthrough)\.md$' | head -1 || true)
+          if [ -n "$code" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else echo "code=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Changed files:"; printf '%s\n' "$files"
+
+  # A draft run skips its jobs, and GitHub counts a skipped required check
+  # as passed. Marking a PR ready right after a push gives the same commit a
+  # draft run and a real run, and the draft run's skipped check can land
+  # last and stand for the real one (seen on #324). So in a draft run the
+  # required jobs carry other names ("... (draft)"), which no ruleset
+  # requires (D120).
   check:
+    name: ${{ github.event.pull_request.draft && 'check (draft)' || 'check' }}
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name == 'push' || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -23,9 +68,12 @@ jobs:
 
   # The browser suite (#102): `npm run e2e` walks through milestone 1 in
   # Chromium on its own local D1 and a dev server without a Resend key, so
-  # it needs no secrets and sends no email. Runs next to `check` on every PR.
+  # it needs no secrets and sends no email. Runs next to `check` on every
+  # ready PR that changes code (D117).
   e2e:
-    if: github.event_name == 'pull_request'
+    name: ${{ github.event.pull_request.draft && 'e2e (draft)' || 'e2e' }}
+    needs: changes
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Read-only token, no `env` and no `secrets`: nothing of Cloudflare or Resend reaches this job.
@@ -73,7 +121,8 @@ jobs:
           retention-days: 14
 
   commitlint:
-    if: github.event_name == 'pull_request'
+    name: ${{ github.event.pull_request.draft && 'commitlint (draft)' || 'commitlint' }}
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

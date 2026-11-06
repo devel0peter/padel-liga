@@ -242,13 +242,33 @@ export async function sendDigests(now: Date, budget: Budget): Promise<number | n
   });
   const [inserts] = await reminderEmailInserts([emails]);
   await db.batch([morningDone(now), ...inserts]);
+  rememberMorningDone(now);
   return emails.length;
 }
 
 const morningDone = (now: Date) => db.insert(jobRuns).values({ key: morningKey(now), doneAt: now }).onConflictDoNothing();
 
+// The morning this isolate last saw done (#279). A run that finds the
+// morning's done mark, or writes it, remembers it, so a later run of the same
+// morning knows without a query that there is nothing left to make, even
+// with no room left. A morning only ever becomes done (job_runs rows are not
+// removed), so what is remembered stays true. An isolate that hasn't seen the
+// mark yet still has to look, so its first run of a morning with no room left
+// still says the reminders are left for the next run.
+let doneMorning: string | null = null;
+const rememberMorningDone = (now: Date) => {
+  doneMorning = morningKey(now);
+};
+const knownMorningDone = (now: Date) => doneMorning === morningKey(now);
+/** Forgets the remembered morning; for tests that start a new database. */
+export function forgetMorningDone(): void {
+  doneMorning = null;
+}
+
 async function morningFinished(now: Date): Promise<boolean> {
+  if (knownMorningDone(now)) return true;
   const [row] = await db.select({ key: jobRuns.key }).from(jobRuns).where(eq(jobRuns.key, morningKey(now)));
+  if (row) rememberMorningDone(now);
   return !!row;
 }
 
@@ -273,6 +293,8 @@ export async function runMatchReminders(
 ): Promise<string | null> {
   const tomorrow = isTomorrowRun(now);
   if (!isMorningRun(now) && !tomorrow) return null;
+  // A morning already done has nothing to leave for the next run (#279).
+  if (!tomorrow && knownMorningDone(now)) return null;
   // Every run that has no room says so (#222), the morning's first check
   // included.
   const noRoom = "match reminders: no room in this run; left for the next one";
@@ -291,7 +313,10 @@ export async function runMatchReminders(
       const digests = await sendDigests(now, budget);
       if (digests === null) left.push("the digest");
       else done.push(`${digests} digest emails`);
-    } else if (fits(budget, 1)) await morningDone(now);
+    } else if (fits(budget, 1)) {
+      await morningDone(now);
+      rememberMorningDone(now);
+    }
     else left.push("the morning's done mark");
   }
   if (tomorrow) {

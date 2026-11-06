@@ -32,7 +32,13 @@ export function pickFreePort(): number {
 // read the same port instead of picking another.
 export const PORT = suitePort(process.env, pickFreePort);
 process.env.E2E_PORT = String(PORT);
-export const BASE_URL = `http://localhost:${PORT}`;
+
+// The one address of a run (#284): the dev server binds only this, and the
+// readiness check and the browser ask only this. Never "localhost", which can
+// mean IPv6 ::1 as well: a server listening there on the same port would get
+// the browser's requests.
+export const HOST = "127.0.0.1";
+export const BASE_URL = `http://${HOST}:${PORT}`;
 
 // The line server.ts prints once its own dev server answers. The suite and
 // e2e:shots wait for this line, never for "something answers on the port",
@@ -40,11 +46,38 @@ export const BASE_URL = `http://localhost:${PORT}`;
 export const readyLine = (port: number) => `e2e server ready on port ${port}`;
 export const READY_PATTERN = new RegExp(`^${readyLine(PORT)}$`, "m");
 
-// True once the dev server's output has vite's "Local: http://localhost:<port>/"
+// True once the dev server's output has vite's "Local: http://127.0.0.1:<port>/"
 // line, which vite prints only after it bound the port itself. Before that,
 // whatever answers on the port may be someone else's server (#169).
 export function viteListening(output: string, port: number): boolean {
-  return new RegExp(`Local:\\s+http://localhost:${port}/`).test(stripVTControlCharacters(output));
+  return new RegExp(`Local:\\s+http://${HOST.replaceAll(".", "\\.")}:${port}/`).test(stripVTControlCharacters(output));
+}
+
+// Reads the dev server's output until vite says it is listening, keeping only
+// the last few KB of it, and nothing after that: the run's memory doesn't grow
+// with what the server prints later (#284; server.log keeps all of it).
+export function startupWatch(port: number, keep = 4096) {
+  let tail = "";
+  let listening = false;
+  return {
+    /** Takes the next chunk of output; true once vite's Local line was seen. */
+    feed(chunk: string): boolean {
+      if (listening) return true;
+      tail = (tail + chunk).slice(-keep);
+      if (viteListening(tail, port)) {
+        listening = true;
+        tail = "";
+      }
+      return listening;
+    },
+    get listening() {
+      return listening;
+    },
+    /** How many characters of output are held right now. */
+    get buffered() {
+      return tail.length;
+    },
+  };
 }
 
 // Refuses a port that something already listens on (IPv4 or IPv6), naming it.
@@ -93,7 +126,7 @@ export const DEV_VARS: Record<string, string> = {
   VAPID_PRIVATE_KEY: "",
   TURNSTILE_SITE_KEY: "",
   TURNSTILE_SECRET: "",
-  TURNSTILE_HOSTNAMES: "localhost",
+  TURNSTILE_HOSTNAMES: HOST,
   RESEND_WEBHOOK_SECRET: "",
   // A run sends far more than the production quota of 100 (login codes too).
   EMAIL_DAILY_LIMIT: "1000",

@@ -1,13 +1,15 @@
+> Historical: these questions are all resolved and kept as history. The current source is the [spec](../spec.md) and the [decision log](../decisions.md).
+
 # Open questions
 
-All resolved on 2026-10-02 unless noted. Decisions are also in the decision log in `README.md`.
+All resolved on 2026-10-02 unless noted. Decisions are also in the decision log, [decisions.md](../decisions.md).
 
 ## Phase 0 (landing page)
 1. ~~**Name and domain.**~~ ✅ **Padelpárbaj**, `padelparbaj.hu` at a Hungarian registrar, DNS on Cloudflare. City leagues: "Padelpárbaj Győr".
 2. ~~**Where do signups go?**~~ ✅ Our own app: the form posts to the Worker, which stores it in D1 (`interest_signups`).
 3. ~~**Hosting**~~ ✅ Cloudflare Workers, for the landing page and the app.
 4. ~~**Contact details**~~ ✅ The interest form stays as it is (names, emails, level, comment). Phone number only at registration, optional (see #15).
-5. ~~**Season start**~~ ✅ When 12 pairs have signed up (raised from 8 on 2026-10-03); target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity (`club-outreach.md`).
+5. ~~**Season start**~~ ✅ When 12 pairs have signed up (raised from 8 on 2026-10-03); target **November 2026**. Only some clubs have courts usable in winter: ask the owners about winter capacity.
 
 ## Rules
 6. ~~Match format~~ ✅ 2 short sets to 4 (tie-break at 4-4), super tie-break to 10 as the decider, golden point; one format per league; 60-minute booking (changed from sets to 6 on 2026-10-04); unfinished matches continue in a new slot. See spec section 7.

@@ -75,38 +75,56 @@ export function insertOrder(tables: SchemaRow[]): string[] {
   return done;
 }
 
-export type ForeignKey = { columns: string[]; parent: string; parentColumns: string[] };
+// What the live database does to a row when the row it links to goes
+// (SQLite's ON DELETE; "no action" when the key names none).
+export type OnDelete = "cascade" | "set null" | "set default" | "restrict" | "no action";
+export type ForeignKey = { columns: string[]; parent: string; parentColumns: string[]; onDelete: OnDelete };
 
 const ident = (s: string) => s.trim().replace(/^[`"'[]|[`"'\]]$/g, "");
 const identList = (s: string) => s.split(",").map(ident).filter(Boolean);
 
+// The ON DELETE clause right after a key's REFERENCES, up to the next comma
+// or parenthesis (ON UPDATE, MATCH or DEFERRABLE may stand around it).
+function onDeleteAfter(sql: string, from: number): OnDelete {
+  const clause = sql.slice(from).match(/^[^,()]*/)![0];
+  const action = clause.match(/\bON\s+DELETE\s+(SET\s+NULL|SET\s+DEFAULT|CASCADE|RESTRICT|NO\s+ACTION)\b/i)?.[1];
+  return action ? (action.toLowerCase().replace(/\s+/, " ") as OnDelete) : "no action";
+}
+
 // The foreign keys in a CREATE TABLE statement, as drizzle writes them
 // (`FOREIGN KEY (a) REFERENCES t(b)`) and as ALTER TABLE ADD COLUMN leaves
-// them (`a integer REFERENCES t(b)`). D1 won't run the foreign_key_list
-// pragma, so the statement is read. One without a parent column list is
-// skipped. A default with parentheses before REFERENCES hides the column.
+// them (`a integer REFERENCES t(b)`), with their ON DELETE action. D1 won't
+// run the foreign_key_list pragma, so the statement is read. One without a
+// parent column list is skipped. A default with parentheses before
+// REFERENCES hides the column.
 export function foreignKeys(sql: string): ForeignKey[] {
   const keys: ForeignKey[] = [];
   const tableLevel: [number, number][] = [];
   for (const m of sql.matchAll(/FOREIGN\s+KEY\s*\(([^)]*)\)\s*REFERENCES\s+([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s*\(([^)]*)\)/gi)) {
-    tableLevel.push([m.index!, m.index! + m[0].length]);
-    keys.push({ columns: identList(m[1]!), parent: ident(m[2]!), parentColumns: identList(m[3]!) });
+    const end = m.index! + m[0].length;
+    tableLevel.push([m.index!, end]);
+    keys.push({ columns: identList(m[1]!), parent: ident(m[2]!), parentColumns: identList(m[3]!), onDelete: onDeleteAfter(sql, end) });
   }
   for (const m of sql.matchAll(/[,(]\s*([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s+[^,()]*?\bREFERENCES\s+([`"'[]?[A-Za-z0-9_]+[`"'\]]?)\s*\(([^)]*)\)/gi)) {
     const at = m.index! + m[0].lastIndexOf("REFERENCES");
     if (tableLevel.some(([from, to]) => at >= from && at < to)) continue;
-    keys.push({ columns: [ident(m[1]!)], parent: ident(m[2]!), parentColumns: identList(m[3]!) });
+    keys.push({ columns: [ident(m[1]!)], parent: ident(m[2]!), parentColumns: identList(m[3]!), onDelete: onDeleteAfter(sql, m.index! + m[0].length) });
   }
   return keys;
 }
 
-// DELETEs that drop rows whose parent row is not in the file. The export is
-// read in steps minutes apart, so a row written meanwhile (a login after
-// `users` was read, before `sessions`) can arrive without its parent, and
-// one such row would fail the whole restore with FOREIGN KEY constraint
-// failed. Parents first: a row removed here can orphan rows of a later table,
-// which that table's DELETE then removes. Runs in one transaction with
-// deferred foreign keys (the PRAGMA at the top of the file).
+// The statements that settle rows whose parent row is not in the file. The
+// export is read in steps minutes apart, so a row written meanwhile (a login
+// after `users` was read, before `sessions`) can arrive without its parent,
+// and one such row would fail the whole restore with FOREIGN KEY constraint
+// failed. Each orphan gets what the live database would have done had its
+// parent gone (#282): a link that is ON DELETE SET NULL is emptied and the
+// row kept (who wrote an audit entry, who dissolved a pair); any other
+// orphan (CASCADE, RESTRICT, no action, SET DEFAULT) is deleted. Parents
+// first: a row removed here can orphan rows of a later table, which that
+// table's statement then settles. Runs in one transaction with deferred
+// foreign keys (the PRAGMA at the top of the file), and without foreign keys
+// too (a plain sqlite3 restore), where it does what their actions would.
 export function orphanCleanupSql(schema: SchemaRow[]): string {
   const tables = userTables(schema);
   const byName = new Map(tables.map((t) => [t.name, t]));
@@ -116,7 +134,11 @@ export function orphanCleanupSql(schema: SchemaRow[]): string {
       if (!byName.has(fk.parent) || fk.columns.length !== fk.parentColumns.length) continue;
       const set = fk.columns.map((c) => `${quote(c)} IS NOT NULL`).join(" AND ");
       const match = fk.columns.map((c, i) => `${quote("r")}.${quote(fk.parentColumns[i]!)} = ${quote(name)}.${quote(c)}`).join(" AND ");
-      out.push(`DELETE FROM ${quote(name)} WHERE ${set} AND NOT EXISTS (SELECT 1 FROM ${quote(fk.parent)} AS ${quote("r")} WHERE ${match});`);
+      const orphan = `${set} AND NOT EXISTS (SELECT 1 FROM ${quote(fk.parent)} AS ${quote("r")} WHERE ${match})`;
+      if (fk.onDelete === "set null") {
+        const cleared = fk.columns.map((c) => `${quote(c)} = NULL`).join(", ");
+        out.push(`UPDATE ${quote(name)} SET ${cleared} WHERE ${orphan};`);
+      } else out.push(`DELETE FROM ${quote(name)} WHERE ${orphan};`);
     }
   }
   return out.length ? `${out.join("\n")}\n` : "";
@@ -209,8 +231,10 @@ export function uniqueIndex(sql: string): UniqueIndex | null {
 // then and CREATE UNIQUE INDEX would fail the whole restore. The rows go in
 // file order, which is rowid order within a table, so the highest rowid is
 // the one read last: the live row. NULLs never clash in a unique index, so
-// rows with a NULL in it stay. A dropped row's children go too (ON DELETE
-// CASCADE, or the orphan cleanup that runs after these).
+// rows with a NULL in it stay. A dropped row's dependants are settled like
+// any orphan (#282): with foreign keys on by their ON DELETE action, and in
+// every case by the orphan cleanup that runs after these, so links that are
+// ON DELETE SET NULL are emptied and the rest of the dependants go.
 export function duplicateCleanupSql(schema: SchemaRow[]): string {
   const order = tableOrder(schema);
   const indexes = schema
@@ -243,6 +267,22 @@ export function tailSql(schema: SchemaRow[], sequences: SequenceRow[], cleanup =
   }
   for (const s of schema) if (s.type !== "table" && s.sql && !isInternalTable(s.name)) out.push(`${s.sql};`);
   return out.length ? `${out.join("\n")}\n` : "";
+}
+
+// The size ceiling (#282): the file is glued from its pieces in one run, one
+// call per piece plus the run's other calls (backup.server.ts), so an export
+// of more pieces than that can't be finished. A finished export says how
+// close it is; past NEAR_CEILING of it the log warns.
+export const NEAR_CEILING = 0.75;
+
+/** How much of the size ceiling an export of `parts` pieces uses, in percent. */
+export function ceilingPercent(parts: number, maxParts: number): number {
+  return Math.round((100 * parts) / maxParts);
+}
+
+/** Whether an export of `parts` pieces is past NEAR_CEILING of the ceiling. */
+export function nearCeiling(parts: number, maxParts: number): boolean {
+  return parts > NEAR_CEILING * maxParts;
 }
 
 // "daily/padel-liga-2026-11-02.sql": the UTC day of the export.

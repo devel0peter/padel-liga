@@ -8,12 +8,14 @@
 // most one active pair per league. A pair can't be dissolved or changed while
 // it plays in a published group whose round hasn't reached its deadline.
 
-export type PairSource = "signup" | "manual" | "link";
+// "search": made from Regisztráltak on Párkeresők (D113, #297).
+export type PairSource = "signup" | "manual" | "link" | "search";
 
 export const SOURCE_LABELS: Record<PairSource, string> = {
   signup: "jelentkezésből",
   manual: "kézzel",
   link: "linkkel",
+  search: "Párkeresők",
 };
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
@@ -21,6 +23,14 @@ export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportba
 // Párom for a player with no pair, under the pair link and the "Párt
 // keresek" switch (partner-search.ts); the contact address follows the text.
 export const NO_PAIR_TEXT = "Kérdés esetén írj nekünk:";
+
+// The header line of Párom (#124). The "if it changes" sentence is only for
+// someone who has a pair; without one, the contact address is given once, by
+// the card under the pair link (NO_PAIR_TEXT).
+export function pairPageDescription(hasPair: boolean, contactEmail: string): string {
+  const base = "Egy ligában egy párod lehet.";
+  return hasPair ? `${base} Ha változna, írj nekünk: ${contactEmail}` : base;
+}
 
 // The pair link (2026-10-31): the box on /home and /pair while the player
 // has no pair in the league.

@@ -1,4 +1,4 @@
-// "Párt keresek" (README decision log, 2026-11-02, D59): a registered player
+// "Párt keresek" (decision log, 2026-11-02, D59): a registered player
 // without a pair asks the organizer for a partner, per league. Pure; the D1
 // side is partner-search.server.ts.
 
@@ -29,6 +29,20 @@ export function defaultSeekers<T extends Solo>(rows: readonly T[], city: string,
     if (r.mode !== "solo" || r.city !== city || r.status === "withdrawn") continue;
     const partner = r.pairedWith == null ? null : byId.get(r.pairedWith);
     if (r.pairedWith == null || !partner || registered.has(partner.email1.toLowerCase())) out.set(r.email1.toLowerCase(), r);
+  }
+  return out;
+}
+
+// A registered player's solo signup in the city, by lowercased email (not
+// withdrawn; the newest wins): the home club shown for a pair from
+// Regisztráltak in Összehozott párok (#297), as Regisztráltak showed it.
+export function soloSignupsByEmail<T extends Solo>(rows: readonly T[], city: string): Map<string, T> {
+  const out = new Map<string, T>();
+  for (const r of rows) {
+    if (r.mode !== "solo" || r.city !== city || r.status === "withdrawn") continue;
+    const key = r.email1.toLowerCase();
+    const seen = out.get(key);
+    if (!seen || seen.id < r.id) out.set(key, r);
   }
   return out;
 }

@@ -1,4 +1,5 @@
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { leagues, pairs, partnerSearches, users } from "~/db/schema";
@@ -111,8 +112,8 @@ export async function leagueSeekers(league: { id: number; city: string }): Promi
 }
 
 // "Párba teszem" for two seekers: the active pair at once (as "Pár
-// létrehozása" on Párok, source "manual", audited), and a message in the app
-// and an email for both (#260).
+// létrehozása" on Párok, audited, but source "search": D113, #297), and a
+// message in the app and an email for both (#260).
 export async function pairSeekers(
   actorId: string,
   league: { id: number; name: string },
@@ -120,5 +121,40 @@ export async function pairSeekers(
   b: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   // createPair tells both players, in the app and by email (#260).
-  return createPair(actorId, league.id, a, b);
+  return createPair(actorId, league.id, a, b, "search");
+}
+
+export type SearchPairPlayer = { id: string; name: string; email: string; level: string };
+
+// Összehozott párok (#297): the league's active pairs made from Regisztráltak
+// (source "search", D113), newest first. A pair dissolved on Párok drops out;
+// pairs made there before D113 are "manual" and not listed. The email is only
+// for the caller's lookups (home club, status): never shown.
+export async function searchPairs(leagueId: number): Promise<{ id: number; players: [SearchPairPlayer, SearchPairPlayer] }[]> {
+  const playerA = alias(users, "search_player_a");
+  const playerB = alias(users, "search_player_b");
+  const rows = await db
+    .select({
+      id: pairs.id,
+      aId: playerA.id,
+      aName: playerA.name,
+      aEmail: playerA.email,
+      aLevel: playerA.level,
+      bId: playerB.id,
+      bName: playerB.name,
+      bEmail: playerB.email,
+      bLevel: playerB.level,
+    })
+    .from(pairs)
+    .innerJoin(playerA, eq(playerA.id, pairs.playerA))
+    .innerJoin(playerB, eq(playerB.id, pairs.playerB))
+    .where(and(eq(pairs.leagueId, leagueId), eq(pairs.status, "active"), eq(pairs.source, "search")))
+    .orderBy(desc(pairs.id));
+  return rows.map((r) => ({
+    id: r.id,
+    players: [
+      { id: r.aId, name: r.aName, email: r.aEmail, level: r.aLevel ?? "" },
+      { id: r.bId, name: r.bName, email: r.bEmail, level: r.bLevel ?? "" },
+    ],
+  }));
 }

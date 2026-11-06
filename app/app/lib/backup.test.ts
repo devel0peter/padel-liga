@@ -160,13 +160,26 @@ describe("foreignKeys", () => {
     expect(
       foreignKeys("CREATE TABLE `s` (`id` integer, `u` text, `a` integer, `b` integer, FOREIGN KEY (`u`) REFERENCES `users`(`id`) ON DELETE cascade, FOREIGN KEY (`a`, `b`) REFERENCES `pairs`(`x`, `y`))"),
     ).toEqual([
-      { columns: ["u"], parent: "users", parentColumns: ["id"] },
-      { columns: ["a", "b"], parent: "pairs", parentColumns: ["x", "y"] },
+      { columns: ["u"], parent: "users", parentColumns: ["id"], onDelete: "cascade" },
+      { columns: ["a", "b"], parent: "pairs", parentColumns: ["x", "y"], onDelete: "no action" },
     ]);
   });
   it("reads a column added with ALTER TABLE ... REFERENCES, once", () => {
     expect(foreignKeys("CREATE TABLE `m` (`id` integer PRIMARY KEY NOT NULL, `club_id` integer REFERENCES clubs(id))")).toEqual([
-      { columns: ["club_id"], parent: "clubs", parentColumns: ["id"] },
+      { columns: ["club_id"], parent: "clubs", parentColumns: ["id"], onDelete: "no action" },
+    ]);
+  });
+  it("reads each key's ON DELETE action, wherever ON UPDATE stands (#282)", () => {
+    const sql =
+      "CREATE TABLE `a` (`id` integer, `by` text, `league_id` integer REFERENCES leagues(id) ON DELETE set null, `x` text, `y` text, " +
+      "FOREIGN KEY (`by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE SET  NULL, " +
+      "FOREIGN KEY (`x`) REFERENCES `users`(`id`) ON DELETE restrict ON UPDATE cascade, " +
+      "FOREIGN KEY (`y`) REFERENCES `users`(`id`) ON UPDATE cascade)";
+    expect(foreignKeys(sql).map((k) => [k.columns[0], k.onDelete])).toEqual([
+      ["by", "set null"],
+      ["x", "restrict"],
+      ["y", "no action"],
+      ["league_id", "set null"],
     ]);
   });
   it("finds nothing in a table without keys", () => {
@@ -184,6 +197,24 @@ describe("orphanCleanupSql", () => {
     expect(orphanCleanupSql(schema).trim().split("\n")).toEqual([
       'DELETE FROM "sessions" WHERE "user_id" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "users" AS "r" WHERE "r"."id" = "sessions"."user_id");',
       'DELETE FROM "logins" WHERE "session" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "sessions" AS "r" WHERE "r"."id" = "logins"."session");',
+    ]);
+  });
+  it("empties a link that is ON DELETE SET NULL and keeps the row; deletes the other orphans (#282)", () => {
+    const linked = [
+      { type: "table", name: "users", sql: "CREATE TABLE `users` (`id` text PRIMARY KEY)" },
+      {
+        type: "table",
+        name: "audit_log",
+        sql:
+          "CREATE TABLE `audit_log` (`id` integer, `actor_id` text, `a` text, `b` text, FOREIGN KEY (`actor_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null, " +
+          "FOREIGN KEY (`a`, `b`) REFERENCES `pairs`(`x`, `y`) ON DELETE set null)",
+      },
+      { type: "table", name: "pairs", sql: "CREATE TABLE `pairs` (`x` text, `y` text, `player_a` text REFERENCES users(id) ON DELETE restrict)" },
+    ];
+    expect(orphanCleanupSql(linked).trim().split("\n")).toEqual([
+      'DELETE FROM "pairs" WHERE "player_a" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "users" AS "r" WHERE "r"."id" = "pairs"."player_a");',
+      'UPDATE "audit_log" SET "actor_id" = NULL WHERE "actor_id" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "users" AS "r" WHERE "r"."id" = "audit_log"."actor_id");',
+      'UPDATE "audit_log" SET "a" = NULL, "b" = NULL WHERE "a" IS NOT NULL AND "b" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "pairs" AS "r" WHERE "r"."x" = "audit_log"."a" AND "r"."y" = "audit_log"."b");',
     ]);
   });
   it("is empty when no table has a key, and goes before the counters in the tail", () => {

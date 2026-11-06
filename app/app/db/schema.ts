@@ -523,8 +523,10 @@ export const pairs = sqliteTable(
     status: text("status", { enum: ["active", "dissolved"] }).notNull().default("active"),
     // "signup": formed from the interest signup (#89), or by an invite before
     // #97; "manual": made by a Szervező on the Párok page (#97); "link": a
-    // player accepted the other's pair link (2026-10-31).
-    source: text("source", { enum: ["signup", "manual", "link"] }).notNull().default("signup"),
+    // player accepted the other's pair link (2026-10-31); "search": made from
+    // Regisztráltak on Párkeresők (D113, #297; "manual" before). A text
+    // column without a CHECK: a new value needs no migration.
+    source: text("source", { enum: ["signup", "manual", "link", "search"] }).notNull().default("signup"),
     dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
     dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -568,7 +570,7 @@ export const pairInvites = sqliteTable(
   ],
 );
 
-// A player's own link to invite a partner (README decision log, 2026-10-31):
+// A player's own link to invite a partner (decision log, 2026-10-31):
 // one per player and league, shown on /home and /pair while they have no
 // pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
 // partner, while both are without a pair in the league. The link carries the

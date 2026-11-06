@@ -17,11 +17,12 @@ import { listSeasons } from "~/lib/seasons.server";
 
 import type { User } from "./auth/session.server";
 import { inLeagueCity, signupCities } from "./league-players";
+import { formatPhone } from "./phone";
 import { canDissolve, checkNewPair, DISSOLVE_REFUSED, NEW_PAIR_REFUSALS, type PairSource } from "./pairs";
 
 // Pairs in D1. The rules are in pairs.ts. Players only see their pair
 // (/pair); a Szervező changes pairs on the Párok page (#97). No email goes
-// out for a pair change: the organizer tells the players.
+// out for a dissolve: the organizer tells the players.
 
 export type PairLeague = { id: number; name: string };
 
@@ -47,7 +48,10 @@ export function activePairWith(leagueId: number, userIds: string[]) {
 
 export type PairOverview = {
   league: PairLeague;
-  pair: { id: number; partnerName: string } | null;
+  // The partner's address and phone (D121): partners have to reach each
+  // other, also when the organizer paired two strangers. Only on Párom, to
+  // the pair's own two players. Phone formatted, "" when none.
+  pair: { id: number; partnerName: string; partnerEmail: string; partnerPhone: string } | null;
 };
 
 // What /pair shows, per league: the active pair, if any.
@@ -55,7 +59,13 @@ export async function pairOverview(user: User, list: PairLeague[]): Promise<Pair
   if (list.length === 0) return [];
   const partner = alias(users, "partner");
   const active = await db
-    .select({ id: pairs.id, leagueId: pairs.leagueId, partnerName: partner.name })
+    .select({
+      id: pairs.id,
+      leagueId: pairs.leagueId,
+      partnerName: partner.name,
+      partnerEmail: partner.email,
+      partnerPhone: partner.phone,
+    })
     .from(pairs)
     .innerJoin(partner, sql`${partner.id} = case when ${pairs.playerA} = ${user.id} then ${pairs.playerB} else ${pairs.playerA} end`)
     .where(
@@ -70,7 +80,12 @@ export async function pairOverview(user: User, list: PairLeague[]): Promise<Pair
     );
   return list.map((league) => {
     const p = active.find((a) => a.leagueId === league.id);
-    return { league, pair: p ? { id: p.id, partnerName: p.partnerName } : null };
+    return {
+      league,
+      pair: p
+        ? { id: p.id, partnerName: p.partnerName, partnerEmail: p.partnerEmail, partnerPhone: formatPhone(p.partnerPhone) }
+        : null,
+    };
   });
 }
 
@@ -249,7 +264,7 @@ async function activePairOf(leagueId: number, a: string, b: string): Promise<num
 // the league by then (checked inside the statement, so two organizers or two
 // accepts at once can't put a player in two pairs). A builder, not a raw
 // db.run(), so it can go in a D1 batch with its audit entry.
-export function insertPairIfFree(leagueId: number, a: string, b: string, source: "manual" | "link") {
+export function insertPairIfFree(leagueId: number, a: string, b: string, source: Exclude<PairSource, "signup">) {
   return db.insert(pairs).select(
     rowSelect(
       pairs,
@@ -276,7 +291,8 @@ export const activePairIdOf = (leagueId: number, a: string, b: string) =>
     and ${pairs.playerA} = ${a} and ${pairs.playerB} = ${b})`;
 
 // An organizer formed this pair (#260, replacing D59's "no email"): both
-// players get the in-app message and the email. The pair is saved already;
+// players get the in-app message and the email, with the partner's address
+// and phone (D121). The pair is saved already;
 // a notice problem must not turn the action into an error.
 async function announcePair(pairId: number): Promise<void> {
   try {
@@ -288,7 +304,16 @@ async function announcePair(pairId: number): Promise<void> {
       [
         [players.a, players.b],
         [players.b, players.a],
-      ].map(([to, partner]) => ({ toEmail: to.email, input: { to: to.name, partnerName: partner.name, league: players.league } })),
+      ].map(([to, partner]) => ({
+        toEmail: to.email,
+        input: {
+          to: to.name,
+          partnerName: partner.name,
+          partnerEmail: partner.email,
+          partnerPhone: formatPhone(partner.phone),
+          league: players.league,
+        },
+      })),
     );
   } catch (e) {
     console.error("pair created notice failed", e);
@@ -296,11 +321,19 @@ async function announcePair(pairId: number): Promise<void> {
 }
 
 // "Pár létrehozása": two registered players without a pair in the league.
-export async function createPair(actorId: string, leagueId: number, a: string, b: string): Promise<Result> {
+// `source`: "search" when made from Regisztráltak on Párkeresők (D113, #297),
+// so its Összehozott párok can list it.
+export async function createPair(
+  actorId: string,
+  leagueId: number,
+  a: string,
+  b: string,
+  source: "manual" | "search" = "manual",
+): Promise<Result> {
   const refused = await newPairRefusal(leagueId, a, b);
   if (refused) return { ok: false, error: refused };
   await db.batch([
-    insertPairIfFree(leagueId, a, b, "manual"),
+    insertPairIfFree(leagueId, a, b, source),
     auditIfChanged({
       actorId,
       action: "pair.create",

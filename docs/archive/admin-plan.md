@@ -1,3 +1,5 @@
+> Historical: this plan is done and kept as history. The current source is the [spec](../spec.md) and the [decision log](../decisions.md).
+
 # Plan: accounts, roles and the admin area
 
 Status: done (2026-10-05). PRs 1–3 shipped together in devel0peter/padel-liga#47; PR 4 (Access retired) right after. Covers devel0peter/padel-liga#14, #17, #18 and #15. Player pages come after this plan.
@@ -9,13 +11,13 @@ Status: done (2026-10-05). PRs 1–3 shipped together in devel0peter/padel-liga#
 | Roles | `player` (everyone), `league_admin` (per league), `superadmin` |
 | UI labels | Játékos / Szervező / Admin |
 | League-admin scope | Per league. Clubs (venues) belong to a city; any Szervező of a league in that city can edit them |
-| Superadmin | DB flag on the user, set only by a CLI command. No screen can grant or remove it. Only Peter's work Google account (Psionic Flare); his personal account is Szervező of Győr |
+| Superadmin | DB flag on the user, set only by a CLI command. No screen can grant or remove it. Only one separate admin account; the organizer's day-to-day account is Szervező of Győr |
 | Who sees what | Admin: interest list, broadcasts, traffic, leagues, users. Szervező: their league + their city's clubs |
 | Navigation | Sidebar (shadcn `sidebar`); off-canvas sheet on mobile |
 | Login | **No passwords.** Google, or a one-time 6-digit code by email. Same email = same account. No Better Auth: our own small module |
 | Sessions | 90 days, extended while active, for players and Szervezők. Admin (work account, rarely used) 12 hours |
 
-These go into the README decision log, spec section 2 and spec section 3 (email + password replaced) with the first PR.
+These go into the decision log, spec section 2 and spec section 3 (email + password replaced) with the first PR.
 
 ## 2. Data model
 
@@ -77,7 +79,7 @@ erDiagram
 - Google: OAuth with PKCE and state via `arctic`. Only `email_verified` Google accounts are accepted. A Google login with a known email attaches to that account.
 - Session cookie: random 32 bytes, httpOnly, Secure, SameSite=Lax. Only its SHA-256 is stored, so a database leak gives no working sessions. Logout deletes the row; "log out everywhere" deletes all of a user's rows.
 - Being a Szervező is a row in `league_admins`, not a role string. Then "Szervező of Győr but not Debrecen" works without parsing anything.
-- `audit_log` records every organizer, Admin, command-line and scheduled change, by account id, in the same batch as the change (README decision log, D91, #225; spec section 16).
+- `audit_log` records every organizer, Admin, command-line and scheduled change, by account id, in the same batch as the change (decision log, D91, #225; spec section 16).
 
 ## 3. Authorization
 
@@ -157,7 +159,7 @@ Every PR is flagged for human review (auth and personal data).
 ## 7. Settled points (2026-10-04)
 
 1. **No passwords.** Google for most people, a one-time email code for the rest. No password hashing to maintain or be responsible for, and it fits the Workers Free plan's 10 ms CPU limit. Better Auth and Workers Paid were considered and dropped.
-2. **Two accounts for Peter.** His work Google account (Psionic Flare Workspace) is the only Admin and logs in with Google. His personal account is a normal player and the Szervező of Győr, used day to day. The address is passed to the CLI command, not written in the repo. `admin@padelparbaj.hu` (a Google Group) stays only as the Cloudflare Access login until Access is retired.
+2. **Two accounts for the organizer.** A separate account is the only Admin and logs in with Google. The organizer's day-to-day account is a normal player and the Szervező of Győr. The Admin address is passed to the CLI command, not written in the repo.
 3. **Rate limiting:** a Cloudflare WAF rate-limiting rule on `POST /login` and `/auth/*`, by IP (the Free plan includes one rule), set by Peter in the dashboard. Plus at most 5 code requests per email per hour in our own code.
 
 ## 8. Email volume (agreed 2026-10-04)

@@ -1,6 +1,6 @@
 // The public landing page (#83): a league city's league is in the hero with
-// the way to registration; other cities leave their contact details. The
-// seed's season has registration open and round 1 about two weeks out.
+// the way to registration; other cities write to the contact address (#332).
+// The seed's season has registration open and round 1 about two weeks out.
 import { expect, test } from "@playwright/test";
 
 import { ADMIN, as, visit } from "./support";
@@ -29,45 +29,22 @@ test("the hero shows a league city's league and leads to registration", async ({
   await page.close();
 });
 
-test("a league city typed in the other-city form leads to registration, not a signup", async ({ browser }) => {
+// No interest form any more (#332, D123): a city without a league has no
+// chip and no form; one line sends visitors to the contact address. An old
+// tagged link still opens the page.
+test("no interest form: another city writes to the contact address", async ({ browser }) => {
   const page = await browser.newPage();
-  await visit(page, "/");
-  await page.locator("#cityOther").fill("mintavaros");
-  await expect(page.getByRole("status")).toContainText("Mintaváros: itt már fut a liga");
-  await expect(page.locator("#name1")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Regisztrálok és nevezek" })).toHaveAttribute("href", "/register");
-  await page.close();
-});
-
-test("another city leaves contact details, and can offer to organize", async ({ browser }) => {
-  const page = await browser.newPage();
-  await visit(page, "/");
-  // A listed city without a league (Győr in this database) fills the form in from its chip.
-  await page.getByRole("link", { name: /^Győr · / }).click();
-  await expect(page.locator("#cityOther")).toHaveValue("Győr");
+  await visit(page, "/?ref=regi-link");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ki a legjobb páros a városban?");
+  await expect(page.locator("#cityOther")).toHaveCount(0);
+  await expect(page.locator("#email1")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Szóljatok, ha indul" })).toHaveCount(0);
+  // Győr is listed in this database but has no league: no chip, no count.
+  await expect(page.getByRole("link", { name: /^Győr · / })).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/pár jelentkezett|jelentkezés nyitva/);
   await page.getByRole("link", { name: "+ A te városod?" }).click();
-  await expect(page.locator("#cityOther")).toHaveValue("");
-
-  await page.locator("#cityOther").fill("Tesztfalva");
-  await page.locator("#name1").fill("Landing Teszt");
-  await page.locator("#email1").fill("landing.teszt@example.test");
-  // No partner fields any more.
-  await expect(page.locator("#name2")).toHaveCount(0);
-  await page.locator("#level").click();
-  await page.getByRole("option", { name: /^Haladó/ }).click();
-  await page.locator("#organize").check();
-  await page.locator("#consent").check();
-  await page.getByRole("button", { name: "Szóljatok, ha indul" }).click();
-  await expect(page.getByText(/Köszönjük! Felírtunk \(Tesztfalva\)/)).toBeVisible();
-  await expect(page.getByText(/Köszönjük!/)).toContainText("szívesen szerveznél");
-
-  const admin = await as(browser, ADMIN.email);
-  await visit(admin.page, "/admin/signups");
-  const row = admin.page.getByRole("row").filter({ hasText: "landing.teszt@example.test" });
-  await expect(row).toContainText("Tesztfalva");
-  await expect(row).toContainText("Szervezne ligát");
-  await expect(row).not.toContainText("párt keres");
-  await admin.context.close();
+  await expect(page.getByText("Nincs még liga a városodban? Ha játszanál vagy szerveznél, írj nekünk:")).toBeVisible();
+  await expect(page.locator("#mas-varos").getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
   await page.close();
 });
 

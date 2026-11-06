@@ -124,7 +124,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 
 - Account: `admin@example.test`
 - Pages and expected results:
-  - `/admin/cities` ("Városok"): Mintaváros is there and listed (shown on the signup form).
+  - `/admin/cities` ("Városok"): Mintaváros is there and listed (shown on the landing page, which has no signup form since #332).
   - `/admin/leagues` ("Ligák"): Padelpárbaj Mintaváros with the organizer Teszt Szervező.
   - `/admin/leagues/minta/clubs` ("Klubok: Mintaváros"): the three clubs. "Inaktiválás" on one turns it off, "Aktiválás" turns it on again (deactivate instead of delete, #19). Leave all three active.
   - `/admin/leagues/minta/seasons` ("Szezonok"): the Teszt szezon with its four rounds, a link under "Nevezések" (0 nevezett) and "Csoportok" under "1. kör". Try "Új szezon" with a start day that is not a Monday: it must be refused.

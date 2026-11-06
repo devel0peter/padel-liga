@@ -241,8 +241,8 @@ export async function pairPlayers(pairId: number) {
   const [row] = await db
     .select({
       league: leagues.name,
-      a: { id: playerA.id, email: playerA.email, name: playerA.name },
-      b: { id: playerB.id, email: playerB.email, name: playerB.name },
+      a: { id: playerA.id, email: playerA.email, name: playerA.name, phone: playerA.phone },
+      b: { id: playerB.id, email: playerB.email, name: playerB.name, phone: playerB.phone },
     })
     .from(pairs)
     .innerJoin(leagues, eq(leagues.id, pairs.leagueId))

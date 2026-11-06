@@ -43,7 +43,14 @@ describe("Párt keresek on real SQLite (D59)", () => {
     expect(await S.partnerSearchState(user("c"), [GYOR])).toEqual(new Map([[1, true]]));
     expect(await ids()).toEqual(["c"]);
     const [cecil] = await S.leagueSeekers(LEAGUE);
-    expect(cecil).toMatchObject({ name: "Cecil", level: "kezdo", fromSignup: true, note: "hétvégén" });
+    expect(cecil).toMatchObject({ name: "Cecil", level: "kezdo", phone: "", fromSignup: true, note: "hétvégén" });
+  });
+
+  it("gives the organizer each seeker's phone number, formatted (D126)", async () => {
+    h.raw.exec(`update users set phone = '+36301234567' where id = 'c'`);
+    const [cecil] = await S.leagueSeekers(LEAGUE);
+    expect(cecil.phone).toBe("+36 30 123 4567");
+    expect(cecil).not.toHaveProperty("email");
   });
 
   it("follows the switch, both ways, and lists by level", async () => {
@@ -110,8 +117,10 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
     await S.pairSeekers("org", LEAGUE, "b", "c");
     await S.pairSeekers("org", LEAGUE, "a", "d");
     expect(await listed()).toEqual(["a+d", "b+c"]);
+    h.raw.exec(`update users set phone = '+36701234567' where id = 'a'`);
     const [first] = await S.searchPairs(1);
-    expect(first.players[0]).toMatchObject({ name: "Anna", level: "halado" });
+    expect(first.players[0]).toMatchObject({ name: "Anna", level: "halado", phone: "+36 70 123 4567" });
+    expect(first.players[1].phone).toBe("");
   });
 
   it("leaves out a pair dissolved on Párok, and one made on Párok, by link or from a signup", async () => {

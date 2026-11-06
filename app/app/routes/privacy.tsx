@@ -195,13 +195,14 @@ export default function Privacy() {
                 érni egymást. Te is az övét.
               </li>
               <li>
-                <strong>A telefonszámodat</strong> rajta kívül csak azok látják, akikkel az
-                aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
-                ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
-                elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése
-                után az ellenfeleid a Kezdőlapjukon és a meccs oldalán, a
-                szervező és az admin a meccsek szervezői oldalán látja, a kör
-                határidejéig; utána már nem.
+                <strong>A telefonszámodat</strong> rajta kívül azok látják, akikkel az
+                aktuális körben meccsed van, hogy egyeztetni tudjatok: a csoportok
+                kihirdetése után a Kezdőlapjukon és a meccs oldalán, a kör
+                határidejéig; utána már nem. Látja még a ligád szervezője és az
+                oldal adminja, hogy fel tudjanak hívni a ligával kapcsolatban
+                (párkeresés, nevezés, elakadt meccs): a szervező a ligája
+                játékosaiét a szervezői oldalakon, az admin mindenkiét. Más
+                játékos nem látja.
               </li>
               <li>
                 <strong>Az időpont-egyeztetést és az eredményt</strong> (ki,

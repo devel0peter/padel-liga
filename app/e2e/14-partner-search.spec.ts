@@ -63,14 +63,14 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   await expect(content(kristof.page)).toContainText("A szervező látja, hogy párt keresel");
   await kristof.context.close();
 
-  // The Szervező: both under Regisztráltak, no contact details.
+  // The Szervező: both under Regisztráltak, with their phones to call (D126), no email address.
   const org = await as(browser, ORGANIZER.email);
   await visit(org.page, "/admin/leagues/minta/solos");
   const registered = org.page.getByRole("region", { name: "Regisztráltak", exact: true });
   await expect(registered).toContainText(KATA.name);
   await expect(registered).toContainText(KRISTOF.name);
   await expect(content(org.page)).not.toContainText("@example.test");
-  await expect(content(org.page)).not.toContainText("+36");
+  await expect(registered.getByRole("row").filter({ hasText: KATA.name }).locator('a[href="tel:+36305551234"]')).toBeVisible();
   const made = await madeCount(org.page);
   await registered.getByRole("checkbox", { name: `${KATA.name} kijelölése` }).check();
   await registered.getByRole("checkbox", { name: `${KRISTOF.name} kijelölése` }).check();
@@ -84,7 +84,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   await expect(content(org.page)).toContainText(`${made + 1} párt hoztál össze`);
   await expect(madeRow(org.page).getByRole("button", { name: "Szétválasztom" })).toHaveCount(0);
   await expect(content(org.page)).not.toContainText("@example.test");
-  await expect(content(org.page)).not.toContainText("+36");
+  await expect(madeRow(org.page).locator('a[href="tel:+36305551234"]:visible')).toHaveCount(2);
   await madeRow(org.page).getByRole("link", { name: "A Párok oldalon bonthatod fel" }).click();
   await expect(org.page).toHaveURL(/\/admin\/leagues\/minta\/pairs$/);
   await org.context.close();

@@ -102,10 +102,15 @@ describe("Párok search and filter (#148)", () => {
     expect((await pairsPage("?q=kovacs", cookie)).query).toEqual({ entry: null, q: "kovacs" });
   });
 
-  it("shows no email address or phone number anywhere", async () => {
-    const page = await pairsPage("?entry=not_in_league", await cookieFor("admin", "superadmin"));
-    expect(JSON.stringify(page)).not.toContain("@");
-    expect(JSON.stringify(page)).not.toContain("+36");
+  it("shows no email address; phone numbers only on the rows, to call (D126)", async () => {
+    for (const cookie of [await cookieFor("admin", "superadmin"), await cookieFor("szervezo", "player", 1)]) {
+      const page = await pairsPage("?entry=not_in_league", cookie);
+      expect(JSON.stringify(page)).not.toContain("@");
+      const phones = page.rows.flatMap((r: any) => (r.kind === "solo" ? [r.player.phone] : r.pair.players.map((p: any) => p.phone)));
+      expect(phones).toContain("+36 30 123 4567");
+      // The player choices of "Pár létrehozása" and "Csere" carry none.
+      expect(JSON.stringify(page.candidates)).not.toContain("+36");
+    }
   });
 
   it("offers Levél nekik to the Admin only (the broadcast page is theirs)", async () => {

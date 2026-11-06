@@ -93,8 +93,9 @@ export async function pairOverview(user: User, list: PairLeague[]): Promise<Pair
 
 export type LeaguePairRow = {
   id: number;
-  // phone: whether they gave a number (the page never shows it).
-  players: { id: string; name: string; level: string | null; phone: boolean }[];
+  // phone: formatted ("+36 30 123 4567"), "" when none. The league's
+  // Szervező and the Admin call players from Párok (D126); never public.
+  players: { id: string; name: string; level: string | null; phone: string }[];
   elo: number | null;
   source: PairSource;
   status: "active" | "dissolved";
@@ -189,8 +190,8 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
     return {
       id: r.id,
       players: [
-        { id: r.aId, name: r.aName, level: r.aLevel, phone: !!r.aPhone },
-        { id: r.bId, name: r.bName, level: r.bLevel, phone: !!r.bPhone },
+        { id: r.aId, name: r.aName, level: r.aLevel, phone: formatPhone(r.aPhone) },
+        { id: r.bId, name: r.bName, level: r.bLevel, phone: formatPhone(r.bPhone) },
       ],
       elo: averageElo({ elo: r.aElo, level: r.aLevel }, { elo: r.bElo, level: r.bLevel }),
       source: r.source,
@@ -204,7 +205,9 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
   });
 }
 
-export type PairCandidate = { id: string; name: string; level: string | null };
+// phone: formatted, "" when none; for Párok's rows only (D126), never in the
+// player choices.
+export type PairCandidate = { id: string; name: string; level: string | null; phone: string };
 
 // Registered players (first-login page done) of the league without an active
 // pair in it, by name. A player belongs to the league by their signups' city,
@@ -213,7 +216,7 @@ export type PairCandidate = { id: string; name: string; level: string | null };
 export async function pairCandidates(league: { id: number; city: string }): Promise<PairCandidate[]> {
   const [accounts, signups] = await db.batch([
     db
-      .select({ id: users.id, name: users.name, level: users.level, email: users.email })
+      .select({ id: users.id, name: users.name, level: users.level, email: users.email, phone: users.phone })
       .from(users)
       .where(
         and(
@@ -226,7 +229,9 @@ export async function pairCandidates(league: { id: number; city: string }): Prom
     db.select({ email1: interestSignups.email1, email2: interestSignups.email2, city: interestSignups.city }).from(interestSignups),
   ]);
   const cities = signupCities(signups);
-  return accounts.filter((a) => inLeagueCity(cities, a.email, league.city)).map(({ id, name, level }) => ({ id, name, level }));
+  return accounts
+    .filter((a) => inLeagueCity(cities, a.email, league.city))
+    .map(({ id, name, level, phone }) => ({ id, name, level, phone: formatPhone(phone) }));
 }
 
 // Why `a` and `b` can't be a new pair, or null. `free`: the players who must

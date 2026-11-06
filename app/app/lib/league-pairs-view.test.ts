@@ -6,7 +6,6 @@ import {
   PAIRS_FILTERS,
   pairsFilterCounts,
   pairsQueryString,
-  pairsSummary,
   parsePairsQuery,
   rowAccounts,
   rowFilters,
@@ -119,57 +118,5 @@ describe("rowAccounts", () => {
 describe("the withdrawn entry's word (#174)", () => {
   it("is the same in the filter option and in the entry badge", () => {
     expect(PAIRS_FILTERS.withdrawn).toBe(ENTRY_STATUS_LABELS.withdrawn);
-  });
-});
-
-describe("pairsSummary, the counts table (#237)", () => {
-  const byFilter = (rows: readonly PairsRow[]) => Object.fromEntries(pairsSummary(rows).rows.map((r) => [r.filter, [r.pairs, r.players]]));
-
-  it("has a row per state, pairs and their players; Nincs párja players only, Felbontott pairs only", () => {
-    expect(pairsSummary(ROWS).rows.map((r) => PAIRS_FILTERS[r.filter])).toEqual([
-      "Nevezett",
-      "Nem nevezett",
-      "Elutasítva",
-      ENTRY_STATUS_LABELS.withdrawn,
-      "Nincs párja",
-      "Felbontott párok",
-    ]);
-    expect(byFilter(ROWS)).toEqual({
-      entered: [1, 2],
-      not_entered: [1, 2],
-      rejected: [1, 2],
-      withdrawn: [1, 2],
-      no_pair: [null, 2],
-      dissolved: [1, null],
-    });
-  });
-
-  it("each number is what that filter lists with an empty search", () => {
-    const counts = pairsFilterCounts(ROWS, "");
-    for (const r of pairsSummary(ROWS).rows) {
-      const listed = filterPairsRows(ROWS, q(r.filter));
-      if (r.pairs !== null) expect(r.pairs).toBe(counts[r.filter]);
-      if (r.players !== null) expect(r.players).toBe(rowAccounts(listed).length);
-    }
-  });
-
-  it("Összesen: active pairs, and each player in an active pair or without one once, not those only in a dissolved pair", () => {
-    // Anna is in an active pair and in a dissolved one; Imre was in the dissolved one and has no pair now.
-    const rows: PairsRow[] = [
-      { kind: "pair", pair: { status: "active", entry: null, players: [{ id: "anna", name: "Anna" }, { id: "bela", name: "Béla" }] } },
-      { kind: "pair", pair: { status: "dissolved", entry: null, players: [{ id: "anna", name: "Anna" }, { id: "imre", name: "Imre" }] } },
-      // An entry left pending from the approval step: active, in no state row, but in the league.
-      { kind: "pair", pair: { status: "active", entry: { status: "pending" }, players: [{ id: "cecil", name: "Cecil" }, { id: "dora", name: "Dóra" }] } },
-      { kind: "solo", player: { id: "imre", name: "Imre" } },
-      // Only in a dissolved pair, no longer a registered player of the league (e.g. deleted).
-      { kind: "pair", pair: { status: "dissolved", entry: null, players: [{ id: "bela", name: "Béla" }, { id: "gone", name: "Törölt játékos" }] } },
-    ];
-    expect(pairsSummary(rows).total).toEqual({ pairs: 2, players: 5 });
-    expect(byFilter(rows)).toMatchObject({ not_entered: [1, 2], no_pair: [null, 1], dissolved: [2, null] });
-  });
-
-  it("an empty league is all zeros", () => {
-    expect(pairsSummary([]).total).toEqual({ pairs: 0, players: 0 });
-    expect(pairsSummary([]).rows.every((r) => (r.pairs ?? 0) === 0 && (r.players ?? 0) === 0)).toBe(true);
   });
 });

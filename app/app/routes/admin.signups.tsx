@@ -4,6 +4,7 @@ import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.signups";
 import { AppPage } from "~/components/app-page";
+import { CARD_CELL, CARD_ROW, CardLabel } from "~/components/card-table";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -206,7 +207,7 @@ function Player({ name, email, status }: { name: string; email: string | null; s
       <div>
         <div className="font-medium">{name}</div>
         {email && (
-          <a href={`mailto:${email}`} className="text-xs text-muted-foreground underline">
+          <a href={`mailto:${email}`} className="text-xs break-all text-muted-foreground underline">
             {email}
           </a>
         )}
@@ -214,16 +215,6 @@ function Player({ name, email, status }: { name: string; email: string | null; s
       <StatusChips chips={status} />
     </div>
   );
-}
-
-// Below sm each signup is a stacked card (#146): the players first, then the
-// other fields, each with its label. Only max-sm: classes and sm:hidden
-// labels, so the desktop table is unchanged.
-const CARD_ROW = "max-sm:flex max-sm:flex-col max-sm:gap-2 max-sm:p-3";
-const CARD_CELL = "max-sm:p-0 max-sm:whitespace-normal max-sm:empty:hidden";
-
-function CardLabel({ children }: { children: string }) {
-  return <span className="text-muted-foreground sm:hidden">{children}: </span>;
 }
 
 function SignupTableRow({
@@ -248,16 +239,19 @@ function SignupTableRow({
 
   return (
     <TableRow className={cn(CARD_ROW, deleting && "opacity-40")}>
-      <TableCell className={cn("text-xs whitespace-nowrap text-muted-foreground", CARD_CELL)}>
-        <CardLabel>Jelentkezett</CardLabel>
-        {formatDateTime(new Date(row.createdAt))}
+      <TableCell className={cn("text-xs text-muted-foreground", CARD_CELL, "sm:whitespace-normal max-sm:grid max-sm:gap-2 max-sm:text-xs")}>
+        <div>
+          <CardLabel>Jelentkezett</CardLabel>
+          {formatDateTime(new Date(row.createdAt))}
+        </div>
+        <div className="max-sm:text-foreground">
+          <CardLabel>Város</CardLabel>
+          {row.cityText}
+        </div>
       </TableCell>
-      <TableCell className={cn(CARD_CELL, "max-sm:text-xs")}>
-        <CardLabel>Város</CardLabel>
-        {row.cityText}
-      </TableCell>
-      <TableCell className={cn("min-w-56 max-sm:order-first", CARD_CELL)}>
-        <div className="grid gap-2">
+      <TableCell className={cn("whitespace-normal max-sm:order-first", CARD_CELL)}>
+        {/* A long name wraps inside its badge (the table has fixed column widths). */}
+        <div className="grid gap-2 [&_[data-slot=badge]]:h-auto [&_[data-slot=badge]]:max-w-full [&_[data-slot=badge]]:whitespace-normal">
           <Player name={row.name1} email={row.email1} status={row.status1} />
           {row.mode === "pair" && row.name2 ? (
             <Player name={row.name2} email={row.email2} status={row.status2} />
@@ -269,37 +263,36 @@ function SignupTableRow({
           {row.wantsToOrganize && <Badge>Szervezne ligát</Badge>}
         </div>
       </TableCell>
-      <TableCell className={CARD_CELL}>
-        <CardLabel>Szint</CardLabel>
-        {levelLabel(row.level)}
-      </TableCell>
-      <TableCell className={cn("max-w-56 text-sm whitespace-normal max-sm:max-w-none", CARD_CELL)}>
+      <TableCell className={cn("break-words whitespace-normal", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
+        <div>
+          <CardLabel>Szint</CardLabel>
+          {levelLabel(row.level)}
+        </div>
         {row.note && (
-          <>
+          <div className="text-sm">
             <CardLabel>Megjegyzés</CardLabel>
             {row.note}
-          </>
+          </div>
         )}
       </TableCell>
-      <TableCell className={cn("text-sm", CARD_CELL)}>
+      <TableCell className={cn("text-sm break-words whitespace-normal", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
         {row.plays && (
-          <>
+          <div>
             <CardLabel>Hol játszik</CardLabel>
             {row.plays}
-          </>
+          </div>
         )}
-      </TableCell>
-      <TableCell className={cn("text-sm", CARD_CELL)}>
         {row.source && (
-          <>
+          <div className="text-xs text-muted-foreground max-sm:text-sm max-sm:text-foreground">
+            <span className="max-sm:hidden">Forrás: </span>
             <CardLabel>Forrás</CardLabel>
             {row.source}
-          </>
+          </div>
         )}
       </TableCell>
       <TableCell className={CARD_CELL}>
         <Select defaultValue={row.status} onValueChange={(status) => save({ status })}>
-          <SelectTrigger aria-label="Állapot" className="w-36">
+          <SelectTrigger aria-label="Állapot" className="w-36 sm:w-full sm:max-w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -311,7 +304,7 @@ function SignupTableRow({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell className={cn("min-w-56", CARD_CELL)}>
+      <TableCell className={cn(CARD_CELL)}>
         <Textarea
           aria-label="Admin jegyzet"
           value={note}
@@ -548,19 +541,16 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table className="max-sm:block">
+          <Table aria-label="Jelentkezők listája" className="max-sm:block sm:min-w-[900px] sm:table-fixed">
             <TableHeader className="max-sm:hidden">
               <TableRow>
-                <TableHead>Jelentkezett</TableHead>
-                <TableHead>Város</TableHead>
-                <TableHead>Játékosok</TableHead>
-                <TableHead>Szint</TableHead>
-                <TableHead>Megjegyzés</TableHead>
-                <TableHead>Hol játszik</TableHead>
-                <TableHead>Forrás</TableHead>
-                <TableHead>Állapot</TableHead>
-                <TableHead>Admin jegyzet</TableHead>
-                <TableHead>
+                <TableHead className="whitespace-normal w-[12%]">Jelentkezett, város</TableHead>
+                <TableHead className="whitespace-normal w-[24%]">Játékosok</TableHead>
+                <TableHead className="whitespace-normal w-[11%]">Szint, megjegyzés</TableHead>
+                <TableHead className="whitespace-normal w-[14%]">Hol játszik, forrás</TableHead>
+                <TableHead className="whitespace-normal w-[15%]">Állapot</TableHead>
+                <TableHead className="whitespace-normal w-[18%]">Admin jegyzet</TableHead>
+                <TableHead className="w-[6%]">
                   <span className="sr-only">Műveletek</span>
                 </TableHead>
               </TableRow>

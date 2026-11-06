@@ -1,3 +1,4 @@
+import { Mail, Phone } from "lucide-react";
 import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
@@ -7,6 +8,7 @@ import { PartnerEmailBox } from "~/components/partner-email";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { requireUser } from "~/lib/auth/session.server";
+import { telHref } from "~/lib/matches";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, pairPageDescription } from "~/lib/pairs";
@@ -25,7 +27,8 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // partner's address when the signup had none (#96), and the league's open
 // seasons to enter together (#23). Without a pair: the player's own pair
 // link to send to a partner (2026-10-31), and the "Párt keresek" switch
-// (D59) for the organizer to find them one. Players can't change their pair here: a Szervező does
+// (D59) for the organizer to find them one. The partner's address and phone
+// (D117) so the two can reach each other. Players can't change their pair here: a Szervező does
 // that on the Párok page (#97). One block per league; the league is only
 // named when there are several.
 
@@ -135,13 +138,34 @@ function ActivePair({ pair, profile }: { pair: NonNullable<Overview["pair"]>; pr
         <CardDescription>A párod</CardDescription>
         <CardTitle className="font-display text-xl">{pair.partnerName}</CardTitle>
       </CardHeader>
-      {profile && (
-        <CardContent className="text-sm">
+      <CardContent className="grid gap-3 text-sm">
+        <ul aria-label="A párod elérhetősége" className="grid gap-1">
+          <li className="min-w-0">
+            <a href={`mailto:${pair.partnerEmail}`} className="inline-flex max-w-full items-center gap-1.5 underline">
+              <Mail className="size-4 shrink-0" />
+              <span className="break-all">{pair.partnerEmail}</span>
+            </a>
+          </li>
+          <li className="min-w-0">
+            {pair.partnerPhone ? (
+              <a href={telHref(pair.partnerPhone)} className="inline-flex items-center gap-1.5 underline">
+                <Phone className="size-4 shrink-0" />
+                {pair.partnerPhone}
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <Phone className="size-4 shrink-0" />
+                Nincs megadva telefonszám
+              </span>
+            )}
+          </li>
+        </ul>
+        {profile && (
           <Link to={profile} className="font-semibold underline">
             A párotok oldala
           </Link>
-        </CardContent>
-      )}
+        )}
+      </CardContent>
     </Card>
   );
 }

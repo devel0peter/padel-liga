@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 05.";
+const EFFECTIVE_FROM = "2026. 11. 06.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -189,7 +189,13 @@ export default function Privacy() {
                 telefonszámod.
               </li>
               <li>
-                <strong>A telefonszámodat</strong> csak azok látják, akikkel az
+                <strong>A párod</strong> látja az e-mail-címedet és a
+                telefonszámodat a Párom oldalon, és megkapja a levélben, amiben
+                a szervező értesít, hogy párba tett titeket, hogy el tudjátok
+                érni egymást. Te is az övét.
+              </li>
+              <li>
+                <strong>A telefonszámodat</strong> rajta kívül csak azok látják, akikkel az
                 aktuális körben meccsed van, hogy egyeztetni tudjatok, és a
                 ligád szervezője meg az oldal adminja, hogy fel tudjanak hívni, ha
                 elakad egy meccs. Más játékos nem látja. A csoportok kihirdetése

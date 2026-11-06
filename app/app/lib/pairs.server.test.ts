@@ -71,18 +71,35 @@ describe("pairs.server on real SQLite (#97)", () => {
     const id = one("select id from pairs").id;
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.create", target: `pair:${id}` }]);
     const [oa] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
-    expect(oa.pair).toEqual({ id, partnerName: "Anna" });
+    // The partner's address and phone (D117); Anna has no phone here.
+    expect(oa.pair).toEqual({ id, partnerName: "Anna", partnerEmail: "a@x.hu", partnerPhone: "" });
   });
 
-  it("tells both players of a new pair, in the app and by email, with the partner's name (#260)", async () => {
+  it("shows the partner's phone on /pair, formatted (D117)", async () => {
+    h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
+    await P.createPair("o", 1, "a", "b");
+    const [ob] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
+    expect(ob.pair).toMatchObject({ partnerEmail: "a@x.hu", partnerPhone: "+36 30 123 4567" });
+    const [oc] = await P.pairOverview({ id: "c" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
+    expect(oc.pair).toBeNull();
+  });
+
+  it("tells both players of a new pair, in the app and by email, with the partner's name, address and phone (#260, D117)", async () => {
+    h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
     await P.createPair("o", 1, "a", "b");
     expect(inbox()).toEqual([
       { user_id: "a", kind: "pair_intro", url: "/pair" },
       { user_id: "b", kind: "pair_intro", url: "/pair" },
     ]);
     expect(pairMails()).toEqual([
-      { toEmail: "a@x.hu", input: { to: "Anna", partnerName: "Béla", league: "Padelpárbaj Győr" } },
-      { toEmail: "b@x.hu", input: { to: "Béla", partnerName: "Anna", league: "Padelpárbaj Győr" } },
+      {
+        toEmail: "a@x.hu",
+        input: { to: "Anna", partnerName: "Béla", partnerEmail: "b@x.hu", partnerPhone: "", league: "Padelpárbaj Győr" },
+      },
+      {
+        toEmail: "b@x.hu",
+        input: { to: "Béla", partnerName: "Anna", partnerEmail: "a@x.hu", partnerPhone: "+36 30 123 4567", league: "Padelpárbaj Győr" },
+      },
     ]);
   });
 

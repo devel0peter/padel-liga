@@ -3,7 +3,7 @@
 ## Sources of truth
 - `docs/spec.md` defines the behaviour. If the code and the spec disagree, ask; don't guess.
 - `docs/szabalyzat.md` holds the user-facing rules. The rules engine must follow it exactly.
-- Record new decisions in the decision log in `README.md`.
+- Record new decisions in the decision log, `docs/decisions.md`.
 
 ## Language
 - Everything the user sees is **Hungarian**: UI, emails, error messages, validation messages, page titles.
@@ -20,7 +20,7 @@
 - The **rules engine** (standings, tiebreakers, walkovers, promotion and relegation, Elo, fixture generation) is a separate project or module made of pure functions, with **unit tests for every rule**. The UI may be rough; this part can't be.
 - Every rule in the spec has at least one test. Edge cases: three-way ties, pairs dropping out mid-season, unplayed matches.
 - Auth, emails and personal data: always flag them for human review in the PR or summary.
-- Before a UI PR merges, call the `e2e-tester` agent (`.claude/agents/e2e-tester.md`, see README) on it and link its report in the PR.
+- Before a UI PR merges, call the `e2e-tester` agent (`.claude/agents/e2e-tester.md`, see `docs/e2e-tests.md`) on it and link its report in the PR.
 - Never expose another player's email or phone number on a public page.
 - Review findings, low ones included, are fixed in the PR where they were found. Don't open a new issue for a low finding. If one really is outside the PR's scope, add it as a checklist line to the open "Small follow-ups from PR reviews" issue (#285; open a new one with that title only when none is open). New issues are only for work that is not a low review finding.
 

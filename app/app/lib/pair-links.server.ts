@@ -9,7 +9,7 @@ import type { User } from "./auth/session.server";
 import { activePairIdOf, activePairWith, insertPairIfFree, pairLeagues, type PairLeague } from "./pairs.server";
 import { checkPairLink, PAIR_LINK_REFUSALS } from "./pairs";
 
-// The pair link (README decision log, 2026-10-31): every player without a
+// The pair link (decision log, 2026-10-31): every player without a
 // pair in a league gets their own link to send to a partner. Whoever opens
 // it, registers and accepts becomes the partner (pairs.source "link"), as
 // long as neither of them is in an active pair of the league by then. No

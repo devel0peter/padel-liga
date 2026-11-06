@@ -44,7 +44,14 @@ jobs:
           if [ -n "$code" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else echo "code=false" >> "$GITHUB_OUTPUT"; fi
           echo "Changed files:"; printf '%s\n' "$files"
 
+  # A draft run skips its jobs, and GitHub counts a skipped required check
+  # as passed. Marking a PR ready right after a push gives the same commit a
+  # draft run and a real run, and the draft run's skipped check can land
+  # last and stand for the real one (seen on #324). So in a draft run the
+  # required jobs carry other names ("... (draft)"), which no ruleset
+  # requires (D120).
   check:
+    name: ${{ github.event.pull_request.draft && 'check (draft)' || 'check' }}
     needs: changes
     if: ${{ !cancelled() && (github.event_name == 'push' || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
@@ -64,6 +71,7 @@ jobs:
   # it needs no secrets and sends no email. Runs next to `check` on every
   # ready PR that changes code (D117).
   e2e:
+    name: ${{ github.event.pull_request.draft && 'e2e (draft)' || 'e2e' }}
     needs: changes
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
@@ -113,6 +121,7 @@ jobs:
           retention-days: 14
 
   commitlint:
+    name: ${{ github.event.pull_request.draft && 'commitlint (draft)' || 'commitlint' }}
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:

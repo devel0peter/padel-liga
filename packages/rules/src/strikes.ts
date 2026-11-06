@@ -1,4 +1,4 @@
-// Strikes ("fekete pont", spec section 8, issue #294; README decision log
+// Strikes ("fekete pont", spec section 8, issue #294; decision log
 // D82, D103). A strike belongs to a player, not to a pair: it follows them
 // across partner changes and counts per season, so a new season starts from
 // zero. A cancelled strike doesn't count. Pure: no I/O.

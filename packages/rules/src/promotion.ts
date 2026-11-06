@@ -127,7 +127,7 @@ function lowest(group: readonly SeedablePair[]): number {
 
 /**
  * Places the new pairs (late entries, re-formed pairs, returning players)
- * into the groups of the continuing pairs (spec 10, README decision log
+ * into the groups of the continuing pairs (spec 10, decision log
  * D107f, Peter 2026-11-05). A pair's rating is its average Elo: each
  * player's current Elo, the level's starting value before a rated match,
  * with no discount.

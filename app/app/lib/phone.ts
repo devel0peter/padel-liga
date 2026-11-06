@@ -1,10 +1,10 @@
 // Hungarian phone numbers for the profile (spec section 3). Pure (no I/O).
 // Stored as E.164 ("+36301234567"), shown as "+36 30 123 4567". Only Hungarian
 // numbers are accepted: the league is local and match-day calls stay in
-// Hungary (README decision log, 2026-10-23).
+// Hungary (decision log, 2026-10-23).
 
 export const PHONE_ERROR = "Magyar telefonszámot adj meg, pl. +36 30 123 4567.";
-// The profile requires a number (README decision log, 2026-10-28).
+// The profile requires a number (decision log, 2026-10-28).
 export const PHONE_REQUIRED = "Add meg a telefonszámod, a meccsek egyeztetéséhez kell.";
 
 export type PhoneResult = { ok: true; value: string | null } | { ok: false; error: string };

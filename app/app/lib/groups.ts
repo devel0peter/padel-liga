@@ -1,4 +1,4 @@
-// First-phase groups (#24, spec section 10, README decision log D20-D22).
+// First-phase groups (#24, spec section 10, decision log D20-D22).
 // Pure (no I/O) so every rule is unit tested; the D1 side is
 // groups.server.ts, the seeding and fixtures are in packages/rules.
 //

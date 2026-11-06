@@ -16,6 +16,7 @@
     "db:read": "node scripts/db-read.mjs",
     "logs:read": "tsx scripts/logs-read.ts",
     "db:seed:local": "tsx scripts/seed-local.ts",
+    "db:seed:season:local": "tsx scripts/seed-season-local.ts",
     "test": "vitest run",
     "auth:invite": "node scripts/invite.mjs",
     "auth:superadmin": "node scripts/superadmin.mjs",

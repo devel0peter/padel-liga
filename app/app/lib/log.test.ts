@@ -92,6 +92,26 @@ describe("scrub", () => {
     });
   });
 
+  it("blanks code fields named exactly, and nothing that only ends in code (#274)", () => {
+    const blanked = ["code", "Code", "loginCode", "login_code", "verificationCode", "verification_code", "verifyCode", "confirmationCode", "authCode", "auth_code", "resetCode", "oneTimeCode", "one_time_code", "otp", "otpCode", "pinCode", "pin_code", "smsCode", "mfaCode", "totpCode", "twoFactorCode", "two_factor_code"];
+    const kept = ["statusCode", "status_code", "zipCode", "zip_code", "postalCode", "errorCode", "countryCode", "error-codes", "barcode", "codes", "codeLength", "encode", "unicode"];
+    const out = scrub(Object.fromEntries([...blanked, ...kept].map((key) => [key, "123"]))) as Record<string, unknown>;
+    for (const key of blanked) expect(out[key], key).toBe("[redacted]");
+    for (const key of kept) expect(out[key], key).toBe("123");
+  });
+
+  it("keeps email kinds as count keys, code kinds included, and still drops personal keys there", () => {
+    expect(scrub({ count: 4, kinds: { login_code: 2, signup_confirmation: 1, email: 1 } })).toEqual({
+      count: 4,
+      kinds: { login_code: 2, signup_confirmation: 1, email: "[redacted]" },
+    });
+    expect(scrub({ login_code: "042913" })).toEqual({ login_code: "[redacted]" });
+    // Only counts: a code name under `kinds` holding anything else is blanked.
+    expect(scrub({ kinds: { code: "042913", login_code: { value: 1 }, sms_code: 3 } })).toEqual({
+      kinds: { code: "[redacted]", login_code: "[redacted]", sms_code: 3 },
+    });
+  });
+
   it("cleans nested objects and arrays", () => {
     expect(scrub({ list: [{ email: "a@b.hu" }, "c@d.hu"], kinds: { broadcast: 3 } })).toEqual({
       list: [{ email: "[redacted]" }, "[email]"],
@@ -128,6 +148,26 @@ describe("serializeError", () => {
     expect(out.stack).toContain("params: [hidden]\n");
     expect(out.stack).toContain("log.test.ts");
     expect((out.cause as { message: string }).message).toBe("D1_ERROR: no such table: interest_signups");
+  });
+
+  it("hides every value even when one holds a line shaped like a stack frame (#274)", () => {
+    const error = new DrizzleQueryError('update "users" set "name" = ? where "id" = ?', ["Kovács Anna\n    at trick", "x1"], new Error("D1_ERROR"));
+    const written = JSON.stringify(logLine("error", "rename failed", { error }, AT));
+    expect(written).not.toContain("Kovács Anna");
+    expect(written).not.toContain("trick");
+    const out = serializeError(error);
+    expect(out.message).toBe('Failed query: update "users" set "name" = ? where "id" = ?\nparams: [hidden]');
+    expect(out.stack).toContain("params: [hidden]\n");
+    expect(out.stack).toContain("log.test.ts");
+  });
+
+  it("hides the values of a stack that doesn't repeat the message as written", () => {
+    const error = new Error("Failed query: select ?\nparams: Kovács Anna\n    at trick (changed)");
+    error.stack = "Error: Failed query: select ?\nparams: Kovács Anna\n    at trick\n    at somewhere (log.test.ts:1:1)";
+    const out = serializeError(error);
+    expect(out.message).toBe("Failed query: select ?\nparams: [hidden]");
+    expect(out.stack).toBe("Error: Failed query: select ?\nparams: [hidden]");
+    expect(serializeError("Failed query: select ?\nparams: Kovács Anna\n    at trick")).toEqual({ message: "Failed query: select ?\nparams: [hidden]" });
   });
 
   it("handles what isn't an Error", () => {

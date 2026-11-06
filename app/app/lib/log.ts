@@ -26,11 +26,18 @@ export const REQUEST_ID_HEADER = "x-request-id";
 
 // ---- Scrubbing --------------------------------------------------------------
 
-// Keys whose value is personal or secret whatever it looks like. A code is
-// `code` or a camelCase `…Code` field; snake_case keys such as the email kind
-// `login_code` (a count in "email queued") are names of things, not codes.
+// Keys whose value is personal or secret whatever it looks like.
 const PERSONAL_KEY =
-  /e-?mail|phone|^(first|last|full|display|user|player|partner)?_?name$|^to$|recipient|address|^code$|[a-z]Code$|token|password|secret|cookie|authorization|endpoint|session/i;
+  /e-?mail|phone|^(first|last|full|display|user|player|partner)?_?name$|^to$|recipient|address|token|password|secret|cookie|authorization|endpoint|session/i;
+// A code field, named exactly (#274): `code` itself or a code named for what it
+// proves (a login or verification code), camelCase or snake_case. Fields that
+// only end in "code" (statusCode, zip_code, error-codes) are not codes.
+const CODE_KEY =
+  /^(otp|(login|verification|verify|confirmation|confirm|auth|otp|one_?time|reset|security|access|pin|sms|mfa|totp|two_?factor)?_?code)$/i;
+const isSecretKey = (key: string) => PERSONAL_KEY.test(key) || CODE_KEY.test(key);
+// Objects whose keys name things rather than fields: "email queued" counts
+// mails per email kind (`kinds: { login_code: 2 }`), and a kind is not a code.
+const NAMED_COUNTS = new Set(["kinds"]);
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // A run of digits with spaces, dashes, dots, slashes or brackets: a phone
@@ -77,13 +84,31 @@ export function logPath(url: string): string {
 // A failed Drizzle query says "Failed query: <sql>\nparams: <every bound
 // value>" in its message and again in its stack: names, notes, addresses.
 // The values never reach the log; the SQL stays (it has only placeholders).
-const QUERY_PARAMS = /\nparams: [\s\S]*?(?=\n\s+at |$)/;
-const withoutParams = (text: string) => text.replace(QUERY_PARAMS, "\nparams: [hidden]");
+// The values are the end of the message, so everything after "params:" goes;
+// a value can hold anything, a line shaped like a stack frame included (#274),
+// so the end of the values is never guessed from the text.
+const PARAMS_MARK = "\nparams: ";
+const HIDDEN_PARAMS = `${PARAMS_MARK}[hidden]`;
+function withoutParams(text: string): string {
+  const at = text.indexOf(PARAMS_MARK);
+  return at < 0 ? text : text.slice(0, at) + HIDDEN_PARAMS;
+}
+
+// The stack starts with the message: that copy is swapped for the cleaned
+// one, and the frames after it stay. A stack that holds values but not the
+// message as written (no frames can be told from values then) keeps only
+// what comes before them.
+function stackWithoutParams(stack: string, message: string): string {
+  if (!message.includes(PARAMS_MARK)) return withoutParams(stack);
+  const at = stack.indexOf(message);
+  if (at >= 0) return stack.slice(0, at) + withoutParams(message) + stack.slice(at + message.length);
+  return withoutParams(stack);
+}
 
 export function serializeError(error: unknown): Fields {
   if (error instanceof Error) {
     const out: Fields = { name: error.name, message: scrubString(withoutParams(error.message)) };
-    if (error.stack) out.stack = scrubString(withoutParams(error.stack));
+    if (error.stack) out.stack = scrubString(stackWithoutParams(error.stack, error.message));
     if (error.cause !== undefined) out.cause = serializeError(error.cause);
     return out;
   }
@@ -109,7 +134,21 @@ export function scrub(value: unknown, depth = 0): unknown {
   const out: Fields = {};
   for (const [key, v] of Object.entries(value)) {
     if (v === undefined) continue;
-    out[key] = PERSONAL_KEY.test(key) ? "[redacted]" : scrub(v, depth + 1);
+    if (NAMED_COUNTS.has(key) && v !== null && typeof v === "object" && !Array.isArray(v)) out[key] = scrubNamedCounts(v as Fields, depth + 1);
+    else out[key] = isSecretKey(key) ? "[redacted]" : scrub(v, depth + 1);
+  }
+  return out;
+}
+
+// The keys are names (email kinds): personal keys are still dropped, code
+// names are not while they hold a count (a number): a code name holding
+// anything else is blanked like any code field. The values are cleaned as usual.
+function scrubNamedCounts(value: Fields, depth: number): Fields {
+  const out: Fields = {};
+  for (const [key, v] of Object.entries(value)) {
+    if (v === undefined) continue;
+    const secret = PERSONAL_KEY.test(key) || (CODE_KEY.test(key) && typeof v !== "number");
+    out[key] = secret ? "[redacted]" : scrub(v, depth + 1);
   }
   return out;
 }

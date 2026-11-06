@@ -45,6 +45,12 @@ export type Limits = {
 };
 export const LIMITS: Limits = { maxOps: 40, pageRows: 200, stepChars: 400_000 };
 
+// The most pieces one run can glue: one get per piece, and besides them the
+// file check, the state, the write, the listing, the pruning and the cleanup,
+// with one call to spare. The size ceiling (#282): 33 pieces of up to about
+// stepChars each, about 13 MB of SQL with LIMITS.
+export const maxParts = (limits: Limits) => limits.maxOps - 7;
+
 type Part = { key: string; size: number };
 type State = {
   day: string;
@@ -62,7 +68,7 @@ type State = {
 export type StepResult =
   | { status: "skipped" | "done" }
   | { status: "progress"; parts: number; table: string | null; ops: number }
-  | { status: "finished"; key: string; bytes: number; parts: number; deleted: number; ops: number };
+  | { status: "finished"; key: string; bytes: number; parts: number; maxParts: number; deleted: number; ops: number };
 
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
 const ROWID = "__rowid";
@@ -159,7 +165,7 @@ export async function exportStep(
   }
 
   // Glue the pieces, if this run still has the calls for it (else the next).
-  if (state.parts.length + 7 > limits.maxOps) {
+  if (state.parts.length > maxParts(limits)) {
     throw new Error(`backup: ${state.parts.length} pieces are too many to glue within ${limits.maxOps} calls; raise stepChars or split the export further`);
   }
   if (ops + state.parts.length + 5 > limits.maxOps) {
@@ -198,7 +204,7 @@ export async function exportStep(
   }
   ops++;
   await bucket.delete([...state.parts.map((p) => p.key), stateKey]);
-  return { status: "finished", key, bytes: total, parts: state.parts.length, deleted: old.length, ops };
+  return { status: "finished", key, bytes: total, parts: state.parts.length, maxParts: maxParts(limits), deleted: old.length, ops };
 }
 
 // Pieces of an earlier day that never got finished: report and delete them.

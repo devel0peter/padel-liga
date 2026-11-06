@@ -36,6 +36,7 @@ const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:0
 const LEVELS = ["versenyzo", "halado", "kozephalado", "kezdo"];
 
 async function freshDb() {
+  R.forgetMorningDone();
   h.raw = migratedDatabase();
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
   h.raw.exec(`insert into clubs (id, slug, city, name, active) values (1, 'ace', 'gyor', 'Ace Padel', 1)`);
@@ -149,6 +150,19 @@ describe("digest reminders (#31)", () => {
     await run(at("2026-11-11", 7, 10));
     expect(inbox("match_no_proposal")).toHaveLength(8);
     expect(mails("match_digest")).toHaveLength(8);
+  });
+
+  it("a morning run with no room left says nothing once the morning is done (#279)", async () => {
+    const full = () => ({ run: new RunBudget({ queries: 0, calls: 0 }), keep: { queries: 0, calls: 0 } });
+    await run(at("2026-11-11", 7));
+    expect(all("select key from job_runs")).toEqual([{ key: "morning:2026-11-11" }]);
+    expect(await R.runMatchReminders(at("2026-11-11", 7, 10), full(), { digest: true, tomorrow: true })).toBeNull();
+    // Learnt from the done mark too, not only from writing it.
+    R.forgetMorningDone();
+    expect(await R.runMatchReminders(at("2026-11-11", 7, 20))).toBeNull();
+    expect(await R.runMatchReminders(at("2026-11-11", 11, 50), full())).toBeNull();
+    // The next morning is a new one: no room, so it is left for the next run.
+    expect(await R.runMatchReminders(at("2026-11-12", 7), full())).toBe("match reminders: no room in this run; left for the next one");
   });
 
   it("with no room left to mark the morning done, it says so; the next run marks it and makes nothing twice (#222)", async () => {

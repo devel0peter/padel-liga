@@ -271,7 +271,7 @@ export function pairIntroMessage(cityName: string): Message {
 
 // A Szervező paired two registered players who asked for a partner ("Párt
 // keresek", D59; Párok, #260). In the app and as a push; the email is
-// pairCreated. Párom shows the partner, with address and phone (D117).
+// pairCreated. Párom shows the partner, with address and phone (D121).
 export function partnerFoundMessage(league: string): Message {
   return {
     title: "Párt találtunk neked",

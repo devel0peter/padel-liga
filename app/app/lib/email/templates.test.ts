@@ -494,7 +494,7 @@ describe("daily digest and holnap meccs (#31, spec 13)", () => {
   });
 });
 
-describe("pairCreated (#260, D117)", () => {
+describe("pairCreated (#260, D121)", () => {
   const input = {
     to: "Nagy Anna",
     partnerName: "Kovács Béla",
@@ -512,7 +512,7 @@ describe("pairCreated (#260, D117)", () => {
     expect(e.html).toContain('href="https://padelparbaj.hu/pair"');
   });
 
-  it("gives the partner's email and phone, so the two can reach each other (D117)", () => {
+  it("gives the partner's email and phone, so the two can reach each other (D121)", () => {
     const e = pairCreated(input);
     expect(e.text).toContain("Így éred el:\nE-mail: bela@example.com\nTelefon: +36 30 123 4567");
     expect(e.html).toContain("E-mail: bela@example.com<br>Telefon: +36 30 123 4567");

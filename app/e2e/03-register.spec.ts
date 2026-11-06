@@ -35,7 +35,7 @@ test("6. the pair forms when the second partner registers", async ({ browser }) 
   await visit(second.page, "/pair");
   await expect(content(second.page)).toContainText("A párod");
   await expect(content(second.page)).toContainText(anna.name);
-  // The partner's address and phone, to reach each other (D117).
+  // The partner's address and phone, to reach each other (D121).
   const contact = second.page.getByRole("list", { name: "A párod elérhetősége" });
   await expect(contact.getByRole("link", { name: anna.email })).toHaveAttribute("href", `mailto:${anna.email}`);
   await expect(contact.getByRole("link", { name: "+36 30 123 4567" })).toHaveAttribute("href", "tel:+36301234567");

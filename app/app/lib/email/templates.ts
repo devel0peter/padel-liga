@@ -177,7 +177,7 @@ export function pairIntro(to: PairIntroPerson, partner: PairIntroPerson, city: s
 
 // An organizer put two registered players in a pair (Párkeresők, Párok or
 // "Partner cseréje", #260): each gets the partner's name, address and phone
-// (D117, so two strangers can reach each other; phone formatted, "" when
+// (D121, so two strangers can reach each other; phone formatted, "" when
 // none) and the way to Párom, where they enter the season. Names stay plain
 // text.
 export function pairCreated(input: {

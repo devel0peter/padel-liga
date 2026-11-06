@@ -28,7 +28,7 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // seasons to enter together (#23). Without a pair: the player's own pair
 // link to send to a partner (2026-10-31), and the "Párt keresek" switch
 // (D59) for the organizer to find them one. The partner's address and phone
-// (D117) so the two can reach each other. Players can't change their pair here: a Szervező does
+// (D121) so the two can reach each other. Players can't change their pair here: a Szervező does
 // that on the Párok page (#97). One block per league; the league is only
 // named when there are several.
 

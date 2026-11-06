@@ -48,7 +48,7 @@ export function activePairWith(leagueId: number, userIds: string[]) {
 
 export type PairOverview = {
   league: PairLeague;
-  // The partner's address and phone (D117): partners have to reach each
+  // The partner's address and phone (D121): partners have to reach each
   // other, also when the organizer paired two strangers. Only on Párom, to
   // the pair's own two players. Phone formatted, "" when none.
   pair: { id: number; partnerName: string; partnerEmail: string; partnerPhone: string } | null;
@@ -292,7 +292,7 @@ export const activePairIdOf = (leagueId: number, a: string, b: string) =>
 
 // An organizer formed this pair (#260, replacing D59's "no email"): both
 // players get the in-app message and the email, with the partner's address
-// and phone (D117). The pair is saved already;
+// and phone (D121). The pair is saved already;
 // a notice problem must not turn the action into an error.
 async function announcePair(pairId: number): Promise<void> {
   try {

@@ -250,7 +250,8 @@ function SignupTableRow({
         </div>
       </TableCell>
       <TableCell className={cn("whitespace-normal max-sm:order-first", CARD_CELL)}>
-        <div className="grid gap-2">
+        {/* A long name wraps inside its badge (the table has fixed column widths). */}
+        <div className="grid gap-2 [&_[data-slot=badge]]:h-auto [&_[data-slot=badge]]:max-w-full [&_[data-slot=badge]]:whitespace-normal">
           <Player name={row.name1} email={row.email1} status={row.status1} />
           {row.mode === "pair" && row.name2 ? (
             <Player name={row.name2} email={row.email2} status={row.status2} />

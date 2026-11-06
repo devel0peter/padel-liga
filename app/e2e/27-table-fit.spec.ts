@@ -4,7 +4,7 @@
 // state the walkthrough left.
 import { expect, test, type Locator } from "@playwright/test";
 
-import { ADMIN, ORGANIZER, as, visit } from "./support";
+import { ADMIN, ORGANIZER, as, d1, d1Insert, visit } from "./support";
 
 // The Állapot words of a signup (STATUSES in app/lib/signups-admin.ts; e2e
 // can't import it).
@@ -24,7 +24,19 @@ async function expectFits(table: Locator, name: string) {
   expect(content, `${name}: content ${content}px in a ${box}px box`).toBeLessThanOrEqual(box);
 }
 
+// The strikes table needs a strike. Spec 24 gives them; run alone, or if it
+// left none, give one to the first player of a published pair (a no-op in the walk).
+function ensureStrike() {
+  if (Number(d1("select count(*) as n from strikes")[0]!.n) > 0) return;
+  const [ids] = d1(`select g.season_id as season, p.id as pair, p.player_a as user
+      from group_pairs gp join groups g on g.id = gp.group_id join pairs p on p.id = gp.pair_id
+      where g.published_at is not null order by g.phase desc limit 1`);
+  expect(ids, "a published pair to give a strike to").toBeTruthy();
+  d1Insert(`insert into strikes (season_id, user_id, pair_id, source, at) values (${ids!.season}, '${ids!.user}', ${ids!.pair}, 'deadline', ${Math.floor(Date.now() / 1000) - 3600})`);
+}
+
 test("Párok at 390px: the list and the strikes table fit, with no counts table", async ({ browser }) => {
+  ensureStrike();
   const { context, page } = await as(browser, ORGANIZER.email);
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, "/admin/leagues/minta/pairs");
@@ -41,9 +53,10 @@ test("Párok at 390px: the list and the strikes table fit, with no counts table"
   await expect(pairRow.getByText("Aktív").first()).toBeVisible();
   const box = await pairRow.getByRole("button", { name: "Felbontás" }).boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  // The strikes table is there once a strike was given (spec 24).
+  // The strikes table (spec 24 leaves strikes on minta): it must be there, not skipped.
   const strikes = page.getByRole("table", { name: "Fekete pontok" });
-  if ((await strikes.count()) > 0) await expectFits(strikes, "Fekete pontok");
+  await expect(strikes).toBeVisible();
+  await expectFits(strikes, "Fekete pontok");
   await context.close();
 });
 

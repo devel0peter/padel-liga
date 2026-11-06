@@ -5,6 +5,8 @@ import { redirect } from "react-router";
 
 import { db } from "~/db/client.server";
 import { oauthAccounts } from "~/db/schema";
+import { leagueOfReturnTo } from "~/lib/league-members";
+import { joinFromRegisterButton } from "~/lib/league-members.server";
 import { formSignupPairs } from "~/lib/signup-partners.server";
 
 import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.server";
@@ -118,5 +120,8 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
   } catch {
     // Malformed: safeReturnTo falls back to the default page.
   }
+  // Through a league's register button: that league, also before the
+  // first-login page is done (D127, #331).
+  await joinFromRegisterButton(userId, leagueOfReturnTo(safeReturnTo(back)));
   return redirect(safeReturnTo(back), { headers });
 }

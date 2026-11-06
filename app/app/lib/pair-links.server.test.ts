@@ -31,6 +31,8 @@ function freshDb() {
     h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, name);
   // Has an account but hasn't finished the first-login page.
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', 'Nándor')`);
+  // Anna joined both leagues (D127); Béla and Cecil none yet.
+  h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (2, 'a', 'chosen')`);
 }
 
 describe("pair links on real SQLite (2026-10-31)", () => {
@@ -38,11 +40,13 @@ describe("pair links on real SQLite (2026-10-31)", () => {
 
   it("gives a player one stable link per league, only in listed cities", async () => {
     const [box] = await L.pairLinkBoxes(user("a"));
-    expect(box.league).toEqual({ id: 1, name: "Padelpárbaj Győr" });
+    expect(box.league).toMatchObject({ id: 1, name: "Padelpárbaj Győr" });
     expect(box.token).toMatch(/^[A-Za-z0-9_-]{24}$/);
     expect(await L.pairLinkBoxes(user("a"))).toEqual([box]);
     expect(all("select league_id, owner_id from pair_links")).toEqual([{ league_id: 1, owner_id: "a" }]);
-    expect((await L.pairLinkBoxes(user("b")))[0].token).not.toBe(box.token);
+    // Only in the player's own leagues: Béla has joined none.
+    expect(await L.pairLinkBoxes(user("b"))).toEqual([]);
+    expect((await L.pairLinkBoxes(user("b"), [{ id: 1, name: "Padelpárbaj Győr" }]))[0].token).not.toBe(box.token);
   });
 
   it("shows no link in a league where the player has a pair", async () => {
@@ -76,6 +80,12 @@ describe("pair links on real SQLite (2026-10-31)", () => {
       status: "active",
     });
     expect(all("select actor_id, action from audit_log")).toEqual([{ actor_id: "b", action: "pair.link" }]);
+    // Accepting joins the link's league (D127, #331).
+    expect(all("select league_id, user_id, source from league_members order by league_id, user_id")).toEqual([
+      { league_id: 1, user_id: "a", source: "chosen" },
+      { league_id: 1, user_id: "b", source: "link" },
+      { league_id: 2, user_id: "a", source: "chosen" },
+    ]);
     expect(await L.pairLinkBoxes(user("a"))).toEqual([]);
     expect(await L.pairLinkBoxes(user("b"))).toEqual([]);
   });

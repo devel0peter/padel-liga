@@ -7,6 +7,7 @@ import { auditEntry } from "~/lib/audit.server";
 
 import type { User } from "./auth/session.server";
 import { defaultSeekers, isSeeking } from "./partner-search";
+import { memberOf } from "./league-members.server";
 import { createPair, type PairLeague } from "./pairs.server";
 import { LEVELS } from "./interest";
 import { formatPhone } from "./phone";
@@ -75,7 +76,7 @@ export type Seeker = {
   since: Date;
 };
 
-// Párkeresők: registered players without an active pair in the league who
+// Párkeresők: registered players of the league (D127) without an active pair in it who
 // look for one, by level, then longest waiting first.
 export async function leagueSeekers(league: { id: number; city: string }): Promise<Seeker[]> {
   const [accounts, stored, signups, registered] = await Promise.all([
@@ -85,6 +86,7 @@ export async function leagueSeekers(league: { id: number; city: string }): Promi
       .where(
         and(
           isNotNull(users.consentAt),
+          memberOf(league.id, users.id),
           sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
             and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
         ),

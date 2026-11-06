@@ -10,6 +10,8 @@ import { googleConfigured, type GoogleError } from "~/lib/auth/google.server";
 import { sendLoginCode, verifyLoginCode } from "~/lib/auth/login-code.server";
 import { loginEmailParam, safeReturnTo } from "~/lib/auth/rules";
 import { createSession, getUser } from "~/lib/auth/session.server";
+import { LEAGUE_PARAM, leagueOfReturnTo, parseLeagueParam, withLeague } from "~/lib/league-members";
+import { joinFromRegisterButton } from "~/lib/league-members.server";
 import { formSignupPairs } from "~/lib/signup-partners.server";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 import { turnstileError } from "~/lib/turnstile";
@@ -52,7 +54,11 @@ const GOOGLE_ERRORS: Record<GoogleError, string> = {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const returnTo = safeReturnTo(url.searchParams.get("returnTo"));
+  // The landing page's register button names a league (D127, #331): it rides in
+  // returnTo through the code step, Google and the first-login page.
+  const league = parseLeagueParam(url.searchParams.get(LEAGUE_PARAM));
+  const back = safeReturnTo(url.searchParams.get("returnTo"));
+  const returnTo = league ? withLeague(back, league) : back;
   if (await getUser(request)) throw redirect(returnTo);
   const code = url.searchParams.get("error") as GoogleError | null;
   return {
@@ -76,6 +82,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     const result = await verifyLoginCode(email, String(form.get("code") ?? ""));
     if (!result.ok) return { step: "code", email, error: result.error };
     await formSignupPairs(result.userId);
+    await joinFromRegisterButton(result.userId, leagueOfReturnTo(returnTo));
     return redirect(returnTo, { headers: { "Set-Cookie": await createSession(result.userId) } });
   }
 

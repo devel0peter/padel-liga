@@ -50,6 +50,8 @@ function freshDb() {
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
   // Has an account but hasn't finished the first-login page.
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', 'Nándor')`);
+  // All of them joined Győr (D127); nobody Debrecen.
+  h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'chosen' from users`);
 }
 
 describe("pairs.server on real SQLite (#97)", () => {
@@ -146,32 +148,48 @@ describe("pairs.server on real SQLite (#97)", () => {
     // A dissolved pair frees them.
     await P.dissolvePair("o", 1, one("select id from pairs").id, NOW);
     expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
-    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
+    expect(await P.pairCandidates(DEB)).toEqual([]);
   });
 
-  it("offers only the league's players: by their signups' city, everyone without a signup (D93)", async () => {
-    const signup = (city: string, email1: string, email2: string | null = null) =>
-      h.raw
-        .prepare("insert into interest_signups (city, mode, name1, email1, email2, level, consent_at) values (?, ?, 'x', ?, ?, 'kezdo', 1)")
-        .run(city, email2 ? "pair" : "solo", email1, email2);
-    signup("gyor", "A@x.hu");
-    signup("deb", "b@x.hu", "C@X.HU");
-    signup("other", "d@x.hu");
-    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "o"]);
-    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c", "o"]);
+  it("offers only the league's players: joined, or in a pair there, whatever the interest list says (D127)", async () => {
+    h.raw.exec(`delete from league_members`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'register'), (2, 'b', 'chosen'), (1, 'n', 'register')`);
+    // Cecil's dissolved pair in Debrecen still makes him one of its players.
+    h.raw.exec(`insert into pairs (league_id, player_a, player_b, status) values (2, 'c', 'b', 'dissolved')`);
+    // A signup no longer decides anything (#331 requirement 4).
+    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('gyor', 'solo', 'x', 'd@x.hu', 'kezdo', 1)`);
+    // Nándor joined Győr but hasn't finished the first-login page.
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c"]);
     // No address leaves the server; the phone is for Párok's rows (D126).
     expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado", phone: "" });
   });
 
-  it("counts staff accounts like anyone else once they finished the first-login page (D93)", async () => {
+  it("counts staff accounts like anyone else: only where they joined (D127)", async () => {
+    h.raw.exec(`delete from league_members`);
     h.raw.exec(`update users set platform_role = 'superadmin' where id = 'o'`);
-    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'Szervező', 1), ('t', 't@x.hu', 'Tóbiás', null)`);
-    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 's'), (1, 't')`);
-    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('deb', 'solo', 'x', 's@x.hu', 'kezdo', 1)`);
-    // The Admin without a signup: every league. The Szervező signed up in
-    // Debrecen: only there, although they organize Győr. Unfinished: nowhere.
-    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o"]);
-    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["a", "b", "c", "d", "o", "s"]);
+    h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'Szervező', 1)`);
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 's')`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'o', 'carried'), (2, 's', 'chosen')`);
+    // The Szervező of Győr who joined Debrecen: only there.
+    expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["o"]);
+    expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["s"]);
+  });
+
+  it("makes both players of a new pair, a partner change's new partner too, members by row (D127)", async () => {
+    h.raw.exec(`delete from league_members`);
+    await P.createPair("o", 2, "a", "b");
+    const id = one("select id from pairs").id;
+    expect(all("select user_id, source from league_members where league_id = 2 order by user_id")).toEqual([
+      { user_id: "a", source: "pair" },
+      { user_id: "b", source: "pair" },
+    ]);
+    await P.changePartner("o", 2, id, "a", "c", NOW);
+    expect(all("select user_id from league_members where league_id = 2 order by user_id").map((r: any) => r.user_id)).toEqual(["a", "b", "c"]);
+    // A refused pair makes nobody a member.
+    expect(await P.createPair("o", 1, "a", "d")).toMatchObject({ ok: true });
+    expect(await P.createPair("o", 1, "a", "n")).toMatchObject({ ok: false });
+    expect(all("select user_id from league_members where league_id = 1 order by user_id").map((r: any) => r.user_id)).toEqual(["a", "d"]);
   });
 
   it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {

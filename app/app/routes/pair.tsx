@@ -12,7 +12,9 @@ import { telHref } from "~/lib/matches";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, pairPageDescription } from "~/lib/pairs";
-import { pairLeagues, pairOverview } from "~/lib/pairs.server";
+import { NO_LEAGUE_TEXT } from "~/lib/league-members";
+import { playerLeagues } from "~/lib/league-members.server";
+import { pairOverview } from "~/lib/pairs.server";
 import { pairPath } from "~/lib/profiles";
 import { profilePairIds } from "~/lib/profiles.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
@@ -44,7 +46,8 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  const leagues = await pairLeagues();
+  // Only the player's own leagues (D127, #331).
+  const leagues = await playerLeagues(user.id);
   // The partner the interest signup names, while they haven't registered
   // (#89): the pair forms by itself once they do.
   // Or the partner the signup names without an email (#96): the box to add it.
@@ -99,7 +102,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
   if (intent === "partner_email") return { intent, ...(await partnerEmailAction(user, form)) };
   if (intent === "partner_search") {
     const league = Number(form.get("league"));
-    const ok = await setPartnerSearch(user, league, form.get("seeking") === "1", await pairLeagues());
+    const ok = await setPartnerSearch(user, league, form.get("seeking") === "1", await playerLeagues(user.id));
     if (!ok) throw new Response("Hibás kérés.", { status: 400 });
     return { intent, ok: true };
   }
@@ -212,7 +215,14 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
           {actionData.error}
         </p>
       )}
-      {d.overview.length === 0 && <p className="max-w-2xl text-muted-foreground">Még nincs liga, ahol párod lehetne.</p>}
+      {d.overview.length === 0 && (
+        <p className="max-w-2xl text-muted-foreground">
+          {NO_LEAGUE_TEXT}{" "}
+          <Link to="/home" className="underline">
+            Kezdőlap
+          </Link>
+        </p>
+      )}
       {d.overview.map((o) => (
         <section key={o.league.id} className="grid gap-4">
           {d.multi && <h2 className="font-display text-lg font-bold">{o.league.name}</h2>}

@@ -31,6 +31,8 @@ beforeEach(() => {
   ])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', ''), ('org', 'org@x.hu', 'Szervező')`);
+  // Anna, Béla and Cecil joined the league (D127).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (1, 'b', 'chosen'), (1, 'c', 'chosen')`);
   // Cecil signed up alone and still waits; Anna signed up as a pair.
   h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at, note) values
     ('gyor', 'solo', 'Cecil', 'C@x.hu', 'kezdo', 1, 'hétvégén'),
@@ -140,5 +142,14 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
     await S.pairSeekers("org", { id: 2, name: "Másik" }, "b", "c");
     expect(await listed(1)).toEqual([]);
     expect(await listed(2)).toEqual(["b+c"]);
+  });
+
+  it("lists only the league's players (D127): someone who joined another league isn't a seeker here", async () => {
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'mmo', 'mmo', 'Óvár')`);
+    h.raw.prepare("insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'kezdo', 1)").run();
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'd', 'chosen')`);
+    h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'd', 1), (2, 'd', 1)`);
+    expect(await ids()).not.toContain("d");
+    expect((await S.leagueSeekers({ id: 2, city: "mmo" })).map((s) => s.id)).toEqual(["d"]);
   });
 });

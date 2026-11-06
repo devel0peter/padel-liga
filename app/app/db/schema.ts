@@ -594,11 +594,36 @@ export const pairLinks = sqliteTable(
   (t) => [uniqueIndex("pair_links_owner_idx").on(t.leagueId, t.ownerId)],
 );
 
+// A league's players (D127, #331, replacing D93): the leagues an account
+// joined. Being in a pair of the league counts too, with or without a row
+// (league-members.server.ts). `source` says how they joined: "register" (the
+// landing page's register button, written at login, before the first-login
+// page is done), "link" (accepted a pair link), "chosen" (the Kezdőlap card),
+// "pair" (a pair of the league was formed with them), "entry" and "carried"
+// (the release's backfill: an entry of the league, or a D93 player). A text
+// column without a CHECK: a new value needs no migration.
+export const leagueMembers = sqliteTable(
+  "league_members",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["register", "link", "chosen", "pair", "entry", "carried"] }).notNull(),
+    joinedAt: integer("joined_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.userId] }), index("league_members_user_idx").on(t.userId)],
+);
+
 // "Párt keresek" (D59): a registered player without a pair says, per league,
 // whether the organizer should find them a partner; Párkeresők lists them.
-// No row: the default, which is on for someone whose solo signup is still
-// waiting and off for everyone else (partner-search.ts). A row stays when they
-// get a pair; it only counts while they have none.
+// No row: off (D127, #333; before, on for a waiting solo signup, whose
+// default the release stored as a row). A row stays when they get a pair; it
+// only counts while they have none.
 export const partnerSearches = sqliteTable(
   "partner_searches",
   {

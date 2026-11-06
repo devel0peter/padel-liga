@@ -2,7 +2,7 @@ import { and, count, eq, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { cities, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminderPeople, stuckReminders, users } from "~/db/schema";
+import { cities, leagueMembers, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminderPeople, stuckReminders, users } from "~/db/schema";
 import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
 import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
@@ -36,7 +36,7 @@ import { logWarn } from "~/lib/log";
 
 // Everything reminders.ts needs, read now.
 export async function reminderInput(now = new Date()): Promise<ReminderInput> {
-  const [leagueRows, seasonList, signups, accounts, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
+  const [leagueRows, seasonList, signups, accounts, members, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
     await Promise.all([
       db
         .select({ id: leagues.id, city: leagues.city, name: leagues.name })
@@ -57,6 +57,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
         .from(users)
         // An anonymized account (#152) is nobody to remind.
         .where(isNull(users.deletedAt)),
+      db.select({ leagueId: leagueMembers.leagueId, userId: leagueMembers.userId }).from(leagueMembers),
       emailSwitchedOff(),
       db
         .select({
@@ -84,6 +85,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
       const email = a.email.toLowerCase();
       return { ...a, email, admin: a.role === "superadmin", emailOff: emailOff.has(email) };
     }),
+    members,
     pairs: pairRows,
     entries,
     partnerSearches: searches,

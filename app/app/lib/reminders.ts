@@ -17,7 +17,6 @@
 // before D) and never the other that season; D then goes to the other player
 // only.
 
-import { inLeagueCity, signupCities } from "./league-players";
 import { defaultSeekers, isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
 import { homeSeasons, type Season } from "./seasons";
@@ -89,6 +88,8 @@ export type ReminderInput = {
   seasons: readonly Season[];
   signups: readonly ReminderSignup[];
   accounts: readonly ReminderAccount[];
+  // The league_members rows (D127); a pair of the league counts too.
+  members: readonly { leagueId: number; userId: string }[];
   pairs: readonly ReminderPair[];
   // Every season entry, whatever its status: an entry pending approval or
   // rejected isn't reminded either.
@@ -173,13 +174,15 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   const registered = (email: string | null) => !!email && !!accountByEmail.get(email.toLowerCase())?.consentAt;
   const live = input.signups.filter((s) => s.status !== "withdrawn");
   const leaguesInCity = (city: string) => enabled.filter((l) => l.city === city && seasonOf.has(l.id));
-  // An account's leagues (league-players.ts, D73, D93): those of its signups'
-  // cities, or, without a signup, every league. Signups only in cities
-  // without a league: none. A withdrawn signup still says where: the account
-  // counts over the signup (signup-progress.ts).
-  const cities = signupCities(input.signups);
-  const accountLeagues = (email: string): ReminderLeague[] =>
-    enabled.filter((l) => inLeagueCity(cities, email, l.city) && seasonOf.has(l.id));
+  // An account's leagues (D127, league-members.server.ts): those it joined
+  // (the register button joins at login, before the first-login page, so B
+  // knows it) or has a pair in. In none: no reminder.
+  const memberOf = new Set([
+    ...input.members.map((m) => `${m.leagueId}:${m.userId}`),
+    ...input.pairs.flatMap((p) => [`${p.leagueId}:${p.playerA}`, `${p.leagueId}:${p.playerB}`]),
+  ]);
+  const accountLeagues = (id: string): ReminderLeague[] =>
+    enabled.filter((l) => memberOf.has(`${l.id}:${id}`) && seasonOf.has(l.id));
   const mailable = (email: string, account?: ReminderAccount) =>
     !input.suppressed.has(email) && !account?.admin && !account?.emailOff;
 
@@ -226,7 +229,7 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   // B: accounts that never finished the first-login page.
   for (const a of input.accounts) {
     if (a.consentAt || !mailable(a.email, a)) continue;
-    const league = accountLeagues(a.email)[0];
+    const league = accountLeagues(a.id)[0];
     const season = league && seasonOf.get(league.id);
     if (!league || !season || !isDue("B", a.createdAt, season, now)) continue;
     add({
@@ -251,7 +254,7 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   };
   for (const a of input.accounts) {
     if (!a.consentAt || !mailable(a.email, a)) continue;
-    for (const league of accountLeagues(a.email)) {
+    for (const league of accountLeagues(a.id)) {
       if (inPair(a.id, league.id)) continue;
       const stored = input.partnerSearches.find((s) => s.leagueId === league.id && s.userId === a.id);
       if (isSeeking(stored?.seeking, waitingSolo(a.email, league.city))) continue;

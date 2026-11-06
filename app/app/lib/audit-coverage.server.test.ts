@@ -225,8 +225,8 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search (their own tests check the entry).
-const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off"];
+// and partner search, and joining a league (their own tests check the entry).
+const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
 
 // Every admin page with an action, and the audit actions its action writes.
 const ROUTE_ACTIONS: Record<string, AuditAction[]> = {

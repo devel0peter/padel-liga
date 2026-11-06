@@ -108,6 +108,9 @@ export type LandingBlock = {
   // The league's public page (groups, tables, matches; #30), when the league
   // is known by its slug.
   ladderPath?: string;
+  // The register button: the league rides along, so the new account joins
+  // it (D127, #331).
+  registerPath?: string;
 };
 
 // The article before a round number: "az 1.", "a 2.", "az 5.".
@@ -213,7 +216,7 @@ export function landingByCity(
       city,
       {
         ...landingBlock(leagueLanding(seasons.filter((s) => s.leagueId === league.id), now)),
-        ...(league.slug ? { ladderPath: `/league/${league.slug}` } : {}),
+        ...(league.slug ? { ladderPath: `/league/${league.slug}`, registerPath: `/register?league=${league.slug}` } : {}),
       },
     ]),
   );

@@ -77,6 +77,7 @@ function pair(a: string, b: string, v: Partial<ReminderPair> = {}): ReminderPair
   return { id: nextPair++, leagueId: 1, playerA: a, playerB: b, status: "active", createdAt: ago(3 * DAY), dissolvedAt: null, ...v };
 }
 
+// Unless a test says otherwise, every account joined league 1 (D127).
 function input(v: Partial<ReminderInput> = {}): ReminderInput {
   return {
     now: NOW,
@@ -84,6 +85,7 @@ function input(v: Partial<ReminderInput> = {}): ReminderInput {
     seasons: [season()],
     signups: [],
     accounts: [],
+    members: (v.accounts ?? []).map((a) => ({ leagueId: 1, userId: a.id })),
     pairs: [],
     entries: [],
     partnerSearches: [],
@@ -207,9 +209,11 @@ describe("B: first login, registration not finished", () => {
     expect(who({ accounts: [unfinished()], suppressed: new Set(["bela@x.hu"]) })).toEqual([]);
   });
 
-  it("skips someone whose signups are all in cities without a league", () => {
-    expect(who({ accounts: [unfinished()], signups: [signup({ email1: "bela@x.hu", city: "other" })] })).toEqual([]);
-    expect(who({ accounts: [unfinished()], signups: [signup({ email1: "bela@x.hu" })] })).toEqual(["B bela@x.hu"]);
+  it("only for the league the account joined (D127): none in no league, whatever its signups", () => {
+    expect(who({ accounts: [unfinished()], members: [] })).toEqual([]);
+    expect(who({ accounts: [unfinished()], members: [], signups: [signup({ email1: "bela@x.hu" })] })).toEqual([]);
+    expect(who({ accounts: [unfinished()], members: [{ leagueId: 2, userId: "bela" }] })).toEqual([]);
+    expect(who({ accounts: [unfinished()], members: [{ leagueId: 1, userId: "bela" }] })).toEqual(["B bela@x.hu"]);
   });
 });
 
@@ -217,6 +221,21 @@ describe("C: registered, no pair", () => {
   it("is reminded 2 days after registering", () => {
     expect(who({ accounts: [account("cili")] })).toEqual(["C cili@x.hu"]);
     expect(who({ accounts: [account("cili", { consentAt: ago(DAY) })] })).toEqual([]);
+  });
+
+  it("only in the leagues the player belongs to (D127): joined, or a pair there", () => {
+    const leagues = [
+      { id: 1, city: "gyor", name: "Győr" },
+      { id: 2, city: "mmo", name: "Mosonmagyaróvár" },
+    ];
+    const seasons = [season(), season({ id: 8, leagueId: 2 })];
+    expect(who({ leagues, seasons, accounts: [account("cili")], members: [] }, [1, 2])).toEqual([]);
+    const [r] = due({ leagues, seasons, accounts: [account("cili")], members: [{ leagueId: 2, userId: "cili" }] }, [1, 2]);
+    expect([r.situation, r.leagueId]).toEqual(["C", 2]);
+    // A dissolved pair in league 2 still makes Cili one of its players.
+    const dissolved = pair("cili", "dani", { leagueId: 2, status: "dissolved", dissolvedAt: ago(3 * DAY) });
+    const v = { leagues, seasons, accounts: [account("cili")], members: [], pairs: [dissolved] };
+    expect(due(v, [1, 2]).map((x) => [x.situation, x.leagueId])).toEqual([["C", 2]]);
   });
 
   it("skips players with a pair, and players looking for a partner (Párt keresek)", () => {

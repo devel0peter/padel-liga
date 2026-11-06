@@ -1,4 +1,4 @@
-import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Form, Link, redirect, type ShouldRevalidateFunctionArgs, useNavigation } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
@@ -8,12 +8,14 @@ import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { PartnerEmailBox } from "~/components/partner-email";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate } from "~/lib/format";
-import { listedCities } from "~/lib/cities.server";
+import { CHOOSE_LEAGUE_BUTTON, CHOOSE_LEAGUE_TEXT, CHOOSE_LEAGUE_TITLE, LEAGUE_PARAM, parseLeagueParam } from "~/lib/league-members";
+import { chooseLeague, joinFromRegisterButton, leagueChoices, playerLeagues } from "~/lib/league-members.server";
 import { listLeagues } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
@@ -42,14 +44,23 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
+  // Through a league's register button while logged in already (the login
+  // page sends a logged-in visitor straight here): join it, then a clean
+  // address. A new account joined at login (D127).
+  const url = new URL(request.url);
+  if (url.searchParams.has(LEAGUE_PARAM)) {
+    await joinFromRegisterButton(user.id, parseLeagueParam(url.searchParams.get(LEAGUE_PARAM)));
+    throw redirect("/home");
+  }
   const actor = (await getActor(request))!;
   const leagues = await listLeagues();
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? leagues : []));
-  // Players don't belong to a league yet: the seasons of every league in a
-  // listed city (a city still being set up stays hidden).
-  const listed = new Set((await listedCities()).map((c) => c.slug));
-  const leagueName = new Map(leagues.filter((l) => listed.has(l.city)).map((l) => [l.id, l.name]));
+  // Only the player's own leagues (D127, #331): their seasons, pair links and
+  // "Párt keresek". In none: the card to choose one.
+  const mine = await playerLeagues(user.id);
+  const leagueName = new Map(mine.map((l) => [l.id, l.name]));
   const now = new Date();
+  const choices = mine.length === 0 ? await leagueChoices(user.id, now) : [];
   const shown = homeSeasons(await listSeasons(), now).filter((s) => leagueName.has(s.leagueId));
   // The pair's entry, the "Nevezünk" button or why not (#23).
   const views = await entryViews(user, shown, now);
@@ -67,12 +78,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   }));
   // No pair in a league: the player's own link to invite one (2026-10-31),
   // first thing after the first-login page, and "Párt keresek" (D59).
-  const links = await pairLinkBoxes(user);
+  const links = await pairLinkBoxes(user, mine);
   const searching = await partnerSearchState(user, links.map((l) => l.league));
   // The current phase's groups (#25): empty before they are published.
   const groups = await currentGroups(user.id, now);
   return {
     groups,
+    // "Melyik ligában játszol?" (#331): empty once they belong to a league.
+    choices: choices.map((c) => ({ id: c.id, city: c.cityName, name: c.name })),
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
     // The signup named a partner without an email (#96): the box to add it.
@@ -95,6 +108,11 @@ export async function action({ request }: Route.ActionArgs): Promise<{ season: n
   const user = await requireUser(request);
   const form = await request.formData();
   if (form.get("intent") === "partner_email") return { season: 0, ...(await partnerEmailAction(user, form)) };
+  // "Csatlakozom" on "Melyik ligában játszol?" (#331), audited.
+  if (form.get("intent") === "join_league") {
+    if (!(await chooseLeague(user.id, Number(form.get("league"))))) throw new Response("Hibás kérés.", { status: 400 });
+    return { season: 0, ok: true };
+  }
   const season = Number(form.get("season") || 0);
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
     throw new Response("Hibás kérés.", { status: 400 });
@@ -120,9 +138,43 @@ function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
   );
 }
 
+// "Melyik ligában játszol?" (#331): for an account in no league, one row per
+// league with a season open for entries or running.
+function ChooseLeague({ choices }: { choices: { id: number; city: string; name: string }[] }) {
+  const busy = useNavigation().state !== "idle";
+  return (
+    <Card className="max-w-2xl border-nav-active">
+      <CardHeader>
+        <CardTitle className="font-display text-lg">{CHOOSE_LEAGUE_TITLE}</CardTitle>
+        <CardDescription>{CHOOSE_LEAGUE_TEXT}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-3">
+          {choices.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                <span className="font-semibold">{c.city}</span>
+                <span className="block text-sm text-muted-foreground">{c.name}</span>
+              </span>
+              <Form method="post">
+                <input type="hidden" name="intent" value="join_league" />
+                <input type="hidden" name="league" value={c.id} />
+                <Button type="submit" disabled={busy}>
+                  {CHOOSE_LEAGUE_BUTTON}
+                </Button>
+              </Form>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
     <AppPage title="Kezdőlap">
+      {d.choices.length > 0 && <ChooseLeague choices={d.choices} />}
       {d.groups.length > 0 && <Todos items={todos(d.groups)} />}
       {d.groups.map((g) => (
         <MyGroup key={g.groupId} group={g} multiLeague={d.multiLeague} />

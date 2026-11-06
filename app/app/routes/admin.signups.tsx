@@ -207,7 +207,7 @@ function Player({ name, email, status }: { name: string; email: string | null; s
       <div>
         <div className="font-medium">{name}</div>
         {email && (
-          <a href={`mailto:${email}`} className="text-xs text-muted-foreground underline">
+          <a href={`mailto:${email}`} className="text-xs break-all text-muted-foreground underline">
             {email}
           </a>
         )}
@@ -239,17 +239,17 @@ function SignupTableRow({
 
   return (
     <TableRow className={cn(CARD_ROW, deleting && "opacity-40")}>
-      <TableCell className={cn("text-xs text-muted-foreground", CARD_CELL, "max-sm:grid max-sm:gap-2 max-sm:text-xs")}>
+      <TableCell className={cn("text-xs text-muted-foreground", CARD_CELL, "sm:whitespace-normal max-sm:grid max-sm:gap-2 max-sm:text-xs")}>
         <div>
           <CardLabel>Jelentkezett</CardLabel>
           {formatDateTime(new Date(row.createdAt))}
         </div>
-        <div>
+        <div className="max-sm:text-foreground">
           <CardLabel>Város</CardLabel>
           {row.cityText}
         </div>
       </TableCell>
-      <TableCell className={cn("min-w-48 max-sm:order-first", CARD_CELL)}>
+      <TableCell className={cn("whitespace-normal max-sm:order-first", CARD_CELL)}>
         <div className="grid gap-2">
           <Player name={row.name1} email={row.email1} status={row.status1} />
           {row.mode === "pair" && row.name2 ? (
@@ -262,7 +262,7 @@ function SignupTableRow({
           {row.wantsToOrganize && <Badge>Szervezne ligát</Badge>}
         </div>
       </TableCell>
-      <TableCell className={cn("max-w-44 whitespace-normal max-sm:max-w-none", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
+      <TableCell className={cn("break-words whitespace-normal", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
         <div>
           <CardLabel>Szint</CardLabel>
           {levelLabel(row.level)}
@@ -274,7 +274,7 @@ function SignupTableRow({
           </div>
         )}
       </TableCell>
-      <TableCell className={cn("text-sm", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
+      <TableCell className={cn("text-sm break-words whitespace-normal", CARD_CELL, "max-sm:grid max-sm:gap-2")}>
         {row.plays && (
           <div>
             <CardLabel>Hol játszik</CardLabel>
@@ -291,7 +291,7 @@ function SignupTableRow({
       </TableCell>
       <TableCell className={CARD_CELL}>
         <Select defaultValue={row.status} onValueChange={(status) => save({ status })}>
-          <SelectTrigger aria-label="Állapot" className="w-28 max-sm:w-36">
+          <SelectTrigger aria-label="Állapot" className="w-36 sm:w-full sm:max-w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -303,7 +303,7 @@ function SignupTableRow({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell className={cn("min-w-36", CARD_CELL)}>
+      <TableCell className={cn(CARD_CELL)}>
         <Textarea
           aria-label="Admin jegyzet"
           value={note}
@@ -540,16 +540,16 @@ export default function AdminSignups({ loaderData }: Route.ComponentProps) {
         </p>
       ) : (
         <div className="rounded-lg border">
-          <Table className="max-sm:block">
+          <Table aria-label="Jelentkezők listája" className="max-sm:block sm:min-w-[900px] sm:table-fixed">
             <TableHeader className="max-sm:hidden">
               <TableRow>
-                <TableHead>Jelentkezett, város</TableHead>
-                <TableHead>Játékosok</TableHead>
-                <TableHead>Szint, megjegyzés</TableHead>
-                <TableHead>Hol játszik, forrás</TableHead>
-                <TableHead>Állapot</TableHead>
-                <TableHead>Admin jegyzet</TableHead>
-                <TableHead>
+                <TableHead className="whitespace-normal w-[12%]">Jelentkezett, város</TableHead>
+                <TableHead className="whitespace-normal w-[24%]">Játékosok</TableHead>
+                <TableHead className="whitespace-normal w-[11%]">Szint, megjegyzés</TableHead>
+                <TableHead className="whitespace-normal w-[14%]">Hol játszik, forrás</TableHead>
+                <TableHead className="whitespace-normal w-[15%]">Állapot</TableHead>
+                <TableHead className="whitespace-normal w-[18%]">Admin jegyzet</TableHead>
+                <TableHead className="w-[6%]">
                   <span className="sr-only">Műveletek</span>
                 </TableHead>
               </TableRow>

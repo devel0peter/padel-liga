@@ -602,8 +602,8 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
         értesítjük, a számot az oldalán látja.
       </p>
       <div className="rounded-lg border">
-        <Table aria-label="Fekete pontok">
-          <TableHeader>
+        <Table aria-label="Fekete pontok" className="max-sm:block">
+          <TableHeader className="max-sm:hidden">
             <TableRow>
               <TableHead>Játékos</TableHead>
               <TableHead>Mikor</TableHead>
@@ -614,12 +614,16 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="max-sm:block">
             {strikes.map((s) => (
-              <TableRow key={s.id} className={s.cancelledAt ? "text-muted-foreground" : undefined}>
-                <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell className="whitespace-nowrap">{formatDeadline(new Date(s.at))}</TableCell>
-                <TableCell className="min-w-48 whitespace-normal">
+              <TableRow key={s.id} className={cn(CARD_ROW, s.cancelledAt && "text-muted-foreground")}>
+                <TableCell className={cn("font-medium", CARD_CELL)}>{s.name}</TableCell>
+                <TableCell className={cn("whitespace-nowrap", CARD_CELL)}>
+                  <CardLabel>Mikor</CardLabel>
+                  {formatDeadline(new Date(s.at))}
+                </TableCell>
+                <TableCell className={cn("min-w-48 whitespace-normal", CARD_CELL)}>
+                  <CardLabel>Miért</CardLabel>
                   {STRIKE_SOURCES[s.source]}
                   {s.matchId && (
                     <>
@@ -630,10 +634,11 @@ function StrikesSection({ strikes, slug }: { strikes: Strike[]; slug: string }) 
                     </>
                   )}
                 </TableCell>
-                <TableCell className="min-w-48 whitespace-normal">
+                <TableCell className={cn("min-w-48 whitespace-normal", CARD_CELL)}>
+                  <CardLabel>Állapot</CardLabel>
                   {s.cancelledAt ? `Törölve (${s.cancelledBy ?? "szervező"}): ${s.cancelReason ?? ""}` : "Érvényes"}
                 </TableCell>
-                <TableCell className="text-right">{!s.cancelledAt && <CancelStrikeDialog strike={s} />}</TableCell>
+                <TableCell className={cn("text-right max-sm:text-left", CARD_CELL)}>{!s.cancelledAt && <CancelStrikeDialog strike={s} />}</TableCell>
               </TableRow>
             ))}
           </TableBody>

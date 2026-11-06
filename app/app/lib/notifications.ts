@@ -6,15 +6,10 @@ import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
 import { formatDeadline, formatShortDate } from "./format";
 import { withArticle } from "./groups";
-import { LEVELS, type Level, type Mode } from "./interest";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
 export const NOTIFICATION_KINDS = {
-  new_signup: {
-    label: "Új jelentkező",
-    description: "Ha valaki jelentkezik a ligádba.",
-  },
   result_disputed: {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
@@ -97,7 +92,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested", "no_show_reported"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["result_disputed", "substitute_requested", "no_show_reported"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -147,52 +142,6 @@ export function followsEmailSwitch(kind: MessageKind): boolean {
 }
 
 export type Message = { title: string; body: string; url: string };
-
-export type SignupRecipient = { userId: string; admin: boolean; leagueSlug: string | null };
-
-// A new signup goes to the Szervezők of that city's league and to every
-// Admin, once each. An Admin who is also the Szervező gets the Admin link.
-export function signupRecipients(
-  city: string,
-  organizers: readonly { userId: string; city: string; leagueSlug: string }[],
-  adminIds: readonly string[],
-): SignupRecipient[] {
-  const out = new Map<string, SignupRecipient>();
-  for (const id of adminIds) out.set(id, { userId: id, admin: true, leagueSlug: null });
-  for (const o of organizers)
-    if (o.city === city && !out.has(o.userId)) out.set(o.userId, { userId: o.userId, admin: false, leagueSlug: o.leagueSlug });
-  return [...out.values()];
-}
-
-export type SignupSummary = {
-  mode: Mode;
-  level: Level;
-  cityName: string;
-  // The city's signups so far, this one included (withdrawn ones not counted).
-  pairs: number;
-  solos: number;
-  // Ticked "Szívesen szerveznék ligát".
-  organize?: boolean;
-};
-
-// "Kezdő – most ismerkedünk…" -> "kezdő"
-const levelWord = (level: Level) => LEVELS[level].split(" – ")[0].toLowerCase();
-
-// No names or email addresses: a Szervező doesn't see the pair signups, and a
-// lock screen is not a private place.
-export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message {
-  const who = s.mode === "pair" ? `Új pár jelentkezett, ${levelWord(s.level)} szint.` : `Új egyéni jelentkező (párt keres), ${levelWord(s.level)} szint.`;
-  const url = to.admin || !to.leagueSlug
-    ? "/admin/signups"
-    : s.mode === "solo"
-      ? `/admin/leagues/${to.leagueSlug}/solos`
-      : `/admin/leagues/${to.leagueSlug}`;
-  return {
-    title: `Új jelentkező · ${s.cityName}`,
-    body: `${who}${s.organize ? " Szívesen szervezne ligát." : ""} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
-    url,
-  };
-}
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -256,16 +205,6 @@ export function groupsPublishedMessage(input: {
     title: `Itt a csoportod: ${input.group}. csoport`,
     body: `${input.phase}. kör, ${input.season}, ${input.league}. Határidő: ${formatDeadline(input.deadline)}.`,
     url: "/home",
-  };
-}
-
-// A Szervező paired two solo signups (#115): for the one who has an account,
-// so it reaches them with email off too. No names; Párom shows the partner.
-export function pairIntroMessage(cityName: string): Message {
-  return {
-    title: "Párt találtunk neked",
-    body: `A szervező párba tett egy másik egyéni jelentkezővel (${cityName}). A Párom oldalon látod, ki az.`,
-    url: "/pair",
   };
 }
 

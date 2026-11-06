@@ -1,13 +1,10 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { interestSignups, leagueAdmins, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
+import { leagueAdmins, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
-import { listCities } from "./cities.server";
-import { cityName, OTHER_CITY } from "./cities";
-import type { InterestSignup } from "./interest";
 import {
   channelEnabled,
   channelKey,
@@ -15,10 +12,8 @@ import {
   isEnabled,
   resultDisputedMessage,
   substituteRequestedMessage,
-  newSignupMessage,
   noShowReportedMessage,
   pushPayload,
-  signupRecipients,
   TEST_MESSAGE,
   type Channel,
   type Message,
@@ -363,33 +358,6 @@ export async function notifyAccounts(kind: PlayerKind, messages: { email: string
   } catch (error) {
     logError("notification failed", { kind, error });
   }
-}
-
-// A landing page signup was saved: tell the city's Szervezők and the Admins.
-export async function notifyNewSignup(signup: InterestSignup): Promise<void> {
-  const [organizers, admins, counts, cities] = await Promise.all([
-    db
-      .select({ userId: leagueAdmins.userId, city: leagues.city, leagueSlug: leagues.slug })
-      .from(leagueAdmins)
-      .innerJoin(leagues, eq(leagues.id, leagueAdmins.leagueId)),
-    db.select({ id: users.id }).from(users).where(eq(users.platformRole, "superadmin")),
-    db
-      .select({ mode: interestSignups.mode, n: count() })
-      .from(interestSignups)
-      .where(and(eq(interestSignups.city, signup.city), ne(interestSignups.status, "withdrawn")))
-      .groupBy(interestSignups.mode),
-    listCities(),
-  ]);
-  const recipients = signupRecipients(signup.city, organizers, admins.map((a) => a.id));
-  const summary = {
-    mode: signup.mode,
-    level: signup.level,
-    cityName: signup.city === OTHER_CITY ? (signup.cityOther ?? "Más város") : cityName(signup.city, cities),
-    pairs: counts.find((c) => c.mode === "pair")?.n ?? 0,
-    solos: counts.find((c) => c.mode === "solo")?.n ?? 0,
-    organize: signup.wantsToOrganize,
-  };
-  await notify("new_signup", recipients.map((r) => ({ userId: r.userId, message: newSignupMessage(summary, r) })));
 }
 
 // A result was disputed (#178): tell the league's Szervezők and the Admins,

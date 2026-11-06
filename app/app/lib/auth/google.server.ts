@@ -7,7 +7,6 @@ import { db } from "~/db/client.server";
 import { oauthAccounts } from "~/db/schema";
 import { leagueOfReturnTo } from "~/lib/league-members";
 import { joinFromRegisterButton } from "~/lib/league-members.server";
-import { formSignupPairs } from "~/lib/signup-partners.server";
 
 import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.server";
 import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
@@ -108,8 +107,6 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
 
   logInfo("login", { method: "google", outcome: "ok", userId, created: decision.kind === "create" });
   await setProfileImage(userId, googlePicture(claims.picture));
-  // The pair from the interest signup, if the partner registered first (D27).
-  await formSignupPairs(userId);
 
   const headers = new Headers();
   headers.append("Set-Cookie", await createSession(userId));

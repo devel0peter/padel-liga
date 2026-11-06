@@ -495,11 +495,11 @@ export const notificationOptOuts = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
-// Two players who play a league together (spec section 4). Formed from the
-// interest signup (#89) or by a Szervező on the Párok page (#97); a player is
-// in at most one active pair per league. The inserts (signup-partners.server.ts,
-// pairs.server.ts) enforce it; the two unique indexes only catch the same
-// player twice in the same column.
+// Two players who play a league together (spec section 4). Formed by a pair
+// link, on Párkeresők or by a Szervező on the Párok page (#97; from the
+// interest signup, #89, until #333); a player is in at most one active pair
+// per league. The inserts (pairs.server.ts) enforce it; the two unique
+// indexes only catch the same player twice in the same column.
 // Dissolved pairs stay as history, so later matches keep their pair.
 export const pairs = sqliteTable(
   "pairs",

@@ -20,7 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "cities.manage" });
   const [cities, usage] = await Promise.all([listCities(), cityUsage()]);
   return {
-    cities: cities.map((c) => ({ ...c, usage: usage.get(c.slug) ?? { signups: 0, clubs: 0, leagues: 0 } })),
+    cities: cities.map((c) => ({ ...c, usage: usage.get(c.slug) ?? { clubs: 0, leagues: 0 } })),
   };
 }
 
@@ -37,13 +37,8 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     const result = parseCity(form);
     if (!result.ok) return { intent, errors: result.errors };
     if (await getCity(result.data.slug)) return { intent, errors: { slug: "Ez az azonosító már egy másik városé." } };
-    const moved = await createCity(result.data, actor.id);
-    return {
-      intent,
-      message: moved
-        ? `${result.data.name} hozzáadva. ${moved} „más város” jelentkezés, aki ezt a várost írta, átkerült ide.`
-        : `${result.data.name} hozzáadva.`,
-    };
+    await createCity(result.data, actor.id);
+    return { intent, message: `${result.data.name} hozzáadva.` };
   }
 
   const slug = String(form.get("slug") ?? "");
@@ -56,7 +51,7 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     await updateCity(slug, { name, listed: form.get("listed") === "on" }, actor.id);
   }
   if (intent === "delete" && !(await deleteCity(slug, actor.id)))
-    return { intent, slug, error: "Ezt a várost már használja egy jelentkezés, klub vagy liga, ezért nem törölhető." };
+    return { intent, slug, error: "Ezt a várost már használja egy klub vagy liga, ezért nem törölhető." };
   return redirect("/admin/cities");
 }
 
@@ -74,7 +69,6 @@ export default function AdminCities({ loaderData, actionData }: Route.ComponentP
             <TableRow>
               <TableHead>Név</TableHead>
               <TableHead>Látszik</TableHead>
-              <TableHead>Jelentkezés</TableHead>
               <TableHead>Klub</TableHead>
               <TableHead>Liga</TableHead>
               <TableHead>
@@ -85,7 +79,7 @@ export default function AdminCities({ loaderData, actionData }: Route.ComponentP
           <TableBody>
             {loaderData.cities.map((city) => {
               const error = actionData && "slug" in actionData && actionData.slug === city.slug ? actionData.error : null;
-              const unused = city.usage.signups + city.usage.clubs + city.usage.leagues === 0;
+              const unused = city.usage.clubs + city.usage.leagues === 0;
               const formId = `city-${city.slug}`;
               return (
                 <TableRow key={city.slug}>
@@ -109,7 +103,6 @@ export default function AdminCities({ loaderData, actionData }: Route.ComponentP
                       className="size-4 accent-primary"
                     />
                   </TableCell>
-                  <TableCell>{city.usage.signups}</TableCell>
                   <TableCell>{city.usage.clubs}</TableCell>
                   <TableCell>{city.usage.leagues}</TableCell>
                   <TableCell className="whitespace-nowrap text-right">

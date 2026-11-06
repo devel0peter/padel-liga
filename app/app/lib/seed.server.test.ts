@@ -1,7 +1,7 @@
 // The local seed (#90) on a real SQLite with every migration applied
 // (~/test/sqlite): what it writes, that running it twice leaves the same
 // state, that it clears what a walkthrough made, and that the real app code
-// can carry the seeded data from the registration invite to published groups.
+// can carry the seeded data from registration to published groups.
 // Email is stubbed and records what it gets; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +27,8 @@ const { db } = await import("~/db/client.server");
 const { users } = await import("~/db/schema");
 const Seed = await import("./seed");
 const O = await import("~/lib/email/outbox.server");
-const SP = await import("~/lib/signup-partners.server");
+const M = await import("~/lib/league-members.server");
+const P = await import("~/lib/pairs.server");
 const E = await import("~/lib/season-entries.server");
 const G = await import("~/lib/groups.server");
 
@@ -39,7 +40,7 @@ const rows = (sql: string, ...params: unknown[]): any[] => h.raw.prepare(sql).al
 const count = (table: string) => rows(`select count(*) as n from ${table}`)[0].n as number;
 
 const TABLES = [
-  "cities", "clubs", "leagues", "users", "league_admins", "seasons", "season_phases", "interest_signups",
+  "cities", "clubs", "leagues", "users", "league_admins", "league_members", "partner_searches", "seasons", "season_phases", "interest_signups",
   "account_invites", "email_messages", "pairs", "pair_invites", "pair_links", "season_entries", "groups", "group_pairs",
   "matches", "sessions", "login_codes", "notifications", "audit_log", "broadcasts", "email_suppressions",
 ];
@@ -53,22 +54,28 @@ beforeEach(() => {
 describe("the seeded state", () => {
   beforeEach(() => run());
 
-  it("has a listed city with a league, 3 clubs and 14 signups", () => {
-    expect(rows("select slug, listed from cities where slug = 'minta'")).toEqual([{ slug: "minta", listed: 1 }]);
-    expect(rows("select slug from leagues")).toEqual([{ slug: "minta" }]);
+  it("has two listed cities with a league each, 3 clubs, and no interest list (#333)", () => {
+    expect(rows("select slug, listed from cities where slug in ('minta', 'pelda') order by slug")).toEqual([
+      { slug: "minta", listed: 1 },
+      { slug: "pelda", listed: 1 },
+    ]);
+    expect(rows("select slug from leagues order by slug")).toEqual([{ slug: "minta" }, { slug: "pelda" }]);
     expect(rows("select city from clubs").map((c) => c.city)).toEqual(["minta", "minta", "minta"]);
     expect(rows("select count(*) as n from clubs where active = 1")[0].n).toBe(3);
-    expect(rows("select mode, count(*) as n from interest_signups group by mode order by mode")).toEqual([
-      { mode: "pair", n: 10 },
-      { mode: "solo", n: 4 },
-    ]);
-    expect(rows("select count(*) as n from interest_signups where city <> 'minta'")[0].n).toBe(0);
+    expect(count("interest_signups")).toBe(0);
   });
 
-  it("has one Admin and one Szervező, and no player accounts", () => {
+  it("has one Admin and one Szervező of Mintaváros, one player of Példaváros, and no other account", () => {
     expect(rows("select email, platform_role, name <> '' as named, consent_at is not null as consented from users order by email")).toEqual([
       { email: "admin@example.test", platform_role: "superadmin", named: 1, consented: 1 },
+      { email: "idegen.ilona@example.test", platform_role: "player", named: 1, consented: 1 },
       { email: "szervezo@example.test", platform_role: "player", named: 1, consented: 1 },
+    ]);
+    // Who belongs where (D127).
+    expect(rows("select l.slug, u.email from league_members m join leagues l on l.id = m.league_id join users u on u.id = m.user_id order by l.slug, u.email")).toEqual([
+      { slug: "minta", email: "admin@example.test" },
+      { slug: "minta", email: "szervezo@example.test" },
+      { slug: "pelda", email: "idegen.ilona@example.test" },
     ]);
     expect(rows("select u.email from league_admins la join users u on u.id = la.user_id")).toEqual([
       { email: "szervezo@example.test" },
@@ -91,28 +98,14 @@ describe("the seeded state", () => {
     );
   });
 
-  it("pairs two solos with each other and leaves two waiting", () => {
-    const solos = rows("select id, name1, status, paired_with from interest_signups where mode = 'solo' order by id");
-    expect(solos.map((s) => s.status)).toEqual(["paired", "paired", "new", "new"]);
-    expect(solos[0].paired_with).toBe(solos[1].id);
-    expect(solos[1].paired_with).toBe(solos[0].id);
-    expect(solos[2].paired_with).toBeNull();
-    expect(solos[3].paired_with).toBeNull();
-  });
-
-  it("holds nothing yet: no mail, no invite, nobody invited", () => {
+  it("holds nothing yet: no mail, no invite", () => {
     expect(count("email_messages")).toBe(0);
     expect(count("account_invites")).toBe(0);
-    expect(rows("select count(*) as n from interest_signups where invited_at is not null or invited2_at is not null")[0].n).toBe(0);
   });
 
   it("only knows @example.test addresses", () => {
-    const emails = [
-      ...rows("select email from users"),
-      ...rows("select email1 as email from interest_signups"),
-      ...rows("select email2 as email from interest_signups where email2 is not null"),
-    ].map((r) => r.email as string);
-    expect(emails.length).toBe(2 + 20 + 4);
+    const emails = rows("select email from users").map((r) => r.email as string);
+    expect(emails.length).toBe(3);
     for (const e of emails) expect(e.endsWith("@example.test"), e).toBe(true);
   });
 });
@@ -121,10 +114,10 @@ describe("running it twice", () => {
   it("leaves the same state", () => {
     run();
     const first = sizes();
-    const signups = rows("select name1, email1, email2, level, status from interest_signups order by email1");
+    const members = rows("select l.slug, m.user_id, m.source from league_members m join leagues l on l.id = m.league_id order by 1, 2");
     run();
     expect(sizes()).toEqual(first);
-    expect(rows("select name1, email1, email2, level, status from interest_signups order by email1")).toEqual(signups);
+    expect(rows("select l.slug, m.user_id, m.source from league_members m join leagues l on l.id = m.league_id order by 1, 2")).toEqual(members);
     // Still exactly one season, with its four phases.
     expect(first.seasons).toBe(1);
     expect(first.season_phases).toBe(4);
@@ -203,8 +196,8 @@ describe("running it twice", () => {
     // What was added inside the fake city goes too: a club, a signup from the public form.
     expect(rows("select slug from clubs where slug = 'uj-klub'")).toHaveLength(0);
     expect(rows("select email1 from interest_signups where email1 like 'kezi%'")).toHaveLength(0);
-    expect(count("cities")).toBe(baseline.cities + 1);
-    expect(count("leagues")).toBe(baseline.leagues + 1);
+    expect(count("cities")).toBe(baseline.cities + 2);
+    expect(count("leagues")).toBe(baseline.leagues + 2);
   });
 });
 
@@ -216,41 +209,33 @@ describe("the seed carries the walkthrough", () => {
 
   const userRow = async (email: string) => (await db.select().from(users)).find((u) => u.email === email)!;
 
-  it("sends the registration invite to the 20 pair players and all 4 solos (#96, #112)", async () => {
-    expect(await O.queueRegistrationInvites()).toBe(24);
-    await settleBackground();
-    const invites = rows("select to_email, status from email_messages where kind = 'registration_invite'");
-    expect(invites).toHaveLength(24);
-    expect(new Set(invites.map((m) => m.status))).toEqual(new Set(["sent"]));
-    expect(h.sent).toHaveLength(24);
-    // The two solos still waiting for a partner get the solo text.
-    const waiting = ["pal.boglarka@example.test", "sandor.akos@example.test"];
-    for (const m of h.sent) expect(m.text.includes("Még keresünk neked párt"), m.to).toBe(waiting.includes(m.to));
-    // Each invited address also gets an account_invites row (it exempts the address from the new-address code cap, #113).
-    expect(count("account_invites")).toBe(24);
-    // A second run adds nothing.
-    expect(await O.queueRegistrationInvites()).toBe(0);
-    await settleBackground();
-    expect(h.sent).toHaveLength(24);
-  });
-
-  it("forms the pairs from the signups, lets them enter, and publishes the groups", async () => {
-    // Everyone registers (the first-login page done) and logs in.
+  it("lets the players join through the register button, pair up, enter, and publishes the groups", async () => {
+    // Everyone registers through Mintaváros's register button (D127) and
+    // finishes the first-login page.
     const people = [
-      ...Seed.PAIR_SIGNUPS.flatMap((p) => [
+      ...Seed.PAIR_PLAYERS.flatMap((p) => [
         { ...p.a, level: p.level },
         { ...p.b, level: p.level },
       ]),
-      { ...Seed.SOLO_SIGNUPS[0]!.who, level: Seed.SOLO_SIGNUPS[0]!.level },
-      { ...Seed.SOLO_SIGNUPS[1]!.who, level: Seed.SOLO_SIGNUPS[1]!.level },
+      { ...Seed.SOLO_PLAYERS[0]!.who, level: Seed.SOLO_PLAYERS[0]!.level },
+      { ...Seed.SOLO_PLAYERS[1]!.who, level: Seed.SOLO_PLAYERS[1]!.level },
     ];
     for (const [i, p] of people.entries()) {
       h.raw
         .prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)")
         .run(`player-${i}`, p.email, p.name, p.level);
-      await SP.formSignupPairs(`player-${i}`);
+      await M.joinFromRegisterButton(`player-${i}`, Seed.LEAGUE.slug);
     }
+    const [league] = rows("select id from leagues where slug = 'minta'");
+    const organizer = await userRow(Seed.ORGANIZER.email);
+    // Only Mintaváros's players are offered on its Párok, never Idegen Ilona (#331).
+    const candidates = (await P.pairCandidates(league)).map((c) => c.id);
+    expect(candidates).toHaveLength(24);
+    expect(candidates).not.toContain(Seed.OUTSIDER.id);
+    // The Szervező pairs them on Párok, as the walkthrough's pair links would.
+    for (let i = 0; i < people.length; i += 2) expect(await P.createPair(organizer.id, league.id, `player-${i}`, `player-${i + 1}`)).toEqual({ ok: true });
     expect(rows("select count(*) as n from pairs where status = 'active'")[0].n).toBe(11);
+    h.raw.exec("delete from email_messages where kind = 'pair_created'");
 
     // Either player of each pair enters ("Nevezünk"): it counts at once, for round 1 (#153).
     const [season] = rows("select id from seasons");
@@ -264,7 +249,6 @@ describe("the seed carries the walkthrough", () => {
     expect(rows("select status, count(*) as n from email_messages where kind = 'season_entry_decision' group by status")).toEqual([
       { status: "sent", n: 22 },
     ]);
-    const organizer = await userRow(Seed.ORGANIZER.email);
 
     // Draft and publish: 11 pairs split into groups of 3 or 4.
     expect(await G.generateDraft(season.id, organizer.id)).toEqual({ ok: true });

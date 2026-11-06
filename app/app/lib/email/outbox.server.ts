@@ -6,22 +6,17 @@ import { db } from "~/db/client.server";
 import { auditEntry } from "~/lib/audit.server";
 import { runAfterResponse } from "~/lib/background.server";
 import {
-  accountInvites,
   broadcasts,
   emailMessages,
   emailSuppressions,
-  interestSignups,
-  leagues,
   notificationOptOuts,
-  stuckReminderPeople,
-  stuckReminders,
   users,
 } from "~/db/schema";
 import type { InterestSignup } from "~/lib/interest";
 import { channelKey, followsEmailSwitch } from "~/lib/notifications";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
-import { INTEREST_INVITE_NOTE, inviteRecipients, inviteStarts, type InviteRecipient, type InviteStart, type Recipient } from "./audience";
+import type { Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
 import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
@@ -30,7 +25,6 @@ import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { isAnonymizedEmail } from "~/lib/account-deletion";
 import { listCities } from "~/lib/cities.server";
 import { logError, logInfo, logWarn } from "~/lib/log";
-import { listSeasons } from "~/lib/seasons.server";
 
 import {
   broadcastEmail,
@@ -42,15 +36,11 @@ import {
   matchResult,
   matchTomorrow,
   pairCreated,
-  pairIntro,
-  partnerNotice,
-  registrationInvite,
   seasonEntered,
   signupConfirmation,
   strikeWarning,
   stuckReminder,
   type Email,
-  type PairIntroPerson,
   type StuckReminderInput,
 } from "./templates";
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
@@ -168,7 +158,8 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
 // can't be used to flood someone's inbox.
 const CONFIRMATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-// Signup confirmation, plus the one-time partner notice (spec section 17).
+// Signup confirmation (the landing form, #332). The partner notice went with
+// the interest list's flows (#333, D128): no email to a signed-up partner.
 export async function queueSignupEmails(signup: InterestSignup, now = new Date()): Promise<number[]> {
   const cities = await listCities();
   const [confirmed] = await db
@@ -185,31 +176,6 @@ export async function queueSignupEmails(signup: InterestSignup, now = new Date()
     confirmed.n === 0
       ? [{ kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) }]
       : [];
-  if (signup.mode === "pair" && signup.name2 && signup.email2) {
-    const partner = signup.email2.toLowerCase();
-    const [[notified], [suppressed]] = await Promise.all([
-      db
-        .select({ n: count() })
-        .from(emailMessages)
-        .where(and(eq(emailMessages.kind, "partner_notice"), eq(emailMessages.toEmail, partner))),
-      db.select({ n: count() }).from(emailSuppressions).where(eq(emailSuppressions.email, partner)),
-    ]);
-    if (notified.n === 0 && suppressed.n === 0)
-      messages.push({ kind: "partner_notice", toEmail: partner, ...partnerNotice(signup, cities) });
-  }
-  return enqueue(messages);
-}
-
-// Two solo signups a Szervező paired: each gets the other's name and email.
-// An unsubscribed address gets nothing.
-export async function queuePairIntros(a: PairIntroPerson, b: PairIntroPerson, city: string): Promise<number[]> {
-  const suppressed = await suppressedSet();
-  const messages: NewMessage[] = [
-    [a, b],
-    [b, a],
-  ]
-    .filter(([to]) => !suppressed.has(to.email.toLowerCase()))
-    .map(([to, partner]) => ({ kind: "pair_intro", toEmail: to.email, ...pairIntro(to, partner, city) }));
   return enqueue(messages);
 }
 
@@ -427,144 +393,6 @@ export async function stuckReminderInserts(
   for (let i = 0; i < queued.length; i += INSERT_CHUNK)
     statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
   return statements;
-}
-
-// Who would get the registration invite now (#20, audience.ts inviteRecipients).
-export async function pendingRegistrationInvites(): Promise<InviteRecipient[]> {
-  const [rows, leagueCities, accounts, suppressed] = await Promise.all([
-    db
-      .select({
-        id: interestSignups.id,
-        mode: interestSignups.mode,
-        email1: interestSignups.email1,
-        name1: interestSignups.name1,
-        email2: interestSignups.email2,
-        name2: interestSignups.name2,
-        pairedWith: interestSignups.pairedWith,
-        city: interestSignups.city,
-        status: interestSignups.status,
-        createdAt: interestSignups.createdAt,
-        invitedAt: interestSignups.invitedAt,
-        invited2At: interestSignups.invited2At,
-      })
-      .from(interestSignups)
-      .orderBy(asc(interestSignups.id)),
-    db.selectDistinct({ city: leagues.city }).from(leagues),
-    db.select({ email: users.email }).from(users),
-    suppressedSet(),
-  ]);
-  return inviteRecipients(rows, {
-    leagueCities: new Set(leagueCities.map((l) => l.city)),
-    accounts: new Set(accounts.map((u) => u.email.toLowerCase())),
-    suppressed,
-  });
-}
-
-// When and where each league city's league starts, for the invite (#131).
-async function leagueStarts(now: Date): Promise<Map<string, InviteStart>> {
-  const [leagueRows, seasons, cities] = await Promise.all([
-    db.select({ id: leagues.id, city: leagues.city }).from(leagues),
-    listSeasons(),
-    listCities(),
-  ]);
-  return inviteStarts(leagueRows, seasons, cities, now);
-}
-
-// account_invites binds 3 parameters per row, the invited_at update 1 per
-// address plus the timestamp (D1: at most 100 per statement).
-const INVITE_CHUNK = 30;
-const MARK_CHUNK = 90;
-
-// Sets or clears invited_at on every signup row of these addresses (and
-// invited2_at where the address is the partner, email2). Setting only touches
-// rows not invited yet, and returns the addresses it claimed.
-async function markInvited(emails: string[], invitedAt: Date | null): Promise<Set<string>> {
-  const claimed = new Set<string>();
-  for (let i = 0; i < emails.length; i += MARK_CHUNK) {
-    const slice = emails.slice(i, i + MARK_CHUNK);
-    const chunk1 = inArray(sql`lower(${interestSignups.email1})`, slice);
-    const chunk2 = inArray(sql`lower(${interestSignups.email2})`, slice);
-    const [rows1, rows2] = await db.batch([
-      db
-        .update(interestSignups)
-        .set({ invitedAt })
-        .where(invitedAt ? and(chunk1, isNull(interestSignups.invitedAt)) : chunk1)
-        .returning({ email: interestSignups.email1 }),
-      db
-        .update(interestSignups)
-        .set({ invited2At: invitedAt })
-        .where(invitedAt ? and(chunk2, isNull(interestSignups.invited2At)) : chunk2)
-        .returning({ email: interestSignups.email2 }),
-    ]);
-    for (const r of [...rows1, ...rows2]) if (r.email) claimed.add(r.email.toLowerCase());
-  }
-  return claimed;
-}
-
-// Queues the registration invite for everyone pending. The addresses are
-// claimed first (invited_at), so a second send running at the same time gets
-// none of them and nobody is invited twice. Then, in one D1 batch (a
-// transaction): the emails and the account_invites rows (since #113 they
-// only exempt the address from the daily cap on login codes to new
-// addresses). If that fails, the claim is released. Then
-// they are sent after the response, within the daily limit (#112, #140).
-// Returns how many were queued.
-// `only`: just these (lowercase) addresses, e.g. the partner's address a
-// player just added (#96); the same rules apply. Never to an address with an
-// account (inviteRecipients), so the email switch (#115) has nothing to skip.
-// `actorId`: the Admin who sent them from Jelentkezők, audited in the same
-// batch (#225); a player adding a partner's address isn't.
-export async function queueRegistrationInvites(now = new Date(), only?: readonly string[], actorId?: string): Promise<number> {
-  const pending = (await pendingRegistrationInvites()).filter((r) => (!only || only.includes(r.email)) && toSomeone({ toEmail: r.email }));
-  if (pending.length === 0) return 0;
-  const claimed = await markInvited(
-    pending.map((r) => r.email),
-    now,
-  );
-  const recipients = pending.filter((r) => claimed.has(r.email));
-  if (recipients.length === 0) return 0;
-  const emails = recipients.map((r) => r.email);
-  let ids: number[];
-  try {
-    const secret = emailSecret();
-    const starts = await leagueStarts(now);
-    const messages = await Promise.all(
-      recipients.map(async (r): Promise<NewMessage> => {
-        const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(r.email, secret));
-        const email = registrationInvite(r, url, starts.get(r.city) ?? null);
-        return { kind: "registration_invite", toEmail: r.email, headers: unsubscribeHeaders(url), ...email };
-      }),
-    );
-    const statements: BatchItem<"sqlite">[] = [];
-    for (let i = 0; i < messages.length; i += INSERT_CHUNK)
-      statements.push(
-        db
-          .insert(emailMessages)
-          .values(messages.slice(i, i + INSERT_CHUNK).map(messageValues))
-          .returning({ id: emailMessages.id }),
-      );
-    const inserts = statements.length;
-    for (let i = 0; i < emails.length; i += INVITE_CHUNK)
-      statements.push(
-        db
-          .insert(accountInvites)
-          .values(emails.slice(i, i + INVITE_CHUNK).map((email) => ({ email, note: INTEREST_INVITE_NOTE })))
-          .onConflictDoNothing(),
-      );
-    if (actorId)
-      statements.push(
-        auditEntry({ actorId, action: "registration_invites.send", target: "signups", detail: `${recipients.length} invites` }),
-      );
-    const [first, ...rest] = statements;
-    const results = (await db.batch([first, ...rest])) as unknown[];
-    ids = (results.slice(0, inserts) as { id: number }[][]).flat().map((r) => r.id);
-    logQueued(messages);
-  } catch (e) {
-    await markInvited(emails, null);
-    throw e;
-  }
-  deliverAfterResponse(ids);
-  return recipients.length;
 }
 
 // A one-off test of a draft, sent only to the admin. Not stored.
@@ -805,60 +633,4 @@ export async function outboxLog(): Promise<KindLog[]> {
         lastError: error?.lastError ? { reason: hideAddresses(error.lastError), at: error.claimedAt } : null,
       };
     });
-}
-
-// The line of a pair intro that carries the partner's address (templates.ts
-// pairIntro), lowercase.
-const PAIR_INTRO_ADDRESS_LINE = "az e-mail-címe: ";
-
-// A signup was withdrawn (#114): delete the registration invites and pair
-// introductions to these addresses that are not sent yet (pending: waiting
-// for the daily limit or a retry, #112), and the introductions to other people that
-// name one of these addresses (the partner's), matched on the whole address
-// line the template writes, never on part of an address (anna@ is not
-// hanna@). Registration invites also lose their invited mark, so a later
-// invite run can offer the address again if another signup of it is still active. Mail already sent stays.
-export async function cancelUnsentSignupMail(emails: string[]): Promise<number> {
-  const lowered = [...new Set(emails.map((e) => e.toLowerCase()))];
-  if (lowered.length === 0) return 0;
-  const unsent = eq(emailMessages.status, "pending");
-  const rows = await db
-    .delete(emailMessages)
-    .where(
-      and(
-        unsent,
-        or(
-          and(
-            eq(emailMessages.kind, "registration_invite"),
-            inArray(sql`lower(${emailMessages.toEmail})`, lowered),
-          ),
-          and(
-            eq(emailMessages.kind, "pair_intro"),
-            or(
-              inArray(sql`lower(${emailMessages.toEmail})`, lowered),
-              ...lowered.map(
-                (e) => sql`instr(lower(${emailMessages.text}), ${PAIR_INTRO_ADDRESS_LINE + e + "\n"}) > 0`,
-              ),
-            ),
-          ),
-        ),
-      ),
-    )
-    .returning({ kind: emailMessages.kind, toEmail: emailMessages.toEmail });
-  const invited = rows.filter((r) => r.kind === "registration_invite").map((r) => r.toEmail.toLowerCase());
-  if (invited.length > 0) await markInvited(invited, null);
-  return rows.length;
-}
-
-// Deletion request: remove the stored emails sent to these addresses, the
-// record of an A reminder (#155), whose key holds the address, and who got a
-// reminder this season (#191), by address.
-export async function deleteMessagesTo(emails: string[]) {
-  if (emails.length === 0) return;
-  const lowered = emails.map((e) => e.toLowerCase());
-  await db.batch([
-    db.delete(emailMessages).where(inArray(emailMessages.toEmail, lowered)),
-    db.delete(stuckReminders).where(inArray(stuckReminders.key, lowered.map((e) => `A:${e}`))),
-    db.delete(stuckReminderPeople).where(inArray(stuckReminderPeople.email, lowered)),
-  ]);
 }

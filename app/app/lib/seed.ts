@@ -4,9 +4,14 @@
 //
 // Everything it writes is recognisable and removable: addresses end in
 // @example.test (a reserved domain, so mail to them goes nowhere), and the
-// city, league and clubs have fixed slugs. Running it again first deletes all
-// of that, including what a walkthrough created on top (pairs, entries,
+// cities, leagues and clubs have fixed slugs. Running it again first deletes
+// all of that, including what a walkthrough created on top (pairs, entries,
 // groups, emails), then writes the same starting state again.
+//
+// No interest list (#333, D128): the players have no account yet; they
+// register through the league's register button (D127), as the walkthrough
+// says. A second league in a second city, with one player who joined it,
+// shows that a league's pages only hold its own players (#331).
 
 import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar } from "@padel-liga/rules";
 
@@ -14,9 +19,14 @@ export const SEED_EMAIL_DOMAIN = "example.test";
 export const CITY = { slug: "minta", name: "Mintaváros" } as const;
 export const LEAGUE = { slug: "minta", name: "Padelpárbaj Mintaváros" } as const;
 export const SEASON_NAME = "Teszt szezon";
+// The second league (#331): listed, no season, one player.
+export const OTHER_CITY = { slug: "pelda", name: "Példaváros" } as const;
+export const OTHER_LEAGUE = { slug: "pelda", name: "Padelpárbaj Példaváros" } as const;
 
 export const ADMIN = { id: "seed-admin", email: `admin@${SEED_EMAIL_DOMAIN}`, name: "Teszt Admin" } as const;
 export const ORGANIZER = { id: "seed-organizer", email: `szervezo@${SEED_EMAIL_DOMAIN}`, name: "Teszt Szervező" } as const;
+// A registered player of the second league only.
+export const OUTSIDER = { id: "seed-outsider", email: `idegen.ilona@${SEED_EMAIL_DOMAIN}`, name: "Idegen Ilona" } as const;
 
 export const CLUBS = [
   { slug: "minta-padel-arena", name: "Minta Padel Aréna" },
@@ -29,9 +39,9 @@ type Person = { name: string; email: string };
 
 const person = (name: string, local: string): Person => ({ name, email: `${local}@${SEED_EMAIL_DOMAIN}` });
 
-// Ten pair signups: both players named, so both get the registration invite.
-// Each row shares one level, which prefills the first-login page of both.
-export const PAIR_SIGNUPS: { a: Person; b: Person; level: Level }[] = [
+// The walkthrough's players, who register themselves (none has an account):
+// ten pairs-to-be, each with one level both pick on the first-login page.
+export const PAIR_PLAYERS: { a: Person; b: Person; level: Level }[] = [
   { a: person("Kovács Anna", "kovacs.anna"), b: person("Nagy Bence", "nagy.bence"), level: "versenyzo" },
   { a: person("Szabó Eszter", "szabo.eszter"), b: person("Tóth Gergő", "toth.gergo"), level: "halado" },
   { a: person("Horváth Zsófia", "horvath.zsofia"), b: person("Molnár Dávid", "molnar.david"), level: "halado" },
@@ -44,22 +54,23 @@ export const PAIR_SIGNUPS: { a: Person; b: Person; level: Level }[] = [
   { a: person("Oláh Kinga", "olah.kinga"), b: person("Fodor Péter", "fodor.peter"), level: "kezdo" },
 ];
 
-// Four solo signups. The first two are already paired by a Szervező; the
-// other two wait (their invite says so, #96), so the walkthrough can pair them.
-export const SOLO_SIGNUPS: { who: Person; level: Level; pairedWithNext: boolean }[] = [
-  { who: person("Varga Dóra", "varga.dora"), level: "kozephalado", pairedWithNext: true },
-  { who: person("Kiss Miklós", "kiss.miklos"), level: "kozephalado", pairedWithNext: false },
-  { who: person("Pál Boglárka", "pal.boglarka"), level: "kezdo", pairedWithNext: false },
-  { who: person("Sándor Ákos", "sandor.akos"), level: "halado", pairedWithNext: false },
+// And four players without a partner, who switch on "Párt keresek" so the
+// Szervező pairs them on Párkeresők.
+export const SOLO_PLAYERS: { who: Person; level: Level }[] = [
+  { who: person("Varga Dóra", "varga.dora"), level: "kozephalado" },
+  { who: person("Kiss Miklós", "kiss.miklos"), level: "kozephalado" },
+  { who: person("Pál Boglárka", "pal.boglarka"), level: "kezdo" },
+  { who: person("Sándor Ákos", "sandor.akos"), level: "halado" },
 ];
 
-// Every address the seed creates a signup for or an account with.
+// Every address the seed or the walkthrough uses.
 export function seedEmails(): string[] {
   return [
     ADMIN.email,
     ORGANIZER.email,
-    ...PAIR_SIGNUPS.flatMap((p) => [p.a.email, p.b.email]),
-    ...SOLO_SIGNUPS.map((s) => s.who.email),
+    OUTSIDER.email,
+    ...PAIR_PLAYERS.flatMap((p) => [p.a.email, p.b.email]),
+    ...SOLO_PLAYERS.map((s) => s.who.email),
   ];
 }
 
@@ -98,7 +109,7 @@ const q = (s: string | null): string => (s === null ? "NULL" : `'${s.replaceAll(
 const secs = (d: Date): number => Math.floor(d.getTime() / 1000);
 
 const SEED_USERS = `select id from users where lower(email) like '%@${SEED_EMAIL_DOMAIN}'`;
-const SEED_LEAGUE = `select id from leagues where slug = ${q(LEAGUE.slug)}`;
+const SEED_LEAGUES = `select id from leagues where slug in (${q(LEAGUE.slug)}, ${q(OTHER_LEAGUE.slug)})`;
 const like = (column: string): string => `lower(${column}) like '%@${SEED_EMAIL_DOMAIN}'`;
 
 // Deletes the seed's rows and whatever hangs off them. The order follows the
@@ -108,11 +119,12 @@ export function resetStatements(): string[] {
   return [
     `delete from broadcasts where ${like("created_by")}`,
     `delete from email_messages where ${like("to_email")}`,
-    `delete from pair_invites where league_id in (${SEED_LEAGUE}) or inviter_id in (${SEED_USERS}) or ${like("invitee_email")}`,
-    `delete from pairs where league_id in (${SEED_LEAGUE}) or player_a in (${SEED_USERS}) or player_b in (${SEED_USERS})`,
+    `delete from pair_invites where league_id in (${SEED_LEAGUES}) or inviter_id in (${SEED_USERS}) or ${like("invitee_email")}`,
+    `delete from pairs where league_id in (${SEED_LEAGUES}) or player_a in (${SEED_USERS}) or player_b in (${SEED_USERS})`,
     // Before the league: its system entries (actor null) go by league_id (#225).
-    `delete from audit_log where actor_id in (${SEED_USERS}) or league_id in (${SEED_LEAGUE}) or ${like("target")} or target = ${q(`league:${LEAGUE.slug}`)} or target in (select 'user:' || id from users where ${like("email")})`,
-    `delete from leagues where slug = ${q(LEAGUE.slug)}`,
+    `delete from audit_log where actor_id in (${SEED_USERS}) or league_id in (${SEED_LEAGUES}) or ${like("target")} or target = ${q(`league:${LEAGUE.slug}`)} or target in (select 'user:' || id from users where ${like("email")})`,
+    // league_members goes with its league and its users (cascade).
+    `delete from leagues where slug in (${q(LEAGUE.slug)}, ${q(OTHER_LEAGUE.slug)})`,
     `delete from users where ${like("email")}`,
     `delete from login_codes where ${like("email")}`,
     `delete from account_invites where ${like("email")}`,
@@ -120,7 +132,7 @@ export function resetStatements(): string[] {
     `delete from email_suppressions where ${like("email")}`,
     `delete from interest_signups where city = ${q(CITY.slug)} or ${like("email1")} or ${like("email2")}`,
     `delete from clubs where city = ${q(CITY.slug)} or slug in (${CLUBS.map((c) => q(c.slug)).join(", ")})`,
-    `delete from cities where slug = ${q(CITY.slug)}`,
+    `delete from cities where slug in (${q(CITY.slug)}, ${q(OTHER_CITY.slug)})`,
   ];
 }
 
@@ -139,30 +151,39 @@ export function insertStatements(now: Date): string[] {
   const phases = phaseCalendar(start, []);
   const opensAt = budapestTime(addDays(today, -1), 0, 0);
   const closesAt = budapestTime(addDays(start, -1), 23, 59);
-  const hour = 3600 * 1000;
-  // Signups arrive over the last ten days, in the order of the lists.
-  let n = 0;
-  const arrival = () => secs(new Date(now.getTime() - 10 * 24 * hour + n++ * 7 * hour));
-  const consent = secs(new Date(now.getTime() - 11 * 24 * hour));
 
   const out: string[] = [];
-  out.push(`insert into cities (slug, name, listed) values (${q(CITY.slug)}, ${q(CITY.name)}, 1)`);
+  out.push(`insert into cities (slug, name, listed) values (${q(CITY.slug)}, ${q(CITY.name)}, 1), (${q(OTHER_CITY.slug)}, ${q(OTHER_CITY.name)}, 1)`);
   for (const c of CLUBS)
     out.push(
       `insert into clubs (slug, city, name, active) values (${q(c.slug)}, ${q(CITY.slug)}, ${q(c.name)}, 1)`,
     );
-  out.push(`insert into leagues (city, slug, name) values (${q(CITY.slug)}, ${q(LEAGUE.slug)}, ${q(LEAGUE.name)})`);
+  out.push(
+    `insert into leagues (city, slug, name) values (${q(CITY.slug)}, ${q(LEAGUE.slug)}, ${q(LEAGUE.name)}), ` +
+      `(${q(OTHER_CITY.slug)}, ${q(OTHER_LEAGUE.slug)}, ${q(OTHER_LEAGUE.name)})`,
+  );
 
   // Admin and Szervező: finished accounts (name, level, sex and consent set), so
-  // they log in with an email code and land on the app, not on /welcome.
+  // they log in with an email code and land on the app, not on /welcome. The
+  // second league's player too, with a phone number like every new player.
   out.push(
-    `insert into users (id, email, name, platform_role, level, sex, consent_at) values ` +
-      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', 'male', ${secs(now)}), ` +
-      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', 'female', ${secs(now)})`,
+    `insert into users (id, email, name, platform_role, level, sex, phone, consent_at) values ` +
+      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', 'male', NULL, ${secs(now)}), ` +
+      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', 'female', NULL, ${secs(now)}), ` +
+      `(${q(OUTSIDER.id)}, ${q(OUTSIDER.email)}, ${q(OUTSIDER.name)}, 'player', 'kozephalado', 'female', '+36301112233', ${secs(now)})`,
   );
   out.push(
     `insert into league_admins (league_id, user_id, granted_by) select id, ${q(ORGANIZER.id)}, ${q(ADMIN.id)} ` +
       `from leagues where slug = ${q(LEAGUE.slug)}`,
+  );
+  // Who belongs where (D127): the Admin and the Szervező joined Mintaváros,
+  // like today's staff; Idegen Ilona joined Példaváros only, with "Párt
+  // keresek" on there.
+  const join = (userId: string, league: string) =>
+    `insert into league_members (league_id, user_id, source) select id, ${q(userId)}, 'chosen' from leagues where slug = ${q(league)}`;
+  out.push(join(ADMIN.id, LEAGUE.slug), join(ORGANIZER.id, LEAGUE.slug), join(OUTSIDER.id, OTHER_LEAGUE.slug));
+  out.push(
+    `insert into partner_searches (league_id, user_id, seeking) select id, ${q(OUTSIDER.id)}, 1 from leagues where slug = ${q(OTHER_LEAGUE.slug)}`,
   );
 
   out.push(
@@ -176,42 +197,6 @@ export function insertStatements(now: Date): string[] {
         `select s.id, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)} from seasons s ` +
         `join leagues l on l.id = s.league_id where l.slug = ${q(LEAGUE.slug)} and s.name = ${q(SEASON_NAME)}`,
     );
-
-  const clubAt = (i: number) => CLUBS[i % CLUBS.length]!.slug;
-  const signup = (cols: string, values: string) => `insert into interest_signups (${cols}) values (${values})`;
-  const cols = "city, mode, name1, email1, name2, email2, level, ref, home_club, consent_at, status, created_at";
-  PAIR_SIGNUPS.forEach((p, i) =>
-    out.push(
-      signup(
-        cols,
-        [
-          q(CITY.slug), q("pair"), q(p.a.name), q(p.a.email), q(p.b.name), q(p.b.email), q(p.level),
-          // Every third signup came from a club poster, as in real life.
-          q(i % 3 === 0 ? clubAt(i) : null), q(clubAt(i)), consent, q("new"), arrival(),
-        ].join(", "),
-      ),
-    ),
-  );
-  SOLO_SIGNUPS.forEach((s, i) =>
-    out.push(
-      signup(
-        cols,
-        [
-          q(CITY.slug), q("solo"), q(s.who.name), q(s.who.email), "NULL", "NULL", q(s.level),
-          "NULL", q(clubAt(i)), consent, q("new"), arrival(),
-        ].join(", "),
-      ),
-    ),
-  );
-  // The Szervező's pairing of the first two solos: both rows point at each
-  // other, as solo-pairing.server.ts writes them.
-  const solos = SOLO_SIGNUPS.flatMap((s, i) => (s.pairedWithNext ? [[s.who, SOLO_SIGNUPS[i + 1]!.who] as const] : []));
-  for (const [a, b] of solos)
-    for (const [x, y] of [[a, b], [b, a]] as const)
-      out.push(
-        `update interest_signups set paired_with = (select id from interest_signups where email1 = ${q(y.email)}), ` +
-          `status = 'paired' where email1 = ${q(x.email)}`,
-      );
   return out;
 }
 
@@ -223,12 +208,13 @@ export function seedSql(now: Date): string {
 // What the CLI prints when it is done.
 export function summary(now: Date): string {
   const start = firstRoundStart(now);
-  const solosPaired = SOLO_SIGNUPS.filter((s) => s.pairedWithNext).length * 2;
   return [
     `Seeded ${CITY.name}: ${CLUBS.length} clubs, league "${LEAGUE.name}", season "${SEASON_NAME}" (round 1 starts ${start}).`,
-    `${PAIR_SIGNUPS.length} pair signups, ${SOLO_SIGNUPS.length} solo signups (${solosPaired} paired, ${SOLO_SIGNUPS.length - solosPaired} waiting).`,
+    `And ${OTHER_CITY.name}: league "${OTHER_LEAGUE.name}" with one player (${OUTSIDER.email}).`,
+    `Players register themselves: ${PAIR_PLAYERS.length * 2 + SOLO_PLAYERS.length} addresses in docs/walkthrough.md.`,
     `Admin: ${ADMIN.email}`,
     `Szervező: ${ORGANIZER.email}`,
     "Next: docs/walkthrough.md",
   ].join("\n");
 }
+

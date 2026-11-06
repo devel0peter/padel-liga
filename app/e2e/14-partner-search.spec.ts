@@ -23,7 +23,8 @@ const madeRow = (page: Page) =>
     .filter({ hasText: KATA.name })
     .filter({ hasText: KRISTOF.name });
 
-// A new account with no signup: the first-login page by hand, then /home.
+// A new account: the first-login page by hand, then /home, where it joins
+// the league on "Melyik ligában játszol?" (D127, #331).
 async function newPlayer(browser: Browser, who: { name: string; email: string }) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -37,6 +38,8 @@ async function newPlayer(browser: Browser, who: { name: string; email: string })
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
+  await content(page).getByRole("button", { name: "Csatlakozom" }).click();
+  await expect(content(page)).not.toContainText("Melyik ligában játszol?");
   await save(context, who.email);
   return { context, page };
 }
@@ -46,7 +49,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   const emailsBefore = d1(OTHER);
   const lastBefore = d1("select max(id) as id from email_messages")[0].id ?? 0;
 
-  // Kata on Párom: off by default (no solo signup), then on.
+  // Kata on Párom: off by default (#333), then on.
   const kata = await newPlayer(browser, KATA);
   await visit(kata.page, "/pair");
   const kataSwitch = content(kata.page).getByRole("switch", { name: "Párt keresek" });

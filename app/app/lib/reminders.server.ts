@@ -10,7 +10,6 @@ import { stuckReminder, type StuckReminderInput } from "~/lib/email/templates";
 import { auditIfChanged } from "~/lib/audit.server";
 import { pairLinkPath } from "~/lib/pair-links.server";
 import { listSeasons } from "~/lib/seasons.server";
-import { listSignups } from "~/lib/signups-admin.server";
 import { SITE_URL } from "~/lib/site";
 
 import type { LeagueRef } from "./auth/permissions";
@@ -36,7 +35,7 @@ import { logWarn } from "~/lib/log";
 
 // Everything reminders.ts needs, read now.
 export async function reminderInput(now = new Date()): Promise<ReminderInput> {
-  const [leagueRows, seasonList, signups, accounts, members, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
+  const [leagueRows, seasonList, accounts, members, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
     await Promise.all([
       db
         .select({ id: leagues.id, city: leagues.city, name: leagues.name })
@@ -44,7 +43,6 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
         .innerJoin(cities, eq(cities.slug, leagues.city))
         .where(eq(cities.listed, true)),
       listSeasons(),
-      listSignups(),
       db
         .select({
           id: users.id,
@@ -80,7 +78,6 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
     now,
     leagues: leagueRows,
     seasons: seasonList,
-    signups,
     accounts: accounts.map((a) => {
       const email = a.email.toLowerCase();
       return { ...a, email, admin: a.role === "superadmin", emailOff: emailOff.has(email) };
@@ -100,7 +97,6 @@ function templateInput(r: Reminder, to: ReminderRecipient, league: string, pairL
   return {
     situation: r.situation,
     to: to.name,
-    email: to.email,
     partner: to.partner,
     league,
     season: r.season.name,

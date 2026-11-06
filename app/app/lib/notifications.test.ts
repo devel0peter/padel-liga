@@ -27,83 +27,29 @@ import {
   isEnabled,
   isNotificationKind,
   kindsFor,
-  pairIntroMessage,
   pairWithdrawnMessage,
   seasonEntryMessage,
-  newSignupMessage,
   parseSubscription,
   pushPayload,
   safeTarget,
-  signupRecipients,
   timeAgo,
-  type SignupSummary,
 } from "./notifications";
 
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers new signups, disputed results and substitute requests to Szervezők and Admins only", () => {
+  it("offers disputed results, substitute requests and no-shows to Szervezők and Admins only (no new signups since #333)", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["new_signup", "result_disputed", "substitute_requested", "no_show_reported"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["new_signup", "result_disputed", "substitute_requested", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
   });
 });
 
 describe("isEnabled", () => {
   it("is on until switched off; the test kind is always on", () => {
-    expect(isEnabled(new Set(), "new_signup")).toBe(true);
-    expect(isEnabled(new Set(["new_signup"]), "new_signup")).toBe(false);
+    expect(isEnabled(new Set(), "result_disputed")).toBe(true);
+    expect(isEnabled(new Set(["result_disputed"]), "result_disputed")).toBe(false);
     expect(isEnabled(new Set(["test"]), "test")).toBe(true);
-  });
-});
-
-describe("signupRecipients", () => {
-  const organizers = [
-    { userId: "anna", city: "gyor", leagueSlug: "gyor" },
-    { userId: "bela", city: "pecs", leagueSlug: "pecs" },
-    { userId: "peter", city: "gyor", leagueSlug: "gyor" },
-  ];
-
-  it("sends to the city's Szervezők and every Admin, once each", () => {
-    expect(signupRecipients("gyor", organizers, ["peter"])).toEqual([
-      { userId: "peter", admin: true, leagueSlug: null },
-      { userId: "anna", admin: false, leagueSlug: "gyor" },
-    ]);
-  });
-
-  it("sends a city without a league to the Admins only", () => {
-    expect(signupRecipients("other", organizers, ["peter"])).toEqual([{ userId: "peter", admin: true, leagueSlug: null }]);
-    expect(signupRecipients("other", organizers, [])).toEqual([]);
-  });
-});
-
-describe("newSignupMessage", () => {
-  const pair: SignupSummary = { mode: "pair", level: "halado", cityName: "Győr", pairs: 9, solos: 4 };
-  const organizer = { userId: "anna", admin: false, leagueSlug: "gyor" };
-  const admin = { userId: "peter", admin: true, leagueSlug: null };
-
-  it("names the city, the level and the counts, never the people", () => {
-    expect(newSignupMessage(pair, organizer)).toEqual({
-      title: "Új jelentkező · Győr",
-      body: "Új pár jelentkezett, haladó szint. Eddig 9 pár és 4 egyéni jelentkező.",
-      url: "/admin/leagues/gyor",
-    });
-  });
-
-  it("says when the signer would organize a league", () => {
-    expect(newSignupMessage({ ...pair, organize: true }, admin).body).toBe(
-      "Új pár jelentkezett, haladó szint. Szívesen szervezne ligát. Eddig 9 pár és 4 egyéni jelentkező.",
-    );
-  });
-
-  it("sends a Szervező to the solo list for a solo signup", () => {
-    const m = newSignupMessage({ ...pair, mode: "solo", level: "kezdo" }, organizer);
-    expect(m.body).toBe("Új egyéni jelentkező (párt keres), kezdő szint. Eddig 9 pár és 4 egyéni jelentkező.");
-    expect(m.url).toBe("/admin/leagues/gyor/solos");
-  });
-
-  it("sends an Admin to the signup list", () => {
-    expect(newSignupMessage(pair, admin).url).toBe("/admin/signups");
   });
 });
 
@@ -183,7 +129,7 @@ describe("channels (#115)", () => {
     expect(channelEnabled(new Set(["channel:email"]), "email")).toBe(false);
     expect(channelEnabled(new Set(["channel:email"]), "push")).toBe(true);
     // A kind switched off is not a channel switched off.
-    expect(channelEnabled(new Set(["new_signup"]), "push")).toBe(true);
+    expect(channelEnabled(new Set(["result_disputed"]), "push")).toBe(true);
   });
 
   it("knows only email and push, and their rows are never a kind", () => {
@@ -192,7 +138,7 @@ describe("channels (#115)", () => {
     expect(isChannel("sms")).toBe(false);
     expect(isChannel("toString")).toBe(false);
     expect(isNotificationKind(channelKey("email"))).toBe(false);
-    expect(isEnabled(new Set([channelKey("email"), channelKey("push")]), "new_signup")).toBe(true);
+    expect(isEnabled(new Set([channelKey("email"), channelKey("push")]), "result_disputed")).toBe(true);
   });
 
   it("only login codes and signup confirmations ignore the switch (Peter, 2026-10-29)", () => {
@@ -207,16 +153,6 @@ describe("channels (#115)", () => {
       "groups_published",
     ] as const)
       expect(followsEmailSwitch(kind)).toBe(true);
-  });
-});
-
-describe("pairIntroMessage", () => {
-  it("says a partner was found, with no names", () => {
-    expect(pairIntroMessage("Győr")).toEqual({
-      title: "Párt találtunk neked",
-      body: "A szervező párba tett egy másik egyéni jelentkezővel (Győr). A Párom oldalon látod, ki az.",
-      url: "/pair",
-    });
   });
 });
 

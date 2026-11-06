@@ -29,7 +29,6 @@ import { organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
 import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
-import { notifyNewSignup } from "~/lib/notifications.server";
 import { turnstileError } from "~/lib/turnstile";
 import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
 import { logError } from "~/lib/log";
@@ -113,12 +112,6 @@ export async function action({ request }: Route.ActionArgs): Promise<SignupActio
     await deliver(await queueSignupEmails(result.data));
   } catch (error) {
     logError("signup email failed", { error });
-  }
-  // Szervezők and Admins hear about it (in the app and by push); same rule.
-  try {
-    await notifyNewSignup(result.data);
-  } catch (error) {
-    logError("signup notification failed", { error });
   }
   return { ok: true, cityOther: result.data.cityOther };
 }

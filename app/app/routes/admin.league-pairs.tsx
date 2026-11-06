@@ -718,7 +718,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
       actions={<CreateDialog candidates={candidates} />}
     >
       <p className="max-w-2xl text-muted-foreground">
-        A játékosok a jelentkezésükben megadott párral indulnak. Minden más változás itt történik. A kihirdetett csoportban
+        A játékosok párlinkkel lesznek párok, vagy te teszed őket párba itt vagy a Párkeresőkön. A kihirdetett csoportban
         játszó pár a kör határidejéig nem bontható fel.
       </p>
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />

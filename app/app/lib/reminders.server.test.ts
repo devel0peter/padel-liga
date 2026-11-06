@@ -42,19 +42,12 @@ function user(id: string, v: { consent?: number | null; created?: number; role?:
   h.raw.prepare("insert into league_members (league_id, user_id, source) values (1, ?, 'register')").run(id);
 }
 
-function invited(email: string, v: { name2?: string; email2?: string } = {}) {
-  h.raw
-    .prepare(
-      "insert into interest_signups (mode, name1, email1, name2, email2, city, level, consent_at, invited_at, invited2_at) values (?, ?, ?, ?, ?, 'gyor', 'kezdo', 1, ?, ?)",
-    )
-    .run(v.name2 ? "pair" : "solo", email.split("@")[0], email, v.name2 ?? null, v.email2 ?? null, T - 3 * DAY, v.email2 ? T - 3 * DAY : null);
-}
-
 // Everyone of the issue's situations, and everyone who must get nothing.
 function people() {
-  invited("eva@x.hu"); // A
-  invited("ugo@x.hu"); // A, but unsubscribed
-  h.raw.prepare("insert into email_suppressions (email, reason) values ('ugo@x.hu', 'unsubscribed')").run();
+  // On the interest list, invited, no account: nothing since #333 (A went).
+  h.raw
+    .prepare("insert into interest_signups (mode, name1, email1, city, level, consent_at, invited_at) values ('solo', 'eva', 'eva@x.hu', 'gyor', 'kezdo', 1, ?)")
+    .run(T - 3 * DAY);
   user("bela", { consent: null, created: T - 2 * DAY }); // B
   user("cili"); // C
   user("gabi"); // D with Hedi
@@ -94,7 +87,7 @@ describe("automatic reminders (#155)", () => {
 
   it("with the switch off, the page counts the backlog and nothing is sent", async () => {
     const view = await R.reminderOverview(league, NOW);
-    expect(view).toMatchObject({ on: false, due: { A: 1, B: 1, C: 1, D: 2 }, season: "2026/27 tél" });
+    expect(view).toMatchObject({ on: false, due: { B: 1, C: 1, D: 2 }, season: "2026/27 tél" });
     expect(await R.queueDueReminders(NOW)).toBe(0);
     expect(reminderMail()).toEqual([]);
   });
@@ -102,15 +95,14 @@ describe("automatic reminders (#155)", () => {
   it("previews each reminder with a real recipient's data, no address and no pair link token", async () => {
     const { previews } = await R.reminderOverview(league, NOW);
     expect(previews.map((p) => [p.situation, p.subject])).toEqual([
-      ["A", "Még nem regisztráltál – Padelpárbaj"],
       ["B", "Fejezd be a regisztrációt – Padelpárbaj"],
       ["C", "Hívd meg a párodat – Padelpárbaj"],
       ["D", "Nevezzetek a szezonra – Padelpárbaj"],
     ]);
-    expect(previews[0].text).toContain("Szia eva!");
-    expect(previews[3].text).toContain("Hedi pároddal még nem neveztetek");
+    expect(previews[0].text).toContain("Szia Bela!");
+    expect(previews[2].text).toContain("Hedi pároddal még nem neveztetek");
     for (const p of previews) expect(p.text).not.toMatch(/@|%40|Leiratkozás/);
-    expect(previews[2].text).toContain("/pair/join/…");
+    expect(previews[1].text).toContain("/pair/join/…");
     expect(all("select count(*) as n from pair_links")).toEqual([{ n: 0 }]);
   });
 
@@ -120,13 +112,12 @@ describe("automatic reminders (#155)", () => {
     const view = await R.reminderOverview(league, NOW);
     expect(view.on).toBe(true);
     const budget = new RunBudget();
-    expect(await R.queueDueReminders(NOW)).toBe(5);
+    expect(await R.queueDueReminders(NOW)).toBe(4);
     // Within what the cron keeps for this step (#183).
     expect(budget.used().queries).toBeLessThanOrEqual(R.STUCK_QUERIES);
     const mail = reminderMail();
-    expect(mail.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu", "eva@x.hu", "gabi@x.hu", "hedi@x.hu"]);
+    expect(mail.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu", "gabi@x.hu", "hedi@x.hu"]);
     expect(all("select situation, recipients from stuck_reminders order by situation")).toEqual([
-      { situation: "A", recipients: 1 },
       { situation: "B", recipients: 1 },
       { situation: "C", recipients: 1 },
       { situation: "D", recipients: 2 },
@@ -141,7 +132,7 @@ describe("automatic reminders (#155)", () => {
     }
     // The cron sends them in the same run, after personal mail.
     await O.deliver();
-    expect(h.sent.map((m) => m.to).sort()).toEqual(["bela@x.hu", "cili@x.hu", "eva@x.hu", "gabi@x.hu", "hedi@x.hu"]);
+    expect(h.sent.map((m) => m.to).sort()).toEqual(["bela@x.hu", "cili@x.hu", "gabi@x.hu", "hedi@x.hu"]);
   });
 
   it("no reminder holds another person's address or phone number", async () => {
@@ -161,17 +152,17 @@ describe("automatic reminders (#155)", () => {
     const later = new Date(NOW.getTime() + 3 * 3600_000);
     expect(await R.queueDueReminders(later)).toBe(0);
     const view = await R.reminderOverview(league, later);
-    expect(view.due).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    expect(view.due).toEqual({ B: 0, C: 0, D: 0 });
     expect(view.sent.D.emails).toBe(2);
-    expect(view.sent.A.emails).toBe(1);
-    expect(view.sent.A.last).toBeInstanceOf(Date);
+    expect(view.sent.B.emails).toBe(1);
+    expect(view.sent.B.last).toBeInstanceOf(Date);
   });
 
   it("two runs at the same time queue each reminder once", async () => {
     await R.setReminders("admin", league, true, NOW);
     const [a, b] = await Promise.all([R.queueDueReminders(NOW), R.queueDueReminders(NOW)]);
-    expect(a + b).toBe(5);
-    expect(reminderMail()).toHaveLength(5);
+    expect(a + b).toBe(4);
+    expect(reminderMail()).toHaveLength(4);
   });
 
   it("someone who leaves the situation before the time passes gets none", async () => {
@@ -180,13 +171,13 @@ describe("automatic reminders (#155)", () => {
     h.raw.prepare("update users set created_at = ? where id = 'bela'").run(T - 20 * 3600);
     user("zoli");
     h.raw.prepare("insert into pairs (league_id, player_a, player_b, created_at) values (1, 'cili', 'zoli', ?)").run(T - 3600);
-    expect(await R.queueDueReminders(NOW)).toBe(3);
-    expect(reminderMail().map((m: any) => m.to_email)).toEqual(["eva@x.hu", "gabi@x.hu", "hedi@x.hu"]);
+    expect(await R.queueDueReminders(NOW)).toBe(2);
+    expect(reminderMail().map((m: any) => m.to_email)).toEqual(["gabi@x.hu", "hedi@x.hu"]);
   });
 
   it("a failure part-way through queueing leaves no email and no record, so the next run sends each once", async () => {
     await R.setReminders("admin", league, true, NOW);
-    // Eight more without a pair: 13 emails, more than one insert of 10.
+    // Eight more without a pair: 12 emails, more than one insert of 10.
     for (let i = 1; i <= 8; i++) user(`c${i}`);
     // The last email (Hedi's, in the second insert) fails.
     h.raw.exec(
@@ -196,11 +187,11 @@ describe("automatic reminders (#155)", () => {
     expect(all("select count(*) as n from email_messages")).toEqual([{ n: 0 }]);
     expect(all("select count(*) as n from stuck_reminders")).toEqual([{ n: 0 }]);
     h.raw.exec("drop trigger fail_hedi");
-    expect(await R.queueDueReminders(NOW)).toBe(13);
+    expect(await R.queueDueReminders(NOW)).toBe(12);
     expect(await R.queueDueReminders(NOW)).toBe(0);
     const to = reminderMail().map((m: any) => m.to_email);
-    expect(to).toHaveLength(13);
-    expect(new Set(to).size).toBe(13);
+    expect(to).toHaveLength(12);
+    expect(new Set(to).size).toBe(12);
   });
 
   it("switching off stops the next run", async () => {
@@ -209,39 +200,27 @@ describe("automatic reminders (#155)", () => {
     expect(await R.queueDueReminders(NOW)).toBe(0);
   });
 
-  it("deleting a signup's mail also forgets its A reminder", async () => {
+  it("one reminder per person per season (#191): B, then C in the same season sends no second email; a new season can", async () => {
     await R.setReminders("admin", league, true, NOW);
-    await R.queueDueReminders(NOW);
-    await O.deleteMessagesTo(["EVA@x.hu"]);
-    expect(all("select key from stuck_reminders where situation = 'A'")).toEqual([]);
-    expect(all("select email from stuck_reminder_people where email = 'eva@x.hu'")).toEqual([]);
-  });
-
-  it("one reminder per person per season (#191): A, then C in the same season sends no second email; a new season can", async () => {
-    await R.setReminders("admin", league, true, NOW);
-    expect(await R.queueDueReminders(NOW)).toBe(5);
+    expect(await R.queueDueReminders(NOW)).toBe(4);
     expect(all("select season_id, email, situation from stuck_reminder_people order by email")).toEqual([
       { season_id: 1, email: "bela@x.hu", situation: "B" },
       { season_id: 1, email: "cili@x.hu", situation: "C" },
-      { season_id: 1, email: "eva@x.hu", situation: "A" },
       { season_id: 1, email: "gabi@x.hu", situation: "D" },
       { season_id: 1, email: "hedi@x.hu", situation: "D" },
     ]);
-    // Éva (got A) registers, has no pair and switched "Párt keresek" off;
-    // Béla (got B) finishes the first-login page. Both are in C now.
-    user("eva", { created: T });
-    h.raw.prepare("insert into partner_searches (league_id, user_id, seeking, updated_at) values (1, 'eva', 0, ?)").run(T);
+    // Béla (got B) finishes the first-login page: he is in C now.
     h.raw.prepare("update users set consent_at = ? where id = 'bela'").run(T);
     const later = new Date(NOW.getTime() + 3 * DAY * 1000);
     const view = await R.reminderOverview(league, later);
-    // Neither is in the backlog or a preview: both got one this season.
-    expect(view.due).toEqual({ A: 0, B: 0, C: 0, D: 0 });
+    // He is not in the backlog or a preview: he got one this season.
+    expect(view.due).toEqual({ B: 0, C: 0, D: 0 });
     expect(view.previews).toEqual([]);
     expect(await R.queueDueReminders(later)).toBe(0);
-    expect(reminderMail().filter((m: any) => m.to_email === "eva@x.hu")).toHaveLength(1);
+    expect(reminderMail().filter((m: any) => m.to_email === "bela@x.hu")).toHaveLength(1);
 
     // Season 1 has started its last phase; the league's next season accepts
-    // entries: Éva and Béla can get C there (Cili had C already, once ever).
+    // entries: Béla can get C there (Cili had C already, once ever).
     h.raw.prepare("update season_phases set starts_at = ? where season_id = 1").run(T);
     h.raw
       .prepare(
@@ -251,10 +230,10 @@ describe("automatic reminders (#155)", () => {
     h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (2, 1, ?, ?)").run(T + 40 * DAY, T + 60 * DAY);
     const next = await R.reminderOverview(league, later);
     expect(next).toMatchObject({ season: "2027 tavasz" });
-    expect(next.due.C).toBe(2);
+    expect(next.due.C).toBe(1);
     await R.queueDueReminders(later);
     const c = reminderMail().filter((m: any) => m.subject === "Hívd meg a párodat – Padelpárbaj");
-    expect(c.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu", "eva@x.hu"]);
-    expect(reminderMail().filter((m: any) => m.to_email === "eva@x.hu")).toHaveLength(2);
+    expect(c.map((m: any) => m.to_email)).toEqual(["bela@x.hu", "cili@x.hu"]);
+    expect(reminderMail().filter((m: any) => m.to_email === "bela@x.hu")).toHaveLength(2);
   });
 });

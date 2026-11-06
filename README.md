@@ -21,6 +21,7 @@ npm ci
 npm run dev                          # dev server with a local D1
 npm run db:migrate:local -w app      # apply migrations to the local D1
 npm run db:seed:local -w app         # fake data for the walkthrough
+npm run db:seed:season:local -w app  # the same, plus a running round 1 with matches
 npm test                             # rules engine tests
 npm run typecheck
 npm run build

@@ -1,7 +1,7 @@
 // The public league page counts final results (#186). Runs after 18-results:
-// Anna's pair has a confirmed win (step 22) and a "both lose" decision on
-// Viták (step 23), so her group's table is no longer at zero. A visitor sees
-// it without logging in.
+// Anna's pair has a confirmed win (walkthrough step 27) and a "both lose"
+// decision on Viták (step 28), so her group's table is no longer at zero. A
+// visitor sees it without logging in (step 29).
 import { expect, test } from "@playwright/test";
 
 import { PAIRS, content, visit } from "./support";

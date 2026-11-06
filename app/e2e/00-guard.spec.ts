@@ -11,6 +11,7 @@ import {
   APP_DIR,
   BASE_URL,
   DEV_VARS,
+  HOST,
   PORT,
   READY_PATTERN,
   assertPortFree,
@@ -18,6 +19,7 @@ import {
   devVarsText,
   pickFreePort,
   readyLine,
+  startupWatch,
   suitePort,
   viteListening,
   wranglerLocal,
@@ -77,7 +79,7 @@ test.describe("guard", () => {
     expect(suitePort({ E2E_PORT: "" }, () => 40123)).toBe(40123);
     for (const bad of ["abc", "80", "70000", "5199x", "-1"])
       expect(() => suitePort({ E2E_PORT: bad }, () => 1)).toThrow(/E2E_PORT/);
-    expect(BASE_URL).toBe(`http://localhost:${PORT}`);
+    expect(BASE_URL).toBe(`http://127.0.0.1:${PORT}`);
   });
 
   // env.ts writes the port back to E2E_PORT, so a process started from here
@@ -116,12 +118,54 @@ test.describe("guard", () => {
   // server.ts asks nothing of the port before vite says it bound it: until
   // then a server answering there may be someone else's (#169, review M1).
   test("the dev server counts as listening only after vite's own Local line", () => {
-    const colored = `  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://localhost:\x1b[1m${PORT}\x1b[22m/\x1b[39m\n`;
+    const colored = `  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://127.0.0.1:\x1b[1m${PORT}\x1b[22m/\x1b[39m\n`;
     expect(viteListening(colored, PORT)).toBe(true);
-    expect(viteListening(`  ➜  Local:   http://localhost:${PORT}/\n`, PORT)).toBe(true);
+    expect(viteListening(`  ➜  Local:   http://127.0.0.1:${PORT}/\n`, PORT)).toBe(true);
     expect(viteListening("", PORT)).toBe(false);
     expect(viteListening(`Error: Port ${PORT} is already in use\n`, PORT)).toBe(false);
-    expect(viteListening(`  ➜  Local:   http://localhost:${PORT + 1}/\n`, PORT)).toBe(false);
+    expect(viteListening(`  ➜  Local:   http://127.0.0.1:${PORT + 1}/\n`, PORT)).toBe(false);
+    // Bound to another address than the run's one (#284): not ours.
+    for (const other of ["localhost", "[::1]", "127.0.0.10", "127a0a0a1"])
+      expect(viteListening(`  ➜  Local:   http://${other}:${PORT}/\n`, PORT)).toBe(false);
+  });
+
+  // One address for the server, the readiness check and the browser (#284):
+  // "localhost" may reach ::1 as well, where another server can listen on the
+  // same port after the run's port checks.
+  test("the browser and the readiness check reach only the run's own address", async ({ page }) => {
+    expect(HOST).toBe("127.0.0.1");
+    expect(new URL(BASE_URL).hostname).toBe(HOST);
+    const stranger = await listen(PORT, "::1").catch(() => null);
+    // A machine without IPv6 on loopback has nothing there to reach.
+    test.skip(!stranger, "no IPv6 loopback here");
+    let reached = 0;
+    stranger!.on("connection", (socket) => {
+      reached++;
+      socket.destroy();
+    });
+    try {
+      // The browser, from the configured base URL, and the readiness check's request.
+      expect((await page.goto("/login"))?.ok()).toBe(true);
+      expect((await fetch(`${BASE_URL}/login`)).ok).toBe(true);
+      expect(reached).toBe(0);
+    } finally {
+      await close(stranger!);
+    }
+  });
+
+  // server.ts reads the dev server's output only until vite's Local line (#284).
+  test("the startup watch holds a few KB at most, and nothing once vite listens", () => {
+    const watch = startupWatch(PORT);
+    const noise = "x".repeat(1000) + "\n";
+    for (let i = 0; i < 1000; i++) expect(watch.feed(noise)).toBe(false);
+    expect(watch.buffered).toBeLessThanOrEqual(4096);
+    // The Local line split across two chunks still counts.
+    expect(watch.feed(`  ➜  Local:   http://127.0.`)).toBe(false);
+    expect(watch.feed(`0.1:${PORT}/\n`)).toBe(true);
+    expect(watch.listening).toBe(true);
+    expect(watch.buffered).toBe(0);
+    for (let i = 0; i < 1000; i++) watch.feed(noise);
+    expect(watch.buffered).toBe(0);
   });
 
   // Logging in reads the code the dev server prints (D38): there is no test

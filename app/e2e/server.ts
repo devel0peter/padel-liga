@@ -14,6 +14,7 @@ import {
   BASE_URL,
   CLOUDFLARE_ENV,
   DEV_VARS_FILE,
+  HOST,
   PERSIST_DIR,
   PORT,
   SEED_ONLY_MARKER,
@@ -23,7 +24,7 @@ import {
   assertSafeEnvironment,
   devVarsText,
   readyLine,
-  viteListening,
+  startupWatch,
   wranglerLocal,
 } from "./env";
 
@@ -60,7 +61,8 @@ if (!keep) {
 // The setup above takes seconds: check again right before the dev server binds.
 await assertPortFree(PORT);
 const log = createWriteStream(SERVER_LOG, { flags: "a" });
-const dev = spawn("npx", ["--no-install", "react-router", "dev", "--port", String(PORT), "--strictPort"], {
+// --host: the run's one address (env.ts HOST, #284), never "localhost".
+const dev = spawn("npx", ["--no-install", "react-router", "dev", "--host", HOST, "--port", String(PORT), "--strictPort"], {
   cwd: APP_DIR,
   env,
   // Same process group as this script: Playwright stops the whole group
@@ -69,8 +71,12 @@ const dev = spawn("npx", ["--no-install", "react-router", "dev", "--port", Strin
 });
 dev.stdout.pipe(log);
 dev.stderr.pipe(log);
-let devOutput = "";
-dev.stdout.on("data", (d) => (devOutput += d));
+// Watches the output only until vite's Local line, then lets go of it (#284).
+const startup = startupWatch(PORT);
+const watch = (d: Buffer) => {
+  if (startup.feed(String(d))) dev.stdout.off("data", watch);
+};
+dev.stdout.on("data", watch);
 
 const stop = () => dev.kill("SIGTERM");
 process.on("SIGTERM", stop);
@@ -90,7 +96,7 @@ dev.on("exit", (code) => {
 // suite and e2e:shots wait for this line, not for the port (#169).
 while (!exited) {
   const ok =
-    viteListening(devOutput, PORT) &&
+    startup.listening &&
     (await fetch(`${BASE_URL}/login`).then(
       (r) => r.ok,
       () => false,

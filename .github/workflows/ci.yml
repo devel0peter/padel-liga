@@ -139,8 +139,12 @@ jobs:
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
 
+  # `changes` is skipped on a push to main, and GitHub's implicit success()
+  # skips every job below a skipped one, `check` passing or not. So deploy
+  # checks `check` itself (D122): without this, the 2026-11-06 release
+  # (#327) passed `check` and skipped `deploy`.
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && needs.check.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: check
     runs-on: ubuntu-latest
     environment:

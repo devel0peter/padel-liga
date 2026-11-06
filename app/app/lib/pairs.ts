@@ -8,12 +8,14 @@
 // most one active pair per league. A pair can't be dissolved or changed while
 // it plays in a published group whose round hasn't reached its deadline.
 
-export type PairSource = "signup" | "manual" | "link";
+// "search": made from Regisztráltak on Párkeresők (D113, #297).
+export type PairSource = "signup" | "manual" | "link" | "search";
 
 export const SOURCE_LABELS: Record<PairSource, string> = {
   signup: "jelentkezésből",
   manual: "kézzel",
   link: "linkkel",
+  search: "Párkeresők",
 };
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";

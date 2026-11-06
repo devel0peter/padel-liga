@@ -102,7 +102,8 @@ function templateInput(r: Reminder, to: ReminderRecipient, league: string, pairL
     partner: to.partner,
     league,
     season: r.season.name,
-    deadline: r.season.registrationClosesAt,
+    // Never a waiting first season (entrySeason), so the deadline is set.
+    deadline: r.season.registrationClosesAt!,
     nextRound: next ? { number: next.number, startsAt: next.startsAt } : null,
     pairLink,
     now,

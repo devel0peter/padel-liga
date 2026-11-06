@@ -17,6 +17,7 @@ import {
   registrationInvite,
   registrationLink,
   seasonEntered,
+  seasonStart,
   signupConfirmation,
   textToHtml,
 } from "./templates";
@@ -351,6 +352,30 @@ describe("seasonEntered (#153)", () => {
   it("keeps the names plain text", () => {
     const email = seasonEntered({ ...base, partnerName: "<i>Béla</i>" });
     expect(email.html).toContain("&lt;i&gt;Béla&lt;/i&gt;");
+  });
+
+  it("in a first season still waiting for its minimum entries (D124): no date yet, it comes later", () => {
+    const text = seasonEntered({ ...base, joins: { phase: 1, startsAt: null } }).text;
+    expect(text).toContain("A szezon akkor indul, ha elég pár nevezett. Amint összegyűlnek, megírjuk, mikor kezdődik az 1. kör.");
+    expect(text).not.toContain("kezdés:");
+  });
+});
+
+describe("seasonStart (D124, #335)", () => {
+  const base = { to: "Nagy Anna", league: "Padelpárbaj Újváros", season: "Első szezon", start: new Date("2026-11-22T23:00:00Z") };
+
+  it("gives the start day and that the groups come out by that morning, in the spec's date format", () => {
+    const email = seasonStart(base);
+    expect(email.subject).toBe("Indul a szezon: nov. 23., hétfő – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain("Összegyűlt elég nevezés, így eldőlt, mikor indul a szezon (Első szezon, Padelpárbaj Újváros).");
+    expect(email.text).toContain("Az 1. kör kezdete: nov. 23., hétfő. A csoportbeosztást legkésőbb aznap reggel megkapjátok e-mailben és az oldalon.");
+    expect(email.html).toContain('href="https://padelparbaj.hu/home"');
+    expect(email.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");
+  });
+
+  it("keeps the name plain text", () => {
+    expect(seasonStart({ ...base, to: "<b>Anna</b>" }).html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
   });
 });
 

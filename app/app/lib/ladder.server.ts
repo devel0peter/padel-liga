@@ -1,16 +1,16 @@
 import { addDays, budapestDay, type Day } from "@padel-liga/rules";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { cities, groupPairs, groups, matches, pairs, users } from "~/db/schema";
+import { cities, groupPairs, groups, matches, pairs, seasonEntries, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, isValidOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
-import { getLeague } from "./leagues.server";
+import { getLeague, minEntriesByLeague } from "./leagues.server";
 import { logWarn } from "./log";
 import { averageElo } from "./season-entries";
-import { currentSeason } from "./seasons";
+import { currentSeason, isWaiting, waitingText } from "./seasons";
 import { listSeasons } from "./seasons.server";
 
 // What the public league page needs (#30). Only names leave this module: the
@@ -20,8 +20,10 @@ export type LadderPage = {
   league: { name: string; city: string };
   season: string;
 } & (
-  // No group of the season is published yet.
-  | { kind: "waiting"; next: { round: number; startsOn: string } | null }
+  // No group of the season is published yet. starting: a first season
+  // waiting for its minimum entries (D124), "9 pár nevezett, még 3 kell,
+  // utána indul."
+  | { kind: "waiting"; next: { round: number; startsOn: string } | null; starting?: string }
   | {
       kind: "ladder";
       phase: number;
@@ -130,6 +132,18 @@ export async function ladderPage(slug: string, now = new Date()): Promise<Ladder
   const season = currentSeason(await listSeasons(league.id), now);
   const head = { league: { name: league.name, city: league.city }, season: season?.name ?? "" };
   if (!season) return { ...head, kind: "waiting", next: null };
+  if (isWaiting(season)) {
+    // Counted as entryCounts (season-entries.server.ts) does, without that
+    // module's email imports on a public page.
+    const [[entered], minimums] = await Promise.all([
+      db
+        .select({ n: count() })
+        .from(seasonEntries)
+        .where(and(eq(seasonEntries.seasonId, season.id), eq(seasonEntries.status, "approved"))),
+      minEntriesByLeague([league.id]),
+    ]);
+    return { ...head, kind: "waiting", next: null, starting: waitingText(entered?.n ?? 0, minimums.get(league.id) ?? 0) };
+  }
 
   const published = await db
     .selectDistinct({ phase: groups.phase })

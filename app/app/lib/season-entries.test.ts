@@ -5,6 +5,7 @@ import {
   checkEntry,
   ENTRY_REFUSALS,
   entryOpen,
+  entryPhase,
   entryStatusText,
   TAKEN_OUT_TEXT,
   WITHDRAWAL_REASON_MAX,
@@ -233,5 +234,21 @@ describe("organizerEntryAction (#154)", () => {
     expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, now)).toEqual({ kind: "enter", seasonId: 1, season: "Tél" });
     expect(organizerEntryAction([winter], { seasonId: 1, status: "withdrawn" }, at("2027-01-26T12:00:00Z"))).toBeNull();
     expect(organizerEntryAction([winter], { seasonId: 1, status: "rejected" }, now)).toBeNull();
+  });
+});
+
+describe("a first season waiting for its minimum entries (D124, #335)", () => {
+  const waiting = { registrationOpensAt: new Date("2026-11-10T08:00:00Z"), registrationClosesAt: null, phases: [], firstPhaseStart: null };
+
+  it("takes entries from its opening on, with no end", () => {
+    expect(entryOpen(waiting, new Date("2026-11-10T07:59:00Z"))).toBe(false);
+    expect(entryOpen(waiting, new Date("2026-11-10T08:00:00Z"))).toBe(true);
+    expect(entryOpen(waiting, new Date("2027-06-01T08:00:00Z"))).toBe(true);
+  });
+
+  it("every entry starts in round 1; a season with dates keeps joinsPhase", () => {
+    expect(entryPhase(waiting, new Date("2026-11-20T08:00:00Z"))).toBe(1);
+    const dated = { phases: [{ number: 1, startsAt: new Date("2026-11-08T23:00:00Z"), deadline: new Date("2026-11-29T22:59:00Z") }], firstPhaseStart: "2026-11-09" };
+    expect(entryPhase(dated, new Date("2026-11-20T08:00:00Z"))).toBeNull();
   });
 });

@@ -117,7 +117,7 @@ export function inviteStarts(
       out.set(league.city, {
         city: cityName(league.city, cities),
         firstRound: start,
-        registrationCloses: season.registrationClosesAt > now ? season.registrationClosesAt : null,
+        registrationCloses: season.registrationClosesAt && season.registrationClosesAt > now ? season.registrationClosesAt : null,
       });
   }
   return out;

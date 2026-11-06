@@ -16,10 +16,11 @@ import {
 import { listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
 import { landingByCity } from "~/lib/landing-league";
-import { listLeagues } from "~/lib/leagues.server";
+import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { publishedPhases } from "~/lib/groups.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { LeagueStatus } from "~/components/league-status";
+import { entryCounts } from "~/lib/season-entries.server";
 import { CONTACT_EMAIL, organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
@@ -48,9 +49,21 @@ export async function loader({ request }: Route.LoaderArgs) {
   const slugs = new Set(listed.map((c) => c.slug));
   const published = await publishedPhases();
   const leagues = (await listLeagues()).filter((l) => slugs.has(l.city));
+  const seasons = await listSeasons();
+  // A first season waiting for its minimum entries (D124) shows how many
+  // pairs are still needed.
+  const waiting = seasons.filter((s) => s.firstPhaseStart === null);
+  const [counts, minimums] = await Promise.all([
+    entryCounts(waiting.map((s) => s.id)),
+    minEntriesByLeague([...new Set(waiting.map((s) => s.leagueId))]),
+  ]);
   const league = landingByCity(
     leagues,
-    (await listSeasons()).map((s) => ({ ...s, publishedPhases: published.get(s.id) })),
+    seasons.map((s) => ({
+      ...s,
+      publishedPhases: published.get(s.id),
+      entries: counts.has(s.id) ? { count: counts.get(s.id)!, minimum: minimums.get(s.leagueId) ?? 0 } : undefined,
+    })),
     new Date(),
   );
   const cities = listed.flatMap(({ slug, name }) => {

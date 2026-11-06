@@ -46,6 +46,7 @@ import {
   partnerNotice,
   registrationInvite,
   seasonEntered,
+  seasonStart,
   signupConfirmation,
   strikeWarning,
   stuckReminder,
@@ -302,6 +303,21 @@ export async function queueStrikeWarnings(
     .map((m): NewMessage => ({ kind: "strike_warning", toEmail: m.toEmail, ...strikeWarning(m.input) }));
   const ids = await enqueue(queued);
   if (sendNow) await deliverNow(ids);
+}
+
+// A league's first season reached its minimum entries (D124, #335): one
+// email per entered player, sent at once. Unsubscribed or bounced addresses,
+// and players who switched email off (#115), get nothing; the in-app notice
+// and push still have it.
+export async function queueSeasonStart(
+  messages: { toEmail: string; input: Parameters<typeof seasonStart>[0] }[],
+): Promise<void> {
+  if (messages.length === 0) return;
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map((m): NewMessage => ({ kind: "season_start", toEmail: m.toEmail, ...seasonStart(m.input) }));
+  await deliverNow(await enqueue(queued));
 }
 
 // The cron's match emails (#31): the daily digest and "holnap meccs", as

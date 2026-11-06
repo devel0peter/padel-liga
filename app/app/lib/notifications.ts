@@ -4,9 +4,10 @@
 
 import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
-import { formatDeadline, formatShortDate } from "./format";
+import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
 import { LEVELS, type Level, type Mode } from "./interest";
+import { WAITING_START } from "./season-entries";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
@@ -75,7 +76,10 @@ export type PlayerKind =
   // pairs, in the app and by push only, never by email. The organizers' kind
   // is `no_show_reported`; the strike's notice is its own kind.
   | "no_show_confirmed"
-  | "no_show_rejected";
+  | "no_show_rejected"
+  // A league's first season reached its minimum entries (D124, #335): every
+  // entered player, in the app and by push, plus one email (season_start).
+  | "season_start";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -203,8 +207,10 @@ export function seasonEntryMessage(
   input: {
     league: string;
     season: string;
-    // Where the pair starts; null: the next season. Not used for "removed".
-    joins: { phase: number; startsAt: Date } | null;
+    // Where the pair starts; null: the next season; startsAt null: a first
+    // season still waiting for its minimum entries (D124). Not used for
+    // "removed".
+    joins: { phase: number; startsAt: Date | null } | null;
   },
   event: "entered" | "entered_by_organizer" | "removed" = "entered",
 ): Message {
@@ -214,11 +220,23 @@ export function seasonEntryMessage(
   const start =
     input.joins === null
       ? "A következő szezontól játszotok."
-      : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
+      : input.joins.startsAt === null
+        ? WAITING_START
+        : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
     title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
     body: `${where} ${start}`,
     url: "/pair",
+  };
+}
+
+// The start of a league's first season is fixed (D124, #335): to every
+// entered player. The groups come out by the morning of the first day.
+export function seasonStartMessage(input: { league: string; season: string; start: Date }): Message {
+  return {
+    title: "Indul a szezon",
+    body: `${input.season}, ${input.league}. Az 1. kör kezdete: ${formatWeekdayDate(input.start)}. A csoportbeosztást legkésőbb aznap reggel megkapjátok.`,
+    url: "/home",
   };
 }
 

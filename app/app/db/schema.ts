@@ -73,6 +73,7 @@ export const emailMessages = sqliteTable(
         "match_tomorrow",
         "match_result",
         "strike_warning",
+        "season_start",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -273,6 +274,10 @@ export const leagues = sqliteTable("leagues", {
   // calibration switches (spec 10, #12): 2 pairs swap at a border of two
   // groups of 4. Default 1: the switch after phase 1 only.
   fastSwitches: integer("fast_switches").notNull().default(1),
+  // How many pair entries the league's first season needs to start by itself
+  // (D124, #335): three groups of four by default. Editable while that
+  // season waits; later seasons keep their own calendar.
+  minEntries: integer("min_entries").notNull().default(12),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -296,6 +301,15 @@ export const seasons = sqliteTable(
     firstPhaseStart: text("first_phase_start").notNull(),
     // JSON array of { start, end } days, both included.
     breaks: text("breaks", { mode: "json" }).$type<{ start: string; end: string }[]>().notNull().default(sql`'[]'`),
+    // A league's first season that starts once its entries reach the
+    // league's min_entries (D124, #335). While it waits (start_fixed_at
+    // null) it has no phases, first_phase_start is '' and
+    // registration_closes_at equals registration_opens_at: seasons.server.ts
+    // reads both as "not set". The entry that reaches the minimum sets all
+    // three and writes the phases in the same batch.
+    startsAtMinimum: integer("starts_at_minimum", { mode: "boolean" }).notNull().default(false),
+    // When the entries reached the minimum, which fixed the start.
+    startFixedAt: integer("start_fixed_at", { mode: "timestamp" }),
     updatedAt: integer("updated_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -430,6 +444,7 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "season_start",
         "strike",
         "substitute_requested",
         "substitute_approved",

@@ -2,7 +2,9 @@
 // deleted their own account (#38): only for a visitor without a session, so
 // a link with ?accountDeleted=1 can't tell a logged-in player their account
 // is gone. Without the interest form (#332, D123): a post of the old form is
-// refused and stores nothing. Email is stubbed and stays unused.
+// refused and stores nothing, and only cities with a league are listed, a
+// waiting first season with its missing entries (#335, D124). Email is
+// stubbed and stays unused.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any, mails: [] as any[] }));
@@ -68,5 +70,22 @@ describe("the landing page without the interest form (#332)", () => {
   it("old links with ?ref= still open it", async () => {
     const data = await H.loader(args(new Request("http://localhost/?ref=fb-csoport")));
     expect(data.ref).toBe("fb-csoport");
+  });
+
+  it("lists only listed cities with a league; a waiting first season shows the entries still needed (#335)", async () => {
+    h.raw.exec(`insert or ignore into cities (slug, name, listed) values ('uj', 'Újváros', 1), ('ures', 'Üresváros', 1)`);
+    h.raw.exec(`delete from leagues`);
+    h.raw.exec(`insert into leagues (id, city, slug, name, min_entries) values (1, 'uj', 'uj', 'Padelpárbaj Újváros', 12)`);
+    h.raw.exec(
+      `insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start, starts_at_minimum)
+       values (1, 1, 'Első', unixepoch() - 3600, unixepoch() - 3600, '', 1)`,
+    );
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('a', 'a@x.hu', 'A', 'halado', 1), ('b', 'b@x.hu', 'B', 'halado', 1)`);
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (1, 1, 'a', 'b')`);
+    h.raw.exec(`insert into season_entries (season_id, pair_id, status, joins_phase) values (1, 1, 'approved', 1)`);
+    const data = await H.loader(args(new Request("http://localhost/")));
+    expect(data.cities.map((c) => c.slug)).toEqual(["uj"]);
+    expect(data.cities[0]!.league.facts).toEqual([["Indulás", "1 pár nevezett, még 11 kell, utána indul."]]);
+    expect(JSON.stringify(data)).not.toMatch(/jelentkez/);
   });
 });

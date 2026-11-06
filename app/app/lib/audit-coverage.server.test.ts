@@ -30,6 +30,7 @@ const CITIES = await import("~/lib/cities.server");
 const LEAGUES = await import("~/lib/leagues.server");
 const CLUBS = await import("~/lib/clubs.server");
 const SEASONS = await import("~/lib/seasons.server");
+const START = await import("~/lib/season-start.server");
 const REMINDERS = await import("~/lib/reminders.server");
 const PAIRS = await import("~/lib/pairs.server");
 const ENTRIES = await import("~/lib/season-entries.server");
@@ -135,6 +136,11 @@ const STEPS: Step[] = [
   { action: "season.create", actor: ORG, run: () => SEASONS.createSeason(1, SPRING, phaseCalendar(SPRING.firstPhaseStart, []), ORG) },
   { action: "season.update", actor: ORG, run: () => SEASONS.updateSeason(springId(), { ...SPRING, name: "Tavasz!" }, phaseCalendar(SPRING.firstPhaseStart, []), ORG) },
   { action: "season.delete", actor: ORG, run: () => SEASONS.deleteSeason(springId(), ORG) },
+  // A first season that starts at the minimum entries (D124), in the league
+  // made above, which has no season yet.
+  { action: "season.create", actor: ORG, run: () => SEASONS.createWaitingSeason(gyor2Id(), { name: "Első", breaks: [] }, ORG) },
+  { action: "season.update", actor: ORG, run: () => SEASONS.updateWaitingSeason(firstId(), { name: "Első!", breaks: [] }, ORG) },
+  { action: "league.min_entries", actor: ORG, run: () => expectOk(START.setMinEntries({ id: ORG }, gyor2Id(), 8)) },
   { action: "reminders.on", actor: ORG, run: () => REMINDERS.setReminders(ORG, league, true) },
   { action: "reminders.off", actor: ORG, run: () => REMINDERS.setReminders(ORG, league, false) },
   { action: "pair.create", actor: ORG, run: () => expectOk(PAIRS.createPair(ORG, 1, "q1", "q2")) },
@@ -198,6 +204,8 @@ const STEPS: Step[] = [
 const SPRING = { name: "Tavasz", registrationOpens: "2027-03-01", registrationCloses: "2027-03-20", firstPhaseStart: "2027-03-22", breaks: [] };
 const clubId = () => one("select id from clubs where slug = 'ace'").id as number;
 const springId = () => one("select id from seasons where name like 'Tavasz%'").id as number;
+const gyor2Id = () => one("select id from leagues where slug = 'gyor2'").id as number;
+const firstId = () => one("select id from seasons where name like 'Első%'").id as number;
 const pairOf = (player: string) => one("select id from pairs where player_a = ? order by id desc", player).id as number;
 const firstPairOfGroup = (n: number) => one("select gp.pair_id from group_pairs gp join groups g on g.id = gp.group_id where g.number = ? order by gp.seed", n).pair_id as number;
 const matchIds = () => all("select id from matches order by id").map((r: any) => r.id as number);
@@ -243,6 +251,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
   "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
+  "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
 };
 

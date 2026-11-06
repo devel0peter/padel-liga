@@ -71,11 +71,11 @@ describe("pairs.server on real SQLite (#97)", () => {
     const id = one("select id from pairs").id;
     expect(audits()).toEqual([{ actor_id: "o", action: "pair.create", target: `pair:${id}` }]);
     const [oa] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
-    // The partner's address and phone (D117); Anna has no phone here.
+    // The partner's address and phone (D121); Anna has no phone here.
     expect(oa.pair).toEqual({ id, partnerName: "Anna", partnerEmail: "a@x.hu", partnerPhone: "" });
   });
 
-  it("shows the partner's phone on /pair, formatted (D117)", async () => {
+  it("shows the partner's phone on /pair, formatted (D121)", async () => {
     h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
     await P.createPair("o", 1, "a", "b");
     const [ob] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
@@ -84,7 +84,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(oc.pair).toBeNull();
   });
 
-  it("tells both players of a new pair, in the app and by email, with the partner's name, address and phone (#260, D117)", async () => {
+  it("tells both players of a new pair, in the app and by email, with the partner's name, address and phone (#260, D121)", async () => {
     h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
     await P.createPair("o", 1, "a", "b");
     expect(inbox()).toEqual([

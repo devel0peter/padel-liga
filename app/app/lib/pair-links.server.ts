@@ -31,7 +31,7 @@ export async function pairLinkFor(userId: string, leagueId: number): Promise<str
 
 export type PairLinkBox = { league: PairLeague; token: string };
 
-// The links /home and /pair show: one per league of the player (D127) where they have no
+// The links /home and /pair show: one per league of the player (D128) where they have no
 // active pair.
 export async function pairLinkBoxes(user: Pick<User, "id">, list?: PairLeague[]): Promise<PairLinkBox[]> {
   const shown = list ?? (await playerLeagues(user.id));
@@ -100,7 +100,7 @@ export async function acceptPairLink(user: Pick<User, "id" | "consentAt">, token
       detail: `league:${link.leagueId}; link:${link.id}; user:${link.ownerId} + user:${user.id}`,
       leagueId: link.leagueId,
     }),
-    // Accepting a pair link joins its league (D127, #331).
+    // Accepting a pair link joins its league (D128, #331).
     ...pairMemberStatements(link.leagueId, link.ownerId, user.id, (id) => (id === user.id ? "link" : "pair")),
   ]);
   const [pair] = await db

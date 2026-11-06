@@ -226,7 +226,7 @@ describe("landingByCity", () => {
     );
     expect(m.get("gyor")!.ladderPath).toBe("/league/gyor-liga");
     expect(m.get("pecs")!.ladderPath).toBeUndefined();
-    // The register button carries the league (D127, #331).
+    // The register button carries the league (D128, #331).
     expect(m.get("gyor")!.registerPath).toBe("/register?league=gyor-liga");
     expect(m.get("pecs")!.registerPath).toBeUndefined();
   });

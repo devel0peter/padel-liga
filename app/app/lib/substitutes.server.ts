@@ -99,7 +99,7 @@ async function groupPlayersOf(groupId: number): Promise<Set<string>> {
 }
 
 // The league's registered players (first-login page done, not deleted), by
-// the D127 rule (league-members.server.ts), by name. No address leaves here.
+// the D128 rule (league-members.server.ts), by name. No address leaves here.
 async function leaguePlayers(leagueId: number): Promise<{ id: string; name: string }[]> {
   const accounts = await db
     .select({ id: users.id, name: users.name })

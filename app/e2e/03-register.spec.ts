@@ -1,6 +1,6 @@
 // Walkthrough steps 5 and 6: a player registers through the league's
 // register button on the landing page and is the league's player at once
-// (D127, #331); the partner accepts the pair link; the other pairs do the
+// (D128, #331); the partner accepts the pair link; the other pairs do the
 // same, and the Szervező pairs two who look for a partner. Nothing comes from
 // the interest list (#333).
 import { expect, test } from "@playwright/test";
@@ -13,7 +13,7 @@ test("5. a player registers through the league's register button", async ({ brow
   const context = await browser.newContext();
   const page = await context.newPage();
   await visit(page, "/");
-  // The league card's button carries the league (D127).
+  // The league card's button carries the league (D128).
   const league = page.getByRole("region", { name: /Mintaváros: a liga állása/ });
   await league.getByRole("link", { name: /^Nevezek/ }).click();
   await expect(page).toHaveURL(/\/register\?league=minta$/);

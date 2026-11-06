@@ -32,7 +32,7 @@ async function cookieFor(id: string, role: "player" | "superadmin", organizes?: 
     .prepare("insert into users (id, email, name, sex, consent_at, platform_role) values (?, ?, ?, 'female', 1, ?)")
     .run(id, `${id}@x.hu`, id, role);
   if (organizes) h.raw.prepare("insert into league_admins (league_id, user_id) values (?, ?)").run(organizes, id);
-  // Joined Győr, like today's staff (D127 backfill).
+  // Joined Győr, like today's staff (D128 backfill).
   h.raw.prepare("insert into league_members (league_id, user_id, source) values (1, ?, 'carried')").run(id);
   return (await createSession(id)).split(";")[0];
 }
@@ -75,7 +75,7 @@ beforeEach(() => {
   h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec("2030-11-08T23:00:00Z"), sec("2030-11-29T22:59:00Z"));
   h.raw.exec(`insert into season_entries (season_id, pair_id, status, joins_phase) values (1, 1, 'approved', 1)`);
   h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'k', 1)`);
-  // Everyone above joined Győr (D127).
+  // Everyone above joined Győr (D128).
   h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'carried' from users`);
   h.raw.exec(`insert into email_suppressions (email, reason) values ('d@x.hu', 'bounced')`);
 });
@@ -154,7 +154,7 @@ describe("Levél nekik from Párok opens the broadcast page with those players (
   });
 });
 
-describe("two leagues in two cities: each Párok has only its players (#331, D127)", () => {
+describe("two leagues in two cities: each Párok has only its players (#331, D128)", () => {
   beforeEach(() => {
     h.raw.exec("insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 1)");
     h.raw.exec("insert into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')");

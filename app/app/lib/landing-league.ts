@@ -109,7 +109,7 @@ export type LandingBlock = {
   // is known by its slug.
   ladderPath?: string;
   // The register button: the league rides along, so the new account joins
-  // it (D127, #331).
+  // it (D128, #331).
   registerPath?: string;
 };
 

@@ -9,7 +9,7 @@ export const PARTNER_SEARCH_ON = "A szervező látja, hogy párt keresel, és p�
 export const PARTNER_SEARCH_OFF = "Ha nincs kivel játszanod, kapcsold be, és a szervező keres neked párt.";
 
 // Whether the player is looking for a partner: what they set; off until they
-// switch it on (#333, D128: no default from the interest list any more; the
+// switch it on (#333, D129: no default from the interest list any more; the
 // release stored the old default as a row, so nobody's setting changed).
 export function isSeeking(stored: boolean | undefined): boolean {
   return stored ?? false;

@@ -38,7 +38,7 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(page).toHaveURL(/\/home$/);
   await save(context, NEW_PLAYER.email);
 
-  // In no league yet (D127): one card to choose, no season and no pair link.
+  // In no league yet (D128): one card to choose, no season and no pair link.
   // Only Mintaváros has a season open; Példaváros has none, so it isn't offered.
   const choose = content(page).locator("[data-slot=card]", { hasText: "Melyik ligában játszol?" });
   await expect(choose).toContainText("Mintaváros");

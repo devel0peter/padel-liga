@@ -29,7 +29,7 @@ type Result = { ok: true } | { ok: false; error: string };
 
 // Where a pair can be made (a pair link works in): every league in a listed
 // city (a city still being set up stays hidden). What a player sees on
-// Kezdőlap and Párom is only their own leagues (playerLeagues, D127).
+// Kezdőlap and Párom is only their own leagues (playerLeagues, D128).
 export async function pairLeagues(): Promise<PairLeague[]> {
   return (await listedLeagues()).map(({ id, name }) => ({ id, name }));
 }
@@ -204,7 +204,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
 export type PairCandidate = { id: string; name: string; level: string | null; phone: string };
 
 // Registered players (first-login page done) of the league without an active
-// pair in it, by name: the league's players by D127 (league-members.server.ts,
+// pair in it, by name: the league's players by D128 (league-members.server.ts,
 // replacing D93), staff accounts too. No address in the result: it goes to
 // the page.
 export async function pairCandidates(league: { id: number }): Promise<PairCandidate[]> {

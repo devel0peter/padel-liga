@@ -105,7 +105,7 @@ export function daysOf({ from, to }: Period): string[] {
 export type LandingCount = { day: string; ref: string | null; count: number };
 
 // Landing page views only: the signups and the conversion beside them came
-// from the interest list and went with its flows (#333, D128).
+// from the interest list and went with its flows (#333, D129).
 export type FunnelRow = { ref: string | null; landings: number }; // ref null: no source
 
 export type DayRow = { day: string; landings: number };

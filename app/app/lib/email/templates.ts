@@ -133,7 +133,7 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
   );
 }
 
-// The partner notice's subject (the notice itself went with #333, D128): it
+// The partner notice's subject (the notice itself went with #333, D129): it
 // named the signer, and subjects stay in the outbox log, so an account
 // deletion (#152) still finds the old rows by it.
 export const partnerNoticeSubject = (name1: string) => `${name1} jelentkeztetett titeket a ${SITE_NAME}ra`;

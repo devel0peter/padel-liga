@@ -1,5 +1,5 @@
 // league-members.server.ts on a real SQLite with every migration applied
-// (~/test/sqlite): a league's players (D127, #331), each way of joining, and
+// (~/test/sqlite): a league's players (D128, #331), each way of joining, and
 // the release's backfill of today's players (migration 0053).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,7 +40,7 @@ function freshDb() {
 
 beforeEach(freshDb);
 
-describe("a league's players (D127)", () => {
+describe("a league's players (D128)", () => {
   it("belongs to no league until joining one; a pair of the league counts too, also a dissolved one", async () => {
     expect(await M.memberLeagueIds("a")).toEqual(new Set());
     expect(await M.playerLeagues("a")).toEqual([]);

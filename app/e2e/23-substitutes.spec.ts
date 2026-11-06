@@ -38,7 +38,7 @@ test("Helyettes: a player asks, the Szervező approves, the opponents see who pl
     expect(groupNames, `${n} plays in the group`).not.toContain(n);
     expect(n).not.toContain("@");
   }
-  // Only the league's players (D127): never the second league's player.
+  // Only the league's players (D128): never the second league's player.
   expect(names).not.toContain(OUTSIDER.name);
   const substitute = names[0]!;
   await options.first().click();

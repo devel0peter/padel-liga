@@ -1,6 +1,6 @@
 // The first-login page ("Üdv!") on a real SQLite (~/test/sqlite), with the
 // real session lookup: nothing comes from the interest list any more (#333,
-// D128), and Férfi or Nő is asked (#133). The sender is stubbed and records
+// D129), and Férfi or Nő is asked (#133). The sender is stubbed and records
 // what it gets; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

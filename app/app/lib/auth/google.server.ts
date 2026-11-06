@@ -118,7 +118,7 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
     // Malformed: safeReturnTo falls back to the default page.
   }
   // Through a league's register button: that league, also before the
-  // first-login page is done (D127, #331).
+  // first-login page is done (D128, #331).
   await joinFromRegisterButton(userId, leagueOfReturnTo(safeReturnTo(back)));
   return redirect(safeReturnTo(back), { headers });
 }

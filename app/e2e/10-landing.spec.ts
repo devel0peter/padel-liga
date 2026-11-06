@@ -23,7 +23,7 @@ test("the hero shows a league city's league and leads to registration", async ({
   await expect(page.getByText("Ahol már fut a liga, nevezhetsz rögtön")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/12 pár|elég pár/);
 
-  // The button carries the league, so the new account joins it (D127, #331).
+  // The button carries the league, so the new account joins it (D128, #331).
   await league.getByRole("link", { name: "Nevezek a 2. körre" }).click();
   await expect(page).toHaveURL(/\/register\?league=minta$/);
   await expect(page.getByRole("heading", { name: "Regisztráció" })).toBeVisible();

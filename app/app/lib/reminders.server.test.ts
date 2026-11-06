@@ -37,7 +37,7 @@ function user(id: string, v: { consent?: number | null; created?: number; role?:
   h.raw
     .prepare("insert into users (id, email, name, platform_role, level, phone, consent_at, created_at) values (?, ?, ?, ?, 'kezdo', ?, ?, ?)")
     .run(id, `${id}@x.hu`, id.charAt(0).toUpperCase() + id.slice(1), v.role ?? "player", PHONE, v.consent === undefined ? T - 3 * DAY : v.consent, v.created ?? T - 3 * DAY);
-  // Everyone here joined the league (D127), unfinished accounts too (the
+  // Everyone here joined the league (D128), unfinished accounts too (the
   // register button joins at login).
   h.raw.prepare("insert into league_members (league_id, user_id, source) values (1, ?, 'register')").run(id);
 }

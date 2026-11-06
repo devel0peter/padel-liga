@@ -50,7 +50,7 @@ function freshDb() {
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
   // Has an account but hasn't finished the first-login page.
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', 'Nándor')`);
-  // All of them joined Győr (D127); nobody Debrecen.
+  // All of them joined Győr (D128); nobody Debrecen.
   h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'chosen' from users`);
 }
 
@@ -151,7 +151,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(await P.pairCandidates(DEB)).toEqual([]);
   });
 
-  it("offers only the league's players: joined, or in a pair there, whatever the interest list says (D127)", async () => {
+  it("offers only the league's players: joined, or in a pair there, whatever the interest list says (D128)", async () => {
     h.raw.exec(`delete from league_members`);
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'register'), (2, 'b', 'chosen'), (1, 'n', 'register')`);
     // Cecil's dissolved pair in Debrecen still makes him one of its players.
@@ -165,7 +165,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado", phone: "" });
   });
 
-  it("counts staff accounts like anyone else: only where they joined (D127)", async () => {
+  it("counts staff accounts like anyone else: only where they joined (D128)", async () => {
     h.raw.exec(`delete from league_members`);
     h.raw.exec(`update users set platform_role = 'superadmin' where id = 'o'`);
     h.raw.exec(`insert into users (id, email, name, consent_at) values ('s', 's@x.hu', 'Szervező', 1)`);
@@ -176,7 +176,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["s"]);
   });
 
-  it("makes both players of a new pair, a partner change's new partner too, members by row (D127)", async () => {
+  it("makes both players of a new pair, a partner change's new partner too, members by row (D128)", async () => {
     h.raw.exec(`delete from league_members`);
     await P.createPair("o", 2, "a", "b");
     const id = one("select id from pairs").id;

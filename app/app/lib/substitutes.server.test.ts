@@ -33,7 +33,7 @@ const AFTER = at("2026-11-12T20:00:00Z");
 const WIN_A = { sets: [[4, 1], [4, 2]] } as const;
 
 // League 1 (Győr), group 1: pairs 1 (a–b), 2 (c–d), 3 (e–f), 4 (g–h).
-// Match 1: pair 1 – pair 2, open. Outsiders who joined league 1 (D127): s
+// Match 1: pair 1 – pair 2, open. Outsiders who joined league 1 (D128): s
 // (kezdő), t, x (first login not done); w joined league 2 only; z (deleted).
 // o: the Szervező, adm: an Admin, q: Szervező of league 2; all three joined
 // league 1 too.
@@ -106,7 +106,7 @@ describe("asking for a substitute (#37 requirement 1)", () => {
     expect(p.open).toBe(true);
     expect(p.form!.absent.map((x) => x.id)).toEqual(["a", "b"]);
     const ids = p.form!.candidates.map((c) => c.id);
-    // s and t and the staff (joined league 1, D127); never the group's
+    // s and t and the staff (joined league 1, D128); never the group's
     // players, w (league 2 only), x (not registered) or z (deleted).
     expect(ids).toEqual(expect.arrayContaining(["s", "t", "o", "adm", "q"]));
     for (const id of ["a", "b", "c", "d", "e", "f", "g", "h", "w", "x", "z"]) expect(ids).not.toContain(id);

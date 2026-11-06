@@ -24,7 +24,7 @@ const madeRow = (page: Page) =>
     .filter({ hasText: KRISTOF.name });
 
 // A new account: the first-login page by hand, then /home, where it joins
-// the league on "Melyik ligában játszol?" (D127, #331).
+// the league on "Melyik ligában játszol?" (D128, #331).
 async function newPlayer(browser: Browser, who: { name: string; email: string }) {
   const context = await browser.newContext();
   const page = await context.newPage();

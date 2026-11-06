@@ -1,4 +1,4 @@
-// The landing page's register button carries its league through login (D127,
+// The landing page's register button carries its league through login (D128,
 // #331): /register?league=<slug> puts it in returnTo, and the login with the
 // code joins the account to that league at once, also before the first-login
 // page is done. Real SQLite (~/test/sqlite); the code check is stubbed.
@@ -34,7 +34,7 @@ beforeEach(() => {
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', '')`);
 });
 
-describe("the register button's league through login (D127, #331)", () => {
+describe("the register button's league through login (D128, #331)", () => {
   it("puts the league in returnTo, so it survives the code step, Google and the first-login page", async () => {
     const page = (await R.loader(args(new Request("http://localhost/register?league=ovar")))) as any;
     expect(page.returnTo).toBe("/home?league=ovar");

@@ -1,6 +1,6 @@
 // The three reminder texts (#155), word for word: they are the final text
 // Peter reviews in the PR. (A, the registration invite's reminder, went with
-// the interest list: #333, D128.)
+// the interest list: #333, D129.)
 import { describe, expect, it } from "vitest";
 
 import { stuckReminder, type StuckReminderInput } from "./templates";

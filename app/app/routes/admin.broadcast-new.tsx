@@ -36,7 +36,7 @@ const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
 // "Levél nekik" on Párok (#148, D64): the players of the rows it shows. The
-// only audience since the interest list's went (#333, D128); without one the
+// only audience since the interest list's went (#333, D129); without one the
 // page has nobody to write to.
 async function audience(params: URLSearchParams) {
   if (!params.has("pairs")) throw redirect("/admin/broadcasts");

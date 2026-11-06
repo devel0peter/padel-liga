@@ -14,7 +14,7 @@ import { SITE_NAME } from "~/lib/site";
 
 // First login: name, level, phone number and the privacy consent
 // (spec section 3) before anything else. Nothing comes from the interest
-// list (#333, D128): a Google login brings its name, the rest is typed here.
+// list (#333, D129): a Google login brings its name, the rest is typed here.
 // Férfi or Nő is asked too (#133); an account from before that question gets
 // only it, once (requireUser sends it here).
 

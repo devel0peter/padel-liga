@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   // Through a league's register button while logged in already (the login
   // page sends a logged-in visitor straight here): join it, then a clean
-  // address. A new account joined at login (D127).
+  // address. A new account joined at login (D128).
   const url = new URL(request.url);
   if (url.searchParams.has(LEAGUE_PARAM)) {
     await joinFromRegisterButton(user.id, parseLeagueParam(url.searchParams.get(LEAGUE_PARAM)));
@@ -47,7 +47,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const actor = (await getActor(request))!;
   const leagues = await listLeagues();
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? leagues : []));
-  // Only the player's own leagues (D127, #331): their seasons, pair links and
+  // Only the player's own leagues (D128, #331): their seasons, pair links and
   // "Párt keresek". In none: the card to choose one.
   const mine = await playerLeagues(user.id);
   const leagueName = new Map(mine.map((l) => [l.id, l.name]));

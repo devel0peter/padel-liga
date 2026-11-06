@@ -53,7 +53,7 @@ const GOOGLE_ERRORS: Record<GoogleError, string> = {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  // The landing page's register button names a league (D127, #331): it rides in
+  // The landing page's register button names a league (D128, #331): it rides in
   // returnTo through the code step, Google and the first-login page.
   const league = parseLeagueParam(url.searchParams.get(LEAGUE_PARAM));
   const back = safeReturnTo(url.searchParams.get("returnTo"));

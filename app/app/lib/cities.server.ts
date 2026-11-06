@@ -32,7 +32,7 @@ export async function getCity(slug: string): Promise<City | undefined> {
 }
 
 // Adds a city, audited (#225). The interest list's "Más város" signups are
-// no longer filed under it (#333, D128).
+// no longer filed under it (#333, D129).
 export async function createCity(input: CityInput, actorId: string): Promise<void> {
   await db.batch([
     db.insert(cities).values(input),

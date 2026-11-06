@@ -1,4 +1,4 @@
-// A league's players (D127, #331; replaces D93's interest-list rule). An
+// A league's players (D128, #331; replaces D93's interest-list rule). An
 // account belongs to the leagues it joined (league_members) and to every
 // league it has a pair in; to no other. Pure parts: the register button's
 // league in the address, and which leagues the Kezdőlap card offers. The D1

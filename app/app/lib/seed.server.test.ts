@@ -71,7 +71,7 @@ describe("the seeded state", () => {
       { email: "idegen.ilona@example.test", platform_role: "player", named: 1, consented: 1 },
       { email: "szervezo@example.test", platform_role: "player", named: 1, consented: 1 },
     ]);
-    // Who belongs where (D127).
+    // Who belongs where (D128).
     expect(rows("select l.slug, u.email from league_members m join leagues l on l.id = m.league_id join users u on u.id = m.user_id order by l.slug, u.email")).toEqual([
       { slug: "minta", email: "admin@example.test" },
       { slug: "minta", email: "szervezo@example.test" },
@@ -210,7 +210,7 @@ describe("the seed carries the walkthrough", () => {
   const userRow = async (email: string) => (await db.select().from(users)).find((u) => u.email === email)!;
 
   it("lets the players join through the register button, pair up, enter, and publishes the groups", async () => {
-    // Everyone registers through Mintaváros's register button (D127) and
+    // Everyone registers through Mintaváros's register button (D128) and
     // finishes the first-login page.
     const people = [
       ...Seed.PAIR_PLAYERS.flatMap((p) => [

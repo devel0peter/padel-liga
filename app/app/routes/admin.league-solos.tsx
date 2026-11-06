@@ -29,7 +29,7 @@ import { leagueSeekers, pairSeekers, searchPairs, type SearchPairPlayer } from "
 import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up the league's registered players who
-// switched on "Párt keresek" (D59, D127): two of them become an active pair
+// switched on "Párt keresek" (D59, D128): two of them become an active pair
 // at once; both get an in-app message and an email with the partner's name
 // (#260). Nothing comes from the interest list (#333). No email addresses
 // shown; phone numbers are, so the organizer can call (D126). Összehozott

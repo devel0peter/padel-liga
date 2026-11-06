@@ -49,7 +49,7 @@ export type ClubsScope = {
 };
 
 // No signup counts or posters any more: they came from the interest list
-// (#333, D128).
+// (#333, D129).
 export type ClubsData = {
   scope: ClubsScope;
   cities: Pick<City, "slug" | "name">[];

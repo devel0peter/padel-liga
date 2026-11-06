@@ -98,7 +98,7 @@ export async function loginCode(email: string, offset: number): Promise<string> 
 
 // --- Logging in -----------------------------------------------------------------
 
-// `league`: through that league's register button (D127, #331), so a new
+// `league`: through that league's register button (D128, #331), so a new
 // account joins it at login.
 export async function logIn(page: Page, email: string, league?: string): Promise<void> {
   await visit(page, `/login?${league ? `league=${league}&` : ""}email=${encodeURIComponent(email)}`);
@@ -115,7 +115,7 @@ const authFile = (email: string) => join(AUTH_DIR, `${email}.json`);
 
 // A page logged in as `email`: the saved session if there is one, else a
 // login (and, for a new player, the first-login page). A seeded player logs
-// in through Mintaváros's register button, so they are its player (D127).
+// in through Mintaváros's register button, so they are its player (D128).
 // Close the context.
 export async function as(browser: Browser, who: string | Player): Promise<{ context: BrowserContext; page: Page }> {
   const email = typeof who === "string" ? who : who.email;

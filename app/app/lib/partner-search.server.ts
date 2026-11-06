@@ -13,7 +13,7 @@ import { LEVELS } from "./interest";
 import { formatPhone } from "./phone";
 
 // "Párt keresek" in D1 (D59). Párom sets it per league; Párkeresők lists the
-// league's registered players (D127) who look for a partner and have none in
+// league's registered players (D128) who look for a partner and have none in
 // it. Off until the player switches it on (#333). Names, levels and, for the
 // league's Szervező and the Admin, phone numbers (D126); never an email
 // address.
@@ -62,7 +62,7 @@ export type Seeker = {
   since: Date;
 };
 
-// Párkeresők: registered players of the league (D127) without an active pair
+// Párkeresők: registered players of the league (D128) without an active pair
 // in it who switched "Párt keresek" on, by level, then longest waiting first.
 export async function leagueSeekers(league: { id: number }): Promise<Seeker[]> {
   const rows = await db

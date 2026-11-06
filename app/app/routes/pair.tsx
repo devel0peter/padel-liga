@@ -27,7 +27,7 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // keresek" switch (D59) for the organizer to find them one. The partner's
 // address and phone (D121) so the two can reach each other. Players can't
 // change their pair here: a Szervező does that on the Párok page (#97). One
-// block per league of the player (D127); the league is only named when there
+// block per league of the player (D128); the league is only named when there
 // are several. Nothing comes from the interest list (#333).
 
 export function meta({}: Route.MetaArgs) {
@@ -36,7 +36,7 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  // Only the player's own leagues (D127, #331).
+  // Only the player's own leagues (D128, #331).
   const leagues = await playerLeagues(user.id);
   // Without a pair: the player's own link to invite one.
   const [pairs, links, searching] = await Promise.all([

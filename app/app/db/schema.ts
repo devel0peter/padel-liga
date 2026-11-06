@@ -594,7 +594,7 @@ export const pairLinks = sqliteTable(
   (t) => [uniqueIndex("pair_links_owner_idx").on(t.leagueId, t.ownerId)],
 );
 
-// A league's players (D127, #331, replacing D93): the leagues an account
+// A league's players (D128, #331, replacing D93): the leagues an account
 // joined. Being in a pair of the league counts too, with or without a row
 // (league-members.server.ts). `source` says how they joined: "register" (the
 // landing page's register button, written at login, before the first-login
@@ -621,7 +621,7 @@ export const leagueMembers = sqliteTable(
 
 // "Párt keresek" (D59): a registered player without a pair says, per league,
 // whether the organizer should find them a partner; Párkeresők lists them.
-// No row: off (D127, #333; before, on for a waiting solo signup, whose
+// No row: off (D128, #333; before, on for a waiting solo signup, whose
 // default the release stored as a row). A row stays when they get a pair; it
 // only counts while they have none.
 export const partnerSearches = sqliteTable(

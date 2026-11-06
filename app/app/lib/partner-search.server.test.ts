@@ -31,7 +31,7 @@ beforeEach(() => {
   ])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', ''), ('org', 'org@x.hu', 'Szervező')`);
-  // Anna, Béla and Cecil joined the league (D127).
+  // Anna, Béla and Cecil joined the league (D128).
   h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (1, 'b', 'chosen'), (1, 'c', 'chosen')`);
   // Cecil looks for a partner (the release stored his old solo-signup default
   // as a row, #333); Béla signed up alone too, but has no row: off.
@@ -135,7 +135,7 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
     expect(await listed(2)).toEqual(["b+c"]);
   });
 
-  it("lists only the league's players (D127): someone who joined another league isn't a seeker here", async () => {
+  it("lists only the league's players (D128): someone who joined another league isn't a seeker here", async () => {
     h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'mmo', 'mmo', 'Óvár')`);
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'kezdo', 1)").run();
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'd', 'chosen')`);

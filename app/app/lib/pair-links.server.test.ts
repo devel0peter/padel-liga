@@ -31,7 +31,7 @@ function freshDb() {
     h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, name);
   // Has an account but hasn't finished the first-login page.
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', 'Nándor')`);
-  // Anna joined both leagues (D127); Béla and Cecil none yet.
+  // Anna joined both leagues (D128); Béla and Cecil none yet.
   h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (2, 'a', 'chosen')`);
 }
 
@@ -80,7 +80,7 @@ describe("pair links on real SQLite (2026-10-31)", () => {
       status: "active",
     });
     expect(all("select actor_id, action from audit_log")).toEqual([{ actor_id: "b", action: "pair.link" }]);
-    // Accepting joins the link's league (D127, #331).
+    // Accepting joins the link's league (D128, #331).
     expect(all("select league_id, user_id, source from league_members order by league_id, user_id")).toEqual([
       { league_id: 1, user_id: "a", source: "chosen" },
       { league_id: 1, user_id: "b", source: "link" },

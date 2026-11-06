@@ -8,8 +8,8 @@
 //   C  registered, no pair in the league, "Párt keresek" off, 2 days
 //   D  active pair, no entry in the season accepting entries, 2 days
 // (A, an invited address on the interest list without an account, went with
-// the list: #333, D128. Its old records stay in stuck_reminders.)
-// Only for the leagues a person belongs to (D127), and only while the league
+// the list: #333, D129. Its old records stay in stuck_reminders.)
+// Only for the leagues a person belongs to (D128), and only while the league
 // has a season accepting entries (registration opened, last phase not
 // started), since every reminder gives its dates. When its registration
 // deadline is under 24 hours away, a reminder goes out after 24 hours instead
@@ -73,7 +73,7 @@ export type ReminderInput = {
   leagues: readonly ReminderLeague[];
   seasons: readonly Season[];
   accounts: readonly ReminderAccount[];
-  // The league_members rows (D127); a pair of the league counts too.
+  // The league_members rows (D128); a pair of the league counts too.
   members: readonly { leagueId: number; userId: string }[];
   pairs: readonly ReminderPair[];
   // Every season entry, whatever its status: an entry pending approval or
@@ -152,7 +152,7 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   if (seasonOf.size === 0) return [];
 
   const accountById = new Map(input.accounts.map((a) => [a.id, a]));
-  // An account's leagues (D127, league-members.server.ts): those it joined
+  // An account's leagues (D128, league-members.server.ts): those it joined
   // (the register button joins at login, before the first-login page, so B
   // knows it) or has a pair in. In none: no reminder.
   const memberOf = new Set([

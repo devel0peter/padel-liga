@@ -45,7 +45,7 @@ The seed takes no options and refuses `--remote`, a production environment and C
 | Second league's player | `idegen.ilona@example.test` (Idegen Ilona): joined Példaváros only, "Párt keresek" on there |
 | Player accounts | none in Mintaváros: players register in step 5 |
 
-The Admin and the Szervező already have accounts and belong to Mintaváros (D127). There is no interest list (#333): the players below have no account and nothing about them is stored; they register themselves through the league's register button, which makes them Mintaváros's players.
+The Admin and the Szervező already have accounts and belong to Mintaváros (D128). There is no interest list (#333): the players below have no account and nothing about them is stored; they register themselves through the league's register button, which makes them Mintaváros's players.
 
 The pairs-to-be (each pair picks one level on the first-login page):
 
@@ -136,7 +136,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 
 - Page: `/` (logged out)
 - Expect:
-  - The "Mintaváros: a liga állása" card in the hero, with its register button ("Nevezek az 1. körre" before the groups are out). The button opens `/register?league=minta`: the league rides along, so whoever registers through it is Mintaváros's player at once (D127, #331).
+  - The "Mintaváros: a liga állása" card in the hero, with its register button ("Nevezek az 1. körre" before the groups are out). The button opens `/register?league=minta`: the league rides along, so whoever registers through it is Mintaváros's player at once (D128, #331).
   - Példaváros has its own card, with its own button (`/register?league=pelda`).
 
 ### 4. Admin checks the log
@@ -256,7 +256,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 
 ### 15. A new player registers without a league and chooses one (side path)
 
-Anyone can create an account, no invite needed (#113). Logging in on `/register` or `/login` directly, not through a league's button, the account belongs to no league until the player chooses one (D127, #331).
+Anyone can create an account, no invite needed (#113). Logging in on `/register` or `/login` directly, not through a league's button, the account belongs to no league until the player chooses one (D128, #331).
 
 - Page: `/register` (or `/login`), then `/welcome`, `/home` and `/pair` ("Párom")
 - Account: a new address that is not in the seed, for example `uj.jatekos@example.test`

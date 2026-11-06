@@ -90,7 +90,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const query = parsePairsQuery(new URL(request.url).searchParams);
   const all = await leaguePairsRows(league);
   // "Pár létrehozása" and "Csere" offer the same players as the rows without
-  // a pair: the league's (D127).
+  // a pair: the league's (D128).
   const candidates = all.flatMap((r) => (r.kind === "solo" ? [{ id: r.player.id, name: r.player.name, level: r.player.level }] : []));
   // The strikes of the league's current season (#294): they reset every
   // season, so a new season shows none, not the last one's.

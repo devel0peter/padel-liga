@@ -9,7 +9,7 @@ import { listSeasons } from "~/lib/seasons.server";
 
 import { joinableLeagues, type JoinableLeague, type JoinSource } from "./league-members";
 
-// A league's players in D1 (D127, #331, replacing D93): the leagues an
+// A league's players in D1 (D128, #331, replacing D93): the leagues an
 // account joined (league_members) or has a pair in, whatever the pair's
 // state (an entry always belongs to a pair of the league). Every reader that
 // means "the league's players" uses memberOf: Párok's players without a pair
@@ -68,7 +68,7 @@ export async function joinLeague(userId: string, leagueId: number, source: JoinS
 
 // The landing page's register button (`?league=<slug>`): joins that league,
 // if it is a listed one. Written as soon as the account logs in through it,
-// before the first-login page is done (D127), so the stuck reminder B knows
+// before the first-login page is done (D128), so the stuck reminder B knows
 // the league; every list of players still waits for the first-login page.
 export async function joinFromRegisterButton(userId: string, slug: string | null): Promise<void> {
   if (!slug) return;

@@ -10,7 +10,7 @@ CREATE TABLE `league_members` (
 --> statement-breakpoint
 CREATE INDEX `league_members_user_idx` ON `league_members` (`user_id`);
 --> statement-breakpoint
--- Backfill (D127, #331): today's players stay their leagues' players. D93
+-- Backfill (D128, #331): today's players stay their leagues' players. D93
 -- read the interest list: a registered account (first-login page done, not
 -- deleted) belonged to the leagues of its signups' cities (either address,
 -- withdrawn signups too), and without a signup to every league. Without a

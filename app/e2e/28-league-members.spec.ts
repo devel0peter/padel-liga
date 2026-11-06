@@ -1,4 +1,4 @@
-// A league's players (D127, #331): the seed's second league, Példaváros, has
+// A league's players (D128, #331): the seed's second league, Példaváros, has
 // one player, Idegen Ilona, who looks for a partner there. She is on no page
 // or count of Mintaváros, and Mintaváros's players are on none of hers; she
 // sees only her own league. Read-only; runs on the state the walkthrough left.

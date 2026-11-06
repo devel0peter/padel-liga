@@ -8,8 +8,8 @@
 // all of that, including what a walkthrough created on top (pairs, entries,
 // groups, emails), then writes the same starting state again.
 //
-// No interest list (#333, D128): the players have no account yet; they
-// register through the league's register button (D127), as the walkthrough
+// No interest list (#333, D129): the players have no account yet; they
+// register through the league's register button (D128), as the walkthrough
 // says. A second league in a second city, with one player who joined it,
 // shows that a league's pages only hold its own players (#331).
 
@@ -176,7 +176,7 @@ export function insertStatements(now: Date): string[] {
     `insert into league_admins (league_id, user_id, granted_by) select id, ${q(ORGANIZER.id)}, ${q(ADMIN.id)} ` +
       `from leagues where slug = ${q(LEAGUE.slug)}`,
   );
-  // Who belongs where (D127): the Admin and the Szervező joined Mintaváros,
+  // Who belongs where (D128): the Admin and the Szervező joined Mintaváros,
   // like today's staff; Idegen Ilona joined Példaváros only, with "Párt
   // keresek" on there.
   const join = (userId: string, league: string) =>

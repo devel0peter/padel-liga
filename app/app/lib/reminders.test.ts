@@ -60,7 +60,7 @@ function pair(a: string, b: string, v: Partial<ReminderPair> = {}): ReminderPair
   return { id: nextPair++, leagueId: 1, playerA: a, playerB: b, status: "active", createdAt: ago(3 * DAY), dissolvedAt: null, ...v };
 }
 
-// Unless a test says otherwise, every account joined league 1 (D127).
+// Unless a test says otherwise, every account joined league 1 (D128).
 function input(v: Partial<ReminderInput> = {}): ReminderInput {
   return {
     now: NOW,
@@ -157,7 +157,7 @@ describe("B: first login, registration not finished", () => {
     expect(who({ accounts: [unfinished()], suppressed: new Set(["bela@x.hu"]) })).toEqual([]);
   });
 
-  it("only for the league the account joined (D127): none in no league, whatever its signups", () => {
+  it("only for the league the account joined (D128): none in no league, whatever its signups", () => {
     expect(who({ accounts: [unfinished()], members: [] })).toEqual([]);
     expect(who({ accounts: [unfinished()], members: [{ leagueId: 2, userId: "bela" }] })).toEqual([]);
     expect(who({ accounts: [unfinished()], members: [{ leagueId: 1, userId: "bela" }] })).toEqual(["B bela@x.hu"]);
@@ -170,7 +170,7 @@ describe("C: registered, no pair", () => {
     expect(who({ accounts: [account("cili", { consentAt: ago(DAY) })] })).toEqual([]);
   });
 
-  it("only in the leagues the player belongs to (D127): joined, or a pair there", () => {
+  it("only in the leagues the player belongs to (D128): joined, or a pair there", () => {
     const leagues = [
       { id: 1, city: "gyor", name: "Győr" },
       { id: 2, city: "mmo", name: "Mosonmagyaróvár" },

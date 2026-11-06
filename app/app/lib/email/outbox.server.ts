@@ -159,7 +159,7 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
 const CONFIRMATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Signup confirmation (the landing form, #332). The partner notice went with
-// the interest list's flows (#333, D128): no email to a signed-up partner.
+// the interest list's flows (#333, D129): no email to a signed-up partner.
 export async function queueSignupEmails(signup: InterestSignup, now = new Date()): Promise<number[]> {
   const cities = await listCities();
   const [confirmed] = await db

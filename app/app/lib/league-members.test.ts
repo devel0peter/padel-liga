@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { joinableLeagues, leagueOfReturnTo, parseLeagueParam, withLeague } from "./league-members";
 
-describe("the register button's league in the address (D127, #331)", () => {
+describe("the register button's league in the address (D128, #331)", () => {
   it("takes only a slug-shaped value", () => {
     expect(parseLeagueParam("gyor")).toBe("gyor");
     expect(parseLeagueParam("padelparbaj-gyor-2")).toBe("padelparbaj-gyor-2");

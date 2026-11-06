@@ -1,5 +1,5 @@
 // What is left of the interest list's admin view since Jelentkezők went
-// (#333, D128): the names Napló shows for old signup entries, and the labels
+// (#333, D129): the names Napló shows for old signup entries, and the labels
 // the landing form's confirmation and the level columns use. Pure.
 
 import { cityName, OTHER_CITY, type City } from "./cities";

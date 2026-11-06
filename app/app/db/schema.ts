@@ -169,7 +169,8 @@ export const users = sqliteTable("users", {
   elo: real("elo"),
   // Hungarian phone number in E.164 ("+36301234567"), required on the profile
   // form since 2026-10-28 (older accounts may lack it). Personal data:
-  // never on a public page; only the current phase's opponents will see it.
+  // never on a public page; the current phase's opponents, the active
+  // partner (D121) and the organizers (D123) see it.
   phone: text("phone"),
   // "male" or "female" (Férfi / Nő), as the player says on the first-login
   // or profile page (#133); never inferred. Null on older accounts until they

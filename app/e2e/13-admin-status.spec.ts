@@ -16,8 +16,10 @@ test("Felhasználók: status chips and, for the Admin, the last login", async ({
   await expect(row).toContainText("Regisztrált");
   await expect(row).toContainText(`Pár: ${partner.name}`);
   await expect(row).toContainText(ENTERED);
+  // The phone number, tap to call (D123).
+  await expect(row.getByRole("link", { name: "+36 30 123 4567" }).first()).toHaveAttribute("href", "tel:+36301234567");
   // Logged in during the walkthrough: a date, not the dash.
-  await expect(row.getByRole("cell").nth(5)).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
+  await expect(row.getByRole("cell").nth(6)).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
 
   // Sándor Ákos lost his pair in step 14 and has none since.
   const akos = WAITING_SOLOS[1];
@@ -40,11 +42,14 @@ test("Jelentkezők: whether each person registered, and their pair", async ({ br
   await context.close();
 });
 
-test("Párok and Párkeresők: entries and pairs made elsewhere, no contact details", async ({ browser }) => {
+test("Párok and Párkeresők: entries, pairs made elsewhere, phones but no email addresses", async ({ browser }) => {
   const [boglarka, akos] = WAITING_SOLOS;
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta/pairs");
-  await expect(page.getByRole("row").filter({ hasText: PAIRS.p1[0].name }).filter({ hasText: PAIRS.p1[1].name })).toContainText(ENTERED);
+  const p1 = page.getByRole("row").filter({ hasText: PAIRS.p1[0].name }).filter({ hasText: PAIRS.p1[1].name });
+  await expect(p1).toContainText(ENTERED);
+  // Both players' phones, tap to call (D123).
+  await expect(p1.locator('a[href="tel:+36301234567"]')).toHaveCount(2);
 
   // The solos paired in step 13 split in step 14: the page says so.
   await visit(page, "/admin/leagues/minta/solos");
@@ -53,7 +58,6 @@ test("Párok and Párkeresők: entries and pairs made elsewhere, no contact deta
   await expect(pair).toContainText("Nincs párja");
   await expect(pair).toContainText(akos.name);
   await expect(content(page)).not.toContainText("@example.test");
-  await expect(content(page)).not.toContainText("+36");
   await context.close();
 });
 

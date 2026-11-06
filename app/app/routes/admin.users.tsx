@@ -2,6 +2,7 @@ import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.users";
 import { AppPage } from "~/components/app-page";
+import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -36,7 +37,8 @@ import {
 } from "~/lib/users-filter";
 
 // Every account (Admin only). Roles are shown, not edited: Szervezők are
-// appointed on Ligák, the Admin only by the CLI. No phone numbers here.
+// appointed on Ligák, the Admin only by the CLI. Phone numbers tap to call
+// (D123).
 // "Utolsó belépés" and "Törlés" (#152) only for the Admin, even if the page
 // is ever opened to others.
 
@@ -199,6 +201,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               <TableRow>
                 <TableHead>Név</TableHead>
                 <TableHead className="hidden sm:table-cell">E-mail</TableHead>
+                <TableHead className="hidden sm:table-cell">Telefon</TableHead>
                 <TableHead className="hidden sm:table-cell">Szerep</TableHead>
                 <TableHead>Állapot</TableHead>
                 <TableHead className="hidden sm:table-cell">Belépés</TableHead>
@@ -219,10 +222,14 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                     {/* The columns that don't fit a phone fold under the name (#146). */}
                     <div className="grid gap-0.5 text-sm font-normal break-all text-muted-foreground sm:hidden">
                       <span>{u.email}</span>
+                      <PhoneLink phone={u.phone} />
                       <span>{u.role}</span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">{u.email}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {u.phone ? <PhoneLink phone={u.phone} /> : <span className="text-muted-foreground">–</span>}
+                  </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <Badge variant={u.role === "Játékos" ? "outline" : "secondary"}>{u.role}</Badge>
                     {u.leagues.length > 0 && <span className="ml-2 text-sm text-muted-foreground">{u.leagues.join(", ")}</span>}

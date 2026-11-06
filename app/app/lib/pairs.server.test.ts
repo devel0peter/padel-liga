@@ -159,8 +159,8 @@ describe("pairs.server on real SQLite (#97)", () => {
     signup("other", "d@x.hu");
     expect((await P.pairCandidates(GYOR)).map((c) => c.id)).toEqual(["a", "o"]);
     expect((await P.pairCandidates(DEB)).map((c) => c.id)).toEqual(["b", "c", "o"]);
-    // No address leaves the server.
-    expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado" });
+    // No address leaves the server; the phone is for Párok's rows (D123).
+    expect((await P.pairCandidates(GYOR))[0]).toEqual({ id: "a", name: "Anna", level: "halado", phone: "" });
   });
 
   it("counts staff accounts like anyone else once they finished the first-login page (D93)", async () => {
@@ -277,8 +277,8 @@ describe("pairs.server on real SQLite (#97)", () => {
       {
         id: 8,
         players: [
-          { id: "c", name: "Cecil", level: "kozephalado", phone: true },
-          { id: "d", name: "Dóra", level: "versenyzo", phone: false },
+          { id: "c", name: "Cecil", level: "kozephalado", phone: "+36 30 123 4567" },
+          { id: "d", name: "Dóra", level: "versenyzo", phone: "" },
         ],
         elo: 1400,
         source: "manual",
@@ -293,8 +293,8 @@ describe("pairs.server on real SQLite (#97)", () => {
       {
         id: 7,
         players: [
-          { id: "a", name: "Anna", level: "halado", phone: false },
-          { id: "b", name: "Béla", level: "kezdo", phone: false },
+          { id: "a", name: "Anna", level: "halado", phone: "" },
+          { id: "b", name: "Béla", level: "kezdo", phone: "" },
         ],
         elo: 1200,
         source: "signup",
@@ -306,9 +306,9 @@ describe("pairs.server on real SQLite (#97)", () => {
         season: "Tél",
       },
     ]);
-    // Never an email address or phone on the page's data.
+    // Never an email address on the page's data; the phone only formatted, to call (D123).
     expect(JSON.stringify(rows)).not.toContain("@");
-    expect(JSON.stringify(rows)).not.toContain("+36");
+    expect(JSON.stringify(rows)).not.toContain("+36301234567");
   });
 });
 

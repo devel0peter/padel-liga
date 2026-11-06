@@ -51,6 +51,13 @@ describe("/admin/users", () => {
     expect(h.raw.prepare("select last_login_at from users where id = 'b'").get().last_login_at).toBeNull();
   });
 
+  it("shows the Admin each account's phone number, formatted, to call (D123)", async () => {
+    h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
+    const page = await R.loader(args(get(await cookieFor("admin", "superadmin"))));
+    expect(page.users.find((u) => u.id === "a")?.phone).toBe("+36 30 123 4567");
+    expect(page.users.find((u) => u.id === "b")?.phone).toBe("");
+  });
+
   it("is for the Admin only: a Szervező gets 403", async () => {
     expect(await status(R.loader(args(get(await cookieFor("szervezo", "player", 1)))))).toBe(403);
   });

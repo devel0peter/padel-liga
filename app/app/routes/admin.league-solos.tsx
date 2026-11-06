@@ -3,6 +3,7 @@ import { data, Link, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-solos";
 import { AppPage } from "~/components/app-page";
+import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -48,7 +49,8 @@ import { cn } from "~/lib/utils";
 // email with the partner's name (#260).
 // Solos from the interest list who haven't registered yet are paired as
 // before: both get an email with each other's name and address (pairIntro),
-// and the pair forms once both have registered. No email addresses shown.
+// and the pair forms once both have registered. No email addresses shown;
+// registered players' phone numbers are, so the organizer can call (D123).
 // Összehozott párok lists both kinds: the solo pairs (undone here) and the
 // active pairs made from Regisztráltak (dissolved on Párok; D113, #297).
 
@@ -85,7 +87,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   ]);
   const row = (r: SignupRow) => publicRow(r, clubs, statuses, league.id);
   // A pair from Regisztráltak: name, level and home club (from their solo
-  // signup, as Regisztráltak showed it) and status; never email or phone.
+  // signup, as Regisztráltak showed it), phone (D123) and status; never email.
   const solos = soloSignupsByEmail(signups, league.city);
   const person = (p: SearchPairPlayer) => {
     const email = p.email.toLowerCase();
@@ -93,6 +95,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       name: p.name,
       // No level: the "Nincs szintje" chip says so.
       level: levelLabel(p.level),
+      phone: p.phone,
       plays: homeClubLabel(solos.get(email)?.homeClub ?? null, clubs),
       status: statusChips(statuses.byEmail.get(email), [league.id]),
     };
@@ -105,6 +108,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       id: s.id,
       name: s.name,
       level: levelLabel(s.level),
+      phone: s.phone,
       plays: homeClubLabel(s.homeClub, clubs),
       note: s.note,
       fromSignup: s.fromSignup,
@@ -160,13 +164,15 @@ function Folded({ note, label, at }: { note: string | null; label: string; at: D
   );
 }
 
-type Person = Pick<Row, "name" | "level" | "plays" | "status">;
+// phone: only registered players have one here (D123).
+type Person = Pick<Row, "name" | "level" | "plays" | "status"> & { phone?: string };
 
 function Who({ row }: { row: Person }) {
   return (
     <div>
       <div className="font-medium">{row.name}</div>
       <div className="text-xs text-muted-foreground">{[row.level, row.plays].filter(Boolean).join(" · ")}</div>
+      <PhoneLink phone={row.phone ?? ""} />
       <div className="mt-1">
         <StatusChips chips={row.status} />
       </div>
@@ -290,6 +296,7 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
                       {row.plays && ` · ${row.plays}`}
                       {row.fromSignup && " · egyedül jelentkezett"}
                     </div>
+                    <PhoneLink phone={row.phone} />
                     <Folded note={row.note} label="Párt keres" at={row.since} />
                   </TableCell>
                   <TableCell className={cn("max-w-72 text-sm whitespace-normal", WIDE)}>{row.note}</TableCell>

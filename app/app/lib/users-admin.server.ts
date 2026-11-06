@@ -5,17 +5,21 @@ import { leagueAdmins, leagues, oauthAccounts, users } from "~/db/schema";
 
 import { deletionPlan, DELETION_REFUSALS, type DeletionMode } from "./account-deletion";
 import { deletionFacts } from "./account-deletion.server";
+import { formatPhone } from "./phone";
 import { roleLabel, type RoleLabel } from "./auth/permissions";
 import { statusChips, type StatusChip } from "./player-status";
 import { playerStatuses } from "./player-status.server";
 import { userFacts, type UserFacts } from "./users-filter";
 
 // The Admin's user list (/admin/users). Never shown to anyone else: it has
-// email addresses (CLAUDE.md: no contact details on public pages).
+// email addresses and phone numbers (CLAUDE.md: no contact details on public
+// pages; D123: the Admin calls players from here).
 export type UserRow = {
   id: string;
   name: string;
   email: string;
+  // Formatted ("+36 30 123 4567"), "" when none.
+  phone: string;
   role: RoleLabel;
   leagues: string[];
   google: boolean;
@@ -66,6 +70,7 @@ export async function listUsers({
       id: u.id,
       name: u.name,
       email: u.email,
+      phone: formatPhone(u.phone),
       role,
       leagues: mine.map((l) => l.name),
       google: withGoogle.has(u.id),

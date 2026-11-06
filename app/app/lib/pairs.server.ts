@@ -249,7 +249,7 @@ async function activePairOf(leagueId: number, a: string, b: string): Promise<num
 // the league by then (checked inside the statement, so two organizers or two
 // accepts at once can't put a player in two pairs). A builder, not a raw
 // db.run(), so it can go in a D1 batch with its audit entry.
-export function insertPairIfFree(leagueId: number, a: string, b: string, source: "manual" | "link") {
+export function insertPairIfFree(leagueId: number, a: string, b: string, source: Exclude<PairSource, "signup">) {
   return db.insert(pairs).select(
     rowSelect(
       pairs,
@@ -296,11 +296,19 @@ async function announcePair(pairId: number): Promise<void> {
 }
 
 // "Pár létrehozása": two registered players without a pair in the league.
-export async function createPair(actorId: string, leagueId: number, a: string, b: string): Promise<Result> {
+// `source`: "search" when made from Regisztráltak on Párkeresők (D113, #297),
+// so its Összehozott párok can list it.
+export async function createPair(
+  actorId: string,
+  leagueId: number,
+  a: string,
+  b: string,
+  source: "manual" | "search" = "manual",
+): Promise<Result> {
   const refused = await newPairRefusal(leagueId, a, b);
   if (refused) return { ok: false, error: refused };
   await db.batch([
-    insertPairIfFree(leagueId, a, b, "manual"),
+    insertPairIfFree(leagueId, a, b, source),
     auditIfChanged({
       actorId,
       action: "pair.create",

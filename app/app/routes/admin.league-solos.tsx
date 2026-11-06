@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { data, useFetcher } from "react-router";
+import { data, Link, useFetcher } from "react-router";
 
 import type { Route } from "./+types/admin.league-solos";
 import { AppPage } from "~/components/app-page";
@@ -38,7 +38,8 @@ import { levelLabel, type SignupRow } from "~/lib/signups-admin";
 import { listSignups } from "~/lib/signups-admin.server";
 import { soloPairs, waitingSolos } from "~/lib/solo-pairing";
 import { pairSolos, unpairSolo } from "~/lib/solo-pairing.server";
-import { leagueSeekers, pairSeekers } from "~/lib/partner-search.server";
+import { soloSignupsByEmail } from "~/lib/partner-search";
+import { leagueSeekers, pairSeekers, searchPairs, type SearchPairPlayer } from "~/lib/partner-search.server";
 import { cn } from "~/lib/utils";
 
 // Párkeresők: a Szervező pairs up players who look for a partner. Registered
@@ -48,6 +49,8 @@ import { cn } from "~/lib/utils";
 // Solos from the interest list who haven't registered yet are paired as
 // before: both get an email with each other's name and address (pairIntro),
 // and the pair forms once both have registered. No email addresses shown.
+// Összehozott párok lists both kinds: the solo pairs (undone here) and the
+// active pairs made from Regisztráltak (dissolved on Párok; D113, #297).
 
 async function scope(request: Request, slug: string) {
   const league = await getLeague(slug);
@@ -73,15 +76,30 @@ function publicRow(r: SignupRow, clubs: Awaited<ReturnType<typeof listClubs>>, s
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, cityName } = await scope(request, params.league);
-  const [signups, clubs, statuses, seekers] = await Promise.all([
+  const [signups, clubs, statuses, seekers, made] = await Promise.all([
     listSignups(),
     listClubs(),
     playerStatuses(),
     leagueSeekers(league),
+    searchPairs(league.id),
   ]);
   const row = (r: SignupRow) => publicRow(r, clubs, statuses, league.id);
+  // A pair from Regisztráltak: name, level and home club (from their solo
+  // signup, as Regisztráltak showed it) and status; never email or phone.
+  const solos = soloSignupsByEmail(signups, league.city);
+  const person = (p: SearchPairPlayer) => {
+    const email = p.email.toLowerCase();
+    return {
+      name: p.name,
+      // No level: the "Nincs szintje" chip says so.
+      level: levelLabel(p.level),
+      plays: homeClubLabel(solos.get(email)?.homeClub ?? null, clubs),
+      status: statusChips(statuses.byEmail.get(email), [league.id]),
+    };
+  };
   return {
     name: league.name,
+    slug: league.slug,
     cityName,
     seekers: seekers.map((s) => ({
       id: s.id,
@@ -97,6 +115,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       .filter((r) => !statuses.byEmail.get(r.email1.toLowerCase())?.registered)
       .map(row),
     pairs: soloPairs(signups, league.city).map(([a, b]) => [row(a), row(b)] as const),
+    searchPairs: made.map((p) => ({ id: p.id, players: [person(p.players[0]), person(p.players[1])] as const })),
   };
 }
 
@@ -141,14 +160,13 @@ function Folded({ note, label, at }: { note: string | null; label: string; at: D
   );
 }
 
-function Who({ row }: { row: Row }) {
+type Person = Pick<Row, "name" | "level" | "plays" | "status">;
+
+function Who({ row }: { row: Person }) {
   return (
     <div>
       <div className="font-medium">{row.name}</div>
-      <div className="text-xs text-muted-foreground">
-        {row.level}
-        {row.plays && ` · ${row.plays}`}
-      </div>
+      <div className="text-xs text-muted-foreground">{[row.level, row.plays].filter(Boolean).join(" · ")}</div>
       <div className="mt-1">
         <StatusChips chips={row.status} />
       </div>
@@ -289,7 +307,8 @@ function Seekers({ seekers }: { seekers: Seeker[] }) {
 }
 
 export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
-  const { name, cityName, seekers, waiting, pairs } = loaderData;
+  const { name, slug, cityName, seekers, waiting, pairs, searchPairs } = loaderData;
+  const matched = pairs.length + searchPairs.length;
   const fetcher = useFetcher<{ ok?: true; error?: string }>();
   const [selected, setSelected] = useState<number[]>([]);
   const chosen = waiting.filter((r) => selected.includes(r.id));
@@ -310,7 +329,7 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
   return (
     <AppPage
       title="Párkeresők"
-      description={`${name} · ${seekers.length} regisztrált és ${waiting.length} még nem regisztrált játékos keres párt, ${pairs.length} párt hoztál össze`}
+      description={`${name} · ${seekers.length} regisztrált és ${waiting.length} még nem regisztrált játékos keres párt, ${matched} párt hoztál össze`}
     >
       <p className="max-w-2xl text-muted-foreground">
         Jelölj ki két hasonló szintű játékost, és tedd őket párba. Szint szerint vannak sorban. Az e-mail-címüket nem
@@ -401,8 +420,8 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
         )}
       </section>
 
-      {pairs.length > 0 && (
-        <section className="grid gap-3 [&>*]:min-w-0">
+      {matched > 0 && (
+        <section aria-label="Összehozott párok" className="grid gap-3 [&>*]:min-w-0">
           <h2 className="font-semibold">Összehozott párok</h2>
           <div className="rounded-lg border">
             <Table>
@@ -420,6 +439,24 @@ export default function LeagueSolos({ loaderData }: Route.ComponentProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <UnpairButton a={a} b={b} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {searchPairs.map(({ id, players: [a, b] }) => (
+                  <TableRow key={`pair-${id}`}>
+                    <TableCell className="min-w-48 max-sm:whitespace-normal">
+                      <Who row={a} />
+                      <div className="mt-3 sm:hidden">
+                        <Who row={b} />
+                      </div>
+                    </TableCell>
+                    <TableCell className={cn("min-w-48", WIDE)}>
+                      <Who row={b} />
+                    </TableCell>
+                    <TableCell className="text-right text-xs whitespace-normal text-muted-foreground">
+                      <Link to={`/admin/leagues/${slug}/pairs`} className="underline underline-offset-2 hover:text-foreground">
+                        A Párok oldalon bonthatod fel
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

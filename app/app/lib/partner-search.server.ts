@@ -9,11 +9,13 @@ import type { User } from "./auth/session.server";
 import { defaultSeekers, isSeeking } from "./partner-search";
 import { createPair, type PairLeague } from "./pairs.server";
 import { LEVELS } from "./interest";
+import { formatPhone } from "./phone";
 import { listSignups } from "./signups-admin.server";
 
 // "Párt keresek" in D1 (D59). Párom sets it per league; Párkeresők lists the
 // registered players who look for a partner and have none in the league.
-// Names and levels only: no email or phone number.
+// Names, levels and, for the league's Szervező and the Admin, phone numbers
+// (D126); never an email address.
 
 const LEVEL_ORDER: string[] = Object.keys(LEVELS);
 const levelRank = (level: string) => (LEVEL_ORDER.includes(level) ? LEVEL_ORDER.indexOf(level) : LEVEL_ORDER.length);
@@ -63,6 +65,8 @@ export type Seeker = {
   id: string;
   name: string;
   level: string;
+  // Formatted, "" when none (D126: Párkeresők, organizers only).
+  phone: string;
   // Signed up alone on the interest list (the default is on for them).
   fromSignup: boolean;
   // The solo signup's note and home club, when there is one.
@@ -76,7 +80,7 @@ export type Seeker = {
 export async function leagueSeekers(league: { id: number; city: string }): Promise<Seeker[]> {
   const [accounts, stored, signups, registered] = await Promise.all([
     db
-      .select({ id: users.id, name: users.name, email: users.email, level: users.level, createdAt: users.createdAt })
+      .select({ id: users.id, name: users.name, email: users.email, level: users.level, phone: users.phone, createdAt: users.createdAt })
       .from(users)
       .where(
         and(
@@ -101,6 +105,7 @@ export async function leagueSeekers(league: { id: number; city: string }): Promi
           id: u.id,
           name: u.name,
           level: u.level ?? "",
+          phone: formatPhone(u.phone),
           fromSignup: !!solo,
           note: solo?.note ?? null,
           homeClub: solo?.homeClub ?? null,
@@ -124,7 +129,8 @@ export async function pairSeekers(
   return createPair(actorId, league.id, a, b, "search");
 }
 
-export type SearchPairPlayer = { id: string; name: string; email: string; level: string };
+// phone: formatted, "" when none (D126).
+export type SearchPairPlayer = { id: string; name: string; email: string; level: string; phone: string };
 
 // Összehozott párok (#297): the league's active pairs made from Regisztráltak
 // (source "search", D113), newest first. A pair dissolved on Párok drops out;
@@ -140,10 +146,12 @@ export async function searchPairs(leagueId: number): Promise<{ id: number; playe
       aName: playerA.name,
       aEmail: playerA.email,
       aLevel: playerA.level,
+      aPhone: playerA.phone,
       bId: playerB.id,
       bName: playerB.name,
       bEmail: playerB.email,
       bLevel: playerB.level,
+      bPhone: playerB.phone,
     })
     .from(pairs)
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
@@ -153,8 +161,8 @@ export async function searchPairs(leagueId: number): Promise<{ id: number; playe
   return rows.map((r) => ({
     id: r.id,
     players: [
-      { id: r.aId, name: r.aName, email: r.aEmail, level: r.aLevel ?? "" },
-      { id: r.bId, name: r.bName, email: r.bEmail, level: r.bLevel ?? "" },
+      { id: r.aId, name: r.aName, email: r.aEmail, level: r.aLevel ?? "", phone: formatPhone(r.aPhone) },
+      { id: r.bId, name: r.bName, email: r.bEmail, level: r.bLevel ?? "", phone: formatPhone(r.bPhone) },
     ],
   }));
 }

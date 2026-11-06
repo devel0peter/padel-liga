@@ -5,6 +5,7 @@ import { data, Form, Link, useFetcher } from "react-router";
 import type { Route } from "./+types/admin.league-pairs";
 import { AppPage } from "~/components/app-page";
 import { CARD_CELL, CARD_ROW, CardLabel } from "~/components/card-table";
+import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
 import {
   AlertDialog,
@@ -70,8 +71,8 @@ import { cancelStrike, countsBySeason, leagueStrikes } from "~/lib/strikes.serve
 // organizer tells the players (an entry change is also an in-app notice).
 // Registered players without a pair are rows too; the list can be searched
 // by name and filtered by entry, in the address, and the Admin can open the
-// broadcast page for the players shown (#148). Names and levels only, never
-// an email address or phone number.
+// broadcast page for the players shown (#148). Names, levels and phone
+// numbers (tap to call, D126); never an email address.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -521,6 +522,9 @@ function SoloRow({ player }: { player: Solo }) {
             Párt keres
           </Badge>
         )}
+        <div>
+          <PhoneLink phone={player.phone} />
+        </div>
       </TableCell>
       <TableCell className="max-sm:hidden">–</TableCell>
       <TableCell className="max-sm:hidden">–</TableCell>
@@ -546,8 +550,11 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
                 {strikes[pl.id]} fekete pont
               </Badge>
             )}
+            <div>
+              <PhoneLink phone={pl.phone} />
+            </div>
             {p.status === "active" && (
-              <StatusChips chips={missingChips({ registered: true, level: pl.level, phone: pl.phone, pairs: [] })} />
+              <StatusChips chips={missingChips({ registered: true, level: pl.level, phone: !!pl.phone, pairs: [] })} />
             )}
           </div>
         ))}

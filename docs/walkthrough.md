@@ -4,7 +4,7 @@ A click-through checklist for milestone 1, "Registration opens": from the regist
 
 The page labels below are the Hungarian ones you see on screen.
 
-`npm run e2e` runs the same steps in a browser on its own local database (#101, see the README). Which spec covers which step:
+`npm run e2e` runs the same steps in a browser on its own local database (#101, see [e2e-tests.md](e2e-tests.md)). Which spec covers which step:
 
 | Steps | Spec |
 |---|---|
@@ -276,7 +276,7 @@ Anyone can create an account, no invite needed (#113).
 
 ### 16. The new player invites a partner with the pair link (side path)
 
-A player without a pair sends their own link; the partner registers and accepts (README decision log, 2026-10-31).
+A player without a pair sends their own link; the partner registers and accepts (decision log (`docs/decisions.md`), 2026-10-31).
 
 - Page: `/home` as the player of step 15, then the link in a private window, `/register`, `/welcome`, the link again, `/pair`
 - Account: another new address, for example `link.partner@example.test`
@@ -341,7 +341,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 
 ### 22. A visitor looks at the league page (public)
 
-The public ladder (README decision log, 2026-11-02, #30). Needs step 11 done.
+The public ladder (decision log (`docs/decisions.md`), 2026-11-02, #30). Needs step 11 done.
 
 - Page: `/`, then `/league/minta`
 - Account: none (logged out)
@@ -425,7 +425,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 
 ### 29. A visitor sees the results in the group table (after steps 27 and 28)
 
-The public ladder counts final results (README decision log, 2026-11-03, #186).
+The public ladder counts final results (decision log (`docs/decisions.md`), 2026-11-03, #186).
 
 - Page: `/league/minta`
 - Account: none (logged out)
@@ -438,7 +438,7 @@ The public ladder counts final results (README decision log, 2026-11-03, #186).
 
 ### 30. Admin deletes an account (side path)
 
-On a deletion request the Admin removes the account (#152, README decision log D60).
+On a deletion request the Admin removes the account (#152, decision log (`docs/decisions.md`) D60).
 
 - Page: `/admin/users` ("Felhasználók")
 - Account: `admin@example.test`
@@ -451,7 +451,7 @@ On a deletion request the Admin removes the account (#152, README decision log D
 
 ### 31. Admin reads the Napló (side path, after any organizer step)
 
-Every organizer and system change leaves an entry (#225, #226, README decision log D91).
+Every organizer and system change leaves an entry (#225, #226, decision log (`docs/decisions.md`) D91).
 
 - Page: `/admin/log` ("Napló", sidebar section Platform)
 - Account: `admin@example.test`
@@ -463,7 +463,7 @@ Every organizer and system change leaves an entry (#225, #226, README decision l
 
 ### 32. A pair asks for a substitute, the Szervező approves (after step 11)
 
-Spec section 4, README decision log D109 (#37).
+Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
 
 - Page: a match of step 17 not played yet (`/matches/<id>`), then `/admin/leagues/minta/substitutes` ("Helyettesek" in the sidebar)
 - Accounts: the player of step 17, then `szervezo@example.test`, then one of the opponents
@@ -479,7 +479,7 @@ Spec section 4, README decision log D109 (#37).
 
 ### 33. A player opens a pair's and a player's profile (after step 29)
 
-Profiles, for logged-in members only (#36, README decision log D110, D112).
+Profiles, for logged-in members only (#36, decision log (`docs/decisions.md`) D110, D112).
 
 - Page: `/league/minta`, then a pair's name in a group table
 - Account: none (logged out) first; then the player of step 27, on the league page, Profil and Párom
@@ -494,7 +494,7 @@ Profiles, for logged-in members only (#36, README decision log D110, D112).
 
 ### 34. A player gets strikes; the Szervező cancels one (side path)
 
-The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/24-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (README decision log D103, D103a):
+The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/24-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (decision log (`docs/decisions.md`) D103, D103a):
 
 - Do: `npx wrangler d1 execute DB --local --command "insert into strikes (season_id, user_id, pair_id, source, at) select g.season_id, p.player_a, p.id, 'deadline', unixepoch() from group_pairs gp join groups g on g.id = gp.group_id join pairs p on p.id = gp.pair_id where g.published_at is not null limit 1"` (in `app/`), twice.
 - Page: `/admin/leagues/minta/pairs` as `szervezo@example.test`.
@@ -505,7 +505,7 @@ The deadline resolution (#11) gives strikes from the cron at 06:00 the morning a
 
 ### 35. A player deletes their own account (side path)
 
-The same deletion as step 30, by the player (#38, README decision log D111).
+The same deletion as step 30, by the player (#38, decision log (`docs/decisions.md`) D111).
 
 - Page: `/profile`, section "Fiók törlése" at the bottom
 - Account: the player of step 15 (`uj.jatekos@example.test`; skip step 30, which deletes them), logged in on two browsers; then a player whose pair is in a published group (after step 11); then `admin@example.test`
@@ -517,7 +517,7 @@ The same deletion as step 30, by the player (#38, README decision log D111).
 
 ### 36. A pair reports a no-show; the Szervező confirms the walkover (side path, after step 11)
 
-Spec section 8, README decision log D108 (#33). A past slot can't be proposed, so put an agreed slot two hours ago on a match of step 17 by hand; `app/e2e/25-no-show.spec.ts` runs the same steps.
+Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't be proposed, so put an agreed slot two hours ago on a match of step 17 by hand; `app/e2e/25-no-show.spec.ts` runs the same steps.
 
 - Do: `npx wrangler d1 execute DB --local --command "update matches set status = 'scheduled', scheduled_at = unixepoch() - 7200, revision = revision + 1 where id = <match id>"` (from `app/`).
 - Page: `/matches/<match id>`, then `/admin/leagues/minta/disputes` ("Viták"), then the match's decision page

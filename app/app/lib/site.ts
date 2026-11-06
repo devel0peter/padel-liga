@@ -5,7 +5,7 @@ export const SITE_URL = "https://padelparbaj.hu";
 export const CONTACT_EMAIL = "hello@padelparbaj.hu";
 export const FACEBOOK_URL = "https://www.facebook.com/padelparbaj";
 
-// Data controller named on the privacy page (README decision log, 2026-10-01).
+// Data controller named on the privacy page (decision log, 2026-10-01).
 export const DATA_CONTROLLER = {
   name: "Psionic Flare Kft.",
   taxNumber: "29268782-2-19",

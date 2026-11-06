@@ -17,7 +17,7 @@ import {
   organizerEntryAction,
 } from "./season-entries";
 
-// The first season (README decision log 2026-10-21): registration 2–5 Nov,
+// The first season (decision log 2026-10-21): registration 2–5 Nov,
 // phases from 9 Nov, a break over Christmas. Budapest is UTC+1 in winter.
 const at = (iso: string) => new Date(iso);
 const season = {

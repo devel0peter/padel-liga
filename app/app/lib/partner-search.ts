@@ -1,4 +1,4 @@
-// "Párt keresek" (README decision log, 2026-11-02, D59): a registered player
+// "Párt keresek" (decision log, 2026-11-02, D59): a registered player
 // without a pair asks the organizer for a partner, per league. Pure; the D1
 // side is partner-search.server.ts.
 

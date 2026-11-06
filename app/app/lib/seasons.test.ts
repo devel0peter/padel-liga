@@ -152,7 +152,7 @@ describe("previewPhases", () => {
   });
 });
 
-describe("seasonActions (README decision log, 2026-10-23)", () => {
+describe("seasonActions (decision log, 2026-10-23)", () => {
   it("is editable until the phase 1 groups are published", () => {
     expect(seasonActions({ groupsPublished: false, entries: 5 }).canEdit).toBe(true);
     expect(seasonActions({ groupsPublished: true, entries: 5 }).canEdit).toBe(false);

@@ -1,4 +1,4 @@
-// Season entries ("Nevezünk", #23, spec section 4, README decision log
+// Season entries ("Nevezünk", #23, spec section 4, decision log
 // D17-D19). Pure (no I/O) so every rule is unit tested; the D1 side is
 // season-entries.server.ts.
 //

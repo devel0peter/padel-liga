@@ -3,7 +3,7 @@ import type { OutgoingEmail } from "./sender";
 import { relayConfigured, sendViaRelay } from "./smtp.server";
 import { logWarn } from "~/lib/log";
 
-// Who sends an email (#111, README decision log 2026-10-28): Google's SMTP
+// Who sends an email (#111, decision log 2026-10-28): Google's SMTP
 // relay first; what it refuses or can't take goes through Resend. Without
 // either (local dev) emails are printed to the console.
 

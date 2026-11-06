@@ -18,7 +18,7 @@ export type LandingSeason = Pick<Season, "registrationOpensAt" | "registrationCl
   publishedPhases?: readonly number[];
 };
 
-// When a new pair can next start playing (README decision log, 2026-10-28).
+// When a new pair can next start playing (decision log, 2026-10-28).
 export type Joining =
   | { kind: "round"; number: number; start: Day }
   // The next season's registration window.

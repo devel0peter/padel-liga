@@ -121,7 +121,7 @@ export function previewPhases(firstPhaseStart: string, breaks: { start: string; 
   return phaseCalendar(firstPhaseStart, complete);
 }
 
-// What an organizer may still do with a season (README decision log,
+// What an organizer may still do with a season (decision log,
 // 2026-10-23): edit it until the phase 1 groups are published, delete it
 // while nobody has entered and nothing is published.
 export function seasonActions(state: { groupsPublished: boolean; entries: number }): { canEdit: boolean; canDelete: boolean } {

@@ -121,6 +121,7 @@ const DETAIL_WORDS: [RegExp, string | ((...m: string[]) => string)][] = [
   [/^(\d+) pairs$/, "$1 pár"],
   [/(\d+) groups, (\d+) matches/, "$1 csoport, $2 meccs"],
   [/; (\d+) signups filed/, "; $1 jelentkezés átsorolva"],
+  [/^(\d+) signups, (\d+) emails, (\d+) reminder records$/, "$1 jelentkezés, $2 levél, $3 emlékeztető-bejegyzés"],
   [/listed=true/, "listázva"],
   [/listed=false/, "nem listázva"],
   [/account deleted/, "fióktörlés miatt"],

@@ -1,6 +1,7 @@
 import { deleteStaleLoginCodes, STALE_CODE_BATCH } from "~/lib/auth/login-code.server";
 import { resolveDeadlines } from "~/lib/deadline.server";
 import { DELIVER_MIN, deliver } from "~/lib/email/outbox.server";
+import { PURGE_MIN, purgeInterestList } from "~/lib/interest-list-purge.server";
 import { beginInvocation, logError, logInfo, logWarn } from "~/lib/log";
 import { runMatchReminders } from "~/lib/match-reminders.server";
 import { pushQueued } from "~/lib/notifications.server";
@@ -18,7 +19,9 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // (#11, #294, deadline.server.ts), and once they are settled the next phase's
 // groups drafted for the organizer (#35, round-switch.server.ts), the match reminders and the
 // daily digest when their hour comes (#31), the reminders for people stuck
-// before entering (#155), then the queued pushes and whatever email waits,
+// before entering (#155), the one-time deletion of the interest list until it
+// is done (#334, interest-list-purge.server.ts; before the delivery, so none
+// of its waiting mail goes out), then the queued pushes and whatever email waits,
 // and last the day's push count (push-stats.server.ts, D100) when the run has
 // a query left. A step that fails is logged under its own name and the next
 // one runs anyway.
@@ -38,7 +41,8 @@ const plus = (a: Usage, b: Usage): Usage => ({ queries: a.queries + b.queries, c
 // What pushQueued needs for one round (the queue, the devices, the claim,
 // gone devices, what's left) and one push.
 const PUSH_MIN: Usage = { queries: 5, calls: 1 };
-const AFTER_STUCK = plus(PUSH_MIN, DELIVER_MIN);
+const AFTER_PURGE = plus(PUSH_MIN, DELIVER_MIN);
+const AFTER_STUCK = plus(PURGE_MIN, AFTER_PURGE);
 const AFTER_MATCH = plus({ queries: STUCK_QUERIES, calls: 0 }, AFTER_STUCK);
 // The match reminders' own lookups (running matches and one batch), so a
 // long deadline run never starves them.
@@ -92,6 +96,12 @@ export const CRON_STEPS: readonly CronStep[] = [
       const n = await queueDueReminders(now);
       return n ? `queued ${n} reminders` : null;
     },
+  },
+  {
+    // Chunks while the run has room beyond what delivery needs; a query a
+    // run until it sees the done mark, then none (#334).
+    name: "interest list deletion",
+    run: (now, run) => purgeInterestList(now, { run, keep: AFTER_PURGE }),
   },
   {
     name: "push delivery",

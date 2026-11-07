@@ -83,7 +83,7 @@ export function PlayerProfileView({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           <Card role="region" aria-label="Meccsek">
             <CardHeader>
-              <CardTitle className="font-display text-lg font-bold">Meccsek</CardTitle>
+              <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">Meccsek</CardTitle>
             </CardHeader>
             <CardContent>
               {started ? (
@@ -97,7 +97,7 @@ export function PlayerProfileView({
             {started && p.eloHistory.length > 1 && (
               <Card role="region" aria-label="Élő-pont alakulása">
                 <CardHeader>
-                  <CardTitle className="font-display text-lg font-bold">Élő-pont alakulása</CardTitle>
+                  <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">Élő-pont alakulása</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <EloChart points={p.eloHistory} />
@@ -106,7 +106,7 @@ export function PlayerProfileView({
             )}
             <Card role="region" aria-label={own ? "Párosod" : "Párosa"}>
               <CardHeader>
-                <CardTitle className="font-display text-lg font-bold">
+                <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">
                   {own ? (p.pairs.length > 1 ? "Párosaid" : "Párosod") : p.pairs.length > 1 ? "Párosai" : "Párosa"}
                 </CardTitle>
               </CardHeader>

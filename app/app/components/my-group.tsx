@@ -92,7 +92,7 @@ export function Todos({ items }: { items: Todo[] }) {
   return (
     <Card role="region" aria-labelledby="teendok" className="ring-nav-active/40">
       <CardHeader>
-        <CardTitle id="teendok" className="font-display text-lg font-bold">
+        <CardTitle role="heading" aria-level={2} id="teendok" className="font-display text-lg font-bold">
           Teendők
         </CardTitle>
       </CardHeader>
@@ -143,7 +143,7 @@ function WeekRow({ g, week, current, open }: { g: HomeGroup; week: number; curre
       <li className="grid gap-0.5 py-3">
         {head}
         <p className="text-sm text-muted-foreground">
-          {off ? `${off.opponents} visszalépett: ez a meccs elmarad, és nem számít.` : "Pihenőhét: ezen a héten nem játszotok."}
+          {off ? `${off.opponents} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.` : "Pihenőhét: ezen a héten nem játszotok."}
         </p>
       </li>
     );
@@ -188,7 +188,7 @@ export function MyMatches({ group: g, multiLeague }: { group: HomeGroup; multiLe
   return (
     <Card role="region" aria-labelledby={`meccseitek-${g.groupId}`}>
       <CardHeader>
-        <CardTitle id={`meccseitek-${g.groupId}`} className="font-display text-lg font-bold">
+        <CardTitle role="heading" aria-level={2} id={`meccseitek-${g.groupId}`} className="font-display text-lg font-bold">
           Meccseitek{multiLeague ? ` · ${g.league}` : ""}
         </CardTitle>
         <CardDescription>
@@ -215,7 +215,7 @@ export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; mul
   return (
     <Card role="region" aria-label={title}>
       <CardHeader>
-        <CardTitle className="font-display text-lg font-bold">{title}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
         <CardDescription>
           {multiLeague ? `${g.league}, ` : ""}
           {g.season}, {g.phase}. kör. {capitalize(g.standing)}.

@@ -85,6 +85,7 @@ test("a first season opens without dates and starts by itself at the minimum ent
   // The league page is for logged-in players only (D134): the Admin's view.
   await visit(page, `/league/${LEAGUE.slug}`);
   await expect(content(page)).toContainText("2 pár nevezett, még 1 kell, utána indul.");
+  await visit(page, `/admin/leagues/${LEAGUE.slug}/pairs`);
   expect(d1(`select count(*) as n from email_messages where kind = 'season_start'`)).toEqual([{ n: 0 }]);
 
   // The third entry reaches the minimum: round 1 is fixed, everyone is told once.

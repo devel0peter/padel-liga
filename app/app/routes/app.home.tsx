@@ -152,7 +152,7 @@ function ChooseLeague({ choices, offered }: { choices: { id: number; city: strin
   return (
     <Card className="max-w-2xl border-nav-active">
       <CardHeader>
-        <CardTitle className="font-display text-lg">{offered ? OFFER_LEAGUE_TITLE : CHOOSE_LEAGUE_TITLE}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg">{offered ? OFFER_LEAGUE_TITLE : CHOOSE_LEAGUE_TITLE}</CardTitle>
         <CardDescription>{offered ? OFFER_LEAGUE_TEXT : CHOOSE_LEAGUE_TEXT}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -211,7 +211,7 @@ function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolea
   return (
     <Card size={running ? "sm" : "default"} className={running ? undefined : "max-w-2xl"}>
       <CardHeader>
-        <CardTitle className="font-display text-lg font-bold">{s.name}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{s.name}</CardTitle>
         <CardDescription>{s.league}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm">

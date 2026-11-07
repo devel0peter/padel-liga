@@ -177,7 +177,7 @@ function Block({ id, title, description, children }: { id?: string; title: strin
   return (
     <Card role="region" id={id} aria-label={title} className="scroll-mt-6">
       <CardHeader>
-        <CardTitle className="font-display text-lg font-bold">{title}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="grid gap-4">{children}</CardContent>

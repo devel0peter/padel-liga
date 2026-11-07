@@ -24,7 +24,7 @@ test("the landing page doesn't link the league page, and a visitor must log in (
 test("a player opens the Tabella from the sidebar: the groups, their tables, and the matches in a side panel", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/home");
-  await page.getByRole("navigation").getByRole("link", { name: "Tabella" }).first().click();
+  await page.getByRole("link", { name: "Tabella", exact: true }).locator("visible=true").first().click();
   await expect(page).toHaveURL(/\/league\/minta$/);
   const main = content(page);
   await expect(main.getByRole("heading", { level: 1 })).toHaveText("Tabella");
@@ -84,7 +84,8 @@ test("no email, phone number or Élő-pont anywhere on the page", async ({ brows
   const { context, page } = await as(browser, anna);
   await visit(page, "/league/minta");
   const html = await page.content();
-  for (const player of GROUP_PAIRS.flat()) expect(html).not.toContain(player.email);
+  // The viewer's own address is in the app shell's account menu: not a player's on the page.
+  for (const player of GROUP_PAIRS.flat().filter((p) => p.email !== anna.email)) expect(html).not.toContain(player.email);
   await expect(content(page)).not.toContainText("@");
   await expect(content(page)).not.toContainText(/\+36|\b06[ -]?\d{2}/);
   await expect(content(page)).not.toContainText("Élő-pont");

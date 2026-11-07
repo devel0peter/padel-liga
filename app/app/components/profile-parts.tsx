@@ -32,7 +32,7 @@ export function Card({ title, children, label }: { title: string; children: Reac
   return (
     <UiCard role="region" aria-label={label ?? title}>
       <CardHeader>
-        <CardTitle className="font-display text-lg font-bold">{title}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">{children}</CardContent>
     </UiCard>

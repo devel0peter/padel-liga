@@ -19,7 +19,7 @@ test("33a. a visitor must log in for the Ranglista", async ({ browser }) => {
 test("33a. before round 1 starts the Ranglista shows no rating", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/home");
-  await page.getByRole("navigation").getByRole("link", { name: "Ranglista" }).first().click();
+  await page.getByRole("link", { name: "Ranglista", exact: true }).locator("visible=true").first().click();
   await expect(page).toHaveURL(/\/league\/minta\/rankings$/);
   await expect(content(page)).toContainText("Az Élő-pontok a liga indulása után látszanak itt.");
   await expect(content(page).getByRole("table")).toHaveCount(0);

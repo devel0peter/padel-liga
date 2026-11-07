@@ -49,7 +49,7 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
   return (
     <Card role="region" aria-label={`${group.number}. csoport`} className={group.mine ? "ring-2 ring-nav-active/60" : undefined}>
       <CardHeader>
-        <CardTitle className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
         <CardDescription className="flex items-center gap-1.5">
           <span aria-hidden className={`size-2 rounded-full ${DOT[division]}`} />
           {label}
@@ -124,7 +124,7 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
       <AppPage title="Tabella" description={where}>
         <Card className="max-w-2xl">
           <CardHeader>
-            <CardTitle className="font-display text-lg font-bold">Még nincsenek kint a csoportok</CardTitle>
+            <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">Még nincsenek kint a csoportok</CardTitle>
           </CardHeader>
           <CardContent>
             <p>

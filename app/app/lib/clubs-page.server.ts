@@ -5,13 +5,11 @@ import type { ClubsActionData, ClubsData, ClubsScope } from "~/components/clubs-
 import { db } from "~/db/client.server";
 import { clubs as clubsTable } from "~/db/schema";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { can } from "~/lib/auth/permissions";
 import { cityName } from "~/lib/cities";
 import { listCities } from "~/lib/cities.server";
-import { countBy, OTHER_CLUB, parseClub } from "~/lib/clubs";
+import { parseClub } from "~/lib/clubs";
 import { createClub, deleteClub, listClubs, setClubActive, slugTaken, updateClub } from "~/lib/clubs.server";
 import { getLeague } from "~/lib/leagues.server";
-import { listSignups } from "~/lib/signups-admin.server";
 
 // Data and writes behind app/components/clubs-page.tsx. With a league slug:
 // that league's city only, for its Szervezők (and the Admin). Without: every
@@ -30,35 +28,19 @@ export async function clubsScope(request: Request, leagueSlug?: string): Promise
       city: league.city,
       cityName: cityName(league.city, await listCities()),
       base: `/admin/leagues/${league.slug}/clubs`,
-      canSeeSignups: can(actor, { kind: "signups.manage" }),
-      canPrintGeneral: can(actor, { kind: "signups.manage" }),
       actorId: actor.id,
     };
   }
   const actor = await requirePermission(request, { kind: "clubs.manage" });
-  return { city: null, cityName: null, base: "/admin/clubs", canSeeSignups: true, canPrintGeneral: true, actorId: actor.id };
+  return { city: null, cityName: null, base: "/admin/clubs", actorId: actor.id };
 }
 
 export async function clubsData({ actorId: _, ...scope }: ServerClubsScope): Promise<ClubsData> {
-  const [allClubs, allSignups, cities] = await Promise.all([listClubs(), listSignups(), listCities()]);
-  const inScope = <T extends { city: string }>(rows: T[]) => (scope.city ? rows.filter((r) => r.city === scope.city) : rows);
-  const clubs = inScope(allClubs);
-  const signups = inScope(allSignups);
-  const refs = countBy(signups, "ref");
-  const plays = countBy(signups, "homeClub");
-  const clubSlugs = new Set(allClubs.map((c) => c.slug));
-  // Refs that aren't a club, e.g. a tournament flyer's "?ref=verseny".
-  const otherRefs = Object.entries(refs).filter(([ref]) => ref !== "" && !clubSlugs.has(ref));
+  const [allClubs, cities] = await Promise.all([listClubs(), listCities()]);
   return {
     scope,
     cities: cities.map(({ slug, name }) => ({ slug, name })),
-    clubs,
-    refs,
-    plays,
-    otherRefs,
-    noRef: refs[""] ?? 0,
-    playsOther: plays[OTHER_CLUB] ?? 0,
-    playsUnknown: plays[""] ?? 0,
+    clubs: scope.city ? allClubs.filter((c) => c.city === scope.city) : allClubs,
   };
 }
 

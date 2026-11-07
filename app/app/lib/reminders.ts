@@ -3,31 +3,30 @@
 // once-only and deadline rules are unit tested; the D1 side is
 // reminders.server.ts, the texts are in email/templates.ts.
 //
-// Four situations, each reminded once (D once per pair and season):
-//   A  on the interest list, got the registration invite, no account, 2 days
+// Three situations, each reminded once (D once per pair and season):
 //   B  started an account (first login), first-login page not done, 24 hours
 //   C  registered, no pair in the league, "Párt keresek" off, 2 days
 //   D  active pair, no entry in the season accepting entries, 2 days
-// Only while the league has a season accepting entries (registration opened,
-// last phase not started), since every reminder gives its dates. When its
-// registration deadline is under 24 hours away, a reminder goes out after 24
-// hours instead of its full waiting time, never sooner (#191). A person gets
-// at most one reminder per league season, whatever the situation (#191, by
-// address): due in two, they get the earlier one's (A before B before C
-// before D) and never the other that season; D then goes to the other player
-// only.
+// (A, an invited address on the interest list without an account, went with
+// the list: #333, D129. Its old records stay in stuck_reminders.)
+// Only for the leagues a person belongs to (D128), and only while the league
+// has a season accepting entries (registration opened, last phase not
+// started), since every reminder gives its dates. When its registration
+// deadline is under 24 hours away, a reminder goes out after 24 hours instead
+// of its full waiting time, never sooner (#191). A person gets at most one
+// reminder per league season, whatever the situation (#191, by address): due
+// in two, they get the earlier one's (B before C before D) and never the
+// other that season; D then goes to the other player only.
 
-import { inLeagueCity, signupCities } from "./league-players";
-import { defaultSeekers, isSeeking } from "./partner-search";
+import { isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
 import { homeSeasons, type Season } from "./seasons";
 
-export const SITUATIONS = ["A", "B", "C", "D"] as const;
+export const SITUATIONS = ["B", "C", "D"] as const;
 export type Situation = (typeof SITUATIONS)[number];
 
 // How the switch page names them.
 export const SITUATION_LABELS: Record<Situation, string> = {
-  A: "Meghívót kapott, nem regisztrált",
   B: "Félbehagyta a regisztrációt",
   C: "Regisztrált, nincs párja",
   D: "Van párja, nem nevezett",
@@ -37,7 +36,7 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
 // How long someone is in a situation before the reminder.
-export const WAIT_MS: Record<Situation, number> = { A: 2 * DAY, B: DAY, C: 2 * DAY, D: 2 * DAY };
+export const WAIT_MS: Record<Situation, number> = { B: DAY, C: 2 * DAY, D: 2 * DAY };
 // Under this before the registration deadline, the reminder waits only
 // MIN_WAIT_MS.
 export const DEADLINE_RUSH_MS = DAY;
@@ -45,20 +44,6 @@ export const DEADLINE_RUSH_MS = DAY;
 export const MIN_WAIT_MS = DAY;
 
 export type ReminderLeague = { id: number; city: string; name: string };
-
-export type ReminderSignup = {
-  id: number;
-  mode: "pair" | "solo";
-  city: string;
-  status: string;
-  name1: string;
-  email1: string;
-  name2: string | null;
-  email2: string | null;
-  pairedWith: number | null;
-  invitedAt: Date | null;
-  invited2At: Date | null;
-};
 
 export type ReminderAccount = {
   id: string;
@@ -87,8 +72,9 @@ export type ReminderInput = {
   // The leagues players can play in (listed cities), with their seasons.
   leagues: readonly ReminderLeague[];
   seasons: readonly Season[];
-  signups: readonly ReminderSignup[];
   accounts: readonly ReminderAccount[];
+  // The league_members rows (D128); a pair of the league counts too.
+  members: readonly { leagueId: number; userId: string }[];
   pairs: readonly ReminderPair[];
   // Every season entry, whatever its status: an entry pending approval or
   // rejected isn't reminded either.
@@ -105,9 +91,7 @@ export type ReminderInput = {
 export type ReminderRecipient = {
   email: string;
   name: string;
-  userId: string | null;
-  // A: the partner of the pair signup, when they already registered.
-  // C: the partner the signup names, when they haven't registered.
+  userId: string;
   // D: the other player of the pair.
   partner: string | null;
 };
@@ -120,15 +104,14 @@ export type Reminder = {
   recipients: ReminderRecipient[];
 };
 
-// What makes a reminder once-only: A per address, B and C per account, D per
-// pair and season.
+// What makes a reminder once-only: B and C per account, D per pair and
+// season.
 export function reminderKey(situation: Situation, id: string | number, seasonId?: number): string {
   return situation === "D" ? `D:${id}:${seasonId}` : `${situation}:${id}`;
 }
 
 // What makes a person reminded for the season (#191): the season and the
-// address, lowercase. A invites an address without an account, so the
-// address is what A, B, C and D share.
+// address, lowercase.
 export function personKey(seasonId: number, email: string): string {
   return `${seasonId}:${email.toLowerCase()}`;
 }
@@ -168,18 +151,16 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   }
   if (seasonOf.size === 0) return [];
 
-  const accountByEmail = new Map(input.accounts.map((a) => [a.email, a]));
   const accountById = new Map(input.accounts.map((a) => [a.id, a]));
-  const registered = (email: string | null) => !!email && !!accountByEmail.get(email.toLowerCase())?.consentAt;
-  const live = input.signups.filter((s) => s.status !== "withdrawn");
-  const leaguesInCity = (city: string) => enabled.filter((l) => l.city === city && seasonOf.has(l.id));
-  // An account's leagues (league-players.ts, D73, D93): those of its signups'
-  // cities, or, without a signup, every league. Signups only in cities
-  // without a league: none. A withdrawn signup still says where: the account
-  // counts over the signup (signup-progress.ts).
-  const cities = signupCities(input.signups);
-  const accountLeagues = (email: string): ReminderLeague[] =>
-    enabled.filter((l) => inLeagueCity(cities, email, l.city) && seasonOf.has(l.id));
+  // An account's leagues (D128, league-members.server.ts): those it joined
+  // (the register button joins at login, before the first-login page, so B
+  // knows it) or has a pair in. In none: no reminder.
+  const memberOf = new Set([
+    ...input.members.map((m) => `${m.leagueId}:${m.userId}`),
+    ...input.pairs.flatMap((p) => [`${p.leagueId}:${p.playerA}`, `${p.leagueId}:${p.playerB}`]),
+  ]);
+  const accountLeagues = (id: string): ReminderLeague[] =>
+    enabled.filter((l) => memberOf.has(`${l.id}:${id}`) && seasonOf.has(l.id));
   const mailable = (email: string, account?: ReminderAccount) =>
     !input.suppressed.has(email) && !account?.admin && !account?.emailOff;
 
@@ -192,41 +173,10 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
     out.push({ ...r, recipients });
   };
 
-  // A: invited addresses without an account, by their earliest invite.
-  const invited = new Map<string, { at: Date; name: string; city: string; partner: string | null }>();
-  for (const s of live) {
-    const sides: [string | null, string | null, Date | null, string | null, string | null][] = [
-      [s.email1, s.name1, s.invitedAt, s.email2, s.name2],
-      [s.mode === "pair" ? s.email2 : null, s.name2, s.invited2At, s.email1, s.name1],
-    ];
-    for (const [email, name, at, partnerEmail, partnerName] of sides) {
-      if (!email || !at) continue;
-      const key = email.toLowerCase();
-      const partner = s.mode === "pair" && partnerName && registered(partnerEmail) ? partnerName : null;
-      const seen = invited.get(key);
-      if (!seen || at < seen.at)
-        invited.set(key, { at, name: name ?? "", city: s.city, partner: partner ?? seen?.partner ?? null });
-      else if (partner && !seen.partner) seen.partner = partner;
-    }
-  }
-  for (const [email, p] of [...invited].sort(([a], [b]) => a.localeCompare(b))) {
-    if (accountByEmail.has(email) || !mailable(email)) continue;
-    const league = leaguesInCity(p.city)[0];
-    const season = league && seasonOf.get(league.id);
-    if (!league || !season || !isDue("A", p.at, season, now)) continue;
-    add({
-      situation: "A",
-      key: reminderKey("A", email),
-      leagueId: league.id,
-      season,
-      recipients: [{ email, name: p.name, userId: null, partner: p.partner }],
-    });
-  }
-
   // B: accounts that never finished the first-login page.
   for (const a of input.accounts) {
     if (a.consentAt || !mailable(a.email, a)) continue;
-    const league = accountLeagues(a.email)[0];
+    const league = accountLeagues(a.id)[0];
     const season = league && seasonOf.get(league.id);
     if (!league || !season || !isDue("B", a.createdAt, season, now)) continue;
     add({
@@ -238,23 +188,17 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
     });
   }
 
-  // C: registered players without a pair in one of their leagues.
+  // C: registered players without a pair in one of their leagues, "Párt
+  // keresek" off (its default since #333).
   const active = input.pairs.filter((p) => p.status === "active");
   const inPair = (userId: string, leagueId: number) =>
     active.some((p) => p.leagueId === leagueId && (p.playerA === userId || p.playerB === userId));
-  // "Párt keresek" is on by default for a solo signup still waiting (D59).
-  const registeredEmails = new Set(input.accounts.filter((a) => a.consentAt).map((a) => a.email));
-  const seekersByCity = new Map<string, Map<string, ReminderSignup>>();
-  const waitingSolo = (email: string, city: string) => {
-    if (!seekersByCity.has(city)) seekersByCity.set(city, defaultSeekers(input.signups, city, registeredEmails));
-    return seekersByCity.get(city)!.has(email);
-  };
   for (const a of input.accounts) {
     if (!a.consentAt || !mailable(a.email, a)) continue;
-    for (const league of accountLeagues(a.email)) {
+    for (const league of accountLeagues(a.id)) {
       if (inPair(a.id, league.id)) continue;
       const stored = input.partnerSearches.find((s) => s.leagueId === league.id && s.userId === a.id);
-      if (isSeeking(stored?.seeking, waitingSolo(a.email, league.city))) continue;
+      if (isSeeking(stored?.seeking)) continue;
       const dissolved = input.pairs
         .filter((p) => p.leagueId === league.id && (p.playerA === a.id || p.playerB === a.id))
         .map((p) => p.dissolvedAt);
@@ -266,7 +210,7 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
         key: reminderKey("C", a.id),
         leagueId: league.id,
         season,
-        recipients: [{ email: a.email, name: a.name, userId: a.id, partner: unregisteredPartner(live, a.email, registered) }],
+        recipients: [{ email: a.email, name: a.name, userId: a.id, partner: null }],
       });
       break;
     }
@@ -293,23 +237,9 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   return out;
 }
 
-// The partner a pair signup names who hasn't registered yet (C), by name.
-function unregisteredPartner(
-  signups: readonly ReminderSignup[],
-  email: string,
-  registered: (email: string | null) => boolean,
-): string | null {
-  for (const s of signups) {
-    if (s.mode !== "pair") continue;
-    if (s.email1.toLowerCase() === email && s.name2 && !registered(s.email2)) return s.name2;
-    if (s.email2?.toLowerCase() === email && !registered(s.email1)) return s.name1;
-  }
-  return null;
-}
-
 // How many people each reminder reaches.
 export function countBySituation(reminders: readonly Reminder[]): Record<Situation, number> {
-  const counts = { A: 0, B: 0, C: 0, D: 0 };
+  const counts = { B: 0, C: 0, D: 0 };
   for (const r of reminders) counts[r.situation] += r.recipients.length;
   return counts;
 }

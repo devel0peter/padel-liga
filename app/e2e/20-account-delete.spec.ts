@@ -33,9 +33,7 @@ test("Törlés: an account without history is removed with its signup", async ({
   await expect(content(page).getByRole("status")).toHaveText("A fiók törölve.");
   await expect(page.getByRole("row").filter({ hasText: TEST.name })).toHaveCount(0);
 
-  // Gone from Jelentkezők too, and from the database.
-  await visit(page, `/admin/signups?q=${encodeURIComponent(TEST.name)}`);
-  await expect(page.getByRole("row").filter({ hasText: TEST.name })).toHaveCount(0);
+  // Gone from the database, its signup too (#334 deletes the rest of the list).
   expect(d1(`select count(*) as n from users where email = '${TEST.email}'`)[0].n).toBe(0);
   expect(d1(`select count(*) as n from interest_signups where email1 = '${TEST.email}'`)[0].n).toBe(0);
   expect(d1("select count(*) as n from email_messages")[0].n).toBe(emailsBefore);

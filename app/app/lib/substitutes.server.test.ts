@@ -33,10 +33,10 @@ const AFTER = at("2026-11-12T20:00:00Z");
 const WIN_A = { sets: [[4, 1], [4, 2]] } as const;
 
 // League 1 (Győr), group 1: pairs 1 (a–b), 2 (c–d), 3 (e–f), 4 (g–h).
-// Match 1: pair 1 – pair 2, open. Outsiders: s (registered, Győr signup,
-// kezdő), t (registered, no signup: every league), w (registered, Budapest
-// signup only), x (first login not done), z (deleted). o: the Szervező,
-// adm: an Admin, q: Szervező of league 2.
+// Match 1: pair 1 – pair 2, open. Outsiders who joined league 1 (D128): s
+// (kezdő), t, x (first login not done); w joined league 2 only; z (deleted).
+// o: the Szervező, adm: an Admin, q: Szervező of league 2; all three joined
+// league 1 too.
 function freshDb() {
   h.raw = migratedDatabase();
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1), ('budapest', 'Budapest', 1)`);
@@ -48,8 +48,7 @@ function freshDb() {
   h.raw.exec(`insert into users (id, email, name, level) values ('x', 'x@x.hu', 'Játékos X', 'halado')`);
   h.raw.exec(`insert into users (id, email, name, level, consent_at, deleted_at) values ('z', 'z@deleted.invalid', 'Törölt játékos', 'halado', 1, 1)`);
   h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o'), (2, 'q')`);
-  h.raw.exec(`insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'S', 's@x.hu', 'gyor', 'kezdo', 1)`);
-  h.raw.exec(`insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'W', 'w@x.hu', 'budapest', 'kezdo', 1)`);
+  h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 's', 'chosen'), (1, 't', 'register'), (1, 'o', 'carried'), (1, 'adm', 'carried'), (1, 'q', 'chosen'), (1, 'x', 'register'), (2, 'w', 'chosen')`);
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (1, 1, 'a', 'b'), (2, 1, 'c', 'd'), (3, 1, 'e', 'f'), (4, 1, 'g', 'h')`);
   h.raw
     .prepare(
@@ -107,8 +106,8 @@ describe("asking for a substitute (#37 requirement 1)", () => {
     expect(p.open).toBe(true);
     expect(p.form!.absent.map((x) => x.id)).toEqual(["a", "b"]);
     const ids = p.form!.candidates.map((c) => c.id);
-    // s (Győr signup) and t (no signup) and the staff; never the group's
-    // players, w (Budapest only), x (not registered) or z (deleted).
+    // s and t and the staff (joined league 1, D128); never the group's
+    // players, w (league 2 only), x (not registered) or z (deleted).
     expect(ids).toEqual(expect.arrayContaining(["s", "t", "o", "adm", "q"]));
     for (const id of ["a", "b", "c", "d", "e", "f", "g", "h", "w", "x", "z"]) expect(ids).not.toContain(id);
     expect(Object.keys(p.form!.candidates[0]!).sort()).toEqual(["id", "name"]);

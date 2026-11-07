@@ -48,6 +48,7 @@ function freshDb() {
       .prepare("insert into users (id, email, name, level, phone, sex, image_url, consent_at, last_login_at) values (?, ?, ?, 'halado', '+36301234567', 'female', 'http://img', 1, 1)")
       .run(id, `${id}@x.hu`, id.toUpperCase());
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (1, 1, 'a', 'b'), (2, 1, 'c', 'd')`);
+  h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'pair'), (1, 'b', 'pair'), (1, 'c', 'pair'), (1, 'd', 'pair')`);
   h.raw
     .prepare("insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Tél', ?, ?, '2026-11-09')")
     .run(sec("2026-10-28T23:00:00Z"), sec("2026-11-06T22:59:00Z"));
@@ -139,6 +140,7 @@ function personalRowsLeft() {
     optOuts: n("select count(*) from notification_opt_outs where user_id = 'a'"),
     pairLinks: n("select count(*) from pair_links where owner_id = 'a'"),
     partnerSearch: n("select count(*) from partner_searches where user_id = 'a'"),
+    leagues: n("select count(*) from league_members where user_id = 'a'"),
     organizer: n("select count(*) from league_admins where user_id = 'a'"),
     loginCodes: n("select count(*) from login_codes where email = 'a@x.hu'"),
     invites: n("select count(*) from account_invites where email = 'a@x.hu'"),
@@ -158,6 +160,7 @@ const NONE = {
   optOuts: 0,
   pairLinks: 0,
   partnerSearch: 0,
+  leagues: 0,
   organizer: 0,
   loginCodes: 0,
   invites: 0,
@@ -196,7 +199,7 @@ describe("deleting an account (#152)", () => {
     // The pair and its entry are gone; the partner is a player without a pair.
     expect(n("select count(*) from pairs where id = 1")).toBe(0);
     expect(n("select count(*) from season_entries where pair_id = 1")).toBe(0);
-    expect((await pairCandidates({ id: 1, city: "gyor" })).map((c) => c.id)).toContain("b");
+    expect((await pairCandidates({ id: 1 })).map((c) => c.id)).toContain("b");
     expect(personalRowsLeft()).toEqual(NONE);
     interestListAfter();
     // Logged by who and when, without the name or email.
@@ -325,7 +328,7 @@ describe("deleting an account (#152)", () => {
     // No contact data, no way to log in, gone from lists.
     expect(personalRowsLeft()).toEqual(NONE);
     interestListAfter();
-    expect((await pairCandidates({ id: 1, city: "gyor" })).map((c) => c.id)).not.toContain("a");
+    expect((await pairCandidates({ id: 1 })).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
     // Párok still lists the dissolved pair, but "Levél nekik" doesn't write to them.
     const audience = (await leaguePairsAudience({ id: 1, city: "gyor", name: "Padelpárbaj Győr" }, { entry: null, q: "" })).people;

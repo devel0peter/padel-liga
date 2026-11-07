@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = {
   "season_entry.withdraw": "Kivétel kihirdetett csoportból",
   "partner_search.on": "Párkeresés be",
   "partner_search.off": "Párkeresés ki",
+  "league.join": "Csatlakozás ligához",
   // Interest list
   "signup.update": "Jelentkezés módosítása",
   "signup.delete": "Jelentkezés törlése",

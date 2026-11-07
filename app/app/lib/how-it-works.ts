@@ -1,5 +1,5 @@
-// "Hogyan működik?": the steps on the landing page (home.tsx) and on the
-// printed poster (admin.poster.tsx). One text for both, so they never differ.
+// "Hogyan működik?": the steps on the landing page (home.tsx). (The printed
+// poster that showed them too went with #333.)
 
 export const STEPS: [title: string, text: string][] = [
   ["Párban vagy egyedül", "Ha még nincs párod, írd fel magad egyedül, és segítünk párt találni."],

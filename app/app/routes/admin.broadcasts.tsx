@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import type { Route } from "./+types/admin.broadcasts";
 import { AppPage } from "~/components/app-page";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import {
   Table,
   TableBody,
@@ -29,15 +28,9 @@ export default function AdminBroadcasts({ loaderData }: Route.ComponentProps) {
     <AppPage
       title="Körlevelek"
       description={<>{unsubscribed} leiratkozott cím, nekik nem megy körlevél.</>}
-      actions={
-        <Button asChild>
-          <Link to="/admin/broadcasts/new">Új körlevél</Link>
-        </Button>
-      }
     >
       <p className="text-sm text-muted-foreground">
-        Címzetteket a <Link to="/admin/signups" className="underline">Jelentkezők</Link> oldalon szűrhetsz,
-        onnan a „Levél nekik” gombbal. Az új körlevél a háttérben indul: az első {SEND_NOW_MAX} levél rögtön, a többi tízpercenként; hogy hol tart, a{" "}
+        Új körlevelet egy liga Párok oldaláról indíthatsz: szűrd a játékosokat, és nyomd meg a „Levél nekik” gombot. Az új körlevél a háttérben indul: az első {SEND_NOW_MAX} levél rögtön, a többi tízpercenként; hogy hol tart, a{" "}
         <Link to="/admin/outbox" className="underline">Kimenő levelek</Link> oldalon látod.
         Naponta legfeljebb {limit} levél megy ki; a többi a következő napokon automatikusan.
       </p>

@@ -3,7 +3,7 @@
 // seed's season has registration open and round 1 about two weeks out.
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, as, visit } from "./support";
+import { ADMIN, as, d1, visit } from "./support";
 
 test("the hero shows a league city's league and leads to registration", async ({ browser }) => {
   const page = await browser.newPage();
@@ -23,8 +23,9 @@ test("the hero shows a league city's league and leads to registration", async ({
   await expect(page.getByText("Ahol már fut a liga, nevezhetsz rögtön")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/12 pár|elég pár/);
 
+  // The button carries the league, so the new account joins it (D128, #331).
   await league.getByRole("link", { name: "Nevezek a 2. körre" }).click();
-  await expect(page).toHaveURL(/\/register$/);
+  await expect(page).toHaveURL(/\/register\?league=minta$/);
   await expect(page.getByRole("heading", { name: "Regisztráció" })).toBeVisible();
   await page.close();
 });
@@ -60,14 +61,11 @@ test("another city leaves contact details, and can offer to organize", async ({ 
   await page.getByRole("button", { name: "Szóljatok, ha indul" }).click();
   await expect(page.getByText(/Köszönjük! Felírtunk \(Tesztfalva\)/)).toBeVisible();
   await expect(page.getByText(/Köszönjük!/)).toContainText("szívesen szerveznél");
-
-  const admin = await as(browser, ADMIN.email);
-  await visit(admin.page, "/admin/signups");
-  const row = admin.page.getByRole("row").filter({ hasText: "landing.teszt@example.test" });
-  await expect(row).toContainText("Tesztfalva");
-  await expect(row).toContainText("Szervezne ligát");
-  await expect(row).not.toContainText("párt keres");
-  await admin.context.close();
+  // Stored, but no admin page reads it any more (#333), and nobody is told in the app.
+  expect(d1("select city, city_other, wants_to_organize from interest_signups where email1 = 'landing.teszt@example.test'")).toEqual([
+    { city: "other", city_other: "Tesztfalva", wants_to_organize: 1 },
+  ]);
+  expect(d1("select count(*) as n from notifications where title like 'Új jelentkező%'")).toEqual([{ n: 0 }]);
   await page.close();
 });
 
@@ -112,11 +110,15 @@ test("the public pages do not scroll sideways at 360 px", async ({ browser }) =>
   await admin.context.close();
 });
 
-// The poster (#120) no longer ties the start to a number of pairs.
-test("the poster doesn't make the start depend on pairs", async ({ browser }) => {
+// Jelentkezők, the poster and the signup CSV went with the interest list
+// (#333): their old addresses lead to the admin home, and the menu has no
+// Jelentkezők.
+test("the interest list's admin pages are gone; their addresses lead to the admin home", async ({ browser }) => {
   const { context, page } = await as(browser, ADMIN.email);
-  await visit(page, "/admin/poster");
-  await expect(page.locator("article")).toContainText("Nevezz a pároddal, és már a következő körtől játszotok.");
-  await expect(page.locator("article")).not.toContainText(/12 pár|összegyűlik/);
+  for (const path of ["/admin/signups", "/admin/signups?stage=no_pair", "/admin/poster", "/admin/poster?ref=minta-padel-arena", "/admin/export.csv"]) {
+    await visit(page, path);
+    await expect(page, path).toHaveURL(/\/admin\/leagues$/);
+  }
+  await expect(page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Jelentkezők" })).toHaveCount(0);
   await context.close();
 });

@@ -2,14 +2,13 @@
 // browser. Every email has an HTML and a plain-text version.
 
 import type { City } from "../cities";
-import { formatDeadline, formatOnDate, formatShortDate, formatUntilDate, formatWeekdayDate } from "../format";
+import { formatDeadline, formatShortDate, formatWeekdayDate } from "../format";
 import { withArticle } from "../groups";
 import type { InterestSignup } from "../interest";
 import { cityLabel, levelLabel } from "../signups-admin";
 import { SHARE_REFS, shareUrl } from "../share";
-import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "../site";
+import { SITE_NAME, SITE_URL } from "../site";
 
-import type { InviteStart } from "./audience";
 
 export type Email = { subject: string; html: string; text: string };
 
@@ -134,46 +133,10 @@ export function signupConfirmation(s: InterestSignup, cities: Cities = []): Emai
   );
 }
 
-// The subject names the signer, and subjects stay in the outbox log: an
-// account deletion (#152) finds the rows by it.
+// The partner notice's subject (the notice itself went with #333, D129): it
+// named the signer, and subjects stay in the outbox log, so an account
+// deletion (#152) still finds the old rows by it.
 export const partnerNoticeSubject = (name1: string) => `${name1} jelentkeztetett titeket a ${SITE_NAME}ra`;
-
-// Spec section 17: the partner gets exactly one email, so they know about the
-// signup and can ask for deletion.
-export function partnerNotice(s: InterestSignup, cities: Cities = []): Email {
-  if (!s.name2) throw new Error("partnerNotice needs a partner");
-  return build(
-    partnerNoticeSubject(s.name1),
-    [
-      `Szia ${s.name2}!`,
-      `${s.name1} párként jelentkeztetett kettőtöket a ${SITE_NAME}ra (${cityLabel(s, cities)}), és megadta a neved és az e-mail-címed.`,
-      `A ${SITE_NAME} pároknak szól: szint szerinti, 3-4 páros csoportok, heti egy meccs, feljutás és kiesés. Részletek: ${SITE_URL}`,
-      // As on the privacy page: the registration invite is the only other email.
-      `Ha nem tudsz róla, vagy nem szeretnéd, válaszolj erre a levélre, és töröljük az adataidat. Amikor indul a regisztráció, kapsz egy meghívót is. Ezen kívül semmit nem küldünk, amíg magad nem regisztrálsz.`,
-      SIGNATURE,
-    ].join("\n\n"),
-    footer(`Ezt az egy levelet azért kaptad, mert ${s.name1} megadta a címedet. Kapcsolat: ${CONTACT_EMAIL}`),
-  );
-}
-
-// A Szervező paired two solo signups (app/lib/solo-pairing.ts): each gets one
-// email with the other's name, level and email, so they can write to each
-// other. Privacy page: "Ha egyedül jelentkezel".
-export type PairIntroPerson = { name: string; email: string; level: string };
-
-export function pairIntro(to: PairIntroPerson, partner: PairIntroPerson, city: string): Email {
-  return build(
-    `Találtunk neked párt – ${SITE_NAME}`,
-    [
-      `Szia ${to.name}!`,
-      `Egyedül jelentkeztél a ${SITE_NAME}ra (${city}), és találtunk neked párt: ${partner.name}, aki szintén párt keres. A szintje: ${levelLabel(partner.level)}.`,
-      `Az e-mail-címe: ${partner.email}\nŐ is megkapta a te nevedet és címedet. Írjatok egymásnak, és játsszatok egyet. Ha összejön, a ligában párként neveztek.`,
-      `Ha nem jön össze, vagy mégsem szeretnél vele játszani, válaszolj erre a levélre, és keresünk mást.`,
-      SIGNATURE,
-    ].join("\n\n"),
-    footer(`Azért kaptad ezt a levelet, mert egyedül jelentkeztél a ${SITE_URL.replace("https://", "")} oldalon, és párt kerestél.`),
-  );
-}
 
 // An organizer put two registered players in a pair (Párkeresők, Párok or
 // "Partner cseréje", #260): each gets the partner's name, address and phone
@@ -237,48 +200,6 @@ export function broadcastEmail(
   return build(
     fill(draft.subject),
     fill(draft.body),
-    footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
-  );
-}
-
-// The registration invite (#20) opens the registration page with the
-// address filled in (routes/register.tsx, the login flow); the first login
-// creates the account. Invites sent before 2026-10-31 open /login, which
-// works the same.
-export function registrationLink(email: string): string {
-  return `${SITE_URL}/register?email=${encodeURIComponent(email)}`;
-}
-
-// Sent once to everyone on the interest list (spec section 3). It goes to the
-// whole list, so it has an unsubscribe link like a broadcast. It is the only
-// email that thanks for signing up early (#131).
-// `variant` (audience.ts, #96): a solo still waiting for a partner gets its
-// own line; the signer of a pair signup without the partner's email is asked
-// to add it on the first-login page (#130).
-// `start` (audience.ts inviteStarts): when and where the league starts; null
-// leaves that sentence out.
-export function registrationInvite(
-  to: { name: string; email: string; variant?: "solo" | "no_partner_email" },
-  unsubscribeUrl: string,
-  start: InviteStart | null = null,
-): Email {
-  const until = start?.registrationCloses ? `, a nevezés ${formatUntilDate(start.registrationCloses)} tart` : "";
-  const when = start ? ` A liga ${formatOnDate(start.firstRound)} indul (${start.city})${until}.` : "";
-  const together = "a ligában magától pár lesztek, és együtt nevezhettek a szezonra.";
-  return build(
-    `Regisztrálj a ${SITE_NAME}ra`,
-    [
-      `Szia ${to.name}!`,
-      `Köszi, hogy előzetesen jelentkeztél a ${SITE_NAME}ra!${when} Regisztrálni és nevezni itt tudsz:`,
-      registrationLink(to.email),
-      `A neved és a szinted már megvan, csak a telefonszámod kell, úgyhogy egy perc az egész. Jelszó sem kell: Google-lel vagy egy e-mailben kapott kóddal lépsz be.`,
-      to.variant === "solo"
-        ? `Még keresünk neked párt, addig regisztrálj.`
-        : to.variant === "no_partner_email"
-          ? `A párod e-mail-címét nem adtad meg: belépéskor add meg, és ő is kap meghívót. Amint ő is regisztrál, ${together}`
-          : `Amint a párod is regisztrál, ${together}`,
-      SIGNATURE,
-    ].join("\n\n"),
     footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`, unsubscribeUrl),
   );
 }
@@ -439,14 +360,10 @@ export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email 
 }
 
 export type StuckReminderInput = {
-  // reminders.ts: A no account yet, B first login not finished, C no pair,
-  // D no entry.
-  situation: "A" | "B" | "C" | "D";
+  // reminders.ts: B first login not finished, C no pair, D no entry.
+  situation: "B" | "C" | "D";
   to: string;
-  // The recipient's own address, for A's registration link.
-  email: string;
-  // A: the partner who already registered; C: the one who hasn't; D: the
-  // other player. Names only.
+  // D: the other player. Names only.
   partner: string | null;
   league: string;
   season: string;
@@ -480,21 +397,6 @@ export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string)
   const registered = `Azért kaptad ezt a levelet, mert regisztráltál a ${SITE_URL.replace("https://", "")} oldalon.`;
   const parts = (() => {
     switch (input.situation) {
-      case "A": {
-        const link = registrationLink(input.email);
-        return {
-          subject: `Még nem regisztráltál – ${SITE_NAME}`,
-          paragraphs: [
-            hi,
-            `Kaptál tőlem meghívót a ${SITE_NAME}ra, de még nem regisztráltál. Egy perc az egész, jelszó sem kell:`,
-            link,
-            input.partner ? `${input.partner} már regisztrált, csak rád vár.` : null,
-            reminderDates(input, false),
-          ],
-          links: [link],
-          reason: `Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_NAME}ra.`,
-        };
-      }
       case "B": {
         const login = `${SITE_URL}/login`;
         return {
@@ -517,7 +419,6 @@ export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string)
             hi,
             `Még nincs párod (${input.league}). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
             link,
-            input.partner ? `${input.partner} még nem regisztrált: neki is küldd el.` : null,
             `Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,
             pairPage,
             reminderDates(input, false),

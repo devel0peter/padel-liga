@@ -36,8 +36,6 @@ const ENTRIES = await import("~/lib/season-entries.server");
 const GROUPS = await import("~/lib/groups.server");
 const RESULTS = await import("~/lib/results.server");
 const DECISIONS = await import("~/lib/decisions.server");
-const SIGNUPS = await import("~/lib/signups-admin.server");
-const SOLO = await import("~/lib/solo-pairing.server");
 const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
 const DEADLINE = await import("~/lib/deadline.server");
@@ -97,12 +95,8 @@ function world() {
   for (const id of ["q1", "q2", "r1", "r2", "r3", "gone"])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, 'halado', 1)").run(id, `${id}@x.hu`, `Játékos ${id}`);
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (9, 1, 'r1', 'r2')`);
-  // Interest list: two solos to pair, one to edit and delete, one to invite.
-  const signup = h.raw.prepare("insert into interest_signups (id, mode, name1, email1, level, consent_at) values (?, ?, ?, ?, 'halado', 1)");
-  signup.run(1, "solo", "Solo Egy", "s1@x.hu");
-  signup.run(2, "solo", "Solo Kettő", "s2@x.hu");
-  signup.run(3, "pair", "Jel Entkező", "j1@x.hu");
-  signup.run(4, "pair", "Meg Hívott", "inv@x.hu");
+  // Every account here joined the league (D128).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'carried' from users`);
 }
 
 const lastId = () => (one("select coalesce(max(id), 0) as n from audit_log").n as number);
@@ -175,17 +169,12 @@ const STEPS: Step[] = [
     actor: ORG,
     run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
   },
-  { action: "signup.update", actor: ADMIN, run: () => SIGNUPS.updateSignup(3, { status: "contacted", adminNote: "hívd fel" }, ADMIN) },
-  { action: "signup.delete", actor: ADMIN, run: () => SIGNUPS.deleteSignup(3, ADMIN) },
-  { action: "solo.pair", actor: ORG, run: () => SOLO.pairSolos(ORG, 1, 1, 2, "gyor", "Győr").then((e) => expect(e).toBeNull()) },
-  { action: "solo.unpair", actor: ORG, run: () => SOLO.unpairSolo(ORG, 1, 1, "gyor") },
   {
     action: "broadcast.send",
     actor: ADMIN,
     run: () =>
       OUTBOX.createBroadcast({ subject: "Hír", body: "Szia {név}!", audience: "Jelentkezők · „anna@x.hu”", recipients: [{ email: "p1a@x.hu", name: "Játékos 1a" }], createdBy: "adm@x.hu", actorId: ADMIN }),
   },
-  { action: "registration_invites.send", actor: ADMIN, run: () => OUTBOX.queueRegistrationInvites(ENTRY_TIME, undefined, ADMIN).then((n) => expect(n).toBeGreaterThan(0)) },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },
   {
     action: "account.anonymize",
@@ -225,8 +214,11 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search (their own tests check the entry).
-const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off"];
+// and partner search, and joining a league (their own tests check the entry).
+// RETIRED: written by flows that went with the interest list (#333, D129);
+// Napló still names their old entries, nothing writes new ones.
+const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
+const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send"];
 
 // Every admin page with an action, and the audit actions its action writes.
 const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
@@ -237,11 +229,10 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
-  "admin.league-solos.tsx": ["pair.create", "solo.pair", "solo.unpair"],
+  "admin.league-solos.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
-  "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
 };
@@ -285,6 +276,6 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
     const stepped = new Set(STEPS.flatMap((s) => [s.action, ...(s.also ?? [])]));
     for (const action of Object.values(ROUTE_ACTIONS).flat()) expect(stepped, action).toContain(action);
     // And every action Napló knows is either stepped here or written outside.
-    for (const action of Object.keys(AUDIT_ACTIONS) as AuditAction[]) expect(stepped.has(action) || OUTSIDE.includes(action), action).toBe(true);
+    for (const action of Object.keys(AUDIT_ACTIONS) as AuditAction[]) expect(stepped.has(action) || OUTSIDE.includes(action) || RETIRED.includes(action), action).toBe(true);
   });
 });

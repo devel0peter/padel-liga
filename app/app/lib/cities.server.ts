@@ -3,7 +3,7 @@ import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { cities, clubs, interestSignups, leagues } from "~/db/schema";
 
-import { matchesCity, OTHER_CITY, pairCounts, type City, type CityInput } from "./cities";
+import { pairCounts, type City, type CityInput } from "./cities";
 import { auditEntry, auditIfChanged } from "./audit.server";
 
 export async function listCities(): Promise<City[]> {
@@ -31,21 +31,13 @@ export async function getCity(slug: string): Promise<City | undefined> {
   return (await listCities()).find((c) => c.slug === slug);
 }
 
-// Adds a city and files the "Más város" signups that typed its name under it.
-// Returns how many signups moved.
-export async function createCity(input: CityInput, actorId: string): Promise<number> {
-  const others = await db
-    .select({ id: interestSignups.id, cityOther: interestSignups.cityOther })
-    .from(interestSignups)
-    .where(eq(interestSignups.city, OTHER_CITY));
-  const ids = others.filter((s) => matchesCity(s.cityOther, input)).map((s) => s.id);
-  // One batch: the city, its signups and the audit entry (#225).
+// Adds a city, audited (#225). The interest list's "Más város" signups are
+// no longer filed under it (#333, D129).
+export async function createCity(input: CityInput, actorId: string): Promise<void> {
   await db.batch([
     db.insert(cities).values(input),
-    ...(ids.length ? [db.update(interestSignups).set({ city: input.slug, cityOther: null }).where(inArray(interestSignups.id, ids))] : []),
-    auditEntry({ actorId, action: "city.create", target: `city:${input.slug}`, detail: `${input.name}${ids.length ? `; ${ids.length} signups filed` : ""}` }),
+    auditEntry({ actorId, action: "city.create", target: `city:${input.slug}`, detail: input.name }),
   ]);
-  return ids.length;
 }
 
 export async function updateCity(slug: string, change: Pick<City, "name" | "listed">, actorId: string): Promise<void> {
@@ -55,26 +47,25 @@ export async function updateCity(slug: string, change: Pick<City, "name" | "list
   ]);
 }
 
-export type CityUsage = { signups: number; clubs: number; leagues: number };
+export type CityUsage = { clubs: number; leagues: number };
 
 export async function cityUsage(): Promise<Map<string, CityUsage>> {
-  const [s, c, l] = await Promise.all([
-    db.select({ city: interestSignups.city, n: count() }).from(interestSignups).groupBy(interestSignups.city),
+  const [c, l] = await Promise.all([
     db.select({ city: clubs.city, n: count() }).from(clubs).groupBy(clubs.city),
     db.select({ city: leagues.city, n: count() }).from(leagues).groupBy(leagues.city),
   ]);
   const out = new Map<string, CityUsage>();
-  const entry = (city: string) => out.get(city) ?? out.set(city, { signups: 0, clubs: 0, leagues: 0 }).get(city)!;
-  for (const r of s) entry(r.city).signups = r.n;
+  const entry = (city: string) => out.get(city) ?? out.set(city, { clubs: 0, leagues: 0 }).get(city)!;
   for (const r of c) entry(r.city).clubs = r.n;
   for (const r of l) entry(r.city).leagues = r.n;
   return out;
 }
 
-// Only a city nothing refers to: signups, clubs and leagues keep a city slug.
+// Only a city nothing refers to: clubs and leagues keep a city slug. (The
+// interest list's signups don't count since #333.)
 export async function deleteCity(slug: string, actorId: string): Promise<boolean> {
   const usage = (await cityUsage()).get(slug);
-  if (usage && usage.signups + usage.clubs + usage.leagues > 0) return false;
+  if (usage && usage.clubs + usage.leagues > 0) return false;
   await db.batch([
     db.delete(cities).where(eq(cities.slug, slug)),
     auditIfChanged({ actorId, action: "city.delete", target: `city:${slug}` }),

@@ -50,10 +50,18 @@ function world() {
   mail.run(8, "signup_confirmation", "anna@x.hu", "Megkaptuk", "sent");
   mail.run(9, "broadcast", "anna@x.hu", "Hír", "sent");
   mail.run(10, "pair_created", "anna@x.hu", "Van párod", "pending");
-  // The list's unsent mail goes to an account too: a pending invite must
-  // not go out, a failed introduction keeps another solo's details.
+  // The list-only kinds' unsent mail goes to an account too: a pending
+  // invite must not go out, a failed introduction keeps another solo's
+  // details. One being sent right now is left to its sender.
   mail.run(12, "registration_invite", "anna@x.hu", "Indul", "pending");
   mail.run(13, "pair_intro", "Anna@x.hu", "Párt találtunk", "failed");
+  mail.run(14, "registration_invite", "anna@x.hu", "Indul", "sending");
+  // Broadcasts ("Levél nekik") and stuck reminders B/C still go to
+  // accounts: unsent or failed, they stay.
+  mail.run(15, "broadcast", "anna@x.hu", "Levél nekik", "pending");
+  mail.run(16, "broadcast", "anna@x.hu", "Levél nekik", "failed");
+  mail.run(17, "stuck_reminder", "anna@x.hu", "Emlékeztető", "pending");
+  mail.run(18, "stuck_reminder", "anna@x.hu", "Emlékeztető", "failed");
   // Not from the list: a login code to a new address stays.
   mail.run(11, "login_code", "dani@x.hu", "Kód", "sent");
   h.raw.exec(`insert into email_suppressions (email, reason) values ('cili@x.hu', 'unsubscribed'), ('bela@x.hu', 'bounced')`);
@@ -79,7 +87,7 @@ describe("purgeInterestList (#334)", () => {
   it("deletes every signup, the list's mail to addresses without an account, every partner notice and the list's reminder records", async () => {
     expect(await purge()).toBeNull();
     expect(n("select count(*) from interest_signups")).toBe(0);
-    expect(all("select id from email_messages order by id").map((r: any) => r.id)).toEqual([8, 9, 10, 11]);
+    expect(all("select id from email_messages order by id").map((r: any) => r.id)).toEqual([8, 9, 10, 11, 14, 15, 16, 17, 18]);
     expect(all("select key from stuck_reminders")).toEqual([{ key: "B:anna" }]);
     expect(all("select email from stuck_reminder_people")).toEqual([{ email: "anna@x.hu" }]);
   });
@@ -148,7 +156,7 @@ describe("purgeInterestList (#334)", () => {
       expect(budget.used().queries).toBeLessThanOrEqual(RUN_LIMITS.queries - keep.queries);
     }
     expect(n("select count(*) from interest_signups")).toBe(0);
-    expect(n("select count(*) from email_messages where kind = 'registration_invite'")).toBe(0);
+    expect(n("select count(*) from email_messages where kind = 'registration_invite' and status <> 'sending'")).toBe(0);
     expect(results.length).toBeGreaterThan(2);
     expect(results.slice(0, -1).every((r) => /more left for the next run/.test(r ?? ""))).toBe(true);
     expect(results.at(-1)).toMatch(/^interest list deletion finished/);

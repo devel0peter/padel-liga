@@ -158,9 +158,9 @@ describe("notification switches (#115)", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
   });
 
-  // Peter, 2026-10-29: only login codes and signup confirmations ignore the
-  // switch; addresses without an account are unaffected.
-  it("broadcasts skip an account with email off; signup confirmations don't, and no partner notice goes out (#333)", async () => {
+  // Peter, 2026-10-29: only login codes ignore the switch (signup
+  // confirmations went with the interest list, #334).
+  it("broadcasts skip an account with email off", async () => {
     await N.setChannelEnabled("a", "email", false);
     await O.createBroadcast({
       subject: "Hír",
@@ -176,15 +176,6 @@ describe("notification switches (#115)", () => {
     await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);
     expect(await O.emailSwitchedOff()).toEqual(new Set(["a@x.hu"]));
-
-    h.sent = [];
-    // Anna signs up and names Béla as partner: her confirmation goes out.
-    await O.deliver(
-      await O.queueSignupEmails({ mode: "pair", name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "gyor", level: "halado" } as any),
-    );
-    // Béla, the partner she named, gets nothing: the partner notice went with #333.
-    expect(h.sent.map((m) => m.to)).toEqual(["a@x.hu"]);
-    expect(all("select kind, to_email from email_messages where kind <> 'broadcast'")).toEqual([{ kind: "signup_confirmation", to_email: "a@x.hu" }]);
   });
 
   it("a fan-out to many players takes a few D1 queries, not a few per player", async () => {

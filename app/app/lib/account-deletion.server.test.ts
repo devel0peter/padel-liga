@@ -18,8 +18,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const D = await import("~/lib/account-deletion.server");
-const { DELETED_NAME, DELETION_REFUSALS, PARTNER_NOTICE_SUBJECT_REMOVED } = await import("~/lib/account-deletion");
-const { partnerNoticeSubject } = await import("~/lib/email/templates");
+const { DELETED_NAME, DELETION_REFUSALS } = await import("~/lib/account-deletion");
 const { pairCandidates } = await import("~/lib/pairs.server");
 const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
@@ -74,33 +73,22 @@ function freshDb() {
   h.raw.exec(`insert into email_suppressions (email, reason) values ('a@x.hu', 'unsubscribed')`);
   h.raw.exec(`insert into audit_log (actor_id, action, target) values ('admin', 'league_admin.grant', 'a@x.hu')`);
   h.raw.exec(`insert into email_messages (kind, to_email, subject, status) values ('login_code', 'a@x.hu', 's', 'pending'), ('login_code', 'a@x.hu', 's', 'sent'), ('login_code', 'b@x.hu', 's', 'pending')`);
-  // Interest list: a's own pair signup (with b), a solo of a's paired with
-  // c's solo, and d's pair signup naming a as the partner.
-  const signup = h.raw.prepare(
-    "insert into interest_signups (id, mode, name1, email1, name2, email2, level, consent_at, paired_with, invited2_at) values (?, ?, ?, ?, ?, ?, 'kezdo', 1, ?, ?)",
-  );
-  signup.run(10, "pair", "A", "A@x.hu", "B", "b@x.hu", null, null);
-  signup.run(11, "solo", "A", "a@x.hu", null, null, 12, null);
-  signup.run(12, "solo", "C", "c@x.hu", null, null, 11, null);
-  signup.run(13, "pair", "D", "d@x.hu", "A", "a@x.hu", null, 1);
-  h.raw.exec(`update interest_signups set status = 'paired' where id in (11, 12)`);
-  // Mail stored for other people that names a (review of #152). Goes or
-  // changes:
-  // - 100: the partner notice a's pair signup sent b (sent: subject only)
+  // Mail stored for other people that names a (review of #152). Goes:
   // - 102: a's solo introduction to c (unsent, has a's address)
   // - 103: an entry decision to the partner b (unsent, has a's name)
   // - 104: group mail to c, an opponent and not a's partner (unsent)
   // - 108: a failed match proposal to c naming a
   // Stays:
-  // - 101: a partner notice from someone else
+  // - 100, 101: sent mail to b, whose subjects name no one else (the
+  //   partner notices that named a signer went with the list, #334)
   // - 105: a pair intro with anna@x.hu, which merely ends in a@x.hu
   // - 106: a broadcast to another "Anna Teszt", her own name
   // - 107: group mail naming "Anna Tesztelő", a different name
   // - 109: group mail to another "Anna Teszt", her own name only in the greeting
   h.raw.exec(`update users set name = 'Anna Teszt' where id = 'a'`);
   const mail = h.raw.prepare("insert into email_messages (id, kind, to_email, subject, text, status) values (?, ?, ?, ?, ?, ?)");
-  mail.run(100, "partner_notice", "b@x.hu", partnerNoticeSubject("A"), null, "sent");
-  mail.run(101, "partner_notice", "b@x.hu", partnerNoticeSubject("Zoli"), null, "sent");
+  mail.run(100, "season_entry_decision", "b@x.hu", "Beneveztek", null, "sent");
+  mail.run(101, "groups_published", "b@x.hu", "Kint a csoportod", null, "sent");
   mail.run(102, "pair_intro", "c@x.hu", "Találtunk neked párt", "Az e-mail-címe: a@x.hu\nŐ is megkapta", "pending");
   mail.run(103, "season_entry_decision", "b@x.hu", "Jóváhagyták", "Szia B! Anna Teszt és te nevezhettek.", "pending");
   mail.run(104, "groups_published", "c@x.hu", "Itt a csoportod", "1. hét: Anna Teszt és B ellen", "pending");
@@ -114,8 +102,8 @@ function freshDb() {
 // What is left of other people's mail (ids 100 to 109 above).
 function otherPeoplesMailAfter() {
   expect(all("select id, subject from email_messages where id >= 100 order by id")).toEqual([
-    { id: 100, subject: PARTNER_NOTICE_SUBJECT_REMOVED },
-    { id: 101, subject: partnerNoticeSubject("Zoli") },
+    { id: 100, subject: "Beneveztek" },
+    { id: 101, subject: "Kint a csoportod" },
     { id: 105, subject: "Találtunk neked párt" },
     { id: 106, subject: "Hírek" },
     { id: 107, subject: "Itt a csoportod" },
@@ -146,7 +134,6 @@ function personalRowsLeft() {
     invites: n("select count(*) from account_invites where email = 'a@x.hu'"),
     reminded: n("select count(*) from stuck_reminder_people where email = 'a@x.hu'"),
     mail: n("select count(*) from email_messages where to_email = 'a@x.hu'"),
-    signups: n("select count(*) from interest_signups where lower(email1) = 'a@x.hu' or lower(email2) = 'a@x.hu'"),
     audit: n("select count(*) from audit_log where target like '%a@x.hu%'"),
     suppressions: n("select count(*) from email_suppressions where email = 'a@x.hu'"),
   };
@@ -166,23 +153,12 @@ const NONE = {
   invites: 0,
   reminded: 0,
   mail: 0,
-  signups: 0,
   audit: 0,
   suppressions: 0,
 };
 
-function interestListAfter() {
-  // a's own signups are gone; c's solo is back on the waiting list; d's
-  // pair signup stays without a's name and address; b's mail is untouched.
-  expect(all("select id from interest_signups order by id").map((r: any) => r.id)).toEqual([12, 13]);
-  expect(one("select paired_with, status from interest_signups where id = 12")).toEqual({ paired_with: null, status: "new" });
-  expect(one("select name1, email1, name2, email2, invited2_at from interest_signups where id = 13")).toEqual({
-    name1: "D",
-    email1: "d@x.hu",
-    name2: null,
-    email2: null,
-    invited2_at: null,
-  });
+function otherMailAfter() {
+  // b's own mail is untouched.
   expect(n("select count(*) from email_messages where to_email = 'b@x.hu' and kind = 'login_code'")).toBe(1);
   otherPeoplesMailAfter();
   // No row has a's address as a whole any more.
@@ -201,7 +177,7 @@ describe("deleting an account (#152)", () => {
     expect(n("select count(*) from season_entries where pair_id = 1")).toBe(0);
     expect((await pairCandidates({ id: 1 })).map((c) => c.id)).toContain("b");
     expect(personalRowsLeft()).toEqual(NONE);
-    interestListAfter();
+    otherMailAfter();
     // Logged by who and when, without the name or email.
     expect(all("select actor_id, action, target, detail from audit_log where action like 'account.%'")).toEqual([
       { actor_id: "admin", action: "account.delete", target: "user:a", detail: null },
@@ -327,7 +303,7 @@ describe("deleting an account (#152)", () => {
     expect(one("select status from season_entries where pair_id = 1").status).toBe("withdrawn");
     // No contact data, no way to log in, gone from lists.
     expect(personalRowsLeft()).toEqual(NONE);
-    interestListAfter();
+    otherMailAfter();
     expect((await pairCandidates({ id: 1 })).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
     // Párok still lists the dissolved pair, but "Levél nekik" doesn't write to them.
@@ -348,8 +324,6 @@ describe("deleting an account (#152)", () => {
     expect(one("select name, email from users where id = 'a'")).toEqual({ name: "Anna Teszt", email: "a@x.hu" });
     expect(n("select count(*) from sessions where user_id = 'a'")).toBe(1);
     expect(one("select status from pairs where id = 1").status).toBe("active");
-    expect(n("select count(*) from interest_signups")).toBe(4);
-    expect(all("select subject from email_messages where id = 100")).toEqual([{ subject: partnerNoticeSubject("A") }]);
     expect(n("select count(*) from email_messages where id >= 100")).toBe(10);
   });
 
@@ -422,7 +396,7 @@ describe("a player deleting their own account (#38)", () => {
     expect(await D.deleteOwnAccount("a", DURING)).toEqual({ ok: true, mode: "remove" });
     expect(n("select count(*) from users where id = 'a'")).toBe(0);
     expect(personalRowsLeft()).toEqual(NONE);
-    interestListAfter();
+    otherMailAfter();
     // Written by the account before it went; the row's delete cleared the
     // actor, so Napló shows "Törölt játékos".
     expect(all("select actor_id, action, target, detail from audit_log where action like 'account.%'")).toEqual([

@@ -38,7 +38,7 @@ const rows = (sql: string, ...params: unknown[]): any[] => h.raw.prepare(sql).al
 const count = (table: string) => rows(`select count(*) as n from ${table}`)[0].n as number;
 
 const TABLES = [
-  "cities", "clubs", "leagues", "users", "league_admins", "league_members", "partner_searches", "seasons", "season_phases", "interest_signups",
+  "cities", "clubs", "leagues", "users", "league_admins", "league_members", "partner_searches", "seasons", "season_phases",
   "account_invites", "email_messages", "pairs", "pair_invites", "pair_links", "season_entries", "groups", "group_pairs",
   "matches", "sessions", "login_codes", "notifications", "audit_log", "broadcasts", "email_suppressions",
 ];
@@ -136,7 +136,6 @@ describe("running it twice", () => {
       insert into users (id, email, name, level, consent_at) values
         ('real', 'real@example.com', 'Valódi', 'kezdo', 1), ('real2', 'real2@example.com', 'Valódi2', 'kezdo', 1);
       insert into leagues (id, city, slug, name) values (900, 'gyor', 'gyor', 'Padelpárbaj Győr');
-      insert into interest_signups (mode, name1, email1, level, consent_at) values ('solo', 'Valódi', 'real@example.com', 'kezdo', 1);
       insert into email_messages (kind, to_email, subject, status) values ('pair_invite', 'real@example.com', 's', 'sent');
       insert into account_invites (email, note) values ('real@example.com', 'x');
     `);
@@ -166,8 +165,6 @@ describe("running it twice", () => {
       insert into users (id, email, name, level, consent_at) values
         ('u1', 'jatekos1@example.test', 'Egy', 'kezdo', 1), ('u2', 'jatekos2@example.test', 'Kettő', 'kezdo', 1);
       insert into pairs (league_id, player_a, player_b) values (900, 'u1', 'u2');
-      insert into interest_signups (mode, name1, email1, level, consent_at) values ('solo', 'Kézi', 'kezi@example.test', 'kezdo', 1);
-      insert into interest_signups (mode, name1, email1, level, city, consent_at) values ('solo', 'Kézi', 'kezi@valodi.example.org', 'kezdo', 'minta', 1);
       insert into clubs (slug, city, name) values ('uj-klub', 'minta', 'Új klub');
     `);
     // A second pair that matches the first one's group, so matches exist too.
@@ -188,12 +185,10 @@ describe("running it twice", () => {
     expect(rows("select slug from leagues where slug = 'gyor'")).toHaveLength(1);
     // A pair of example users in another league is gone too (pairs have no cascade from users).
     expect(count("pairs")).toBe(0);
-    expect(rows("select email1 from interest_signups where email1 = 'real@example.com'")).toHaveLength(1);
     expect(rows("select to_email from email_messages")).toEqual([{ to_email: "real@example.com" }]);
     expect(rows("select email from account_invites")).toEqual([{ email: "real@example.com" }]);
-    // What was added inside the fake city goes too: a club, a signup from the public form.
+    // What was added inside the fake city goes too: a club.
     expect(rows("select slug from clubs where slug = 'uj-klub'")).toHaveLength(0);
-    expect(rows("select email1 from interest_signups where email1 like 'kezi%'")).toHaveLength(0);
     expect(count("cities")).toBe(baseline.cities + 2);
     expect(count("leagues")).toBe(baseline.leagues + 2);
   });

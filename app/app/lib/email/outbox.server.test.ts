@@ -2,7 +2,6 @@
 // and for whom. The sender is stubbed; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { InterestSignup } from "~/lib/interest";
 
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], gate: null as Promise<void> | null }));
 
@@ -185,20 +184,6 @@ describe("a deleted account's placeholder address", () => {
 
 // Every email goes out by itself (#112, replaces the held outbox of #88).
 describe("automatic outbox", () => {
-  const signup: InterestSignup = {
-    city: "gyor",
-    cityOther: null,
-    mode: "pair",
-    name1: "Nagy Anna",
-    email1: "anna@x.hu",
-    name2: "Kovács Béla",
-    email2: "bela@x.hu",
-    level: "kezdo",
-    note: null,
-    ref: null,
-    homeClub: null,
-    wantsToOrganize: false,
-  };
   const byKind = () =>
     Object.fromEntries(
       h.raw
@@ -228,8 +213,6 @@ describe("automatic outbox", () => {
 
   it("sends every kind as soon as it is queued, with no further action", async () => {
     const league = "Padelpárbaj Győr";
-    // A pair signup: the confirmation only, no partner notice (#333).
-    await O.deliver(await O.queueSignupEmails(signup));
     await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
@@ -263,13 +246,12 @@ describe("automatic outbox", () => {
     await O.queueLoginCode("anna@x.hu", "123456");
 
     expect(byKind()).toEqual({
-      signup_confirmation: "sent",
       season_entry_decision: "sent",
       broadcast: "sent",
       groups_published: "sent",
       login_code: "sent",
     });
-    expect(h.sent).toHaveLength(5);
+    expect(h.sent).toHaveLength(4);
     expect(h.sent.at(-1).subject).toMatch(/^123 456 a belépőkódod/);
   });
 

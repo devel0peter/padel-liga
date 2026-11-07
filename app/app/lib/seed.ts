@@ -130,7 +130,6 @@ export function resetStatements(): string[] {
     `delete from account_invites where ${like("email")}`,
     `delete from league_admin_invites where ${like("email")}`,
     `delete from email_suppressions where ${like("email")}`,
-    `delete from interest_signups where city = ${q(CITY.slug)} or ${like("email1")} or ${like("email2")}`,
     `delete from clubs where city = ${q(CITY.slug)} or slug in (${CLUBS.map((c) => q(c.slug)).join(", ")})`,
     `delete from cities where slug in (${q(CITY.slug)}, ${q(OTHER_CITY.slug)})`,
   ];

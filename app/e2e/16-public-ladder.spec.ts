@@ -17,7 +17,7 @@ test("the landing page's league card leads to the league page", async ({ browser
   await page.close();
 });
 
-test("a visitor sees the bands, group tables and the first week's matches", async ({ browser }) => {
+test("a visitor sees the bands, group tables and every week's matches", async ({ browser }) => {
   const page = await browser.newPage();
   await visit(page, "/league/minta");
   const main = content(page);
@@ -32,15 +32,22 @@ test("a visitor sees the bands, group tables and the first week's matches", asyn
   for (const player of GROUP_PAIRS.flat()) await expect(main).toContainText(player.name);
   await expect(main).not.toContainText(PAIRS.late[0].name);
 
-  // A table with 3 rows per group, all at zero before the first result; one match in week 1 per group.
+  // A table with 3 rows per group, all at zero and no places before the first result;
+  // the fixture list has every week with one match each in a group of 3 (D128).
   const first = main.getByRole("region", { name: "1. csoport" });
   await expect(first.getByRole("row")).toHaveCount(4); // header + 3 pairs
-  await expect(first.getByRole("heading", { name: /^1\. hét meccsei/ })).toBeVisible();
-  await expect(first.getByRole("listitem")).toHaveCount(1);
-  // 15-matches agreed a time for some matches: those show it, the rest "időpont még nincs".
-  const agreed = d1("select count(*) as n from matches where week = 1 and scheduled_at is not null")[0]!.n as number;
-  await expect(main.getByText("időpont még nincs")).toHaveCount(2 - agreed);
-  await expect(main.locator("li", { hasText: /\d{2}:\d{2}$/ })).toHaveCount(agreed);
+  await expect(first).toContainText("Még nincs végleges eredmény: a sorrend a kiemelés.");
+  for (const week of ["1. hét", "2. hét", "3. hét"]) await expect(first.getByRole("region", { name: week, exact: true })).toBeVisible();
+  await expect(first.getByRole("listitem")).toHaveCount(3);
+  await expect(first).toContainText("Pihen:");
+  // 15-matches fixed a time for some matches: those show it, the open ones "Egyeztetés alatt".
+  const count = (status: string) =>
+    d1(
+      `select count(*) as n from matches m join groups g on g.id = m.group_id join seasons s on s.id = g.season_id join leagues l on l.id = s.league_id
+       where l.slug = 'minta' and g.phase = 1 and m.status = '${status}'`,
+    )[0]!.n as number;
+  await expect(main.getByText("Egyeztetés alatt", { exact: true })).toHaveCount(count("open"));
+  await expect(main.locator("li", { hasText: /\d{2}:\d{2}/ })).toHaveCount(count("scheduled"));
   await expect(main).toContainText("1. kör, indul");
 
   // The explainer: three points, reached from a division header.

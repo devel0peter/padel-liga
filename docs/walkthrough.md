@@ -293,9 +293,9 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Page: `/home` ("Kezdőlap")
 - Account: any player in a published group, for example the first pair's first player
 - Expect:
-  - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match.
-  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, the group's pairs with "(ti)" on yours (without numbers until a result is final; then the same table as on the public league page: place, pair, M, P, Szett, Játék, #201), then weeks 1 to 3. With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét".
-  - Each match: the opponents, "Egyeztetésre vár", their two phone numbers (tap to call) and "Egyeztetés és részletek". No email address anywhere.
+  - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match with the round's deadline under it.
+  - "Meccseitek": a card per week 1 to 3 (D128). With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét". Each match card: the week and its dates, the opponents, "Egyeztetésre vár", their two phone numbers as call buttons and "Egyeztetés és részletek" (the whole card opens the match). No email address anywhere.
+  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, where the pair stands ("A létra csúcsán vagytok, 3 kör van hátra"), "Minden csoport" (the public league page), the table (place, pair, M, Gy, V, Szett, Játék, P; "–" instead of places and "Még nincs végleges eredmény: a sorrend a kiemelés." until a result is final, D85) and "A csoport meccsei": every match of the group by week, yours linked.
   - "Hamarosan itt lesz a csoportod" is gone.
 
 ### 18. A pair proposes slots, the other accepts one
@@ -304,12 +304,12 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Accounts: the player of step 17, then one of the opponents
 - Do: fill two times on the same day and press "Elküldöm az időpontokat"; then three times on two days, at least 48 hours ahead, and send again.
 - Expect:
-  - The page shows "Hogyan egyeztessetek?" with the 3-sentence guide.
+  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok időpontokat" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D128).
   - The first try is refused: "Legalább 3 különböző időpontot ajánlj." and "Az időpontok legalább 2 különböző napra essenek." (a time before 7:00 or after 22:00, or under 48 hours ahead, gets its own message under its row).
   - The second goes through: "Elküldtük az időpontokat a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár". The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the link.
   - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, pick a time and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
   - Once scheduled, both pairs see "Naptárba" under the status (#192): "Google Naptár" (opens Google Calendar's new-event page with the time, 60 minutes, the four names, the club if recorded and the match link) and ".ics letöltése" (`/matches/<id>/calendar.ics`, only for the four players and the league's organizers; anyone else gets 404). The file never has an email address or phone number. Cancel the time: the row stays with only ".ics letöltése" and "Lemondták az időpontot…"; the downloaded file is STATUS:CANCELLED and removes the entry. A new time gives the same entry (same UID, higher SEQUENCE), so a new download replaces the old one.
-  - Instead of accepting, the opponent can send their own times ("Új időpontok ajánlása"): it replaces the first proposal.
+  - Instead of accepting, the opponent can open "Egyik sem jó? Ajánljatok másik időpontokat" and send their own times: it replaces the first proposal.
   - Sending times again on the same match the same day: the opponents get it in "Értesítések" (and by push), but the terminal prints no second email; one scheduling email per match a day to each player (#191).
 
 ### 19. A pair records an agreed time, the other confirms
@@ -348,7 +348,7 @@ The public ladder (decision log (`docs/decisions.md`), 2026-11-02, #30). Needs s
 - Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
 - Expect:
   - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
-  - Each group has a table (place, pair, M, P, Szett, Játék) with all pairs at zero until a result is final (steps 27 and 28 change that), and one match under "1. hét meccsei", with its agreed time (step 18 and 19) or "időpont még nincs".
+  - Each group has a table (place, pair, M, Gy, V, Szett, Játék, P; Játék hides at 390 px) with all pairs at zero and "–" instead of places until a result is final (steps 27 and 28 change that), and its matches by week (1. hét, 2. hét, 3. hét with the dates, the current week marked "ez a hét"): each with its agreed time (step 18 and 19) or "Egyeztetés alatt", and in a group of 3 who rests ("Pihen: …").
   - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
   - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
   - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
@@ -432,7 +432,7 @@ The public ladder counts final results (decision log (`docs/decisions.md`), 2026
 - Do: open the league page after the confirmation of step 27 and the decision of step 28.
 - Expect:
   - In the player's group the table is no longer at zero: the player's pair has 3 points in 2 matches (the confirmed win of step 27 and the "both lose" decision of step 28, 0 points), the step 27 opponent 1 point in 1 match, the step 28 opponent 0 points in 1 match. Szett and Játék follow the rules (spec 9).
-  - Both results are listed once (#202): under "<n>. hét meccsei" when they belong to the week shown, else under "Lejátszott meccsek". Scores read as in the app, from the 1. pár's side ("4:1, 2:4, szuper tie-break 10:8" or "1:4, 4:2, szuper tie-break 8:10"), and the decision as "Mindkét pár vereséget kap (0:4, 0:4)".
+  - Both results are listed once (#202), under their own week: the sets from the 1. pár's side (4:1 over 2:4, the super tie-break as "(10:8)"), the winner in bold, and the decision as "Mindkét pár vereséget kap (0:4, 0:4)". The 1st of a group below the top one is marked to move up, the last of a group above the bottom one to move down.
   - Before the confirmation (a result still waiting) and while a result is disputed (step 28, before the decision) the table does not change; it changes when the result is confirmed, accepted after 48 hours, or decided.
   - Still no email address or phone number on the page.
 

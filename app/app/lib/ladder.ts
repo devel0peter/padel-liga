@@ -16,8 +16,7 @@ import {
   validateScore,
 } from "@padel-liga/rules";
 
-import { formatSlot } from "./format";
-import { MATCH_LOST_BOTH_TEXT, neutralScoreText } from "./results";
+import { fixtureWeeks, moveZones, type FixtureWeek, type Zone } from "./fixtures";
 
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
@@ -25,68 +24,71 @@ const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} diví
  * A pair as the ladder shows it: the two players' names and the pair's rating
  * for the last tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
  */
-export type LadderPair = { id: number; names: [string, string]; elo: number; withdrawn?: boolean };
+export type LadderPair = {
+  id: number;
+  names: [string, string];
+  elo: number;
+  withdrawn?: boolean;
+};
 
-/** A group match. `scheduledAt` and `outcome` are null until the match is agreed or played. */
+/**
+ * A group match. `scheduledAt` and `outcome` are null until the match is
+ * agreed or played; `outcome` is the counted one (countedOutcome). `status`
+ * is the stored one (matches.status), for the fixture list's state.
+ */
 export type LadderMatch = {
   id: number;
   a: number;
   b: number;
   week: number;
+  status: string;
   scheduledAt: Date | null;
   outcome: MatchOutcome | null;
 };
 
 /** A stored group; `pairs` in seed order (strongest first). */
-export type LadderGroupInput = { id: number; number: number; pairs: LadderPair[]; matches: LadderMatch[] };
+export type LadderGroupInput = {
+  id: number;
+  number: number;
+  pairs: LadderPair[];
+  matches: LadderMatch[];
+};
 
-export type LadderRow = {
+/** A table row as groupTable computes it (the rules engine's numbers). */
+export type TableRow = {
   rank: number;
   /** The pair's profile is /pairs/<pairId> (#36), linked for members only (D112): the one id on the page. */
   pairId: number;
-  names: [string, string];
   matches: number;
+  wins: number;
+  losses: number;
+  setsWon: number;
+  setsLost: number;
+  gamesWon: number;
+  gamesLost: number;
   points: number;
   setDiff: number;
   gameDiff: number;
 };
 
-// No database id: nothing internal goes into the public page's data.
-export type LadderMatchView = {
-  a: [string, string];
-  b: [string, string];
-  /** "nov. 10., kedd 18:30", or null when no time is set yet. */
-  when: string | null;
-  /** "4:2, 4:1", "kontumác", ... or null when the match is not played. */
-  result: string | null;
-};
+export type LadderRow = TableRow & { names: [string, string]; zone: Zone };
 
 export type LadderGroup = {
   number: number;
+  /** False before any final result: the order is only the seeding (D85). */
+  ranked: boolean;
   rows: LadderRow[];
-  /** The matches scheduled for the week shown, played or not. */
-  weekMatches: LadderMatchView[];
-  /** Every played match of the phase, in week order. */
-  results: LadderMatchView[];
+  /** Every match of the group by week (D128); no database id leaves the server. */
+  weeks: FixtureWeek[];
   /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
   withdrawn: [string, string][];
 };
 
-export type LadderBand = { division: Division; label: string; groups: LadderGroup[] };
-
-// "4:2, 4:1", "4:1, 3:4, szuper tie-break 10:7": the app's score format (#202).
-function scoreText(outcome: MatchOutcome): string | null {
-  switch (outcome.kind) {
-    case "played":
-      return neutralScoreText(outcome.score);
-    case "walkover":
-      return "kontumác";
-    case "both-inactive":
-      return MATCH_LOST_BOTH_TEXT;
-    case "unplayed":
-      return null;
-  }
-}
+export type LadderBand = {
+  division: Division;
+  label: string;
+  groups: LadderGroup[];
+};
 
 /**
  * The outcome a match counts with (#186, #220): only a `final` match's, so a
@@ -136,58 +138,71 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
 export function groupTable(
   pairs: readonly { id: number; elo: number; withdrawn?: boolean }[],
   matches: readonly { a: number; b: number; outcome: MatchOutcome | null }[],
-): Omit<LadderRow, "names">[] {
+): TableRow[] {
   const decided: GroupMatch[] = matches.flatMap((m) => (m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : []));
   return groupStandings(
-    pairs.map((p) => ({ id: String(p.id), elo: p.elo, withdrawn: !!p.withdrawn })),
+    pairs.map((p) => ({
+      id: String(p.id),
+      elo: p.elo,
+      withdrawn: !!p.withdrawn,
+    })),
     decided,
   ).map((r) => ({
     pairId: Number(r.id),
     rank: r.rank,
     matches: r.matches,
+    wins: r.wins,
+    losses: r.losses,
+    setsWon: r.setsWon,
+    setsLost: r.setsLost,
+    gamesWon: r.gamesWon,
+    gamesLost: r.gamesLost,
     points: r.points,
     setDiff: r.setDiff,
     gameDiff: r.gameDiff,
   }));
 }
 
+/** Whether any match of a table counts yet: before that the order is only the seeding (D85). */
+export const isRanked = (rows: readonly { matches: number }[]) => rows.some((r) => r.matches > 0);
+
 /**
  * The ladder of one phase: bands top-down (empty ones left out), each with
- * its groups. `week` (1–3) picks the matches shown as "this week".
+ * its groups' tables and fixture lists. `week` (1–3) is the week marked as
+ * current, or null when none is (the phase hasn't started).
  */
-export function buildLadder(groups: readonly LadderGroupInput[], week: number): LadderBand[] {
+export function buildLadder(groups: readonly LadderGroupInput[], week: number | null, phaseStartsAt: Date): LadderBand[] {
   const ordered = [...groups].sort((x, y) => x.number - y.number);
   const bands = new Map<Division, LadderGroup[]>(DIVISIONS.map((d) => [d, []]));
   ordered.forEach((group, index) => {
     const byId = new Map(group.pairs.map((p) => [p.id, p]));
     const names = (id: number) => byId.get(id)!.names;
-    // A withdrawn pair's matches leave the group (rules 2): not in the
-    // table (groupTable drops them), this week's list or the results.
-    const counts = (m: LadderMatch) => !byId.get(m.a)?.withdrawn && !byId.get(m.b)?.withdrawn;
-    const shown = group.matches.filter(counts);
     const standings = groupTable(group.pairs, group.matches);
-    const view = (m: LadderMatch): LadderMatchView => ({
-      a: names(m.a),
-      b: names(m.b),
-      when: m.scheduledAt ? formatSlot(m.scheduledAt) : null,
-      result: m.outcome ? scoreText(m.outcome) : null,
-    });
+    const ranked = isRanked(standings);
+    const zones = moveZones(standings.length, index + 1, ordered.length, ranked);
     bands.get(divisionOf(index + 1, ordered.length))!.push({
       number: group.number,
-      rows: standings.map((r) => ({ ...r, names: names(r.pairId) })),
-      weekMatches: shown.filter((m) => m.week === week).map(view),
-      // A result is listed once: a played match of the week shown is already
-      // under "meccsei" (#202).
-      results: [...shown]
-        .filter((m) => m.week !== week && m.outcome && scoreText(m.outcome))
-        .sort((x, y) => x.week - y.week || x.id - y.id)
-        .map(view),
+      ranked,
+      rows: standings.map((r, i) => ({
+        ...r,
+        names: names(r.pairId),
+        zone: zones[i]!,
+      })),
+      // A withdrawn pair's matches leave the group (rules 2): fixtureWeeks
+      // lists only the matches of the pairs given.
+      weeks: fixtureWeeks(
+        group.pairs.filter((p) => !p.withdrawn),
+        group.matches,
+        { phaseStartsAt, currentWeek: week },
+      ),
       withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
     });
   });
-  return DIVISIONS.map((division) => ({ division, label: divisionLabel(division), groups: bands.get(division)! })).filter(
-    (b) => b.groups.length > 0,
-  );
+  return DIVISIONS.map((division) => ({
+    division,
+    label: divisionLabel(division),
+    groups: bands.get(division)!,
+  })).filter((b) => b.groups.length > 0);
 }
 
 function dayNumber(day: Day): number {

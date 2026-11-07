@@ -68,7 +68,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // No pair in a league: the player's own link to invite one (2026-10-31),
   // first thing after the first-login page, and "Párt keresek" (D59).
   const links = await pairLinkBoxes(user);
-  const searching = await partnerSearchState(user, links.map((l) => l.league));
+  const searching = await partnerSearchState(
+    user,
+    links.map((l) => l.league),
+  );
   // The current phase's groups (#25): empty before they are published.
   const groups = await currentGroups(user.id, now);
   return {
@@ -85,19 +88,29 @@ export async function loader({ request }: Route.LoaderArgs) {
     })),
     multiLeague: leagueName.size > 1,
     seasons,
-    shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
+    shortcuts: nav
+      .filter((s) => s.label)
+      .map((s) => ({
+        label: s.label,
+        role: s.role,
+        items: s.items.map(({ label, to }) => ({ label, to })),
+      })),
   };
 }
 
 // "Nevezünk" on a season card, and the partner's address (#96).
 // `season` 0: not about a season card (the box's fetcher reads its own result).
-export async function action({ request }: Route.ActionArgs): Promise<{ season: number; error?: string; notice?: string; ok?: true }> {
+export async function action({ request }: Route.ActionArgs): Promise<{
+  season: number;
+  error?: string;
+  notice?: string;
+  ok?: true;
+}> {
   const user = await requireUser(request);
   const form = await request.formData();
   if (form.get("intent") === "partner_email") return { season: 0, ...(await partnerEmailAction(user, form)) };
   const season = Number(form.get("season") || 0);
-  if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
-    throw new Response("Hibás kérés.", { status: 400 });
+  if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0) throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
   return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
 }
@@ -117,6 +130,25 @@ function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
         Szabályzat
       </Link>
     </p>
+  );
+}
+
+function SeasonDates({
+  s,
+}: {
+  s: {
+    registrationOpensAt: Date;
+    registrationClosesAt: Date;
+    phases: Parameters<typeof PhaseList>[0]["phases"];
+  };
+}) {
+  return (
+    <>
+      <p>
+        <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} – {formatDeadline(s.registrationClosesAt)}
+      </p>
+      <PhaseList phases={s.phases} />
+    </>
   );
 }
 
@@ -154,36 +186,37 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
             <CardDescription>{s.league}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
-            <p>
-              <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} –{" "}
-              {formatDeadline(s.registrationClosesAt)}
-            </p>
-            <PhaseList phases={s.phases} />
+            {/* Once the season runs its dates are reference, not news (D128). */}
+            {d.groups.length > 0 ? (
+              <details className="group rounded-md border px-3 py-2">
+                <summary className="cursor-pointer font-medium">A szezon naptára</summary>
+                <div className="grid gap-3 pt-3">
+                  <SeasonDates s={s} />
+                </div>
+              </details>
+            ) : (
+              <SeasonDates s={s} />
+            )}
             {(s.strikes.count > 0 || s.strikes.leaving) && <StrikeLine {...s.strikes} />}
             {actionData?.season === s.id && (
-              <p
-                role={actionData.error ? "alert" : "status"}
-                className={actionData.error ? "font-semibold text-destructive" : "font-medium"}
-              >
+              <p role={actionData.error ? "alert" : "status"} className={actionData.error ? "font-semibold text-destructive" : "font-medium"}>
                 {actionData.error ?? actionData.notice}
               </p>
             )}
-            {s.entry && !(actionData?.season === s.id && actionData.notice) && (
-              <SeasonEntry seasonId={s.id} view={s.entry} />
-            )}
+            {s.entry && !(actionData?.season === s.id && actionData.notice) && <SeasonEntry seasonId={s.id} view={s.entry} />}
           </CardContent>
         </Card>
       ))}
       {d.groups.length === 0 && (
         <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
           <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
-        <p className="text-muted-foreground">
-          Amint indul a szezon, itt látod a csoportodat, a következő meccsedet és az eredményeket. Addig a{" "}
-          <Link to="/rules" className="underline">
-            szabályzatot
-          </Link>{" "}
-          érdemes átfutni.
-        </p>
+          <p className="text-muted-foreground">
+            Amint indul a szezon, itt látod a csoportodat, a következő meccsedet és az eredményeket. Addig a{" "}
+            <Link to="/rules" className="underline">
+              szabályzatot
+            </Link>{" "}
+            érdemes átfutni.
+          </p>
         </section>
       )}
       {d.shortcuts.map((s) => (
@@ -191,9 +224,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             {s.label}
             {s.role && (
-              <span className="rounded-full bg-nav-active-bg px-1.5 py-px text-[10px] font-semibold tracking-wide text-nav-active uppercase">
-                {s.role}
-              </span>
+              <span className="rounded-full bg-nav-active-bg px-1.5 py-px text-[10px] font-semibold tracking-wide text-nav-active uppercase">{s.role}</span>
             )}
           </h2>
           <ul className="flex flex-wrap gap-2">

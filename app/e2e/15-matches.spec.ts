@@ -129,7 +129,9 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${second!.id}`);
   const offset = logOffset();
-  // Late in the evening: an agreed time has no time window (spec 6.3).
+  // Late in the evening: an agreed time has no time window (spec 6.3). It is
+  // folded under the proposal form (D128).
+  await player.page.getByText("Máshol már megbeszéltétek?").click();
   await player.page.getByLabel("Megbeszélt időpont").fill(slot(1, "23:00"));
   await player.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
   await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
@@ -185,7 +187,8 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   await visit(other.page, `/matches/${first!.id}`);
   await expect(status(other.page)).toContainText("Minta Padel Aréna, 2-es pálya");
 
-  // Days ahead: not late, back to scheduling for both.
+  // Days ahead: not late, back to scheduling for both. Cancelling is folded (D128).
+  await main.getByText("Mégsem jó az időpont?").click();
   await main.getByRole("button", { name: "Lemondom a meccset" }).click();
   await expect(player.page.getByRole("alertdialog", { name: "Lemondod a meccset?" })).toBeVisible();
   await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();
@@ -194,6 +197,7 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
 
   // The other pair records a time 3 hours from now, anna confirms, then cancels: late.
   await visit(other.page, `/matches/${first!.id}`);
+  await other.page.getByText("Máshol már megbeszéltétek?").click();
   await other.page.getByLabel("Megbeszélt időpont").fill(hoursAhead(3));
   await other.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
   await expect(content(other.page).getByRole("status").filter({ hasText: "Rögzítettük." })).toBeVisible();
@@ -201,6 +205,7 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   await player.page.getByRole("button", { name: "Megerősítem" }).click();
   await expect(status(player.page)).toContainText("Lefixálva");
   await expect(main).toContainText("ez késői lemondás");
+  await main.getByText("Mégsem jó az időpont?").click();
   await main.getByRole("button", { name: "Lemondom a meccset" }).click();
   await expect(player.page.getByRole("alertdialog", { name: "Késői lemondás. Biztosan lemondod?" })).toBeVisible();
   await player.page.getByRole("button", { name: "Lemondom", exact: true }).click();

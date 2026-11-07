@@ -115,6 +115,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         a: m.a,
         b: m.b,
         week: m.week,
+        status: m.status,
         scheduledAt: m.scheduledAt,
         outcome: skipped.has(m.id) ? null : countedOutcome(m),
       })),
@@ -156,6 +157,6 @@ export async function ladderPage(slug: string, now = new Date()): Promise<Ladder
     startsOn: formatOnDate(shown.startsAt),
     weekFrom: formatShortDay(addDays(start, (week - 1) * 7)),
     weekTo: formatShortDay(addDays(start, (week - 1) * 7 + 6)),
-    bands: buildLadder(await phaseInput(season.id, shown.number), week),
+    bands: buildLadder(await phaseInput(season.id, shown.number), started && now <= shown.deadline ? week : null, shown.startsAt),
   };
 }

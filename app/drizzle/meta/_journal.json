@@ -323,13 +323,6 @@
       "when": 1793901527634,
       "tag": "0052_round_switch",
       "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "6",
-      "when": 1794005980033,
-      "tag": "0054_first_season_minimum",
-      "breakpoints": true
     }
   ]
 }

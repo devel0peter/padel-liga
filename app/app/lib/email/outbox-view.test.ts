@@ -4,7 +4,7 @@ import { emailMessages } from "~/db/schema";
 import { CONTACT_EMAIL, SITE_URL } from "~/lib/site";
 
 import { HIDDEN, hideAddresses, kindLabel, relayWarning } from "./outbox-view";
-import { pairIntro, registrationInvite } from "./templates";
+import { pairCreated } from "./templates";
 import { unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 const ALL_KINDS = emailMessages.kind.enumValues;
@@ -35,22 +35,17 @@ describe("hideAddresses", () => {
     ).toBe(`relay: RCPT TO: 550 5.1.1 The email account <${HIDDEN}> does not exist; resend: 422 x`);
   });
 
-  it("hides the partner's address in a pair intro", () => {
-    const { text, subject } = pairIntro(
-      { name: "Anna", email: "anna@example.com", level: "kezdo" },
-      { name: "Béla", email: "Bela.Kovacs@example.hu", level: "halado" },
-      "Győr",
-    );
+  it("hides the partner's address in a new pair's email", () => {
+    const { text, subject } = pairCreated({ to: "Anna", partnerName: "Béla", partnerEmail: "Bela.Kovacs@example.hu", partnerPhone: "", league: "Padelpárbaj Győr" });
+    expect(leak(text, "bela.kovacs@example.hu").length).toBeGreaterThan(0);
     expect(leak(hideAddresses(text), "bela.kovacs@example.hu")).toEqual([]);
-    expect(leak(hideAddresses(text), "anna@example.com")).toEqual([]);
-    expect(hideAddresses(text)).toContain(`Az e-mail-címe: ${HIDDEN}`);
     expect(hideAddresses(subject)).toBe(subject);
   });
 
   it("hides the address in a login link and in the unsubscribe link", async () => {
     const email = "zsofi.szabo@example.com";
     const url = unsubscribeUrl(SITE_URL, await unsubscribeToken(email, "secret"));
-    const { text } = registrationInvite({ name: "Zsófi", email }, url);
+    const text = `Regisztrálj: ${SITE_URL}/register?email=${encodeURIComponent(email)}\n\nLeiratkozás: ${url}`;
     expect(leak(text, email).length).toBeGreaterThan(0);
     const hidden = hideAddresses(text);
     expect(leak(hidden, email)).toEqual([]);

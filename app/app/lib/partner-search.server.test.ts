@@ -31,19 +31,23 @@ beforeEach(() => {
   ])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, ?, 1)").run(id, `${id}@x.hu`, name, level);
   h.raw.exec(`insert into users (id, email, name) values ('n', 'n@x.hu', ''), ('org', 'org@x.hu', 'Szervező')`);
-  // Cecil signed up alone and still waits; Anna signed up as a pair.
+  // Anna, Béla and Cecil joined the league (D128).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (1, 'b', 'chosen'), (1, 'c', 'chosen')`);
+  // Cecil looks for a partner (the release stored his old solo-signup default
+  // as a row, #333); Béla signed up alone too, but has no row: off.
+  h.raw.exec(`insert into partner_searches (league_id, user_id, seeking, updated_at) values (1, 'c', 1, 100)`);
   h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at, note) values
-    ('gyor', 'solo', 'Cecil', 'C@x.hu', 'kezdo', 1, 'hétvégén'),
-    ('gyor', 'pair', 'Anna', 'a@x.hu', 'halado', 1, null)`);
+    ('gyor', 'solo', 'Béla', 'b@x.hu', 'kezdo', 1, 'hétvégén')`);
 });
 
 describe("Párt keresek on real SQLite (D59)", () => {
-  it("is on by default for a waiting solo signup only", async () => {
+  it("is off until switched on, whatever the interest list says (#333)", async () => {
     expect(await S.partnerSearchState(user("a"), [GYOR])).toEqual(new Map([[1, false]]));
+    expect(await S.partnerSearchState(user("b"), [GYOR])).toEqual(new Map([[1, false]]));
     expect(await S.partnerSearchState(user("c"), [GYOR])).toEqual(new Map([[1, true]]));
     expect(await ids()).toEqual(["c"]);
-    const [cecil] = await S.leagueSeekers(LEAGUE);
-    expect(cecil).toMatchObject({ name: "Cecil", level: "kezdo", phone: "", fromSignup: true, note: "hétvégén" });
+    // Name, level, phone and since when; nothing from a signup.
+    expect(await S.leagueSeekers(LEAGUE)).toEqual([{ id: "c", name: "Cecil", level: "kezdo", phone: "", since: new Date(100_000) }]);
   });
 
   it("gives the organizer each seeker's phone number, formatted (D126)", async () => {
@@ -72,7 +76,7 @@ describe("Párt keresek on real SQLite (D59)", () => {
   it("refuses an unfinished account and an unknown league", async () => {
     expect(await S.setPartnerSearch(user("n", null), 1, true, [GYOR])).toBe(false);
     expect(await S.setPartnerSearch(user("a"), 2, true, [GYOR])).toBe(false);
-    expect(h.raw.prepare("select count(*) as n from partner_searches").get()).toEqual({ n: 0 });
+    expect(h.raw.prepare("select count(*) as n from partner_searches where user_id <> 'c'").get()).toEqual({ n: 0 });
   });
 
   it("pairs two seekers at once, with a message and an email (#260), and they leave the list", async () => {
@@ -90,17 +94,6 @@ describe("Párt keresek on real SQLite (D59)", () => {
     expect((await S.pairSeekers("org", LEAGUE, "a", "b")).ok).toBe(false);
   });
 
-  it("a solo paired by a Szervező waits for the partner, then looks again if they have no pair", async () => {
-    h.raw.exec(`insert into interest_signups (id, city, mode, name1, email1, level, consent_at, paired_with, status) values
-      (10, 'gyor', 'solo', 'Béla', 'b@x.hu', 'kezdo', 1, 11, 'paired'),
-      (11, 'gyor', 'solo', 'Zoli', 'z@x.hu', 'kezdo', 1, 10, 'paired')`);
-    expect(await ids()).toEqual(["c"]);
-    // Zoli registered and joined someone else: Béla is looking again.
-    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('z', 'z@x.hu', 'Zoli', 'kezdo', 1)`);
-    h.raw.exec(`insert into pairs (league_id, player_a, player_b) values (1, 'z', 'a')`);
-    expect(await ids()).toEqual(["b", "c"]);
-  });
-
   it("lists a seeker again once the pair is dissolved", async () => {
     await S.pairSeekers("org", LEAGUE, "b", "c");
     h.raw.exec(`update pairs set status = 'dissolved'`);
@@ -114,6 +107,7 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
 
   it("lists an active pair made from Regisztráltak, newest first, with name and level", async () => {
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'halado', 1)`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'd', 'chosen')`);
     await S.pairSeekers("org", LEAGUE, "b", "c");
     await S.pairSeekers("org", LEAGUE, "a", "d");
     expect(await listed()).toEqual(["a+d", "b+c"]);
@@ -137,8 +131,18 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
 
   it("keeps to the league", async () => {
     h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'gyor', 'gyor2', 'Másik')`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'b', 'chosen'), (2, 'c', 'chosen')`);
     await S.pairSeekers("org", { id: 2, name: "Másik" }, "b", "c");
     expect(await listed(1)).toEqual([]);
     expect(await listed(2)).toEqual(["b+c"]);
+  });
+
+  it("lists only the league's players (D128): someone who joined another league isn't a seeker here", async () => {
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'mmo', 'mmo', 'Óvár')`);
+    h.raw.prepare("insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'kezdo', 1)").run();
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'd', 'chosen')`);
+    h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'd', 1), (2, 'd', 1)`);
+    expect(await ids()).not.toContain("d");
+    expect((await S.leagueSeekers({ id: 2 })).map((s) => s.id)).toEqual(["d"]);
   });
 });

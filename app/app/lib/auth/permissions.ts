@@ -19,9 +19,8 @@ export type Permission =
   | { kind: "app.enter" }
   // See the admin area at all.
   | { kind: "admin.enter" }
-  // Admin (superadmin) only: the interest list (and its CSV), broadcasts, the
-  // outbox log, traffic, leagues and Szervező appointments, the user list.
-  | { kind: "signups.manage" }
+  // Admin (superadmin) only: broadcasts, the outbox log, traffic, leagues and
+  // Szervező appointments, the user list.
   | { kind: "broadcasts.send" }
   | { kind: "outbox.manage" }
   | { kind: "traffic.view" }
@@ -63,7 +62,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
+export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -73,7 +72,6 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Ligák", to: "/admin/leagues", icon: "leagues", permission: { kind: "leagues.manage" } },
   { label: "Városok", to: "/admin/cities", icon: "cities", permission: { kind: "cities.manage" } },
   { label: "Felhasználók", to: "/admin/users", icon: "users", permission: { kind: "users.view" } },
-  { label: "Jelentkezők", to: "/admin/signups", icon: "signups", permission: { kind: "signups.manage" } },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
@@ -126,10 +124,10 @@ export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []
     .filter((s) => s.items.length > 0);
 }
 
-// Where /admin sends you: the Admin to the signups, a Szervező to their
+// Where /admin sends you: the Admin to the leagues, a Szervező to their
 // (first) league. Null: nothing to open yet.
 export function adminHome(actor: Actor): string | null {
-  if (actor.platformRole === "superadmin") return "/admin/signups";
+  if (actor.platformRole === "superadmin") return "/admin/leagues";
   const league = actor.leagues[0];
   return league ? `/admin/leagues/${league.slug}` : null;
 }

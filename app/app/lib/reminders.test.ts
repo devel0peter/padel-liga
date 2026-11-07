@@ -12,7 +12,6 @@ import {
   type ReminderAccount,
   type ReminderInput,
   type ReminderPair,
-  type ReminderSignup,
 } from "./reminders";
 import type { Season } from "./seasons";
 
@@ -44,22 +43,6 @@ function season(over: Partial<Season> = {}): Season {
   };
 }
 
-let nextSignup = 1;
-function signup(v: Partial<ReminderSignup> & { email1: string }): ReminderSignup {
-  return {
-    id: nextSignup++,
-    mode: "solo",
-    city: "gyor",
-    status: "new",
-    name1: v.email1.split("@")[0]!,
-    name2: null,
-    email2: null,
-    pairedWith: null,
-    invitedAt: null,
-    invited2At: null,
-    ...v,
-  };
-}
 
 function account(id: string, v: Partial<ReminderAccount> = {}): ReminderAccount {
   return {
@@ -79,13 +62,14 @@ function pair(a: string, b: string, v: Partial<ReminderPair> = {}): ReminderPair
   return { id: nextPair++, leagueId: 1, playerA: a, playerB: b, status: "active", createdAt: ago(3 * DAY), dissolvedAt: null, ...v };
 }
 
+// Unless a test says otherwise, every account joined league 1 (D128).
 function input(v: Partial<ReminderInput> = {}): ReminderInput {
   return {
     now: NOW,
     leagues: [{ id: 1, city: "gyor", name: "Padelpárbaj Győr" }],
     seasons: [season()],
-    signups: [],
     accounts: [],
+    members: (v.accounts ?? []).map((a) => ({ leagueId: 1, userId: a.id })),
     pairs: [],
     entries: [],
     partnerSearches: [],
@@ -126,11 +110,11 @@ describe("the season the reminders are about", () => {
 describe("the waiting time and the deadline rule", () => {
   const s = season();
 
-  it("B waits 24 hours, A, C and D 2 days", () => {
+  it("B waits 24 hours, C and D 2 days", () => {
     const early = new Date("2026-10-30T12:00:00Z");
     expect(isDue("B", new Date(early.getTime() - 24 * HOUR), s, early)).toBe(true);
     expect(isDue("B", new Date(early.getTime() - 23 * HOUR), s, early)).toBe(false);
-    for (const x of ["A", "C", "D"] as const) {
+    for (const x of ["C", "D"] as const) {
       expect(isDue(x, new Date(early.getTime() - 2 * DAY), s, early)).toBe(true);
       expect(isDue(x, new Date(early.getTime() - 47 * HOUR), s, early)).toBe(false);
     }
@@ -161,40 +145,6 @@ describe("the waiting time and the deadline rule", () => {
   });
 });
 
-describe("A: invited, no account", () => {
-  it("is reminded 2 days after the invite", () => {
-    expect(who({ signups: [signup({ email1: "eva@x.hu", invitedAt: ago(2 * DAY) })] })).toEqual(["A eva@x.hu"]);
-    expect(who({ signups: [signup({ email1: "eva@x.hu", invitedAt: ago(DAY) })] })).toEqual([]);
-  });
-
-  it("covers the partner of a pair signup by the partner's own invite", () => {
-    const s = signup({ mode: "pair", email1: "eva@x.hu", name2: "Feri", email2: "feri@x.hu", invitedAt: ago(DAY), invited2At: ago(3 * DAY) });
-    expect(who({ signups: [s] })).toEqual(["A feri@x.hu"]);
-  });
-
-  it("names the partner who already registered", () => {
-    const s = signup({ mode: "pair", email1: "eva@x.hu", name1: "Éva", name2: "Feri", email2: "feri@x.hu", invitedAt: ago(3 * DAY), invited2At: ago(3 * DAY) });
-    const feri = account("feri");
-    const [r] = due({ signups: [s], accounts: [feri], pairs: [] });
-    expect(r).toMatchObject({ situation: "A", key: "A:eva@x.hu", recipients: [{ email: "eva@x.hu", name: "Éva", partner: "Feri" }] });
-    // Not yet registered: no partner line.
-    const unfinished = account("feri", { consentAt: null });
-    expect(due({ signups: [s], accounts: [unfinished] }).find((x) => x.situation === "A")?.recipients[0].partner).toBeNull();
-  });
-
-  it("skips withdrawn signups, unsubscribed or bounced addresses, cities without a league and the uninvited", () => {
-    expect(who({ signups: [signup({ email1: "eva@x.hu", invitedAt: ago(3 * DAY), status: "withdrawn" })] })).toEqual([]);
-    expect(who({ signups: [signup({ email1: "eva@x.hu", invitedAt: ago(3 * DAY) })], suppressed: new Set(["eva@x.hu"]) })).toEqual([]);
-    expect(who({ signups: [signup({ email1: "eva@x.hu", invitedAt: ago(3 * DAY), city: "pecs" })] })).toEqual([]);
-    expect(who({ signups: [signup({ email1: "eva@x.hu" })] })).toEqual([]);
-  });
-
-  it("is over once there is an account (then B or C applies)", () => {
-    const s = signup({ email1: "eva@x.hu", invitedAt: ago(3 * DAY) });
-    expect(who({ signups: [s], accounts: [account("eva", { consentAt: null })] })).toEqual(["B eva@x.hu"]);
-  });
-});
-
 describe("B: first login, registration not finished", () => {
   const unfinished = (v: Partial<ReminderAccount> = {}) => account("bela", { consentAt: null, createdAt: ago(25 * HOUR), ...v });
 
@@ -209,9 +159,10 @@ describe("B: first login, registration not finished", () => {
     expect(who({ accounts: [unfinished()], suppressed: new Set(["bela@x.hu"]) })).toEqual([]);
   });
 
-  it("skips someone whose signups are all in cities without a league", () => {
-    expect(who({ accounts: [unfinished()], signups: [signup({ email1: "bela@x.hu", city: "other" })] })).toEqual([]);
-    expect(who({ accounts: [unfinished()], signups: [signup({ email1: "bela@x.hu" })] })).toEqual(["B bela@x.hu"]);
+  it("only for the league the account joined (D128): none in no league, whatever its signups", () => {
+    expect(who({ accounts: [unfinished()], members: [] })).toEqual([]);
+    expect(who({ accounts: [unfinished()], members: [{ leagueId: 2, userId: "bela" }] })).toEqual([]);
+    expect(who({ accounts: [unfinished()], members: [{ leagueId: 1, userId: "bela" }] })).toEqual(["B bela@x.hu"]);
   });
 });
 
@@ -221,11 +172,26 @@ describe("C: registered, no pair", () => {
     expect(who({ accounts: [account("cili", { consentAt: ago(DAY) })] })).toEqual([]);
   });
 
+  it("only in the leagues the player belongs to (D128): joined, or a pair there", () => {
+    const leagues = [
+      { id: 1, city: "gyor", name: "Győr" },
+      { id: 2, city: "mmo", name: "Mosonmagyaróvár" },
+    ];
+    const seasons = [season(), season({ id: 8, leagueId: 2 })];
+    expect(who({ leagues, seasons, accounts: [account("cili")], members: [] }, [1, 2])).toEqual([]);
+    const [r] = due({ leagues, seasons, accounts: [account("cili")], members: [{ leagueId: 2, userId: "cili" }] }, [1, 2]);
+    expect([r.situation, r.leagueId]).toEqual(["C", 2]);
+    // A dissolved pair in league 2 still makes Cili one of its players.
+    const dissolved = pair("cili", "dani", { leagueId: 2, status: "dissolved", dissolvedAt: ago(3 * DAY) });
+    const v = { leagues, seasons, accounts: [account("cili")], members: [], pairs: [dissolved] };
+    expect(due(v, [1, 2]).map((x) => [x.situation, x.leagueId])).toEqual([["C", 2]]);
+  });
+
   it("skips players with a pair, and players looking for a partner (Párt keresek)", () => {
     expect(who({ accounts: [account("cili"), account("dani")], pairs: [pair("cili", "dani")], entries: [{ seasonId: 7, pairId: nextPair - 1 }] })).toEqual([]);
     expect(who({ accounts: [account("cili")], partnerSearches: [{ leagueId: 1, userId: "cili", seeking: true, updatedAt: ago(5 * DAY) }] })).toEqual([]);
-    // A solo signup still waiting is looking by default.
-    expect(who({ accounts: [account("cili")], signups: [signup({ email1: "cili@x.hu", mode: "solo" })] })).toEqual([]);
+    // Off without a stored choice (#333): a solo signup no longer counts.
+    expect(who({ accounts: [account("cili")] })).toEqual(["C cili@x.hu"]);
   });
 
   it("starts the 2 days again when the pair is dissolved or Párt keresek is switched off", () => {
@@ -235,12 +201,7 @@ describe("C: registered, no pair", () => {
     expect(who({ accounts: [account("cili")], partnerSearches: [{ ...off, updatedAt: ago(2 * DAY) }] })).toEqual(["C cili@x.hu"]);
   });
 
-  it("names the partner the signup names who hasn't registered", () => {
-    const s = signup({ mode: "pair", email1: "cili@x.hu", name2: "Dani", email2: "dani@x.hu" });
-    expect(due({ accounts: [account("cili")], signups: [s] })[0].recipients[0].partner).toBe("Dani");
-    // Without an address too.
-    const noEmail = signup({ mode: "pair", email1: "cili@x.hu", name2: "Dani" });
-    expect(due({ accounts: [account("cili")], signups: [noEmail] })[0].recipients[0].partner).toBe("Dani");
+  it("names no partner: nobody is taken from the interest list (#333)", () => {
     expect(due({ accounts: [account("cili")] })[0].recipients[0].partner).toBeNull();
   });
 
@@ -310,24 +271,20 @@ describe("once only, one per person, and the switch", () => {
     const v = { leagues, seasons, accounts: [account("cili"), account("dani")], pairs: [pair("cili", "dani", { leagueId: 2 })] };
     // Dani has a pair in league 2 but none in league 1 either: C for both.
     expect(who(v, [1, 2])).toEqual(["C cili@x.hu", "C dani@x.hu"]);
-    expect(countBySituation(due(v, [1, 2]))).toEqual({ A: 0, B: 0, C: 2, D: 0 });
+    expect(countBySituation(due(v, [1, 2]))).toEqual({ B: 0, C: 2, D: 0 });
     expect(who({ ...v, sent: new Set(["C:cili", "C:dani"]) }, [1, 2])).toEqual(["D cili@x.hu", "D dani@x.hu"]);
   });
 
   it("counts each person in at most one reminder", () => {
     const v = {
-      signups: [
-        signup({ email1: "eva@x.hu", invitedAt: ago(3 * DAY) }),
-        signup({ mode: "pair" as const, email1: "cili@x.hu", name2: "Dani", email2: "dani@x.hu", invitedAt: ago(3 * DAY), invited2At: ago(3 * DAY) }),
-      ],
       accounts: [account("bela", { consentAt: null, createdAt: ago(2 * DAY) }), account("cili"), account("gabi"), account("hedi")],
       pairs: [pair("gabi", "hedi")],
     };
     const r = due(v);
-    expect(who(v)).toEqual(["A dani@x.hu", "A eva@x.hu", "B bela@x.hu", "C cili@x.hu", "D gabi@x.hu", "D hedi@x.hu"]);
+    expect(who(v)).toEqual(["B bela@x.hu", "C cili@x.hu", "D gabi@x.hu", "D hedi@x.hu"]);
     const emails = r.flatMap((x) => x.recipients.map((p) => p.email));
     expect(new Set(emails).size).toBe(emails.length);
-    expect(countBySituation(r)).toEqual({ A: 2, B: 1, C: 1, D: 2 });
+    expect(countBySituation(r)).toEqual({ B: 1, C: 1, D: 2 });
   });
 
   it("sends nothing in a league with the switch off", () => {
@@ -336,8 +293,8 @@ describe("once only, one per person, and the switch", () => {
 });
 
 describe("one reminder per person per league season (#191)", () => {
-  it("someone who got A is not reminded again in C in the same season; in a new season they can be", () => {
-    // Cili got A (invited, no account) in season 7, then registered and has no pair.
+  it("someone who got B is not reminded again in C in the same season; in a new season they can be", () => {
+    // Cili got B in season 7, then finished registering and has no pair.
     const v = { accounts: [account("cili")] };
     expect(who({ ...v, reminded: new Set([personKey(7, "cili@x.hu")]) })).toEqual([]);
     // Another season of the league: C again.
@@ -345,11 +302,10 @@ describe("one reminder per person per league season (#191)", () => {
   });
 
   it("holds for every situation, matched by address", () => {
-    const reminded = new Set(["eva@x.hu", "bela@x.hu", "cili@x.hu"].map((e) => personKey(7, e)));
+    const reminded = new Set(["bela@x.hu", "cili@x.hu"].map((e) => personKey(7, e)));
     expect(
       who({
         reminded,
-        signups: [signup({ email1: "Eva@x.hu", invitedAt: ago(3 * DAY) })],
         accounts: [account("bela", { consentAt: null }), account("cili")],
       }),
     ).toEqual([]);

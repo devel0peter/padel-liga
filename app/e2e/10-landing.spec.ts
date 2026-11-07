@@ -23,8 +23,9 @@ test("the hero shows a league city's league and leads to registration", async ({
   await expect(page.getByText("Ahol már fut a liga, nevezhetsz rögtön")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/12 pár|elég pár/);
 
+  // The button carries the league, so the new account joins it (D128, #331).
   await league.getByRole("link", { name: "Nevezek a 2. körre" }).click();
-  await expect(page).toHaveURL(/\/register$/);
+  await expect(page).toHaveURL(/\/register\?league=minta$/);
   await expect(page.getByRole("heading", { name: "Regisztráció" })).toBeVisible();
   await page.close();
 });
@@ -89,11 +90,15 @@ test("the public pages do not scroll sideways at 360 px", async ({ browser }) =>
   await admin.context.close();
 });
 
-// The poster (#120) no longer ties the start to a number of pairs.
-test("the poster doesn't make the start depend on pairs", async ({ browser }) => {
+// Jelentkezők, the poster and the signup CSV went with the interest list
+// (#333): their old addresses lead to the admin home, and the menu has no
+// Jelentkezők.
+test("the interest list's admin pages are gone; their addresses lead to the admin home", async ({ browser }) => {
   const { context, page } = await as(browser, ADMIN.email);
-  await visit(page, "/admin/poster");
-  await expect(page.locator("article")).toContainText("Nevezz a pároddal, és már a következő körtől játszotok.");
-  await expect(page.locator("article")).not.toContainText(/12 pár|összegyűlik/);
+  for (const path of ["/admin/signups", "/admin/signups?stage=no_pair", "/admin/poster", "/admin/poster?ref=minta-padel-arena", "/admin/export.csv"]) {
+    await visit(page, path);
+    await expect(page, path).toHaveURL(/\/admin\/leagues$/);
+  }
+  await expect(page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Jelentkezők" })).toHaveCount(0);
   await context.close();
 });

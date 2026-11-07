@@ -2,11 +2,12 @@
 // published joins round 2, at once (#153).
 import { expect, test } from "@playwright/test";
 
-import { PAIRS, as, content, registerAll, visit } from "./support";
+import { PAIRS, as, content, pairUp, registerAll, visit } from "./support";
 
 test("11. a pair entering after Közzététel starts in round 2", async ({ browser }) => {
   const [reka, levente] = PAIRS.late;
   await registerAll(browser, PAIRS.late);
+  await pairUp(browser, PAIRS.late);
   const player = await as(browser, reka);
   await visit(player.page, "/pair");
   await expect(content(player.page)).toContainText(levente.name);

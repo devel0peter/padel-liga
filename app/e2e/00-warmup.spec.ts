@@ -24,7 +24,6 @@ test("warm up the dev server", async ({ browser }) => {
     "/admin/cities",
     "/admin/clubs",
     "/admin/leagues",
-    "/admin/signups",
     "/admin/outbox",
     "/admin/users",
   ]) {

@@ -1,5 +1,6 @@
-// The four reminder texts (#155), word for word: they are the final text
-// Peter reviews in the PR.
+// The three reminder texts (#155), word for word: they are the final text
+// Peter reviews in the PR. (A, the registration invite's reminder, went with
+// the interest list: #333, D129.)
 import { describe, expect, it } from "vitest";
 
 import { stuckReminder, type StuckReminderInput } from "./templates";
@@ -7,7 +8,6 @@ import { stuckReminder, type StuckReminderInput } from "./templates";
 const NOW = new Date("2026-11-02T12:00:00Z");
 const base: Omit<StuckReminderInput, "situation"> = {
   to: "Anna",
-  email: "anna@x.hu",
   partner: null,
   league: "Padelpárbaj Győr",
   season: "2026/27 tél",
@@ -21,22 +21,6 @@ const UNSUB = "https://padelparbaj.hu/unsubscribe?t=abc";
 const body = (input: StuckReminderInput) => stuckReminder(input, UNSUB).text.split("\n\n--\n")[0];
 
 describe("stuckReminder", () => {
-  it("A: register, with the partner who waits", () => {
-    const email = stuckReminder({ ...base, situation: "A", partner: "Béla" }, UNSUB);
-    expect(email.subject).toBe("Még nem regisztráltál – Padelpárbaj");
-    expect(body({ ...base, situation: "A", partner: "Béla" })).toBe(
-      [
-        "Szia Anna!",
-        "Kaptál tőlem meghívót a Padelpárbajra, de még nem regisztráltál. Egy perc az egész, jelszó sem kell:",
-        "https://padelparbaj.hu/register?email=anna%40x.hu",
-        "Béla már regisztrált, csak rád vár.",
-        "Nevezési határidő: nov. 6., péntek 23:59. Az 1. kör nov. 9., hétfő indul.",
-        "Péter\nPadelpárbaj",
-      ].join("\n\n"),
-    );
-    expect(email.text).toContain("Azért kaptad ezt a levelet, mert jelentkeztél a Padelpárbajra.");
-  });
-
   it("B: finish the registration", () => {
     const email = stuckReminder({ ...base, situation: "B" }, UNSUB);
     expect(email.subject).toBe("Fejezd be a regisztrációt – Padelpárbaj");
@@ -54,14 +38,13 @@ describe("stuckReminder", () => {
   });
 
   it("C: send the pair link, or switch on Párt keresek", () => {
-    const input = { ...base, situation: "C" as const, partner: "Béla", pairLink: "https://padelparbaj.hu/pair/join/tok" };
+    const input = { ...base, situation: "C" as const, pairLink: "https://padelparbaj.hu/pair/join/tok" };
     expect(stuckReminder(input, UNSUB).subject).toBe("Hívd meg a párodat – Padelpárbaj");
     expect(body(input)).toBe(
       [
         "Szia Anna!",
         "Még nincs párod (Padelpárbaj Győr). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.",
         "https://padelparbaj.hu/pair/join/tok",
-        "Béla még nem regisztrált: neki is küldd el.",
         "Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:",
         "https://padelparbaj.hu/pair",
         "Nevezési határidő: nov. 6., péntek 23:59. Az 1. kör nov. 9., hétfő indul.",
@@ -91,7 +74,7 @@ describe("stuckReminder", () => {
   });
 
   it("has an unsubscribe link and a link only where we put one", () => {
-    for (const situation of ["A", "B", "C", "D"] as const) {
+    for (const situation of ["B", "C", "D"] as const) {
       const email = stuckReminder({ ...base, situation, to: "<b>X</b>", partner: "https://evil.example" }, UNSUB);
       expect(email.text).toContain(`Leiratkozás: ${UNSUB}`);
       expect(email.html).toContain(`href="${UNSUB}"`);
@@ -100,11 +83,11 @@ describe("stuckReminder", () => {
     }
   });
 
-  it("holds no address but the recipient's own (A's link), and no phone number", () => {
-    for (const situation of ["A", "B", "C", "D"] as const) {
+  it("holds no address and no phone number", () => {
+    for (const situation of ["B", "C", "D"] as const) {
       const { text, html } = stuckReminder({ ...base, situation, partner: "Béla", pairLink: "https://padelparbaj.hu/pair/join/tok" }, UNSUB);
       for (const s of [text, html]) {
-        expect(s.replace(/anna(%40|@)x\.hu/g, "")).not.toMatch(/@|%40/);
+        expect(s).not.toMatch(/@|%40/);
         expect(s).not.toMatch(/\+36|06\d{8}/);
       }
     }

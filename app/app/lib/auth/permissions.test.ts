@@ -19,7 +19,6 @@ const organizer = actor({ leagues: [gyor] });
 const superadmin = actor({ platformRole: "superadmin" });
 
 const platformOnly: Permission[] = [
-  { kind: "signups.manage" },
   { kind: "broadcasts.send" },
   { kind: "outbox.manage" },
   { kind: "traffic.view" },
@@ -108,13 +107,12 @@ describe("sidebar", () => {
       "/admin/leagues",
       "/admin/cities",
       "/admin/users",
-      "/admin/signups",
       "/admin/broadcasts",
       "/admin/outbox",
       "/admin/traffic",
       "/admin/log",
     ]);
-    expect(adminHome(superadmin)).toBe("/admin/signups");
+    expect(adminHome(superadmin)).toBe("/admin/leagues");
   });
 
   it("follows the league in the URL", () => {

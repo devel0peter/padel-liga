@@ -1,124 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDateTime } from "./format";
-import {
-  cityLabel,
-  countSignups,
-  filterSignups,
-  NO_REF,
-  parseFilters,
-  toCsv,
-  type SignupRow,
-} from "./signups-admin";
+import { cityLabel, levelLabel } from "./signups-admin";
 
 const GYOR = [{ slug: "gyor", name: "Győr" }];
 
-function row(over: Partial<SignupRow>): SignupRow {
-  return {
-    id: 1,
-    city: "gyor",
-    cityOther: null,
-    mode: "pair",
-    name1: "Nagy Anna",
-    email1: "anna@example.com",
-    name2: "Kovács Béla",
-    email2: null,
-    level: "kezdo",
-    note: null,
-    ref: null,
-    homeClub: null,
-    wantsToOrganize: false,
-    status: "new",
-    adminNote: null,
-    pairedWith: null,
-    invitedAt: null,
-    invited2At: null,
-    consentAt: new Date("2026-10-01T12:00:00Z"),
-    createdAt: new Date("2026-10-01T12:00:00Z"),
-    updatedAt: null,
-    ...over,
-  };
-}
-
-const rows = [
-  row({ id: 1, homeClub: "other" }),
-  row({ id: 2, mode: "solo", name1: "Szabó Csaba", email1: "csaba@example.com", name2: null, level: "halado", status: "contacted" }),
-  row({ id: 3, city: "other", cityOther: "Szeged", name1: "Tóth Dóra", email1: "dora@example.com", name2: "Varga Éva", ref: "gyp" }),
-];
-
-const none = parseFilters(new URLSearchParams());
-
-describe("filterSignups", () => {
-  it("returns everything without filters", () => {
-    expect(filterSignups(rows, none)).toHaveLength(3);
-  });
-
-  it("filters by city, status, level and mode", () => {
-    expect(filterSignups(rows, { ...none, city: "other" }).map((r) => r.id)).toEqual([3]);
-    expect(filterSignups(rows, { ...none, status: "contacted" }).map((r) => r.id)).toEqual([2]);
-    expect(filterSignups(rows, { ...none, level: "halado" }).map((r) => r.id)).toEqual([2]);
-    expect(filterSignups(rows, { ...none, mode: "pair" }).map((r) => r.id)).toEqual([1, 3]);
-  });
-
-  it("filters by source, including signups without one", () => {
-    expect(filterSignups(rows, { ...none, ref: "gyp" }).map((r) => r.id)).toEqual([3]);
-    expect(filterSignups(rows, { ...none, ref: NO_REF }).map((r) => r.id)).toEqual([1, 2]);
-  });
-
-  it("filters by home club, including signups without one", () => {
-    expect(filterSignups(rows, { ...none, club: "other" }).map((r) => r.id)).toEqual([1]);
-    expect(filterSignups(rows, { ...none, club: NO_REF }).map((r) => r.id)).toEqual([2, 3]);
-  });
-
-  it("searches names, emails and the other city, ignoring case and accents", () => {
-    expect(filterSignups(rows, { ...none, q: "kovacs" }).map((r) => r.id)).toEqual([1]);
-    expect(filterSignups(rows, { ...none, q: "SZEGED" }).map((r) => r.id)).toEqual([3]);
-    expect(filterSignups(rows, { ...none, q: "anna@" }).map((r) => r.id)).toEqual([1]);
-  });
-});
-
-describe("countSignups", () => {
-  it("counts pairs, solo signups and players", () => {
-    expect(countSignups(rows)).toEqual({ signups: 3, pairs: 2, solo: 1, players: 5 });
-  });
-});
-
 describe("cityLabel", () => {
   it("names supported and other cities", () => {
-    expect(cityLabel(rows[0], GYOR)).toBe("Győr");
-    expect(cityLabel(rows[2], GYOR)).toBe("Szeged (más város)");
+    expect(cityLabel({ city: "gyor", cityOther: null }, GYOR)).toBe("Győr");
+    expect(cityLabel({ city: "other", cityOther: "Szeged" }, GYOR)).toBe("Szeged (más város)");
+    expect(cityLabel({ city: "other", cityOther: null }, GYOR)).toBe("Más város");
   });
 });
 
-describe("toCsv", () => {
-  it("keeps user input that starts like a formula as text", () => {
-    const line = toCsv([row({ name1: "=HYPERLINK(\"x\")", note: "-1", adminNote: "@sum" })], undefined, GYOR).split("\r\n")[1];
-    expect(line).toContain(`"'=HYPERLINK(""x"")"`);
-    expect(line).toContain(";'-1;");
-    expect(line).toContain(";'@sum");
-  });
-
-  it("writes a BOM, a header and semicolon-separated rows with quoting", () => {
-    const csv = toCsv([row({ note: 'hétfő; "este"' })], undefined, GYOR);
-    expect(csv.startsWith("﻿Azonosító;")).toBe(true);
-    const line = csv.split("\r\n")[1];
-    expect(line).toContain("Győr;Pár;Nagy Anna;anna@example.com;Kovács Béla;;Kezdő;");
-    expect(line).toContain('"hétfő; ""este"""');
-    expect(line).toContain(";Új;");
-  });
-
-  it("marks who would organize a league in the last column", () => {
-    const csv = toCsv([row({ wantsToOrganize: true }), row({})]);
-    const [header, yes, no] = csv.split("\r\n");
-    expect(header.endsWith(";Szervezne")).toBe(true);
-    expect(yes.endsWith(";igen")).toBe(true);
-    expect(no.endsWith(";")).toBe(true);
-  });
-
-  it("writes the source and home club through the given labels", () => {
-    const name = (s: string | null) => (s === "gyp" ? "Győr Padel" : "");
-    const line = toCsv([row({ ref: "gyp", homeClub: "gyp" })], { ref: name, homeClub: name }).split("\r\n")[1];
-    expect(line).toContain(";Kezdő;;Győr Padel;Győr Padel;Új;");
+describe("levelLabel", () => {
+  it("is the level's name without its description; an unknown one as it is", () => {
+    expect(levelLabel("halado")).toBe("Haladó");
+    expect(levelLabel("valami")).toBe("valami");
   });
 });
 

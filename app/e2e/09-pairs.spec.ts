@@ -16,7 +16,7 @@ async function pick(page: Page, label: string, player: Player) {
 test("14. create, dissolve and change pairs; a published pair is locked", async ({ browser }) => {
   const { torok, lakatos } = LONE;
   const [boglarka, akos] = WAITING_SOLOS;
-  // Two players whose signup partner never registers: no pair yet.
+  // Two players whose partner never registers: no pair yet.
   await registerAll(browser, [torok, lakatos]);
   const OTHER = "select count(*) as n from email_messages where kind != 'pair_created'";
   const emailsBefore = d1(OTHER);

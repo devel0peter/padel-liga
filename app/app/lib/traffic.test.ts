@@ -135,7 +135,7 @@ describe("daysOf", () => {
   });
 });
 
-describe("buildFunnel", () => {
+describe("buildFunnel (landings only since #333)", () => {
   const period = { from: "2026-10-05", to: "2026-10-06" };
   const landings = [
     { day: "2026-10-05", ref: "fb", count: 40 },
@@ -144,44 +144,29 @@ describe("buildFunnel", () => {
     { day: "2026-10-05", ref: "gyor-padel", count: 5 },
     { day: "2026-10-04", ref: "fb", count: 999 }, // before the period
   ];
-  const signups = [
-    { createdAt: new Date("2026-10-05T08:00:00Z"), ref: "fb" },
-    { createdAt: new Date("2026-10-06T08:00:00Z"), ref: "fb" },
-    { createdAt: new Date("2026-10-05T09:00:00Z"), ref: "gyor-padel" },
-    { createdAt: new Date("2026-10-05T10:00:00Z"), ref: null },
-    // Signed up from a source with no counted landing (e.g. before tracking).
-    { createdAt: new Date("2026-10-06T10:00:00Z"), ref: "verseny" },
-    // 22:30 UTC on 6 Oct is 7 Oct in Budapest: outside the period.
-    { createdAt: new Date("2026-10-06T22:30:00Z"), ref: "fb" },
-  ];
-  const funnel = buildFunnel(landings, signups, period);
+  const funnel = buildFunnel(landings, period);
 
-  it("counts landings, signups and conversion per source", () => {
+  it("counts landings per source, no source last", () => {
     expect(funnel.sources).toEqual([
-      { ref: "fb", landings: 80, signups: 2, conversion: 0.025 },
-      { ref: "gyor-padel", landings: 5, signups: 1, conversion: 0.2 },
-      { ref: "verseny", landings: 0, signups: 1, conversion: null },
-      { ref: null, landings: 20, signups: 1, conversion: 0.05 },
+      { ref: "fb", landings: 80 },
+      { ref: "gyor-padel", landings: 5 },
+      { ref: null, landings: 20 },
     ]);
   });
 
   it("totals the period", () => {
-    expect(funnel.total).toEqual({ ref: null, landings: 105, signups: 5, conversion: 5 / 105 });
+    expect(funnel.total).toEqual({ ref: null, landings: 105 });
   });
 
-  it("breaks the period down by Budapest day, including empty days", () => {
+  it("breaks the period down by day, including empty days", () => {
     expect(funnel.days).toEqual([
-      { day: "2026-10-05", landings: 65, signups: 3 },
-      { day: "2026-10-06", landings: 40, signups: 2 },
+      { day: "2026-10-05", landings: 65 },
+      { day: "2026-10-06", landings: 40 },
     ]);
-    expect(buildFunnel([], [], period).days).toEqual([
-      { day: "2026-10-05", landings: 0, signups: 0 },
-      { day: "2026-10-06", landings: 0, signups: 0 },
+    expect(buildFunnel([], period).days).toEqual([
+      { day: "2026-10-05", landings: 0 },
+      { day: "2026-10-06", landings: 0 },
     ]);
-  });
-
-  it("has no conversion without landings", () => {
-    expect(buildFunnel([], [], period).total.conversion).toBeNull();
   });
 });
 

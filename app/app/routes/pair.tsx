@@ -1,10 +1,9 @@
 import { Mail, Phone } from "lucide-react";
-import { Link, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Link } from "react-router";
 import type { Route } from "./+types/pair";
 import { AppPage } from "~/components/app-page";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
-import { PartnerEmailBox } from "~/components/partner-email";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { requireUser } from "~/lib/auth/session.server";
@@ -12,31 +11,24 @@ import { telHref } from "~/lib/matches";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, pairPageDescription } from "~/lib/pairs";
-import { pairLeagues, pairOverview } from "~/lib/pairs.server";
+import { NO_LEAGUE_TEXT } from "~/lib/league-members";
+import { playerLeagues } from "~/lib/league-members.server";
+import { pairOverview } from "~/lib/pairs.server";
 import { pairPath } from "~/lib/profiles";
 import { profilePairIds } from "~/lib/profiles.server";
 import { applyToSeason, entryViews } from "~/lib/season-entries.server";
-import { waitingMessage } from "~/lib/signup-partners";
-import { missingPartnerEmails, partnerEmailAction, waitingPartners } from "~/lib/signup-partners.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
-// "Párom": the pair (from the interest signup, #89, or made by a Szervező,
-// #97), or the partner who hasn't registered yet, or the box to add the
-// partner's address when the signup had none (#96), and the league's open
-// seasons to enter together (#23). Without a pair: the player's own pair
-// link to send to a partner (2026-10-31), and the "Párt keresek" switch
-// (D59) for the organizer to find them one. The partner's address and phone
-// (D121) so the two can reach each other. Players can't change their pair here: a Szervező does
-// that on the Párok page (#97). One block per league; the league is only
-// named when there are several.
-
-// After the partner's address is saved (#96) the box stays to say so: no
-// reload, which would remove it before the notice shows.
-export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
-  return formData?.get("intent") === "partner_email" ? false : defaultShouldRevalidate;
-}
+// "Párom": the pair (by pair link, or made by a Szervező, #97) and the
+// league's open seasons to enter together (#23). Without a pair: the
+// player's own pair link to send to a partner (2026-10-31), and the "Párt
+// keresek" switch (D59) for the organizer to find them one. The partner's
+// address and phone (D121) so the two can reach each other. Players can't
+// change their pair here: a Szervező does that on the Párok page (#97). One
+// block per league of the player (D128); the league is only named when there
+// are several. Nothing comes from the interest list (#333).
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Párom – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -44,15 +36,11 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  const leagues = await pairLeagues();
-  // The partner the interest signup names, while they haven't registered
-  // (#89): the pair forms by itself once they do.
-  // Or the partner the signup names without an email (#96): the box to add it.
+  // Only the player's own leagues (D128, #331).
+  const leagues = await playerLeagues(user.id);
   // Without a pair: the player's own link to invite one.
-  const [pairs, waiting, missing, links, searching] = await Promise.all([
+  const [pairs, links, searching] = await Promise.all([
     pairOverview(user, leagues),
-    waitingPartners(user.email),
-    missingPartnerEmails(user),
     pairLinkBoxes(user, leagues),
     partnerSearchState(user, leagues),
   ]);
@@ -64,8 +52,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     return {
       ...o,
       profile: o.pair && open.has(o.pair.id) ? pairPath(o.pair.id) : null,
-      waiting: o.pair ? null : (waiting.get(o.league.id) ?? null),
-      missingEmail: o.pair ? null : (missing.find((m) => m.leagueId === o.league.id) ?? null),
       link: link ? origin + pairLinkPath(link.token) : null,
       seeking: o.pair ? null : (searching.get(o.league.id) ?? false),
     };
@@ -91,15 +77,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 type ActionData = { intent: string; error?: string; notice?: string; ok?: true };
 
-// "Nevezünk", the partner's address (#96) and "Párt keresek" (D59).
+// "Nevezünk" and "Párt keresek" (D59).
 export async function action({ request }: Route.ActionArgs): Promise<ActionData> {
   const user = await requireUser(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  if (intent === "partner_email") return { intent, ...(await partnerEmailAction(user, form)) };
   if (intent === "partner_search") {
     const league = Number(form.get("league"));
-    const ok = await setPartnerSearch(user, league, form.get("seeking") === "1", await pairLeagues());
+    const ok = await setPartnerSearch(user, league, form.get("seeking") === "1", await playerLeagues(user.id));
     if (!ok) throw new Response("Hibás kérés.", { status: 400 });
     return { intent, ok: true };
   }
@@ -184,16 +169,6 @@ function NoPair() {
   );
 }
 
-function Waiting({ name }: { name: string }) {
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle className="font-display text-lg">{waitingMessage(name)}</CardTitle>
-      </CardHeader>
-    </Card>
-  );
-}
-
 export default function Pair({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
     <AppPage title="Párom" description={pairPageDescription(d.hasPair, CONTACT_EMAIL)}>
@@ -212,7 +187,14 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
           {actionData.error}
         </p>
       )}
-      {d.overview.length === 0 && <p className="max-w-2xl text-muted-foreground">Még nincs liga, ahol párod lehetne.</p>}
+      {d.overview.length === 0 && (
+        <p className="max-w-2xl text-muted-foreground">
+          {NO_LEAGUE_TEXT}{" "}
+          <Link to="/home" className="underline">
+            Kezdőlap
+          </Link>
+        </p>
+      )}
       {d.overview.map((o) => (
         <section key={o.league.id} className="grid gap-4">
           {d.multi && <h2 className="font-display text-lg font-bold">{o.league.name}</h2>}
@@ -220,8 +202,6 @@ export default function Pair({ loaderData: d, actionData }: Route.ComponentProps
           {o.pair && d.entries.some((e) => e.leagueId === o.league.id) && (
             <Entries entries={d.entries.filter((e) => e.leagueId === o.league.id)} />
           )}
-          {o.waiting && <Waiting name={o.waiting} />}
-          {o.missingEmail && <PartnerEmailBox signupId={o.missingEmail.signupId} name={o.missingEmail.name} />}
           {o.link && <PairLinkBox url={o.link} />}
           {o.seeking != null && <PartnerSearchBox leagueId={o.league.id} seeking={o.seeking} />}
           {!o.pair && <NoPair />}

@@ -107,7 +107,7 @@ const RULES = [
   ["Elmaradt meccs", "Ha a kör végéig sem jön össze, és csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap."],
   ["Meccs", "2 nyert szettig, egy szett 4 játékig, 4:4-nél tie-break, 1:1-nél szuper tie-break 10 pontig. Arany ponttal: 40:40-nél egy pont dönt. Egy óra pályafoglalás általában elég."],
   ["Eredmény", "Az egyik pár rögzíti, a másik megerősíti az oldalon."],
-  ["Párcsere", "Csak két kör között lehet. Mindenkinek van egyéni értékszáma, így új párral is a megfelelő csoportba kerülsz."],
+  ["Párcsere", "Csak két kör között lehet. Mindenkinek van egyéni Élő-pontja, így új párral is a megfelelő csoportba kerülsz."],
 ];
 
 const FAQ = [

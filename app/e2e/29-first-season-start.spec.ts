@@ -2,7 +2,7 @@
 // the Admin opens it without dates, lowers the league's minimum to 3, and
 // enters three pairs on Párok; the third entry fixes round 1 to the first Monday at
 // least 7 days later, and every entered player gets one email and one
-// notice. Meanwhile the landing card and the public league page show how many
+// notice. Meanwhile the landing card and the league page show how many
 // pairs are still needed, then the start day. Its own city, league, players
 // and pairs, removed at the end; the walkthrough's league is never touched.
 import { budapestDay, firstSeasonStart } from "@padel-liga/rules";
@@ -82,8 +82,9 @@ test("a first season opens without dates and starts by itself at the minimum ent
   await visit(anon, "/");
   await expect(card(anon)).toContainText("2 pár nevezett, még 1 kell, utána indul.");
   await expect(card(anon).getByRole("link", { name: "Nevezek az 1. körre" })).toBeVisible();
-  await visit(anon, `/league/${LEAGUE.slug}`);
-  await expect(content(anon)).toContainText("2 pár nevezett, még 1 kell, utána indul.");
+  // The league page is for logged-in players only (D134): the Admin's view.
+  await visit(page, `/league/${LEAGUE.slug}`);
+  await expect(content(page)).toContainText("2 pár nevezett, még 1 kell, utána indul.");
   expect(d1(`select count(*) as n from email_messages where kind = 'season_start'`)).toEqual([{ n: 0 }]);
 
   // The third entry reaches the minimum: round 1 is fixed, everyone is told once.
@@ -108,8 +109,8 @@ test("a first season opens without dates and starts by itself at the minimum ent
   await expect(card(anon).getByRole("definition")).toHaveText(day);
   await expect(card(anon).getByRole("term")).toHaveText("Indul");
   await expect(card(anon)).not.toContainText("Nevezés zárul");
-  await visit(anon, `/league/${LEAGUE.slug}`);
-  await expect(content(anon)).toContainText(/Az 1\. kör .+ indul\./);
+  await visit(page, `/league/${LEAGUE.slug}`);
+  await expect(content(page)).toContainText(/Az 1\. kör .+ indul\./);
   await anon.close();
 
   // Once the season has its start the minimum means nothing: not shown.

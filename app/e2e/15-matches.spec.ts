@@ -42,12 +42,18 @@ test("17. Kezdőlap shows the group, the division line, the matches by week with
   const matches = main.getByRole("list", { name: "Meccseitek" });
   await expect(matches.locator(":scope > li")).toHaveCount(3);
   await expect(matches.getByText("Pihenőhét: ezen a héten nem játszotok.")).toHaveCount(1);
-  await expect(matches.getByRole("link", { name: "Egyeztetés és részletek" })).toHaveCount(2);
+  // Each match is one link (the next one opens as a block with "A meccs oldala", D136).
+  await expect(matches.locator('a[href^="/matches/"]')).toHaveCount(2);
+  await expect(matches.getByRole("link", { name: "A meccs oldala" })).toHaveCount(1);
   await expect(matches.getByText("Egyeztetésre vár")).toHaveCount(2);
-  // Both matches are a Teendő; the opponents' phones are tap to call.
+  // Both matches are a Teendő; the next match's opponents are tap to call and to write (D135).
   await expect(main.getByRole("link", { name: /^Ajánlj időpontot/ })).toHaveCount(2);
-  await expect(matches.locator('a[href^="tel:"]')).toHaveCount(4);
-  await expect(main).not.toContainText("@example.test");
+  const [next] = annasMatches().sort((x, y) => x.week - y.week);
+  await expect(matches.locator('a[href^="tel:"]')).toHaveCount(2);
+  for (const o of next!.opponents) await expect(matches.locator(`a[href="mailto:${o.email}"]`)).toHaveCount(1);
+  // No other address: not Anna's, not her partner's.
+  await expect(main.locator('a[href^="mailto:"]')).toHaveCount(2);
+  await expect(main).not.toContainText(anna.email);
   await context.close();
 });
 

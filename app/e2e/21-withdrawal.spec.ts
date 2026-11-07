@@ -78,13 +78,13 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   await expect(content(mate.page)).not.toContainText(REASON);
   await mate.context.close();
 
-  // The public table: the pair is named below its group, not in the table.
-  const visitor = await browser.newPage();
-  await visit(visitor, "/league/minta");
-  await expect(content(visitor)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
-  await expect(content(visitor).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
-  await expect(content(visitor)).not.toContainText(REASON);
-  await visitor.close();
+  // The Tabella (players only, D134): the pair is named below its group, not in the table.
+  const viewer = await as(browser, others[0]![0]);
+  await visit(viewer.page, "/league/minta");
+  await expect(content(viewer.page)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
+  await expect(content(viewer.page).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
+  await expect(content(viewer.page)).not.toContainText(REASON);
+  await viewer.context.close();
 
   expect(d1("select count(*) as n from email_messages")[0]!.n).toBe(emailsBefore);
 });

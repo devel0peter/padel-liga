@@ -43,6 +43,7 @@ import { COURT_MAX } from "./matches";
 import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseWeek, type TableRow } from "./ladder";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureWeek, type Zone } from "./fixtures";
 import { formatPhone } from "./phone";
+import { isAnonymizedEmail } from "./account-deletion";
 import { resultOf, resultsOf } from "./result-log.server";
 import { decisionText, resultEventText } from "./results";
 import { averageElo } from "./season-entries";
@@ -178,12 +179,21 @@ export async function groupCount(seasonId: number, phase: number): Promise<numbe
 
 // --- Kezdőlap (#25) -----------------------------------------------------------
 
-export type Opponent = { name: string; phone: string };
+// The other pair's players while their match is to be played (D135): the
+// phone, tap to call, and the email address; an anonymized account's address
+// (account-deletion.ts) is none.
+export type Opponent = { name: string; phone: string; email: string | null };
+
+const contactOf = (p: Person): Opponent => ({
+  name: p.name,
+  phone: formatPhone(p.phone),
+  email: isAnonymizedEmail(p.email) ? null : p.email,
+});
 
 export type HomeMatch = {
   id: number;
   week: number;
-  // The other pair: names, and phones (only the current phase is listed here).
+  // The other pair: names, phones and email addresses (only the current phase is listed here).
   opponents: string;
   contacts: Opponent[];
   side: Side;
@@ -341,7 +351,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
             id: m.id,
             week: m.week,
             opponents: them ? pairName(them.players) : "",
-            contacts: (them?.players ?? []).map((p) => ({ name: p.name, phone: formatPhone(p.phone) })),
+            contacts: (them?.players ?? []).map(contactOf),
             side,
             state,
             venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
@@ -628,7 +638,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     us: pairName(ours.players),
     opponents: pairName(theirs.players),
     // A withdrawn pair's match (#34): the two are no opponents any more.
-    contacts: running && !ctx.voided ? theirs.players.map((p) => ({ name: p.name, phone: formatPhone(p.phone) })) : [],
+    contacts: running && !ctx.voided ? theirs.players.map(contactOf) : [],
     state,
     venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
     actions: result.status === "none" && !ctx.voided ? scheduling : NO_SCHEDULING,

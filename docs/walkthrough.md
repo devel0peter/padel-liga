@@ -290,8 +290,9 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Account: any player in a published group, for example the first pair's first player
 - Expect:
   - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match with the round's deadline under it.
-  - "Meccseitek": a card per week 1 to 3 (D133). With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét". Each match card: the week and its dates, the opponents, "Egyeztetésre vár", their two phone numbers as call buttons and "Egyeztetés és részletek" (the whole card opens the match). No email address anywhere.
-  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, where the pair stands ("A létra csúcsán vagytok, 3 kör van hátra"), "Minden csoport" (the public league page), the table (place, pair, M, Gy, V, Szett, Játék, P; "–" instead of places and "Még nincs végleges eredmény: a sorrend a kiemelés." until a result is final, D85) and "A csoport meccsei": every match of the group by week, yours linked.
+  - Three separate cards (D136). "Teendők" only while there is one.
+  - "Meccseitek": a row per week 1 to 3 (D133, D136). With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét". Each row: the week and its dates, the opponents and the state ("Egyeztetésre vár"), the whole row a link to the match. The next match to play is open: its time and venue once fixed, the opponents' phone numbers (tap to call) and email addresses (`mailto:`, D135), and "A meccs oldala". No one else's email address.
+  - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season and the round, where the pair stands ("A létra csúcsán vagytok, 3 kör van hátra"), "Tabella" (the league page), and the table (place, pair, M, Gy, V, Szett, Játék, P; "–" instead of places and "Még nincs végleges eredmény: a sorrend a kiemelés." until a result is final, D85). The group's matches are on the Tabella, not here.
   - "Hamarosan itt lesz a csoportod" is gone.
 
 ### 18. A pair proposes slots, the other accepts one
@@ -329,24 +330,27 @@ A player without a pair sends their own link; the partner registers and accepts 
 ### 21. A player's level locks after the first season (side path)
 
 - Page: `/profile` as a player of a published group (step 11, for example the first pair's first player), then as a player without a group (step 15)
-- Do: open Profil; open the "i" next to "Értékszámod"; as the second player change "Szinted" and press "Mentés".
+- Do: open Profil; open the "i" next to "Élő-pont"; on "Beállításaim" (`/profile?tab=settings`), as the second player, change "Szinted" and press "Mentés".
 - Expect:
-  - The player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
-  - Both see "Értékszámod" with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
+  - Profil has two tabs (D136): "Játékosprofil" (default: the summary Élő-pont, Szezon, Kör, Meccs, Győzelem, Vereség; then Meccsek and Párod once in a published group) and "Beállításaim" (Adataid, Fiók, Értesítések, Fiók törlése).
+  - On "Beállításaim" the player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
+  - Both see the Élő-pont with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
 
-### 22. A visitor looks at the league page (public)
+### 22. A player looks at the Tabella (the league page)
 
-The public ladder (decision log (`docs/decisions.md`), 2026-11-02, #30). Needs step 11 done.
+The ladder (decision log (`docs/decisions.md`), 2026-11-02, #30), for logged-in players only since D134. Needs step 11 done.
 
 - Page: `/`, then `/league/minta`
-- Account: none (logged out)
-- Do: on the landing page press "Csoportok és tabella" in the league card, then follow "Hogyan működik?" in a division header.
+- Account: none (logged out) first, then any player of step 11
+- Do: on the landing page look for a link to the league page; open `/league/minta` logged out; log in, press "Tabella" in the sidebar (on a phone in the bottom bar), open "A csoport meccsei" under a group and "Hogyan működik a létra?" at the bottom.
 - Expect:
-  - The six pairs of the walkthrough are two groups of 3: the "Bronz divízió" band holds the 1. csoport and "Réz divízió" the 2. csoport, each band with its own header.
-  - Each group has a table (place, pair, M, Gy, V, Szett, Játék, P; Játék hides at 390 px) with all pairs at zero and "–" instead of places until a result is final (steps 27 and 28 change that), and its matches by week (1. hét, 2. hét, 3. hét with the dates, the current week marked "ez a hét"): each with its agreed time (step 18 and 19) or "Egyeztetés alatt", and in a group of 3 who rests ("Pihen: …").
-  - Only names: no email address or phone number anywhere on the page, and the pair that joins later is not there.
-  - "Hogyan működik?" jumps to the explainer with its three points; at 390 px the page does not scroll sideways.
+  - The landing page's league card has no link to the league page, and logged out `/league/minta` goes to the login page and back to the Tabella after logging in (D134).
+  - The Tabella sits in the app shell. The six pairs of the walkthrough are two groups of 3: "1. csoport" (Bronz divízió) and "2. csoport" (Réz divízió), each a card naming its division; the player's own group says "A ti csoportotok" and their row "(ti)".
+  - Each group has a table (place, pair, M, Gy, V, Szett, Játék, P; Játék hides at 390 px) with all pairs at zero and "–" instead of places until a result is final (steps 27 and 28 change that). The marks and abbreviations are explained once under the groups.
+  - "A csoport meccsei (3)" opens the group's matches by week (1. hét, 2. hét, 3. hét with the dates, the current week marked "ez a hét"): each with its agreed time (step 18 and 19) or "Egyeztetés alatt", and in a group of 3 who rests ("Pihen: …"). The player's own matches link to their page.
+  - Only names: no email address, phone number or Élő-pont anywhere on the page, and the pair that joins later is not there.
+  - At 390 px the page does not scroll sideways.
   - Before step 11 the page says "Még nincsenek kint a csoportok" and when round 1 starts.
 
 ### 23. The Szervező sees every match of the running phase (after step 19)
@@ -401,7 +405,7 @@ People stuck before entering get at most one reminder per season, whatever the s
   - The first try is refused: "1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
-  - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések". The group card on Kezdőlap now shows the table (#, Pár, M, P, Szett, Játék), the same as the public league page.
+  - As the opponent: Kezdőlap's Teendők has "Erősítsd meg az eredményt"; on the match, "Megerősítem": "Megerősítetted, az eredmény végleges.", "Lejátszva: 1:4, 4:2, szuper tie-break 8:10 (kikaptatok)". "Napló" lists both steps. No email for the confirmation (a daily-digest item, #31); all four players see it in "Értesítések". The group card on Kezdőlap now shows the table (#, Pár, M, P, Szett, Játék), the same as the Tabella.
   - Instead of confirming, "Nem így volt?" takes the opponent's own score (and an optional note): "Jeleztük a szervezőnek, ő dönt.", the status "Vitatott eredmény, a szervező dönt", and the match doesn't count until the organizer decides (step 28).
   - A result nobody answers is accepted by the cron (every 10 minutes) 48 hours after it was recorded; locally the cron doesn't run.
 
@@ -419,13 +423,13 @@ People stuck before entering get at most one reminder per season, whatever the s
   - Both pairs: "Végeredmény: <outcome>" ("Lejátszva: <score>" for a played match) and "A szervező döntött: … Indoklás: …" in the log; all four get it in "Értesítések" (no email: a daily-digest item, #31).
   - "Felülbírálom" works the same for any match, played or not; the latest decision counts.
 
-### 29. A visitor sees the results in the group table (after steps 27 and 28)
+### 29. A player sees the results in the group table (after steps 27 and 28)
 
-The public ladder counts final results (decision log (`docs/decisions.md`), 2026-11-03, #186).
+The ladder counts final results (decision log (`docs/decisions.md`), 2026-11-03, #186).
 
 - Page: `/league/minta`
-- Account: none (logged out)
-- Do: open the league page after the confirmation of step 27 and the decision of step 28.
+- Account: any player
+- Do: open the Tabella after the confirmation of step 27 and the decision of step 28, and open "A csoport meccsei" under the player's group.
 - Expect:
   - In the player's group the table is no longer at zero: the player's pair has 3 points in 2 matches (the confirmed win of step 27 and the "both lose" decision of step 28, 0 points), the step 27 opponent 1 point in 1 match, the step 28 opponent 0 points in 1 match. Szett and Játék follow the rules (spec 9).
   - Both results are listed once (#202), under their own week: the sets from the 1. pár's side (4:1 over 2:4, the super tie-break as "(10:8)"), the winner in bold, and the decision as "Mindkét pár vereséget kap (0:4, 0:4)". The 1st of a group below the top one is marked to move up, the last of a group above the bottom one to move down.
@@ -468,7 +472,7 @@ Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
   - The picker shows names only, never an address, and never the match's four players or anyone in another pair of your group. "Elküldtük a kérést a szervezőnek. Szólunk, ha döntött." and the request "… helyett …: Jóváhagyásra vár", with "Visszavonom a kérést" for the player who asked (not for the partner).
   - The Szervező and the Admin get "Helyettes kérés · <liga>" in Értesítések (no names, no email); the asking player doesn't.
   - Helyettesek: the request under "Jóváhagyásra vár (1)" with the season, round, group and week, the pair and its opponents, the start (or the deadline), and the absent player's and the substitute's Elo side by side with the difference. "Jóváhagyom": "Jóváhagytad a helyettest. Mindkét pár értesítést kap.", and the request moves to "Jóváhagyva, még nem játszották", with "Visszavonom" until the match starts.
-  - Both pairs see "<hiányzó> helyett <helyettes> játszik …" on the match page; the asking pair gets "Jóváhagyták a helyettest", the opponents "Helyettes az ellenfeleteknél" (app and push only, no email). The substitute gets nothing and gets 404 on the match page. The group table and the public league page show the pair's own names.
+  - Both pairs see "<hiányzó> helyett <helyettes> játszik …" on the match page; the asking pair gets "Jóváhagyták a helyettest", the opponents "Helyettes az ellenfeleteknél" (app and push only, no email). The substitute gets nothing and gets 404 on the match page. The group table and the Tabella show the pair's own names.
   - "Elutasítom" with a reason instead: only the asking pair is told, and sees "Elutasítva" and "A szervező indoklása: …" on the match page; they can ask again.
   - After the confirmed result (step 27), the substitute's Elo changes and the absent player's doesn't.
   - Napló lists "Helyettes jóváhagyása" with the match and "<hiányzó> → <helyettes>". A player opening `/admin/leagues/minta/substitutes` gets 403.
@@ -478,15 +482,28 @@ Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
 Profiles, for logged-in members only (#36, decision log (`docs/decisions.md`) D110, D112).
 
 - Page: `/league/minta`, then a pair's name in a group table
-- Account: none (logged out) first; then the player of step 27, on the league page, Profil and Párom
-- Do: logged out, open the league page, then a profile's address; logged in, press the player's pair in their group table, then one of the two names on the pair page.
+- Account: none (logged out) first; then the player of step 27, on the Tabella, Profil and Párom
+- Do: logged out, open a profile's address; logged in, press the player's pair in their group table, then one of the two names on the pair page.
 - Expect:
-  - Logged out: the league page shows the names as plain text (no link, no értékszám); a profile's address goes to the login page and back to the profile after logging in.
-  - While round 1 has not started (the seed's dates): names and groups only. The pair page says "Az eredmények a liga indulása után látszanak itt." and the player page shows no értékszám, although the league page already lists the results. The rest below shows once round 1 has started (the e2e spec moves its start into the past for a moment).
+  - Logged out: a profile's address goes to the login page and back to the profile after logging in.
+  - While round 1 has not started (the seed's dates): names and groups only. The pair page says "Az eredmények a liga indulása után látszanak itt." and the player page shows no Élő-pont and "–" in the summary, although the Tabella already lists the results. The rest below shows once round 1 has started (the e2e spec moves its start into the past for a moment).
   - The pair page (`/pairs/<id>`): both names (each a link), "Csoportok" with "<season>, 1. kör: <n>. csoport (<division>)" and the pair's place in the table, the same as on the league page, and "Meccsek" with the step 27 win and the step 28 decision from the pair's side ("Győzelem · 4:1, 2:4, szuper tie-break 10:8", "Vereség · Mindkét pár vereséget kap (0:4, 0:4)"). A result still waiting or disputed is not listed.
-  - The player page (`/players/<id>`): the name, "Értékszám" (a whole number), "Párja" with the pair and its group, and the matches; the step 27 win has an "Értékszám: +… → …" line, the decision has none (no Elo change). After two rated matches a small chart shows the rating.
+  - The player page (`/players/<id>`): the name, the summary (D136: Élő-pont as a whole number, Szezon 1, Kör 1, Meccs, Győzelem, Vereség from the final results), "Párja" with the pair and its group, and the matches; the step 27 win has an "Élő-pont: +… → …" line, the decision has none (no Elo change). After two rated matches a small chart shows the rating.
   - No email address or phone number on either page. An unknown id, or a deleted player's page, is the 404 page ("Ez az oldal nem létezik."); a deleted player is "Törölt játékos" without a link.
-  - Profil shows "A profilod" and Párom "A párotok oldala", both leading to these pages, once the pair is in a published group.
+  - Profil's "Játékosprofil" tab shows the same as the player page (with a link to it), and Párom "A párotok oldala", once the pair is in a published group.
+
+### 33a. A player opens the Ranglista (after step 33)
+
+The league's players and pairs by Élő-pont (decision log (`docs/decisions.md`) D137).
+
+- Page: `/league/minta/rankings`
+- Account: the player of step 27
+- Do: press "Ranglista" in the sidebar (on a phone: "Ranglista" at the top of the Tabella), then the "Párok" tab.
+- Expect:
+  - While round 1 has not started (the seed's dates): "Az Élő-pontok a liga indulása után látszanak itt." and no rating.
+  - Once it has started: "Játékosok" lists every player of the published groups with place, name (a link to the profile), Élő-pont and "Meccs" (rated matches), highest first; the player's own row says "(te)". Equal Élő-pont shares a place ("1., 1., 3.") and goes by name (#345 brings the tiebreaks).
+  - "Párok" (`?view=pairs`) lists the pairs with the pair's Élő-pont, its players' average; the player's pair says "(ti)".
+  - No email address or phone number on the page.
 
 ### 34. A player gets strikes; the Szervező cancels one (side path)
 
@@ -497,7 +514,7 @@ The deadline resolution (#11) gives strikes from the cron at 06:00 the morning a
 - Expect:
   - The player's row on Párok shows "2 fekete pont"; below the list, "Fekete pontok · <szezon>" lists both, "Határidő: nem próbált egyeztetni", "Érvényes".
   - "Törlés" asks for a reason (the button stays off without one); after it the row says "Törölve (Teszt Szervező): <indok>" and the badge "1 fekete pont". Napló has "Fekete pont törlése" with the reason.
-  - As that player, Kezdőlap's season card says "Fekete pontjaid ebben a szezonban: 1." The public league page shows no strikes. Nothing new on Kimenő levelek (only a 2nd strike given by the cron sends the warning email).
+  - As that player, Kezdőlap's season card says "Fekete pontjaid ebben a szezonban: 1." The Tabella shows no strikes. Nothing new on Kimenő levelek (only a 2nd strike given by the cron sends the warning email).
 
 ### 35. A player deletes their own account (side path)
 
@@ -524,7 +541,7 @@ Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't
   - "Elküldtük a szervezőnek. Szólunk, ha döntött." and "Jeleztétek, hogy az ellenfeletek nem jött el (…)", with "Visszavonom a bejelentést" for the reporter only; the other pair sees "Az ellenfeletek jelezte, hogy nem jöttetek el (…)". No second report on the match.
   - The Szervező and the Admin get "Nem jöttek el · <liga>" in Értesítések (no names, no email; switchable on Profil as "Nem jöttek el"); the reporter doesn't.
   - Viták: "Nem jöttek el (1)" with the season, round, group and week, "<pár> szerint <pár> nem jött el", the slot and when it was reported. The decision page shows "Nem jöttek el: döntés" above the override form.
-  - "Jóváhagyom": the match is final, a 4-0 4-0 walkover for the reporting pair (the group table and the public league page count it); the log has "Nem jöttek el: a szervező jóváhagyta a bejelentést. <indok>". The other pair's two players get a strike ("Nem jelentetek meg egy lefixált meccsen."), which Párok lists with "Nem jelent meg". Both pairs are told in the app and by push; no email (a 2nd strike sends its own warning).
+  - "Jóváhagyom": the match is final, a 4-0 4-0 walkover for the reporting pair (the group table and the Tabella count it); the log has "Nem jöttek el: a szervező jóváhagyta a bejelentést. <indok>". The other pair's two players get a strike ("Nem jelentetek meg egy lefixált meccsen."), which Párok lists with "Nem jelent meg". Both pairs are told in the app and by push; no email (a 2nd strike sends its own warning).
   - "Elutasítom" instead: nothing changes on the match; both pairs see "A szervező elutasította …" with the reason on the match page, and a new report can be made.
   - Napló lists "Nem jöttek el: jóváhagyás" (or "elutasítás") with the match. The deadline resolution leaves a match with a waiting report alone until the Szervező decides.
 

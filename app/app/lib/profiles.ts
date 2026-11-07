@@ -189,3 +189,23 @@ export function eloSeries(changes: readonly EloChangeInput[]): number[] {
   if (ordered.length === 0) return [];
   return [ordered[0]!.before, ...ordered.map((c) => c.after)];
 }
+
+/** A player's summary on their profile (D136). */
+export type PlayerStats = { seasons: number; rounds: number; matches: number; wins: number; losses: number };
+
+/**
+ * The summary of a player profile (D136): the seasons and rounds (phases)
+ * the player played in, a published group whose phase has started, and the
+ * matches with a final result (D80), split into wins and losses. `groups`:
+ * one row per group of the player's pairs, `season` unique per league.
+ */
+export function playerStats(
+  groups: readonly { season: string; startsAt: Date }[],
+  matches: readonly Pick<ProfileMatchView, "verdict">[],
+  now: Date,
+): PlayerStats {
+  const played = groups.filter((g) => g.startsAt <= now);
+  const wins = matches.filter((m) => m.verdict === "Győzelem").length;
+  const losses = matches.filter((m) => m.verdict === "Vereség").length;
+  return { seasons: new Set(played.map((g) => g.season)).size, rounds: played.length, matches: wins + losses, wins, losses };
+}

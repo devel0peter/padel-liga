@@ -65,6 +65,7 @@ export function StandingsTable({
   ranked,
   linkFor,
   label = "Tabella",
+  legend = true,
 }: {
   rows: StandingsRow[];
   /** False before any final result: no places and no marks (D85). */
@@ -72,6 +73,8 @@ export function StandingsTable({
   /** A pair's profile link, or null (members only, D112). */
   linkFor?: (pairId: number) => string | null;
   label?: string;
+  /** False when the page shows the legend once (StandingsLegend), below several tables. */
+  legend?: boolean;
 }) {
   const zones = rows.some((r) => r.zone);
   return (
@@ -137,20 +140,27 @@ export function StandingsTable({
           })}
         </TableBody>
       </Table>
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {!ranked && <span>Még nincs végleges eredmény: a sorrend a kiemelés.</span>}
-        {zones && (
-          <>
-            <span className="inline-flex items-center gap-0.5">
-              <ChevronUp aria-hidden className="size-3.5 text-emerald-600" /> feljut
-            </span>
-            <span className="inline-flex items-center gap-0.5">
-              <ChevronDown aria-hidden className="size-3.5 text-rose-600" /> kiesik a kör végén
-            </span>
-          </>
-        )}
-        <span>M: meccs · Gy: győzelem · V: vereség · P: pont (győzelem 3, vereség 1, játék nélkül 0)</span>
-      </p>
+      {!ranked && <p className="text-xs text-muted-foreground">Még nincs végleges eredmény: a sorrend a kiemelés.</p>}
+      {legend && <StandingsLegend zones={zones} />}
     </div>
+  );
+}
+
+// What the marks and the abbreviations mean: under one table, or once on a page of several.
+export function StandingsLegend({ zones = true }: { zones?: boolean }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {zones && (
+        <>
+          <span className="inline-flex items-center gap-0.5">
+            <ChevronUp aria-hidden className="size-3.5 text-emerald-600" /> feljut
+          </span>
+          <span className="inline-flex items-center gap-0.5">
+            <ChevronDown aria-hidden className="size-3.5 text-rose-600" /> kiesik a kör végén
+          </span>
+        </>
+      )}
+      <span>M: meccs · Gy: győzelem · V: vereség · P: pont (győzelem 3, vereség 1, játék nélkül 0)</span>
+    </p>
   );
 }

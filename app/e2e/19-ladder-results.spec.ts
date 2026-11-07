@@ -1,15 +1,15 @@
 // The public league page counts final results (#186). Runs after 18-results:
 // Anna's pair has a confirmed win (walkthrough step 27) and a "both lose"
-// decision on Viták (step 28), so her group's table is no longer at zero. A
-// visitor sees it without logging in (step 29).
+// decision on Viták (step 28), so her group's table is no longer at zero.
+// Players only since D134 (step 29).
 import { expect, test } from "@playwright/test";
 
-import { PAIRS, content, visit } from "./support";
+import { PAIRS, as, content, visit } from "./support";
 
 const anna = PAIRS.p1[0];
 
 test("29. the group table counts the confirmed win and the organizer's decision", async ({ browser }) => {
-  const page = await browser.newPage();
+  const { context, page } = await as(browser, PAIRS.p2[0]);
   await visit(page, "/league/minta");
   const group = content(page)
     .getByRole("region", { name: /^\d+\. csoport$/ })
@@ -32,12 +32,14 @@ test("29. the group table counts the confirmed win and the organizer's decision"
 
   // The played match shows its sets (from the 1st pair's side, as in the app)
   // with the super tie-break in brackets, and the decision its note, each
-  // once, under its own week (#202, D133).
-  const played = group.locator('[aria-label^="Eredmény: "]');
+  // once, under its own week (#202, D133), in the group's side panel (D136).
+  await group.getByRole("button", { name: /^A csoport meccsei/ }).click();
+  const panel = page.getByRole("dialog");
+  const played = panel.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);
   await expect(played).toContainText(/\((10:8|8:10)\)/);
-  await expect(group).not.toContainText("egyik fél sem játszott");
-  await expect(group.getByText("Mindkét pár vereséget kap (0:4, 0:4)")).toHaveCount(1);
-  await page.close();
+  await expect(panel).not.toContainText("egyik fél sem játszott");
+  await expect(panel.getByText("Mindkét pár vereséget kap (0:4, 0:4)")).toHaveCount(1);
+  await context.close();
 });

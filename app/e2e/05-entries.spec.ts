@@ -18,7 +18,7 @@ async function flipEmail(page: Page) {
 
 test("7a. a player switches email notifications off on the profile", async ({ browser }) => {
   const { context, page } = await as(browser, PAIRS.p1[1]);
-  await visit(page, "/profile");
+  await visit(page, "/profile?tab=settings");
   const section = page.locator("#ertesitesek");
   // Both on by default.
   await expect(emailSwitch(page)).toBeChecked();
@@ -66,7 +66,7 @@ test("7. every pair enters once and is in at once; the partner sees it too", asy
   }
 
   const partner = await as(browser, PAIRS.p1[1]);
-  await visit(partner.page, "/profile");
+  await visit(partner.page, "/profile?tab=settings");
   await flipEmail(partner.page);
   await expect(emailSwitch(partner.page)).toBeChecked();
   await partner.page.reload();

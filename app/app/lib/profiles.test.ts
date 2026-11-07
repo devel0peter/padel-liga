@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { eloSeries, matchViews, pairName, pairPath, personView, playerPath, shownElo, type ProfileMatchInput, type ProfilePair } from "./profiles";
+import { eloSeries, matchViews, pairName, pairPath, personView, playerPath, playerStats, shownElo, type ProfileMatchInput, type ProfilePair } from "./profiles";
 
 const pairOf = (id: number, a: string, b: string): ProfilePair => ({
   id,
@@ -97,5 +97,37 @@ describe("Elo on profiles (spec 11: the profile shows the rounded number)", () =
     const c = (matchId: number, before: number, after: number, iso: string) => ({ matchId, before, after, delta: after - before, at: new Date(iso) });
     expect(eloSeries([c(2, 1420, 1410, "2026-11-18T10:00:00Z"), c(1, 1400, 1420, "2026-11-11T10:00:00Z")])).toEqual([1400, 1420, 1410]);
     expect(eloSeries([])).toEqual([]);
+  });
+});
+
+describe("playerStats (D136)", () => {
+  const now = new Date("2026-11-20T12:00:00Z");
+  const g = (season: string, startsAt: string) => ({ season, startsAt: new Date(startsAt) });
+
+  it("counts the seasons and rounds the player has played in", () => {
+    const stats = playerStats(
+      [g("1:ősz", "2026-10-05T00:00:00Z"), g("1:ősz", "2026-10-26T00:00:00Z"), g("1:tél", "2026-11-16T00:00:00Z")],
+      [],
+      now,
+    );
+    expect(stats).toMatchObject({ seasons: 2, rounds: 3 });
+  });
+
+  it("leaves out a round that hasn't started yet", () => {
+    const stats = playerStats([g("1:ősz", "2026-10-26T00:00:00Z"), g("1:tél", "2026-11-30T00:00:00Z")], [], now);
+    expect(stats).toMatchObject({ seasons: 1, rounds: 1 });
+  });
+
+  it("keeps two leagues' seasons of the same name apart", () => {
+    expect(playerStats([g("1:ősz", "2026-10-05T00:00:00Z"), g("2:ősz", "2026-10-05T00:00:00Z")], [], now).seasons).toBe(2);
+  });
+
+  it("counts the matches with a final result as wins and losses", () => {
+    const stats = playerStats([], [{ verdict: "Győzelem" }, { verdict: "Vereség" }, { verdict: "Győzelem" }], now);
+    expect(stats).toEqual({ seasons: 0, rounds: 0, matches: 3, wins: 2, losses: 1 });
+  });
+
+  it("is all zero for a player without a started round", () => {
+    expect(playerStats([], [], now)).toEqual({ seasons: 0, rounds: 0, matches: 0, wins: 0, losses: 0 });
   });
 });

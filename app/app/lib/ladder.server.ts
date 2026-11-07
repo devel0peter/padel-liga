@@ -1,5 +1,5 @@
 import { addDays, budapestDay, type Day } from "@padel-liga/rules";
-import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -13,8 +13,8 @@ import { averageElo } from "./season-entries";
 import { currentSeason, isWaiting, waitingText } from "./seasons";
 import { listSeasons } from "./seasons.server";
 
-// What the public league page needs (#30). Only names leave this module: the
-// queries below select no email, phone or user id.
+// What the league page needs (#30; members only since D134). Only names leave
+// this module: the queries below select no email, phone or user id.
 
 export type LadderPage = {
   league: { name: string; city: string };
@@ -124,7 +124,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
   }));
 }
 
-export async function ladderPage(slug: string, now = new Date()): Promise<LadderPage | null> {
+/** `mine`: the viewer's pairs, marked on the page (D136). */
+export async function ladderPage(slug: string, now = new Date(), mine: ReadonlySet<number> = new Set()): Promise<LadderPage | null> {
   const league = await getLeague(slug);
   if (!league) return null;
   // Like the landing page, only leagues of listed cities are public.
@@ -171,6 +172,15 @@ export async function ladderPage(slug: string, now = new Date()): Promise<Ladder
     startsOn: formatOnDate(shown.startsAt),
     weekFrom: formatShortDay(addDays(start, (week - 1) * 7)),
     weekTo: formatShortDay(addDays(start, (week - 1) * 7 + 6)),
-    bands: buildLadder(await phaseInput(season.id, shown.number), started && now <= shown.deadline ? week : null, shown.startsAt),
+    bands: buildLadder(await phaseInput(season.id, shown.number), started && now <= shown.deadline ? week : null, shown.startsAt, mine),
   };
+}
+
+/** Every pair the account is or was in: what the league page marks as theirs (D136). */
+export async function pairIdsOf(userId: string): Promise<Set<number>> {
+  const rows = await db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  return new Set(rows.map((r) => r.id));
 }

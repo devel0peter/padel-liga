@@ -1,4 +1,4 @@
-// The profile page's level lock and értékszám (#135) on a real SQLite
+// The profile page's level lock and Élő-pont (#135) on a real SQLite
 // (~/test/sqlite) with the real session lookup.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +26,7 @@ const post = (cookie: string, fields: Record<string, string>) =>
   });
 const level = (id: string) => h.raw.prepare("select level from users where id = ?").get(id).level as string;
 
-describe("Profil: level lock and értékszám", () => {
+describe("Profil: level lock and Élő-pont", () => {
   let placed: string;
   let free: string;
 
@@ -72,7 +72,7 @@ describe("Profil: level lock and értékszám", () => {
     expect(h.raw.prepare("select name, level from users where id = 'placed'").get()).toEqual({ name: "Újabb Anna", level: "halado" });
   });
 
-  it("shows the starting értékszám of the level, nothing without one", async () => {
+  it("shows the starting Élő-pont of the level, nothing without one", async () => {
     expect(await P.loader(args(get(placed)))).toMatchObject({ rating: 1400 });
     expect(await P.loader(args(get(free)))).toMatchObject({ rating: 1200 });
     const nolevel = (await createSession("nolevel")).split(";")[0]!;

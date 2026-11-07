@@ -703,7 +703,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             )}
             {m.contacts.length > 0 && r.status !== "final" && (
               <div className="grid gap-1.5">
-                <p className="text-sm font-medium">Az ellenfeleitek telefonszáma:</p>
+                <p className="text-sm font-medium">Az ellenfeleitek elérhetősége:</p>
                 <Contacts contacts={m.contacts} />
               </div>
             )}

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, Handshake, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, Handshake, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -64,7 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
     // The badge on Értesítések, in the sidebar and the phone's bottom bar (D133).
     unread: await unreadCount(user.id),
-    // The league whose public table "Tabella" opens (D133).
+    // The league whose table "Tabella" opens (D133, D134).
     tableHref: await playerLeagueSlug(user.id).then((slug) => (slug ? `/league/${slug}` : null)),
     // The sidebar remembers open/closed in a cookie; read it so the first
     // render matches.
@@ -74,6 +74,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
+  rankings: Medal,
   pair: Handshake,
   notifications: Bell,
   overview: LayoutDashboard,
@@ -261,10 +262,21 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
   const { actor, leagues, sidebarOpen, unread, tableHref, ...profile } = loaderData;
   const { pathname } = useLocation();
   const base = appNav(actor, leagues, leagueFromPath(pathname));
-  // The player's league table, after Kezdőlap (D133): the public page, one click away.
+  // The player's league table, after Kezdőlap (D133, D134): one tap away.
   const nav = tableHref
     ? base.map((section, i) =>
-        i === 0 ? { ...section, items: [section.items[0]!, { label: "Tabella", to: tableHref, icon: "leagues" as const, permission: section.items[0]!.permission }, ...section.items.slice(1)] } : section,
+        i === 0
+          ? {
+              ...section,
+              items: [
+                section.items[0]!,
+                { label: "Tabella", to: tableHref, icon: "leagues" as const, permission: section.items[0]!.permission },
+                // The Ranglista (D137), next to it.
+                { label: "Ranglista", to: `${tableHref}/rankings`, icon: "rankings" as const, permission: section.items[0]!.permission },
+                ...section.items.slice(1),
+              ],
+            }
+          : section,
       )
     : base;
   return (

@@ -71,10 +71,12 @@ export type TableRow = {
   gameDiff: number;
 };
 
-export type LadderRow = TableRow & { names: [string, string]; zone: Zone };
+export type LadderRow = TableRow & { names: [string, string]; zone: Zone; mine: boolean };
 
 export type LadderGroup = {
   number: number;
+  /** The viewer's pair is in it (D136). */
+  mine: boolean;
   /** False before any final result: the order is only the seeding (D85). */
   ranked: boolean;
   rows: LadderRow[];
@@ -171,7 +173,16 @@ export const isRanked = (rows: readonly { matches: number }[]) => rows.some((r) 
  * its groups' tables and fixture lists. `week` (1–3) is the week marked as
  * current, or null when none is (the phase hasn't started).
  */
-export function buildLadder(groups: readonly LadderGroupInput[], week: number | null, phaseStartsAt: Date): LadderBand[] {
+/**
+ * `mine`: the viewer's pairs (D136): their sides are marked and their own
+ * matches link to the match page. Empty for nobody.
+ */
+export function buildLadder(
+  groups: readonly LadderGroupInput[],
+  week: number | null,
+  phaseStartsAt: Date,
+  mine: ReadonlySet<number> = new Set(),
+): LadderBand[] {
   const ordered = [...groups].sort((x, y) => x.number - y.number);
   const bands = new Map<Division, LadderGroup[]>(DIVISIONS.map((d) => [d, []]));
   ordered.forEach((group, index) => {
@@ -182,18 +193,20 @@ export function buildLadder(groups: readonly LadderGroupInput[], week: number | 
     const zones = moveZones(standings.length, index + 1, ordered.length, ranked);
     bands.get(divisionOf(index + 1, ordered.length))!.push({
       number: group.number,
+      mine: group.pairs.some((p) => mine.has(p.id) && !p.withdrawn),
       ranked,
       rows: standings.map((r, i) => ({
         ...r,
         names: names(r.pairId),
         zone: zones[i]!,
+        mine: mine.has(r.pairId),
       })),
       // A withdrawn pair's matches leave the group (rules 2): fixtureWeeks
       // lists only the matches of the pairs given.
       weeks: fixtureWeeks(
         group.pairs.filter((p) => !p.withdrawn),
         group.matches,
-        { phaseStartsAt, currentWeek: week },
+        { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null },
       ),
       withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
     });

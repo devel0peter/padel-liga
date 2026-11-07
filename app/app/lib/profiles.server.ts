@@ -11,10 +11,12 @@ import {
   groupHistory,
   matchViews,
   personView,
+  playerStats,
   shownElo,
   type EloChangeInput,
   type GroupHistoryRow,
   type GroupInput,
+  type PlayerStats,
   type ProfileMatchInput,
   type ProfileMatchView,
   type ProfilePair,
@@ -198,6 +200,10 @@ export type PairProfile = {
   started: boolean;
   groups: GroupHistoryRow[];
   matches: ProfileMatchView[];
+  /** The pair's Élő-pont, its two players' average, rounded; null before the league starts. */
+  elo: number | null;
+  /** Seasons, rounds, matches, wins, losses (D136), as on a player profile. */
+  stats: PlayerStats;
 };
 
 /** A pair's public profile, or null: no such pair, or never in a published group of a listed city's league. */
@@ -213,12 +219,23 @@ export async function pairProfile(pairId: number, now = new Date()): Promise<Pai
   ]);
   const pair = details.pairById.get(pairId)!;
   const own = new Set([pairId]);
+  const isStarted = started.has(leagueId);
+  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => p.id === pairId));
+  const rating = ownGroups.flatMap((g) => g.pairs).find((p) => p.id === pairId)?.elo;
   return {
     pair,
     league: league!,
-    started: started.has(leagueId),
+    started: isStarted,
     groups: groupHistory(pairId, details.inputs, now),
-    matches: matchViews(own, matchInputs(own, list, details, started), formatShortDate),
+    matches: matchList,
+    elo: isStarted && rating ? shownElo(rating) : null,
+    // One league: the season name is unique in it.
+    stats: playerStats(
+      ownGroups.map((g) => ({ season: g.season, startsAt: g.startsAt })),
+      matchList,
+      now,
+    ),
   };
 }
 
@@ -233,6 +250,8 @@ export type PlayerProfile = {
   /** The player's pairs with a profile, newest group first, with that group. */
   pairs: { pair: ProfilePair; league: string; latest: GroupHistoryRow }[];
   matches: ProfileMatchView[];
+  /** Seasons, rounds, matches, wins, losses (D136). */
+  stats: PlayerStats;
 };
 
 /** A player's public profile, or null: no such account, a deleted or anonymized one, or no published group yet. */
@@ -281,13 +300,22 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     .map(({ at: _, ...p }) => p);
 
   const eloByMatch = new Map<number, EloChangeInput>(changes.map((c) => [c.matchId, c]));
+  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  // A season is one league's: the same name in two leagues is two seasons.
+  const leagueOf = new Map(list.map((g) => [g.id, g.leagueId]));
+  const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => own.has(p.id)));
   return {
     player: personView(user),
     started: isStarted,
     elo: isStarted && rating !== null ? shownElo(rating) : null,
     eloHistory: isStarted ? eloSeries(changes).map(shownElo) : [],
     pairs: pairsShown,
-    matches: matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch),
+    matches: matchList,
+    stats: playerStats(
+      ownGroups.map((g) => ({ season: `${leagueOf.get(g.id)}:${g.season}`, startsAt: g.startsAt })),
+      matchList,
+      now,
+    ),
   };
 }
 

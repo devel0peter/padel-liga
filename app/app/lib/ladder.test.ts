@@ -82,7 +82,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
     const [band] = buildLadder([g], 1, START);
     expect(band!.groups[0]!.rows).toEqual([
       // prettier-ignore
-      { rank: 1, pairId: 11, names: ["Játékos 11A", "Játékos 11B"], matches: 2, wins: 1, losses: 1, setsWon: 2, setsLost: 2, gamesWon: 11, gamesLost: 10, points: 4, setDiff: 0, gameDiff: 1, zone: null },
+      { rank: 1, pairId: 11, names: ["Játékos 11A", "Játékos 11B"], matches: 2, wins: 1, losses: 1, setsWon: 2, setsLost: 2, gamesWon: 11, gamesLost: 10, points: 4, setDiff: 0, gameDiff: 1, zone: null, mine: false },
       {
         rank: 2,
         pairId: 12,
@@ -98,6 +98,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
         setDiff: 2,
         gameDiff: 5,
         zone: null,
+        mine: false,
       },
       {
         rank: 3,
@@ -114,6 +115,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
         setDiff: -2,
         gameDiff: -6,
         zone: null,
+        mine: false,
       },
     ]);
   });

@@ -20,7 +20,7 @@ A részleteket lent találod.
 5. [Ha elmarad a meccs](#section-5)
 6. [Sorrend a csoportban](#section-6)
 7. [Feljutás és kiesés](#section-7)
-8. [Egyéni értékszám (Élő)](#section-8)
+8. [Egyéni Élő-pont](#section-8)
 9. [Fair play](#section-9)
 10. [A szezon vége és a díjak](#section-10)
 
@@ -44,13 +44,13 @@ A részleteket lent találod.
   - a „Hívd meg a párodat” kártyán (Kezdőlap vagy Párom) másold ki a meghívó linkedet, és küldd el annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
   - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
-- A telefonszámod kötelező, az első belépéskor kérjük. Csak az aktuális kör ellenfelei látják, nyilvánosan soha nem jelenik meg.
-- **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni értékszáma alapján soroljuk be.
+- A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.
+- **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni Élő-pontja alapján soroljuk be.
 - **Helyettes:** ha a párod megsérül vagy nem ér rá, a szervező jóváhagyásával helyettes játszhat helyette egy vagy több meccsen a körön belül.
   - A kérést a meccs előtt kell beadni az oldalon, a helyettes nevével. Az ellenfelek látják, ki játszik.
   - A helyettes nagyjából azonos vagy alacsonyabb szintű legyen, és nem játszhat másik párban ugyanebben a csoportban.
   - Az eredmény a párnak számít, ugyanúgy, mint bármelyik meccs.
-  - A helyettes értékszáma változik, a hiányzó játékosé nem.
+  - A helyettes Élő-pontja változik, a hiányzó játékosé nem.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
 - **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
@@ -85,7 +85,7 @@ A részleteket lent találod.
 ## 5. Ha elmarad a meccs
 A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
 - **Csak az egyik pár próbált egyeztetni:** ők nyernek, 4:0, 4:0 eredménnyel.
-- **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az értékszámok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
+- **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az Élő-pontok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
 - **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:4, 0:4 eredménnyel.
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
 
@@ -110,7 +110,7 @@ Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
 2. Egymás elleni eredmény (két pár holtversenye esetén).
 3. Szettkülönbség.
 4. Játékkülönbség.
-5. A pár átlagos értékszáma.
+5. A pár átlagos Élő-pontja.
 
 A szett- és játékkülönbségbe a kör összes csoportmeccse beszámít, a játék nélküli eredmények is.
 
@@ -123,23 +123,23 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
 - **A liga első szezonjának első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. Ha a határ egyik oldalán 3 páros csoport van, ott ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
 - **Új párok a szezon közben** (később nevezők, párcsere után és visszatérők):
-  - Ha szezon közben csatlakozol, vagy szünet után visszatérsz, a szinted (ha már játszottál, az értékszámod) szerinti divízió legalsó csoportjába kerülsz. Ha ott nincs hely, onnan lefelé a csoportok leggyengébb párja egy csoporttal lejjebb kerül.
+  - Ha szezon közben csatlakozol, vagy szünet után visszatérsz, a szinted (ha már játszottál, az Élő-pontod) szerinti divízió legalsó csoportjába kerülsz. Ha ott nincs hely, onnan lefelé a csoportok leggyengébb párja egy csoporttal lejjebb kerül.
   - A beosztást a kör indulása előtt a szervező átnézi.
 
-## 8. Egyéni értékszám (Élő)
-- Az értékszám az **Élő-rendszer**, amelyet a magyar származású Élő Árpád dolgozott ki a sakkhoz. Azóta sok sportág használja, például az asztalitenisz és a FIFA-világranglista.
-- Minden játékosnak saját értékszáma van. A pár értékszáma a két játékos átlaga.
-- A kezdő értékszám a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
-- A szintedet a profilodon addig módosíthatod, amíg nem játszottál szezonban. Amint egy párod bekerül egy kihirdetett csoportba, a szinted lezárul: onnantól a liga eredményei döntik el, hol tartasz, ezt az értékszámod mutatja.
-- **Hogyan változik:** minden lejátszott meccs előtt a két pár értékszámából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik, ha a két pár `K`-ja egyezik; a pár `K`-ja a két játékos `K`-jának átlaga (40, 30 vagy 20).
+## 8. Egyéni Élő-pont
+- Az Élő-pont az **Élő-rendszerből** jön, amelyet a magyar származású Élő Árpád dolgozott ki a sakkhoz. Azóta sok sportág használja, például az asztalitenisz és a FIFA-világranglista.
+- Minden játékosnak saját Élő-pontja van. A pár Élő-pontja a két játékos átlaga.
+- A kezdő Élő-pont a jelentkezéskor megadott szinttől függ: kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600.
+- A szintedet a profilodon addig módosíthatod, amíg nem játszottál szezonban. Amint egy párod bekerül egy kihirdetett csoportba, a szinted lezárul: onnantól a liga eredményei döntik el, hol tartasz, ezt az Élő-pontod mutatja.
+- **Hogyan változik:** minden lejátszott meccs előtt a két pár Élő-pontjából kiszámoljuk, mekkora eséllyel nyertek. Ha erősebb párt vertek meg, sokat kaptok; ha gyengébbet, keveset. Vereségnél fordítva. Amennyit az egyik pár kap, annyit veszít a másik, ha a két pár `K`-ja egyezik; a pár `K`-ja a két játékos `K`-jának átlaga (40, 30 vagy 20).
   - Esély: `E = 1 / (1 + 10^((ellenfél − ti) / 400))`
   - Változás: `K × (eredmény − E)`, ahol az eredmény győzelemnél 1, vereségnél 0.
   - `K` = 40 az első 10 meccseden, utána 20.
   - A pár mindkét tagja ugyanannyit kap vagy veszít.
   - Csak az számít, ki nyert, az eredmény aránya nem.
 - **Példa:** 1200-as pár játszik egy 1400-as ellen. Az esélyük 24%. Ha nyernek, +30 pontot kapnak, ha kikapnak, −10 pontot (kerekítve, K = 40).
-- A játék nélküli győzelem és az elmaradt meccs nem változtat az értékszámon.
-- Az értékszám alapján soroljuk be az új párokat (7. pont), és ez az utolsó holtversenydöntő (6. pont).
+- A játék nélküli győzelem és az elmaradt meccs nem változtat az Élő-ponton.
+- Az Élő-pont alapján soroljuk be az új párokat (7. pont), és ez az utolsó holtversenydöntő (6. pont).
 
 ## 9. Fair play
 - Az egyeztetésnél légy korrekt: ne ajánlj olyan időpontot, amelyről tudod, hogy az ellenfél számára elfogadhatatlan.
@@ -155,6 +155,6 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
   - A díjakat és a felajánlókat szezononként az oldalon hirdetjük meg. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.
 - A szezon végén e-mailben küldjük az összesítődet. A lezárt szezonok tabellái az oldalon visszanézhetők.
 - **Folytatás:** a következő szezonra a „Nevezünk újra” gombbal neveztek, a jelentkezési határidőig. Aki nem nevez újra, kimarad. Ha inkább a szervezőnek szólsz, ő is benevezhet titeket.
-- **Az értékszámod és a csoportod is megmarad:** a következő szezon az utolsó kör feljutása és kiesése utáni csoportokkal indul. A kimaradó párok helyére az alattuk lévők lépnek feljebb. A beosztást a szervező átnézi.
+- **Az Élő-pontod és a csoportod is megmarad:** a következő szezon az utolsó kör feljutása és kiesése utáni csoportokkal indul. A kimaradó párok helyére az alattuk lévők lépnek feljebb. A beosztást a szervező átnézi.
 - Ha párt cseréltek a két szezon között, az új párt új nevezőként soroljuk be (7. pont).
 - Ha a szezon utolsó körében neveztek, a következő szezon elején automatikusan bekapcsolódtok, nem kell újra neveznetek.

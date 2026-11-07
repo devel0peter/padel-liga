@@ -95,6 +95,8 @@ function world() {
   for (const id of ["q1", "q2", "r1", "r2", "r3", "gone"])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, 'halado', 1)").run(id, `${id}@x.hu`, `Játékos ${id}`);
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (9, 1, 'r1', 'r2')`);
+  // Every account here joined the league (D128).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'carried' from users`);
 }
 
 const lastId = () => (one("select coalesce(max(id), 0) as n from audit_log").n as number);

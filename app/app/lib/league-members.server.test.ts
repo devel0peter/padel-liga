@@ -100,12 +100,30 @@ describe("Melyik ligában játszol? (#331 requirement 1)", () => {
     expect((await M.leagueChoices("a", NOW)).map((l) => l.id)).toEqual([1]);
   });
 
-  it("joins a league the card offers, audited; refuses one it doesn't", async () => {
-    expect(await M.chooseLeague("a", 3, NOW)).toBe(false);
-    expect(await M.chooseLeague("a", 4, NOW)).toBe(false);
-    expect(await M.chooseLeague("a", 2, NOW)).toBe(true);
+  it("joins a listed league, audited; refuses an unlisted or unknown one", async () => {
+    expect(await M.chooseLeague("a", 4)).toBe(false);
+    expect(await M.chooseLeague("a", 99)).toBe(false);
+    expect(await M.chooseLeague("a", 2)).toBe(true);
     expect(all("select league_id, user_id, source from league_members")).toEqual([{ league_id: 2, user_id: "a", source: "chosen" }]);
     expect(all("select actor_id, action, detail from audit_log")).toEqual([{ actor_id: "a", action: "league.join", detail: "league:2; chosen" }]);
+    // A further league, as its register button offers it (D128).
+    expect(await M.chooseLeague("a", 3)).toBe(true);
+    expect(await M.memberLeagueIds("a")).toEqual(new Set([2, 3]));
+  });
+});
+
+describe("the register button's league for a logged-in visitor (D128)", () => {
+  it("is offered while they don't belong to it, even without an open season; nothing is joined", async () => {
+    expect(await M.leagueOffer("a", "deb")).toEqual({ id: 3, city: "deb", cityName: "Debrecen", name: "Padelpárbaj Debrecen" });
+    expect(all("select * from league_members")).toEqual([]);
+  });
+
+  it("is not offered to a member, nor for an unlisted, unknown or missing league", async () => {
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen')`);
+    expect(await M.leagueOffer("a", "gyor")).toBeNull();
+    expect(await M.leagueOffer("a", "pecs")).toBeNull();
+    expect(await M.leagueOffer("a", "nincs")).toBeNull();
+    expect(await M.leagueOffer("a", null)).toBeNull();
   });
 });
 
@@ -179,6 +197,25 @@ describe("the release's backfill (migration 0053, #331 requirement 3)", () => {
     ]);
     backfill();
     expect(members()).toHaveLength(7);
+  });
+
+  it("keeps on Párkeresők whoever looks for a partner there, wherever their signups were (#333)", async () => {
+    h.raw.exec(`delete from users`);
+    user("far");
+    user("off");
+    user("gone", { deleted: true });
+    // Signed up for another city, but switched "Párt keresek" on in Győr and
+    // Óvár: Párkeresők listed every seeker, so they stay there.
+    signup("other", "solo", "far@x.hu");
+    signup("other", "solo", "off@x.hu");
+    signup("other", "solo", "gone@x.hu");
+    h.raw.exec(`insert into partner_searches (league_id, user_id, seeking, updated_at) values
+      (1, 'far', 1, 70), (2, 'far', 1, 80), (1, 'off', 0, 70), (1, 'gone', 1, 70)`);
+    backfill();
+    expect(all("select league_id, user_id, source, joined_at from league_members order by league_id, user_id")).toEqual([
+      { league_id: 1, user_id: "far", source: "carried", joined_at: 70 },
+      { league_id: 2, user_id: "far", source: "carried", joined_at: 80 },
+    ]);
   });
 
   it("stores 'Párt keresek' on for whoever is on today only by the old default (#333), and keeps stored choices", async () => {

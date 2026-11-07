@@ -120,7 +120,8 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(await P.createPair("o", 1, "c", "a")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
     expect(await P.createPair("o", 1, "b", "d")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.paired });
     expect(all("select id from pairs")).toHaveLength(1);
-    // Another league doesn't count.
+    // Another league doesn't count (where both are its players too).
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'a', 'chosen'), (2, 'c', 'chosen')`);
     expect(await P.createPair("o", 2, "a", "c")).toEqual({ ok: true });
     expect(audits().map((r: any) => r.action)).toEqual(["pair.create", "pair.create"]);
   });
@@ -178,18 +179,23 @@ describe("pairs.server on real SQLite (#97)", () => {
 
   it("makes both players of a new pair, a partner change's new partner too, members by row (D128)", async () => {
     h.raw.exec(`delete from league_members`);
-    await P.createPair("o", 2, "a", "b");
-    const id = one("select id from pairs").id;
+    // Debrecen's players only through old pairs, with no row yet.
+    h.raw.exec(`insert into pairs (league_id, player_a, player_b, status) values (2, 'a', 'b', 'dissolved'), (2, 'c', 'd', 'dissolved')`);
+    expect(await P.createPair("o", 2, "a", "b")).toEqual({ ok: true });
+    const id = one("select id from pairs where status = 'active'").id;
     expect(all("select user_id, source from league_members where league_id = 2 order by user_id")).toEqual([
       { user_id: "a", source: "pair" },
       { user_id: "b", source: "pair" },
     ]);
     await P.changePartner("o", 2, id, "a", "c", NOW);
     expect(all("select user_id from league_members where league_id = 2 order by user_id").map((r: any) => r.user_id)).toEqual(["a", "b", "c"]);
-    // A refused pair makes nobody a member.
-    expect(await P.createPair("o", 1, "a", "d")).toMatchObject({ ok: true });
-    expect(await P.createPair("o", 1, "a", "n")).toMatchObject({ ok: false });
-    expect(all("select user_id from league_members where league_id = 1 order by user_id").map((r: any) => r.user_id)).toEqual(["a", "d"]);
+    // Players who aren't Győr's (a forged id on Párok) are refused, and become
+    // nobody's members (#331 review).
+    expect(await P.createPair("o", 1, "a", "d")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.unknown });
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen')`);
+    expect(await P.createPair("o", 1, "a", "d")).toEqual({ ok: false, error: NEW_PAIR_REFUSALS.unknown });
+    expect(all("select user_id from league_members where league_id = 1")).toEqual([{ user_id: "a" }]);
+    expect(all("select count(*) as n from pairs where league_id = 1")).toEqual([{ n: 0 }]);
   });
 
   it("dissolves a pair, audited, without any email; a second dissolve is refused", async () => {
@@ -207,6 +213,7 @@ describe("pairs.server on real SQLite (#97)", () => {
   });
 
   it("refuses a pair of another league (the URL's league decides)", async () => {
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'a', 'chosen'), (2, 'b', 'chosen')`);
     await P.createPair("o", 2, "a", "b");
     const id = one("select id from pairs").id;
     expect(await P.dissolvePair("o", 1, id, NOW)).toMatchObject({ ok: false });

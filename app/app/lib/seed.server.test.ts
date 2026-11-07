@@ -22,11 +22,9 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { settleBackground } = await import("~/test/background");
 const { db } = await import("~/db/client.server");
 const { users } = await import("~/db/schema");
 const Seed = await import("./seed");
-const O = await import("~/lib/email/outbox.server");
 const M = await import("~/lib/league-members.server");
 const P = await import("~/lib/pairs.server");
 const E = await import("~/lib/season-entries.server");

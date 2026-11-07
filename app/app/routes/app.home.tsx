@@ -13,8 +13,16 @@ import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate } from "~/lib/format";
-import { CHOOSE_LEAGUE_BUTTON, CHOOSE_LEAGUE_TEXT, CHOOSE_LEAGUE_TITLE, LEAGUE_PARAM, parseLeagueParam } from "~/lib/league-members";
-import { chooseLeague, joinFromRegisterButton, leagueChoices, playerLeagues } from "~/lib/league-members.server";
+import {
+  CHOOSE_LEAGUE_BUTTON,
+  CHOOSE_LEAGUE_TEXT,
+  CHOOSE_LEAGUE_TITLE,
+  LEAGUE_PARAM,
+  OFFER_LEAGUE_TEXT,
+  OFFER_LEAGUE_TITLE,
+  parseLeagueParam,
+} from "~/lib/league-members";
+import { chooseLeague, leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
 import { listLeagues } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
@@ -37,13 +45,13 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   // Through a league's register button while logged in already (the login
-  // page sends a logged-in visitor straight here): join it, then a clean
-  // address. A new account joined at login (D128).
+  // page sends a logged-in visitor straight here): the card offers that
+  // league, and "Csatlakozom" joins it; nothing is joined on this GET. A
+  // member already, or an unknown league: a clean address. (A new account
+  // joined at login, D128.)
   const url = new URL(request.url);
-  if (url.searchParams.has(LEAGUE_PARAM)) {
-    await joinFromRegisterButton(user.id, parseLeagueParam(url.searchParams.get(LEAGUE_PARAM)));
-    throw redirect("/home");
-  }
+  const offer = url.searchParams.has(LEAGUE_PARAM) ? await leagueOffer(user.id, parseLeagueParam(url.searchParams.get(LEAGUE_PARAM))) : null;
+  if (url.searchParams.has(LEAGUE_PARAM) && !offer) throw redirect("/home");
   const actor = (await getActor(request))!;
   const leagues = await listLeagues();
   const nav = appNav(actor, navLeagues(actor, actor.platformRole === "superadmin" ? leagues : []));
@@ -52,7 +60,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const mine = await playerLeagues(user.id);
   const leagueName = new Map(mine.map((l) => [l.id, l.name]));
   const now = new Date();
-  const choices = mine.length === 0 ? await leagueChoices(user.id, now) : [];
+  const choices = offer ? [offer] : mine.length === 0 ? await leagueChoices(user.id, now) : [];
   const shown = homeSeasons(await listSeasons(), now).filter((s) => leagueName.has(s.leagueId));
   // The pair's entry, the "Nevezünk" button or why not (#23).
   const views = await entryViews(user, shown, now);
@@ -78,6 +86,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     groups,
     // "Melyik ligában játszol?" (#331): empty once they belong to a league.
     choices: choices.map((c) => ({ id: c.id, city: c.cityName, name: c.name })),
+    // The register button's league, rather than "which one".
+    offered: !!offer,
     // Accounts from before the level was asked for: nudge them to the profile.
     needsLevel: !user.level,
     pairLinks: links.map((l) => ({
@@ -129,13 +139,13 @@ function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
 
 // "Melyik ligában játszol?" (#331): for an account in no league, one row per
 // league with a season open for entries or running.
-function ChooseLeague({ choices }: { choices: { id: number; city: string; name: string }[] }) {
+function ChooseLeague({ choices, offered }: { choices: { id: number; city: string; name: string }[]; offered: boolean }) {
   const busy = useNavigation().state !== "idle";
   return (
     <Card className="max-w-2xl border-nav-active">
       <CardHeader>
-        <CardTitle className="font-display text-lg">{CHOOSE_LEAGUE_TITLE}</CardTitle>
-        <CardDescription>{CHOOSE_LEAGUE_TEXT}</CardDescription>
+        <CardTitle className="font-display text-lg">{offered ? OFFER_LEAGUE_TITLE : CHOOSE_LEAGUE_TITLE}</CardTitle>
+        <CardDescription>{offered ? OFFER_LEAGUE_TEXT : CHOOSE_LEAGUE_TEXT}</CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="grid gap-3">
@@ -163,7 +173,7 @@ function ChooseLeague({ choices }: { choices: { id: number; city: string; name: 
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
     <AppPage title="Kezdőlap">
-      {d.choices.length > 0 && <ChooseLeague choices={d.choices} />}
+      {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {d.groups.length > 0 && <Todos items={todos(d.groups)} />}
       {d.groups.map((g) => (
         <MyGroup key={g.groupId} group={g} multiLeague={d.multiLeague} />

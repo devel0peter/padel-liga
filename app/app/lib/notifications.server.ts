@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-o
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { leagueAdmins, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
+import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
   channelEnabled,

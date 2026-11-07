@@ -232,7 +232,9 @@ async function newPairRefusal(leagueId: number, a: string, b: string, free = [a,
     db
       .select({ id: users.id })
       .from(users)
-      .where(and(inArray(users.id, [a, b]), isNotNull(users.consentAt))),
+      // Registered, and the league's players (D128): a forged id must not make an
+      // outsider a member of the league through the pair (#331 review).
+      .where(and(inArray(users.id, [a, b]), isNotNull(users.consentAt), memberOf(leagueId, users.id))),
     db.select({ id: pairs.id }).from(pairs).where(activePairWith(leagueId, free)).limit(1),
   ]);
   const refusal = checkNewPair({ a, b, registered: registered.length === 2, paired: paired.length > 0 });

@@ -56,3 +56,11 @@ WHERE u.`consent_at` IS NOT NULL AND u.`deleted_at` IS NULL
     OR EXISTS (SELECT 1 FROM `interest_signups` o JOIN `users` ou ON ou.`email` = lower(o.`email1`)
       WHERE o.`id` = s.`paired_with` AND ou.`consent_at` IS NOT NULL))
 GROUP BY l.`id`, u.`id`;
+--> statement-breakpoint
+-- Párkeresők listed every registered player with "Párt keresek" on, in any
+-- league, whatever D93 said: whoever is on in a league (by their own switch
+-- or the default just stored) stays its player, so nobody drops off it.
+INSERT OR IGNORE INTO `league_members` (`league_id`, `user_id`, `source`, `joined_at`)
+SELECT ps.`league_id`, u.`id`, 'carried', ps.`updated_at`
+FROM `partner_searches` ps JOIN `users` u ON u.`id` = ps.`user_id`
+WHERE ps.`seeking` = 1 AND u.`consent_at` IS NOT NULL AND u.`deleted_at` IS NULL;

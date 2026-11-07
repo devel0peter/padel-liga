@@ -93,9 +93,24 @@ async function joinable(now: Date): Promise<JoinableLeague[]> {
   );
 }
 
-// "Csatlakozom": only a league the card offers.
-export async function chooseLeague(userId: string, leagueId: number, now = new Date()): Promise<boolean> {
-  if (!(await joinable(now)).some((l) => l.id === leagueId)) return false;
+// A logged-in visitor came through a league's register button
+// (`/home?league=<slug>`): the league to offer on the card, or null when the
+// slug is no listed league or they belong to it already. Nothing is joined
+// on the GET: a crafted link must not make anyone a member (their phone
+// would show to that league's organizer, D126); "Csatlakozom" does it.
+export async function leagueOffer(userId: string, slug: string | null): Promise<JoinableLeague | null> {
+  if (!slug) return null;
+  const [listed, cities, mine] = await Promise.all([listedLeagues(), listedCities(), memberLeagueIds(userId)]);
+  const league = listed.find((l) => l.slug === slug);
+  if (!league || mine.has(league.id)) return null;
+  return { id: league.id, city: league.city, cityName: cities.find((c) => c.slug === league.city)?.name ?? league.city, name: league.name };
+}
+
+// "Csatlakozom": any listed league. The card offers those with a season open
+// or running to a player in none, or the register button's league; joining
+// one more league by hand is what that button does anyway (D128).
+export async function chooseLeague(userId: string, leagueId: number): Promise<boolean> {
+  if (!(await listedLeagues()).some((l) => l.id === leagueId)) return false;
   await joinLeague(userId, leagueId, "chosen");
   return true;
 }

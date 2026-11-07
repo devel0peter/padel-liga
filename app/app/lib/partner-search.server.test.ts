@@ -107,6 +107,7 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
 
   it("lists an active pair made from Regisztráltak, newest first, with name and level", async () => {
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'halado', 1)`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'd', 'chosen')`);
     await S.pairSeekers("org", LEAGUE, "b", "c");
     await S.pairSeekers("org", LEAGUE, "a", "d");
     expect(await listed()).toEqual(["a+d", "b+c"]);
@@ -130,6 +131,7 @@ describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () 
 
   it("keeps to the league", async () => {
     h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'gyor', 'gyor2', 'Másik')`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'b', 'chosen'), (2, 'c', 'chosen')`);
     await S.pairSeekers("org", { id: 2, name: "Másik" }, "b", "c");
     expect(await listed(1)).toEqual([]);
     expect(await listed(2)).toEqual(["b+c"]);

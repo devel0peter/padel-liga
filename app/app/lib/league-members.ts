@@ -15,6 +15,10 @@ export const LEAGUE_PARAM = "league";
 export const CHOOSE_LEAGUE_TITLE = "Melyik ligában játszol?";
 export const CHOOSE_LEAGUE_TEXT = "Válaszd ki a ligádat, és utána párt is találsz, nevezni is tudsz.";
 export const CHOOSE_LEAGUE_BUTTON = "Csatlakozom";
+// The same card for a logged-in visitor who came through a league's register
+// button: that league only.
+export const OFFER_LEAGUE_TITLE = "Csatlakozol a ligához?";
+export const OFFER_LEAGUE_TEXT = "Ennek a ligának a gombjával jöttél. Ha itt játszol, csatlakozz, és párt is találsz, nevezni is tudsz.";
 export const NO_LEAGUE_TEXT = "Még nem csatlakoztál egyik ligához sem. Itt választhatsz:";
 
 // How they joined (league_members.source).

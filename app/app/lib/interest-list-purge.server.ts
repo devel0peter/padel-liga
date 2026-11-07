@@ -12,9 +12,10 @@ import type { RunBudget, Usage } from "~/lib/run-usage";
 // retires it (#334, D123, D132; replaces D88's "end of round 1"). Nothing
 // writes the list any more (#332, #333), so what is there at the first run is
 // all there ever is. Gone: every signup, registered or not; the stored
-// emails the list produced to an address with no account (an account's own
-// mail stays, as do the unsubscribe and bounce records); every partner
-// notice, whose subject names the signer; and the stuck reminder records
+// emails the list produced to an address with no account, and the unsent
+// ones of those kinds to anyone (a pending invite must not go out, a failed
+// one keeps its text; an account's sent mail stays, as do the unsubscribe
+// and bounce records); every partner notice, whose subject names the signer; and the stuck reminder records
 // that hold a list address (situation A's key, and the per-season record of
 // an address with no account). One audit entry and one log line give the
 // counts, never an address.
@@ -29,7 +30,7 @@ export const PURGE_MIN: Usage = { queries: 3, calls: 0 };
 // confirmation, the partner notice, the registration invite, the solo
 // pairing's introduction, the broadcasts to the list, and the stuck reminder
 // A (and C's copy to the partner a signup named). To an address with an
-// account the same kinds are that account's own mail and stay.
+// account the same kinds, once sent, are that account's own mail and stay.
 export const LIST_MAIL_KINDS = [
   "signup_confirmation",
   "partner_notice",
@@ -44,7 +45,8 @@ const AUDIT_ACTION = "interest_list.delete";
 const noAccount = (email: unknown) => sql`not exists (select 1 from users u where lower(u.email) = lower(${email}))`;
 
 const listMail = sql`(${emailMessages.kind} = 'partner_notice'
-  or (${inArray(emailMessages.kind, [...LIST_MAIL_KINDS])} and ${noAccount(emailMessages.toEmail)}))`;
+  or (${inArray(emailMessages.kind, [...LIST_MAIL_KINDS])}
+    and (${noAccount(emailMessages.toEmail)} or ${emailMessages.status} <> 'sent')))`;
 const listReminder = eq(stuckReminders.situation, "A");
 const listPerson = noAccount(stuckReminderPeople.email);
 

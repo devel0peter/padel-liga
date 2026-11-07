@@ -46,10 +46,14 @@ function world() {
   mail.run(6, "stuck_reminder", "cili@x.hu", "Emlékeztető", "sent");
   // A partner notice to someone who registered names the signer: goes too.
   mail.run(7, "partner_notice", "anna@x.hu", "Béla jelentkeztetett", "sent");
-  // An account's own mail stays, also of the same kinds.
+  // An account's own sent mail stays, also of the same kinds.
   mail.run(8, "signup_confirmation", "anna@x.hu", "Megkaptuk", "sent");
   mail.run(9, "broadcast", "anna@x.hu", "Hír", "sent");
-  mail.run(10, "pair_created", "anna@x.hu", "Van párod", "sent");
+  mail.run(10, "pair_created", "anna@x.hu", "Van párod", "pending");
+  // The list's unsent mail goes to an account too: a pending invite must
+  // not go out, a failed introduction keeps another solo's details.
+  mail.run(12, "registration_invite", "anna@x.hu", "Indul", "pending");
+  mail.run(13, "pair_intro", "Anna@x.hu", "Párt találtunk", "failed");
   // Not from the list: a login code to a new address stays.
   mail.run(11, "login_code", "dani@x.hu", "Kód", "sent");
   h.raw.exec(`insert into email_suppressions (email, reason) values ('cili@x.hu', 'unsubscribed'), ('bela@x.hu', 'bounced')`);
@@ -89,10 +93,10 @@ describe("purgeInterestList (#334)", () => {
   it("writes one audit entry and one log line with counts only, and marks it done", async () => {
     await purge();
     expect(audits()).toEqual([
-      { actor_id: null, action: "interest_list.delete", target: "Jelentkezési lista", detail: "2 signups, 7 emails, 3 reminder records", at: NOW.getTime() / 1000 },
+      { actor_id: null, action: "interest_list.delete", target: "Jelentkezési lista", detail: "2 signups, 9 emails, 3 reminder records", at: NOW.getTime() / 1000 },
     ]);
     const logged = lines.filter((l) => l.event === "interest list deletion");
-    expect(logged).toEqual([expect.objectContaining({ level: "info", signups: 2, messages: 7, reminders: 3, done: true })]);
+    expect(logged).toEqual([expect.objectContaining({ level: "info", signups: 2, messages: 9, reminders: 3, done: true })]);
     expect(JSON.stringify(lines)).not.toMatch(/@/);
     expect(one("select key from job_runs where key = ?", P.DONE_KEY)).toEqual({ key: P.DONE_KEY });
   });
@@ -149,7 +153,7 @@ describe("purgeInterestList (#334)", () => {
     expect(results.slice(0, -1).every((r) => /more left for the next run/.test(r ?? ""))).toBe(true);
     expect(results.at(-1)).toMatch(/^interest list deletion finished/);
     // One entry with the totals of the first run, whatever the number of runs.
-    expect(audits().map((a: any) => a.detail)).toEqual([`${SIGNUPS} signups, ${3000 + 7} emails, 3 reminder records`]);
+    expect(audits().map((a: any) => a.detail)).toEqual([`${SIGNUPS} signups, ${3000 + 9} emails, 3 reminder records`]);
     expect(lines.filter((l) => l.event === "interest list deletion")).toHaveLength(1);
   });
 

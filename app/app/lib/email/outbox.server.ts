@@ -394,7 +394,7 @@ export async function sendTestBroadcast(draft: { subject: string; body: string }
 type Claimed = typeof emailMessages.$inferSelect;
 
 // The send order: login codes, other transactional emails, then bulk mail
-// (broadcasts and registration invites). Each group has its own budget
+// (broadcasts and the stuck reminders). Each group has its own budget
 // (budget.ts).
 const GROUPS = ["login", "transactional", "broadcast"] as const;
 type Group = (typeof GROUPS)[number];
@@ -503,7 +503,8 @@ export async function sentLast24h(now = Date.now()): Promise<number> {
 }
 
 // Sends pending emails within the daily budget: login codes first, then
-// signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
+// the other transactional emails, then bulk mail. With `ids`, only those
+// messages (used right after the request that queued them).
 // `at`: the cron run's scheduled time (#188); the time of the call otherwise.
 // `run`: the cron run's limits (#183); `left` says how many emails wait when
 // the run stopped early because of them.

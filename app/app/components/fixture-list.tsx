@@ -54,7 +54,8 @@ function Middle({ m }: { m: FixtureMatch }) {
       </span>
     );
   }
-  if (m.state === "final") return <span className="text-xs font-semibold text-muted-foreground">{m.note}</span>;
+  // A final outcome without a score: a dash here, its note under the row.
+  if (m.state === "final") return <span className="font-bold text-muted-foreground">–</span>;
   if (m.state === "scheduled" && m.when) {
     const [day, time] = splitWhen(m.when);
     return (
@@ -84,6 +85,8 @@ function Row({ m }: { m: FixtureMatch }) {
         <Middle m={m} />
       </span>
       <Side side={m.b} won={m.winner === "b"} align="left" />
+      {/* Under the names, so a long note never squeezes them (D128). */}
+      {m.state === "final" && !m.sets && m.note && <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span>}
     </>
   );
   const grid = "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 rounded-lg border bg-background px-2 py-2 sm:gap-3 sm:px-3";

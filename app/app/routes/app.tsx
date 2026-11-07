@@ -62,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     // the same pure function; the actor is the user's own data.
     actor,
     leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
-    // The badge on Értesítések (and the phone header's bell, app-page.tsx).
+    // The badge on Értesítések, in the sidebar and the phone's bottom bar (D128).
     unread: await unreadCount(user.id),
     // The league whose public table "Tabella" opens (D128).
     tableHref: await playerLeagueSlug(user.id).then((slug) => (slug ? `/league/${slug}` : null)),

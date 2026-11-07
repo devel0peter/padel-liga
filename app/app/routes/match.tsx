@@ -629,7 +629,7 @@ function whenLine(m: Route.ComponentProps["loaderData"]): string {
     case "proposed":
       return "Ajánlott időpontok várnak választásra";
     case "to_schedule":
-      return m.result.status === "none" ? "Még nincs időpont" : "–";
+      return m.result.status === "none" ? "Még nincs időpont" : "Nincs rögzített időpont";
   }
 }
 
@@ -725,7 +725,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </section>
           )}
 
-          {r.status !== "none" && !confirmResult && (
+          {/* A confirmed played result is already on the score board above. */}
+          {r.status !== "none" && !confirmResult && !(r.status === "final" && r.outcome.kind === "played" && r.how === "confirmed") && (
             <Panel title="Eredmény">
                             <ResultStatus m={m} />
             </Panel>

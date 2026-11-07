@@ -22,7 +22,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| T1 | Columns: place, pair, played (M), wins (Gy), losses (V), sets won:lost (Szett), games won:lost (Játék), points (P). Ratios, not only differences, so a player can check the tiebreak by eye. | Peter, 2026-11-07; spec 9 |
+| T1 | Columns: place, pair, played (M), wins (Gy), losses (V), sets won:lost (Szett), games won:lost (Játék), points (P). Ratios, not only differences, so a player can check the tiebreak by eye. Under 640 px Játék is left out, so the names keep room (T6); the league page on a wider screen has it. | Peter, 2026-11-07; spec 9 |
 | T2 | The places that move at the end of the round are marked: 1st moves up (not in group 1), last moves down (not in the last group; in a group of 3 the 3rd). A legend says what the marks mean. | spec 10; Peter, 2026-11-07 |
 | T3 | Before any final result the order is only the seeding: no place numbers and no up/down marks, so nobody reads the seed as a ranking. | D85 |
 | T4 | The player's own pair is highlighted ("ti"). | D67 |

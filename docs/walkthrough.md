@@ -130,7 +130,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
   - `/admin/leagues` ("Ligák"): Padelpárbaj Mintaváros with the organizer Teszt Szervező, and Padelpárbaj Példaváros.
   - `/admin/leagues/minta/clubs` ("Klubok: Mintaváros"): the three clubs. "Inaktiválás" on one turns it off, "Aktiválás" turns it on again (deactivate instead of delete, #19). Leave all three active.
   - `/admin/leagues/minta/seasons` ("Szezonok"): the Teszt szezon with its four rounds, a link under "Nevezések" (0 nevezett) and "Csoportok" under "1. kör". Try "Új szezon" with a start day that is not a Monday: it must be refused.
-  - `/privacy`: opens without login; check that it describes pairs, season entries, the group emails and how long email text is kept.
+  - `/privacy`: opens without login; check that it describes pairs, season entries, the group emails and how long email text is kept, and says nothing about a signup or interest list (#334).
 
 ### 3. A visitor finds the league's register button
 

@@ -15,9 +15,9 @@ import {
   checkEntry,
   ENTRY_REFUSALS,
   entryOpen,
+  entryPhase,
   entryView,
   IN_RUNNING_PHASE,
-  joinsPhase,
   noLevelRefusal,
   NOT_IN_RUNNING_PHASE,
   ORGANIZER_ENTRY_REFUSALS,
@@ -25,7 +25,8 @@ import {
   type EntryStatus,
   type EntryView,
 } from "./season-entries";
-import type { Season } from "./seasons";
+import { isWaiting, type Season } from "./seasons";
+import { announceSeasonStart, fixStartStatements } from "./season-start.server";
 import { getSeason } from "./seasons.server";
 import { notInRunningGroup, pairInRunningGroup, phasesWithGroups } from "./groups.server";
 
@@ -150,7 +151,8 @@ async function entryRefusal(user: User, season: Season, now: Date) {
   return { pair, refusal };
 }
 
-type Joins = { phase: number; startsAt: Date } | null;
+// startsAt null: a first season still waiting for its minimum entries (D124).
+type Joins = { phase: number; startsAt: Date | null } | null;
 
 // Enters the pair at `now` (#153, D62): the entry counts at once, from the
 // joining phase. One statement re-checks that the pair is still active, both
@@ -159,20 +161,24 @@ type Joins = { phase: number; startsAt: Date } | null;
 // settles a double submit. A withdrawn entry of the same pair is entered
 // again (#154). Returns where the pair starts, or null when nothing changed.
 // `logged`: an organizer's entry, audited in the same batch (#225); a
-// player's own entry isn't.
+// player's own entry isn't. In a first season waiting for its minimum
+// (D124) the pair starts in phase 1, and the same batch fixes the season's
+// start if this entry reaches the minimum (`started`): every entered player
+// is told then, and the caller sends no notice of the entry itself.
 async function enter(
   season: Season,
   pair: { id: number; players: [string, string] },
   decidedBy: string | null,
   now: Date,
   logged?: { actorId: string },
-): Promise<{ id: number; joins: Joins } | null> {
+): Promise<{ id: number; joins: Joins; started: boolean } | null> {
   const [a, b] = pair.players;
+  const waiting = isWaiting(season);
   // A pair entered once a phase's groups are out starts at the phase after
   // it (#24), also when a later phase is published before it starts (a
   // round switch before a break, #35).
-  const published = (await phasesWithGroups(season.id)).filter((p) => p.published).map((p) => p.phase);
-  const phase = joinsPhase(season.phases, now, published);
+  const published = waiting ? [] : (await phasesWithGroups(season.id)).filter((p) => p.published).map((p) => p.phase);
+  const phase = entryPhase(season, now, published);
   const seconds = Math.floor(now.getTime() / 1000);
   // A builder (insert ... select from the pair's row), not a raw statement,
   // so it can share a D1 batch with the audit entry.
@@ -219,9 +225,8 @@ async function enter(
     })
     .returning({ id: seasonEntries.id });
   const entryId = sql`(select ${seasonEntries.id} from ${seasonEntries} where ${seasonEntries.seasonId} = ${season.id} and ${seasonEntries.pairId} = ${pair.id})`;
-  const [inserted] = logged
-    ? await db.batch([
-        upsert,
+  const audit = logged
+    ? [
         auditIfChanged({
           actorId: logged.actorId,
           action: "season_entry.enter",
@@ -229,11 +234,29 @@ async function enter(
           detail: `pair:${pair.id}`,
           leagueId: season.leagueId,
         }),
-      ])
-    : [await upsert];
-  const [row] = inserted;
+      ]
+    : [];
+  // The audit right after the upsert: auditIfChanged reads its changes().
+  const start = waiting ? fixStartStatements(season, now) : null;
+  const results = start
+    ? await db.batch([upsert, ...audit, start.fix, ...start.phases])
+    : logged
+      ? await db.batch([upsert, ...audit])
+      : [await upsert];
+  const [row] = results[0] as { id: number }[];
+  const started = !!start && (results[1 + audit.length] as { id: number }[]).length > 0;
+  if (started) await announceSeasonStart(season.id, start!.startsAt);
   if (!row) return null;
-  return { id: row.id, joins: phase === null ? null : { phase, startsAt: season.phases.find((p) => p.number === phase)!.startsAt } };
+  if (phase === null) return { id: row.id, joins: null, started };
+  const startsAt = started
+    ? start!.startsAt
+    : waiting
+      ? // Another entry may have fixed the start between our read and our
+        // batch, and announced it before this entry counted: then this
+        // pair's own notice carries the date (D124).
+        ((await getSeason(season.id))?.phases.find((p) => p.number === phase)?.startsAt ?? null)
+      : season.phases.find((p) => p.number === phase)!.startsAt;
+  return { id: row.id, joins: { phase, startsAt }, started };
 }
 
 // Both players of the pair, with what the notices need.
@@ -270,7 +293,9 @@ export async function applyToSeason(
     const again = await entryRefusal(user, season, now);
     return { ok: false, error: again.refusal ? ENTRY_REFUSALS[again.refusal] : "Ez a pár már nem létezik." };
   }
-  const players = await pairPlayers(pair!.id);
+  // The entry that started the season (D124): its players had the start
+  // notice with everyone else, so no second email or notice.
+  const players = entered.started ? undefined : await pairPlayers(pair!.id);
   if (players) {
     const message = seasonEntryMessage({ league: players.league, season: season.name, joins: entered.joins });
     await notifyPlayers("season_entry_decision", [players.a, players.b].map((p) => ({ userId: p.id, message })));
@@ -347,7 +372,7 @@ export async function enterPairByOrganizer(
   if (missing.length) return { ok: false, error: noLevelRefusal(missing) };
   const entered = await enter(season, { id: pair.id, players: [pair.a.id, pair.b.id] }, actor.id, now, { actorId: actor.id });
   if (!entered) return { ok: false, error: "A pár közben változott. Frissítsd az oldalt." };
-  await notifyPair(pairId, season, "entered_by_organizer", entered.joins);
+  if (!entered.started) await notifyPair(pairId, season, "entered_by_organizer", entered.joins);
   return { ok: true, joins: entered.joins };
 }
 
@@ -551,8 +576,10 @@ export async function entryCounts(seasonIds: number[]): Promise<Map<number, numb
 
 // D19: dissolving a pair withdraws the entries it hasn't played in: pending
 // ones (left from the approval step), and approved ones whose first phase hasn't started (or that wait for
-// the next season). For the dissolve batch in pairs.server.ts, after the
-// pair's update: it does nothing unless the pair is dissolved by then.
+// the next season), also those of a first season still waiting for its
+// minimum (D124: no phases yet). For the dissolve batch in pairs.server.ts,
+// after the pair's update: it does nothing unless the pair is dissolved by
+// then.
 export function withdrawEntries(pairId: number, now: Date) {
   const seconds = Math.floor(now.getTime() / 1000);
   return db
@@ -566,7 +593,8 @@ export function withdrawEntries(pairId: number, now: Date) {
           season_entries.joins_phase is null or exists (
             select 1 from season_phases sp
             where sp.season_id = season_entries.season_id and sp.number = season_entries.joins_phase and sp.starts_at > ${seconds}
-          ))))`,
+          ) or not exists (select 1 from season_phases sp where sp.season_id = season_entries.season_id)
+          )))`,
       ),
     );
 }

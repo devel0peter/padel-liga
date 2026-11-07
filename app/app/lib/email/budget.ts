@@ -4,7 +4,7 @@
 // an account's limit); without the relay everything goes through Resend, whose
 // free plan sends 100 a day, so EMAIL_DAILY_LIMIT (default 100) applies.
 
-// Kept free for signup confirmations, so a large broadcast can't block them.
+// Kept free for transactional emails, so a large broadcast can't block them.
 export const TRANSACTIONAL_RESERVE = 15;
 // Kept free for login codes, so a flood of signups can't lock everyone out.
 // Smaller than TRANSACTIONAL_RESERVE, so broadcasts never use it either.
@@ -29,7 +29,8 @@ export type MessageKind =
   | "stuck_reminder"
   | "match_digest"
   | "match_tomorrow"
-  | "strike_warning";
+  | "strike_warning"
+  | "season_start";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

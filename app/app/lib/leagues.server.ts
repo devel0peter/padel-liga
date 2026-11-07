@@ -1,4 +1,4 @@
-import { and, asc, eq, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { accountInvites, cities, leagueAdminInvites, leagueAdmins, leagues, pairs, users } from "~/db/schema";
@@ -15,7 +15,7 @@ export async function listLeagues(): Promise<LeagueRef[]> {
 }
 
 /**
- * The league whose public table a player's "Tabella" opens (D128): the league
+ * The league whose public table a player's "Tabella" opens (D133): the league
  * of their active pair, else the only league of a listed city; null when
  * neither says which.
  */
@@ -43,6 +43,14 @@ export async function getLeague(slug: string): Promise<LeagueRef | undefined> {
     .from(leagues)
     .where(eq(leagues.slug, slug));
   return row;
+}
+
+// The league's minimum entries for its first season to start (D124), for
+// these leagues.
+export async function minEntriesByLeague(leagueIds: number[]): Promise<Map<number, number>> {
+  if (leagueIds.length === 0) return new Map();
+  const rows = await db.select({ id: leagues.id, min: leagues.minEntries }).from(leagues).where(inArray(leagues.id, leagueIds));
+  return new Map(rows.map((r) => [r.id, r.min]));
 }
 
 export async function leagueSlugTaken(slug: string): Promise<boolean> {

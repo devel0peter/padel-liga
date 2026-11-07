@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, Handshake, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, Users, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, Handshake, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -62,9 +62,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     // the same pure function; the actor is the user's own data.
     actor,
     leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
-    // The badge on Értesítések, in the sidebar and the phone's bottom bar (D128).
+    // The badge on Értesítések, in the sidebar and the phone's bottom bar (D133).
     unread: await unreadCount(user.id),
-    // The league whose public table "Tabella" opens (D128).
+    // The league whose public table "Tabella" opens (D133).
     tableHref: await playerLeagueSlug(user.id).then((slug) => (slug ? `/league/${slug}` : null)),
     // The sidebar remembers open/closed in a cookie; read it so the first
     // render matches.
@@ -84,7 +84,6 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   disputes: Scale,
   substitutes: ArrowLeftRight,
   reminders: BellRing,
-  signups: Users,
   broadcasts: Mail,
   outbox: Send,
   clubs: MapPin,
@@ -213,7 +212,7 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
   ));
 }
 
-// Phones (D128, docs/player-ui.md N1): the player's own pages one tap away at
+// Phones (D133, docs/player-ui.md N1): the player's own pages one tap away at
 // the bottom; the sidebar stays for the organizer's and the Admin's sections.
 function TabBar({ tableHref, unread, initials, imageUrl }: { tableHref: string | null; unread: number; initials: string; imageUrl: string | null }) {
   const { pathname } = useLocation();
@@ -262,7 +261,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
   const { actor, leagues, sidebarOpen, unread, tableHref, ...profile } = loaderData;
   const { pathname } = useLocation();
   const base = appNav(actor, leagues, leagueFromPath(pathname));
-  // The player's league table, after Kezdőlap (D128): the public page, one click away.
+  // The player's league table, after Kezdőlap (D133): the public page, one click away.
   const nav = tableHref
     ? base.map((section, i) =>
         i === 0 ? { ...section, items: [section.items[0]!, { label: "Tabella", to: tableHref, icon: "leagues" as const, permission: section.items[0]!.permission }, ...section.items.slice(1)] } : section,

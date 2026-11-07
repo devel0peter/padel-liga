@@ -49,24 +49,3 @@ export function parseCity(form: FormData): CityResult {
 export function matchesCity(typed: string | null, city: Pick<City, "slug" | "name">): boolean {
   return !!typed && findCity(typed, [city]) === city.slug;
 }
-
-// Below this many pairs a city's landing chip says "jelentkezés nyitva"
-// instead of a count: a small number puts people off more than none.
-export const MIN_SHOWN_PAIRS = 6;
-
-// Pairs signed up per city for the landing page: a pair signup counts one,
-// two solos a Szervező paired count one, an unpaired solo none. Withdrawn
-// signups don't count. Cities under MIN_SHOWN_PAIRS are left out.
-export function pairCounts(
-  rows: readonly { city: string; mode: "pair" | "solo"; paired: boolean; n: number }[],
-): Map<string, number> {
-  const pairs = new Map<string, number>();
-  const pairedSolos = new Map<string, number>();
-  for (const r of rows) {
-    if (r.mode === "pair") pairs.set(r.city, (pairs.get(r.city) ?? 0) + r.n);
-    else if (r.paired) pairedSolos.set(r.city, (pairedSolos.get(r.city) ?? 0) + r.n);
-  }
-  for (const [city, n] of pairedSolos) pairs.set(city, (pairs.get(city) ?? 0) + Math.floor(n / 2));
-  for (const [city, n] of pairs) if (n < MIN_SHOWN_PAIRS) pairs.delete(city);
-  return pairs;
-}

@@ -62,14 +62,15 @@ export type NewPairRefusal = "same" | "unknown" | "paired";
 
 export const NEW_PAIR_REFUSALS: Record<NewPairRefusal, string> = {
   same: "Két különböző játékost válassz.",
-  unknown: "Csak regisztrált játékost választhatsz.",
+  unknown: "Csak a liga regisztrált játékosai közül választhatsz.",
   paired: "Egyikük már párban van ebben a ligában.",
 };
 
 export type NewPairCheck = {
   a: string;
   b: string;
-  // Both have an account and finished the first-login page.
+  // Both have an account, finished the first-login page and are the
+  // league's players (D128).
   registered: boolean;
   // Either is in an active pair of the league.
   paired: boolean;

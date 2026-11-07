@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 06.";
+const EFFECTIVE_FROM = "2026. 11. 07.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -55,34 +55,12 @@ export default function Privacy() {
           </Section>
 
           <Section title="Milyen adatokat kezelünk?">
-            <p>Most, a jelentkezéskor:</p>
-            <ul className={list}>
-              <li>a neved és az e-mail-címed,</li>
-              <li>a város, ahol játszanál,</li>
-              <li>ha párral jelentkezel, a párod neve és (ha megadod) az e-mail-címe,</li>
-              <li>a szint, amit megadsz, és a megjegyzésed,</li>
-              <li>ha bejelölöd, hogy szívesen szerveznél ligát (ezért keresünk meg),</li>
-              <li>ha megadod, melyik klubban játszol a legtöbbet,</li>
-              <li>
-                ha egy klub plakátjáról (QR-kóddal) érkeztél, a klub neve, hogy
-                lássuk, melyik plakát hoz jelentkezőket,
-              </li>
-              <li>
-                ha hirdetésből vagy más megjelölt linkről érkeztél, a link
-                forrása (pl. „facebook”), hogy lássuk, mi hoz jelentkezőket,
-              </li>
-              <li>a jelentkezés és a hozzájárulás időpontja.</li>
-            </ul>
             <p>Ha fiókot hozol létre:</p>
             <ul className={list}>
-              <li>
-                a neved és az e-mail-címed (ha jelentkeztél, az első belépéskor
-                a jelentkezésedből kitöltjük a neved; átírhatod),
-              </li>
+              <li>a neved és az e-mail-címed,</li>
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
-                állítasz be (ha jelentkeztél, a jelentkezésben megadott szint az
-                alap), és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
+                állítasz be, és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
@@ -100,9 +78,15 @@ export default function Privacy() {
               </li>
               <li>a fiók létrehozásának, a hozzájárulásodnak és az utolsó belépésednek az időpontja,</li>
               <li>
-                a párod a ligában (a jelentkezésből, vagy akivel a szervező
-                párba tett), és ha korábban pármeghívót küldtél vagy kaptál, az
-                is (kinek az e-mail-címére, mikor, és elfogadták-e),
+                melyik ligákhoz csatlakoztál, mikor és hogyan (a liga
+                regisztrációs gombjával, párlinkkel, vagy mert párod lett
+                benne),
+              </li>
+              <li>
+                a párod a ligában (akivel a párlinkeddel összeálltatok, vagy
+                akivel a szervező párba tett), és ha korábban pármeghívót
+                küldtél vagy kaptál, az is (kinek az e-mail-címére, mikor, és
+                elfogadták-e),
               </li>
               <li>
                 a párotok nevezései a szezonokra (mikor neveztetek, melyik körtől
@@ -141,19 +125,19 @@ export default function Privacy() {
             <p>
               Az értesítéseidet a fiókodban mindig látod. A profilodban
               választod ki, hogy e-mailben, push értesítésben vagy mindkettőben
-              is szóljunk. A belépési kódot és a jelentkezésed visszaigazolását
-              mindig e-mailben küldjük. Ha időpontot ajánlanak a meccsedre vagy
+              is szóljunk. A belépési kódot mindig e-mailben küldjük. Ha időpontot ajánlanak a meccsedre vagy
               meg kell erősítened egyet, egy meccsről naponta legfeljebb egy
               levelet kapsz, a többit az oldalon és push értesítésben látod. A
               meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
               meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
               nem. A fekete pontról az oldalon és push értesítésben szólunk; a
-              másodiknál egy figyelmeztető levelet is küldünk.
+              másodiknál egy figyelmeztető levelet is küldünk. Ha egy új liga
+              első szezonja összegyűjti a szükséges nevezéseket, minden nevezett
+              játékosnak egy levelet küldünk az indulás napjával.
             </p>
             <p>
-              Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem
-              regisztráltál; nem fejezted be a regisztrációt; nincs párod; vagy
-              a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
+              Ha elakadsz a nevezés előtt (nem fejezted be a regisztrációt;
+              nincs párod; vagy a pároddal nem neveztetek), és a liga szervezője bekapcsolta,
               szezononként legfeljebb egy emlékeztetőt küldünk a következő
               lépésről. Ehhez az e-mail-címeddel együtt feljegyezzük, melyik
               szezonban kaptál; a fiókod törlésével ezt is töröljük. Benne lehet
@@ -161,13 +145,12 @@ export default function Privacy() {
               kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
             </p>
             <p>
-              Jelentkezéskor küldünk egy visszaigazolást. A körlevelek alján
-              mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
+              A körlevelek alján mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
               őrizzük meg, hogy ne írjunk rá többet.
             </p>
             <p>
-              Az adatkezelés alapja a hozzájárulásod, amit a jelentkezéskor adsz
-              meg, és bármikor visszavonhatsz.
+              Az adatkezelés alapja a hozzájárulásod, amit az első belépéskor
+              adsz meg, és bármikor visszavonhatsz.
             </p>
           </Section>
 
@@ -238,13 +221,6 @@ export default function Privacy() {
                 szervező indoklását, ha törlöd a fiókodat, töröljük.
               </li>
               <li>
-                A jelentkezési listát csak a szervező látja, semmi nem
-                kerül belőle nyilvánosságra. A városod ligájának szervezője az
-                egyedül jelentkezők nevét, szintjét, megjegyzését és azt, hogy hol
-                játszanak a legtöbbet, hogy párt találjon nekik; az
-                e-mail-címüket nem.
-              </li>
-              <li>
                 A nevezéseket a liga szervezője látja: a pár két tagjának nevét,
                 szintjét és azt, hogy mikor neveztetek; az e-mail-címeteket és a
                 telefonszámotokat nem.
@@ -264,27 +240,6 @@ export default function Privacy() {
             </ul>
           </Section>
 
-          <Section title="Ha a párodat is jelentkezteted">
-            <p>
-              Ha megadod a párod e-mail-címét, egyszer írunk neki, hogy tudjon a
-              jelentkezésről, és kérhesse az adatai törlését. Amikor indul a
-              regisztráció, neki is küldünk egy meghívót. Ezen kívül semmit nem
-              küldünk neki, amíg ő maga nem regisztrál. Kérjük, csak akkor add
-              meg a párod adatait, ha ő is benne van.
-            </p>
-            <p>
-              Ha a jelentkezéskor nem adtad meg a párod e-mail-címét, belépés
-              után megadhatod. Ugyanúgy eltároljuk, mintha a jelentkezésben
-              szerepelt volna, és küldünk rá egy regisztrációs meghívót.
-            </p>
-            <p>
-              Ha mindketten regisztráltatok, a ligában magától pár lesztek. Amíg
-              csak egyikőtök regisztrált, ő a Párom oldalon látja a másik nevét a
-              jelentkezésből, az e-mail-címét nem. Ha a szervező felbontja a
-              párt, nem jön létre újra magától.
-            </p>
-          </Section>
-
           <Section title="Ha linkkel hívod meg a párodat">
             <p>
               Amíg nincs párod, a Kezdőlapon és a Párom oldalon kapsz egy saját
@@ -297,11 +252,11 @@ export default function Privacy() {
           <Section title="Ha párt keresel">
             <p>
               Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
-              jelzést. Ilyenkor a szervező látja a neved, a szinted és azt, hogy
-              mióta keresel párt, és párba tehet egy másik párkeresővel. Erről az
-              oldalon és e-mailben is szólunk, benne a párod nevével. Ha
-              egyedül jelentkeztél előre, a jelzés eleve be van kapcsolva. Bármikor
-              kikapcsolhatod.
+              jelzést. Ilyenkor a szervező látja a neved, a szinted, a
+              telefonszámod és azt, hogy mióta keresel párt, és párba tehet egy
+              másik párkeresővel. Erről az oldalon és e-mailben is szólunk, benne
+              a párod nevével, e-mail-címével és telefonszámával. A jelzés
+              alapból ki van kapcsolva, és bármikor kikapcsolhatod.
             </p>
           </Section>
 
@@ -310,9 +265,10 @@ export default function Privacy() {
               Felbontani vagy cserélni a párt a szervező tud: írj
               nekünk, ha változna a párod. Ha a szervező párba tesz valakivel
               (új pár vagy partnercsere), az oldalon és e-mailben is szólunk,
-              benne a párod nevével, az e-mail-címe és a telefonszáma nélkül. A
-              felbontásról nem küldünk e-mailt, a szervező szól nektek. A Párok oldalon a szervező a játékosok nevét és
-              szintjét látja, az e-mail-címeteket és a telefonszámotokat nem.
+              benne a párod nevével, e-mail-címével és telefonszámával, hogy el
+              tudjátok érni egymást. A felbontásról nem küldünk e-mailt, a
+              szervező szól nektek. A Párok oldalon a szervező a játékosok nevét,
+              szintjét és telefonszámát látja, az e-mail-címeteket nem.
               Ugyanitt be is nevezhet titeket egy szezonra, vagy kivehet belőle;
               ezt az oldalon (és push értesítésben, ha bekapcsoltad) jelezzük,
               e-mailben nem. Hogy ki és mikor tette, eltároljuk. A Párok oldalon
@@ -320,26 +276,6 @@ export default function Privacy() {
               szintjük és az, hogy párt keresnek-e. Az Admin innen körlevelet
               írhat a listán látott játékosoknak (például akik még nem neveztek);
               aki leiratkozott vagy kikapcsolta az e-mailt, nem kapja meg.
-            </p>
-            <p>
-              A Párom oldalon a párod csak a neved látja, az e-mail-címedet és a
-              telefonszámodat nem.
-            </p>
-          </Section>
-
-          <Section title="Ha egyedül jelentkezel">
-            <p>
-              Ha a szervező talál neked hasonló szintű párt a többi egyedül
-              jelentkező közül, egy e-mailben elküldjük nektek egymás nevét,
-              szintjét és e-mail-címét, hogy megbeszélhessétek. Mást nem adunk át,
-              és a szervező sem látja az e-mail-címedet. Ha ezt nem szeretnéd,
-              írd meg a megjegyzésben, vagy írj nekünk.
-            </p>
-            <p>
-              A regisztráció indulásakor akkor is kapsz meghívót, ha még nincs
-              párod. Ha párt kaptál, és mindketten regisztráltatok, a ligában
-              magától pár lesztek. Amíg csak egyikőtök regisztrált, ő a Párom oldalon látja a
-              másik nevét.
             </p>
           </Section>
 
@@ -381,7 +317,7 @@ export default function Privacy() {
               (adatfeldolgozók):
             </p>
             <ul className={list}>
-              <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a jelentkezési űrlap robotszűrője (Turnstile),</li>
+              <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a belépési kód kérésének robotszűrője (Turnstile),</li>
               <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók és a liga e-mailjeinek kiküldése,</li>
               <li>Resend – a liga e-mailjeinek kiküldése, ha a Google épp nem tudja.</li>
             </ul>
@@ -389,10 +325,6 @@ export default function Privacy() {
 
           <Section title="Meddig őrizzük?">
             <ul className={list}>
-              <li>
-                <strong>Jelentkezési lista:</strong> az első szezon első körének
-                végén töröljük, kivéve, ha regisztráltál.
-              </li>
               <li>
                 <strong>Fiókok:</strong> amíg nem törlöd (a Profil oldalon) vagy
                 nem kéred a törlést. Ha még nem
@@ -441,9 +373,9 @@ export default function Privacy() {
               eszközön kiléptetünk.
             </p>
             <p>
-              Törléskor a fiókoddal együtt töröljük a jelentkezésedet, a
-              neked szóló leveleket, és a neved meg a címed mások
-              jelentkezéséből és a nekik szóló levelekből is. Amíg a párod
+              Törléskor a fiókoddal együtt töröljük a neked szóló leveleket,
+              és a neved meg a címed a másoknak szóló, még ki nem küldött
+              levelekből is. Amíg a párod
               kihirdetett csoportban játszik, és a kör még nem ért véget, a
               Profil oldalon nem tudod törölni a fiókodat; ha ilyenkor kéred
               e-mailben, a kör végén törlünk. A címedhez tartozó minden tárolt adatot

@@ -19,7 +19,6 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { audienceLabel, signupRecipients } from "~/lib/email/audience";
 import { SEND_NOW_MAX, TRANSACTIONAL_RESERVE } from "~/lib/email/budget";
 import {
   createBroadcast,
@@ -29,43 +28,18 @@ import {
   suppressedSet,
 } from "~/lib/email/outbox.server";
 import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
-import { filterSignups, parseFilters } from "~/lib/signups-admin";
-import { listSignups } from "~/lib/signups-admin.server";
-import { listCities } from "~/lib/cities.server";
-import { getLeague, listLeagues } from "~/lib/leagues.server";
+import { getLeague } from "~/lib/leagues.server";
 import { pairsQueryString, parsePairsQuery } from "~/lib/league-pairs-view";
 import { leaguePairsAudience } from "~/lib/league-pairs-view.server";
-import { playerStatuses } from "~/lib/player-status.server";
-import { NO_MAIL_STAGES, parseStage, progressContext, stageRecipients, STAGES } from "~/lib/signup-progress";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
+// "Levél nekik" on Párok (#148, D64): the players of the rows it shows. The
+// only audience since the interest list's went (#333, D129); without one the
+// page has nobody to write to.
 async function audience(params: URLSearchParams) {
-  // "Levél nekik" on Párok (#148, D64): the players of the rows it shows.
-  if (params.has("pairs")) return pairsAudience(params);
-  const filters = parseFilters(params);
-  const stage = params.has("stage") ? parseStage(params) : null;
-  if (params.has("stage") && (!stage || NO_MAIL_STAGES.includes(stage)))
-    throw new Response("Ennek a csoportnak nem küldhetsz levelet.", { status: 400 });
-  const [rows, suppressed, off, cities] = await Promise.all([listSignups(), suppressedSet(), emailSwitchedOff(), listCities()]);
-  // Accounts that switched email off get no broadcast either (#115, Peter 2026-10-29).
-  const skipped = new Set([...suppressed, ...off]);
-  const label = audienceLabel(filters, cities);
-  if (!stage) return { label, ...signupRecipients(filterSignups(rows, filters), skipped) };
-  // "Hol tart" (D58): the people at that stage, not every signer of the
-  // signups shown (a pair signup's two people can be at different stages).
-  const [statuses, leagues] = await Promise.all([playerStatuses(), listLeagues()]);
-  const people = stageRecipients(filterSignups(rows, filters), stage, progressContext(rows, statuses.byEmail, leagues));
-  const recipients = people.filter((p) => !skipped.has(p.email));
-  return {
-    label: `${label} · ${STAGES[stage]}`,
-    recipients,
-    suppressed: people.length - recipients.length,
-  };
-}
-
-async function pairsAudience(params: URLSearchParams) {
+  if (!params.has("pairs")) throw redirect("/admin/broadcasts");
   const league = await getLeague(params.get("pairs") ?? "");
   if (!league) throw new Response("Nincs ilyen liga.", { status: 404 });
   const query = parsePairsQuery(params);
@@ -85,7 +59,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const actor = await requirePermission(request, { kind: "broadcasts.send" });
   const found = await audience(new URL(request.url).searchParams);
   const { label, recipients, suppressed } = found;
-  const back = "back" in found ? found.back : null;
+  const { back } = found;
   return { label, recipients, suppressed, back, adminEmail: actor.email, limit: dailyLimit() };
 }
 
@@ -136,11 +110,11 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             {suppressed > 0 && ` (${suppressed} címet kihagyunk: leiratkozott, nem kézbesíthető, vagy kikapcsolta az e-mailt)`}
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link to={back?.to ?? `/admin/signups?${params.toString()}`}>Szűrők módosítása</Link>
+            <Link to={back.to}>Szűrők módosítása</Link>
           </Button>
         </div>
         <p className="mt-2 text-muted-foreground">
-          {back?.note ?? "Csak a jelentkezőnek megy, a megadott párnak nem (adatkezelési tájékoztató)."}
+          {back.note}
           {recipients.length > perDay &&
             ` Naponta legfeljebb ${perDay} körlevél megy ki, a többi a következő napokon.`}
         </p>

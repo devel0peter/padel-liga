@@ -20,17 +20,43 @@ import {
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { formatDate, formatShortDate } from "~/lib/format";
-import { getLeague } from "~/lib/leagues.server";
-import { MAX_BREAKS, MAX_NAME, parseSeason, previewPhases, seasonActions, seasonEnd, type SeasonField } from "~/lib/seasons";
+import { getLeague, minEntriesByLeague } from "~/lib/leagues.server";
+import {
+  FIXED_START_LOCKED,
+  isWaiting,
+  MAX_BREAKS,
+  movesFixedStart,
+  MAX_NAME,
+  parseSeason,
+  parseWaitingSeason,
+  previewPhases,
+  seasonActions,
+  seasonEnd,
+  waitingText,
+  type SeasonField,
+} from "~/lib/seasons";
 import { entryCounts } from "~/lib/season-entries.server";
-import { createSeason, deleteSeason, listSeasons, seasonInLeague, seasonState, updateSeason } from "~/lib/seasons.server";
+import {
+  createSeason,
+  createWaitingSeason,
+  deleteSeason,
+  getSeason,
+  listSeasons,
+  seasonInLeague,
+  seasonState,
+  updateSeason,
+  updateWaitingSeason,
+} from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 
 // A league's seasons for its Szervezők: the list and the "Új szezon" form with
 // a live preview of the 4 phases (issue #22). The calendar: packages/rules.
+// A league's first season may instead start at the minimum entries (D124,
+// #335): no registration deadline or start date, only a name and breaks.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Szezonok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -46,17 +72,18 @@ async function leagueScope(request: Request, slug: string) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league } = await leagueScope(request, params.league);
   const seasons = await listSeasons(league.id);
-  const counts = await entryCounts(seasons.map((s) => s.id));
+  const [counts, minimums] = await Promise.all([entryCounts(seasons.map((s) => s.id)), minEntriesByLeague([league.id])]);
   return {
-    league: { name: league.name },
+    league: { name: league.name, minEntries: minimums.get(league.id) ?? 0 },
     seasons: await Promise.all(
       seasons.map(async (s) => ({
         ...s,
         ...seasonActions(await seasonState(s.id)),
+        waiting: isWaiting(s),
         entries: counts.get(s.id)!,
         // The form's days, as the organizer typed them.
         registrationOpens: budapestDay(s.registrationOpensAt),
-        registrationCloses: budapestDay(s.registrationClosesAt),
+        registrationCloses: s.registrationClosesAt ? budapestDay(s.registrationClosesAt) : "",
       })),
     ),
   };
@@ -82,12 +109,37 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
 
   if (allowed && !allowed.canEdit)
     throw data("Ezt a szezont már nem lehet módosítani: az első kör csoportjai kint vannak.", { status: 409 });
+
+  // A first season that starts at the minimum entries (D124): a new one
+  // ("start" = "minimum"), or one still waiting.
+  const stored = id ? await getSeason(id) : undefined;
+  if (stored ? isWaiting(stored) : form.get("start") === "minimum") {
+    const result = parseWaitingSeason(form);
+    if (!result.ok) return { errors: result.errors };
+    if (id) {
+      if (!(await updateWaitingSeason(id, result.data, actor.id)))
+        throw data("Közben kiderült a szezon kezdése. Frissítsd az oldalt.", { status: 409 });
+    } else if (!(await createWaitingSeason(league.id, result.data, actor.id))) {
+      return { errors: { start: FIRST_ONLY } };
+    }
+    return redirect(base);
+  }
+
   const result = parseSeason(form);
   if (!result.ok) return { errors: result.errors };
+  // A start fixed at the minimum entries was sent to every player (D124).
+  if (stored && movesFixedStart(stored, result.phases)) return { errors: { firstPhaseStart: FIXED_START_LOCKED } };
   if (id) await updateSeason(id, result.data, result.phases, actor.id);
-  else await createSeason(league.id, result.data, result.phases, actor.id);
+  else {
+    // While the first season waits, it is the league's only one.
+    if ((await listSeasons(league.id)).some(isWaiting)) return { errors: { start: WAITING_FIRST } };
+    await createSeason(league.id, result.data, result.phases, actor.id);
+  }
   return redirect(base);
 }
+
+const FIRST_ONLY = "Csak a liga első szezonja indulhat a minimum nevezéssel.";
+const WAITING_FIRST = "Amíg az első szezon a nevezésekre vár, nem hozhatsz létre újat.";
 
 type SeasonRow = Route.ComponentProps["loaderData"]["seasons"][number];
 
@@ -104,8 +156,23 @@ function Field({ name, label, hint, error, children }: { name: string; label: st
 
 type BreakRow = { key: number; start: string; end: string };
 
-function SeasonForm({ season, errors, base }: { season?: SeasonRow; errors: Partial<Record<SeasonField, string>>; base: string }) {
+function SeasonForm({
+  season,
+  errors,
+  base,
+  firstSeason,
+  minEntries,
+}: {
+  season?: SeasonRow;
+  errors: Partial<Record<SeasonField, string>>;
+  base: string;
+  // The league has no season yet: it may start at the minimum entries.
+  firstSeason: boolean;
+  minEntries: number;
+}) {
   const busy = useNavigation().state === "submitting";
+  const [start, setStart] = useState(season?.waiting ? "minimum" : "dates");
+  const atMinimum = start === "minimum";
   const [first, setFirst] = useState(season?.firstPhaseStart ?? "");
   const [breaks, setBreaks] = useState<BreakRow[]>(() => (season?.breaks ?? []).map((b, key) => ({ key, ...b })));
   const [nextKey, setNextKey] = useState(breaks.length);
@@ -117,31 +184,68 @@ function SeasonForm({ season, errors, base }: { season?: SeasonRow; errors: Part
     <Form method="post" className="grid gap-4 rounded-lg border p-4">
       <h2 className="font-display text-lg font-bold">{season ? `${season.name} szerkesztése` : "Új szezon"}</h2>
       {season && <input type="hidden" name="id" value={season.id} />}
+      {!season && firstSeason && (
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-medium">Kezdés</legend>
+          <RadioGroup name="start" value={start} onValueChange={setStart}>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="dates" id="start-dates" />
+              <Label htmlFor="start-dates" className="font-normal">
+                Dátumokkal: nevezési időszak és az első kör hétfője
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="minimum" id="start-minimum" />
+              <Label htmlFor="start-minimum" className="font-normal">
+                Első szezon: akkor indul, ha összegyűlik a minimum nevezés ({minEntries} pár)
+              </Label>
+            </div>
+          </RadioGroup>
+          {errors.start && <p className="text-sm font-semibold text-destructive">{errors.start}</p>}
+        </fieldset>
+      )}
+      {!season && !firstSeason && errors.start && <p className="text-sm font-semibold text-destructive">{errors.start}</p>}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field name="name" label="Név" hint="Pl. 2026/27 tél" error={errors.name}>
             <Input id="name" name="name" defaultValue={season?.name} maxLength={MAX_NAME} required />
           </Field>
         </div>
-        <Field name="registrationOpens" label="Nevezés kezdete" error={errors.registrationOpens}>
-          <Input id="registrationOpens" name="registrationOpens" type="date" defaultValue={season?.registrationOpens} required />
-        </Field>
-        <Field
-          name="registrationCloses"
-          label="Nevezés vége"
-          hint="Ezen a napon 23:59-ig lehet nevezni. Az első kör előtt kell zárulnia."
-          error={errors.registrationCloses}
-        >
-          <Input id="registrationCloses" name="registrationCloses" type="date" defaultValue={season?.registrationCloses} required />
-        </Field>
-        <Field
-          name="firstPhaseStart"
-          label="Első kör hétfője"
-          hint="Egy kör 3 hét, a határidő az utolsó vasárnap 23:59."
-          error={errors.firstPhaseStart}
-        >
-          <Input id="firstPhaseStart" name="firstPhaseStart" type="date" value={first} onChange={(e) => setFirst(e.target.value)} required />
-        </Field>
+        {!atMinimum && (
+          <>
+            <Field name="registrationOpens" label="Nevezés kezdete" error={errors.registrationOpens}>
+              <Input id="registrationOpens" name="registrationOpens" type="date" defaultValue={season?.registrationOpens} required />
+            </Field>
+            <Field
+              name="registrationCloses"
+              label="Nevezés vége"
+              hint="Ezen a napon 23:59-ig lehet nevezni. Az első kör előtt kell zárulnia."
+              error={errors.registrationCloses}
+            >
+              <Input id="registrationCloses" name="registrationCloses" type="date" defaultValue={season?.registrationCloses} required />
+            </Field>
+            <Field
+              name="firstPhaseStart"
+              label="Első kör hétfője"
+              hint={
+                season?.startsAtMinimum
+                  ? "A minimum elérésekor dőlt el, és a játékosok megkapták: nem módosítható."
+                  : "Egy kör 3 hét, a határidő az utolsó vasárnap 23:59."
+              }
+              error={errors.firstPhaseStart}
+            >
+              <Input
+                id="firstPhaseStart"
+                name="firstPhaseStart"
+                type="date"
+                value={first}
+                onChange={(e) => setFirst(e.target.value)}
+                readOnly={season?.startsAtMinimum}
+                required
+              />
+            </Field>
+          </>
+        )}
       </div>
 
       <fieldset className="grid gap-2">
@@ -197,7 +301,13 @@ function SeasonForm({ season, errors, base }: { season?: SeasonRow; errors: Part
 
       <section className="grid gap-2 rounded-md bg-muted/50 p-3 text-sm" aria-live="polite">
         <h3 className="font-semibold">Előnézet</h3>
-        {preview ? (
+        {atMinimum ? (
+          <p className="text-muted-foreground">
+            A nevezés azonnal nyílik. Amikor összegyűlik {minEntries} nevezés, az 1. kör a legalább 7 nappal későbbi első
+            hétfőn indul (ha szünet esik rá, a szünet után), és minden nevezett játékos e-mailt kap róla. A minimumot az
+            Áttekintés oldalon módosíthatod.
+          </p>
+        ) : preview ? (
           <PhaseList phases={preview} />
         ) : (
           <p className="text-muted-foreground">
@@ -281,10 +391,16 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell>
-                      {formatShortDate(s.registrationOpensAt)} – {formatShortDate(s.registrationClosesAt)}
+                      {s.registrationClosesAt
+                        ? `${formatShortDate(s.registrationOpensAt)} – ${formatShortDate(s.registrationClosesAt)}`
+                        : `${formatShortDate(s.registrationOpensAt)} óta nyitva`}
                     </TableCell>
                     <TableCell>
-                      <PhaseList phases={s.phases} compact />
+                      {s.waiting ? (
+                        <span className="text-muted-foreground">{waitingText(s.entries, league.minEntries)}</span>
+                      ) : (
+                        <PhaseList phases={s.phases} compact />
+                      )}
                     </TableCell>
                     <TableCell>{end && formatDate(end)}</TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -316,7 +432,14 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
       )}
 
       {/* Keyed by season (and a new one by the count), so switching seasons or saving resets the fields. */}
-      <SeasonForm key={editing?.id ?? `new-${seasons.length}`} season={editing} errors={actionData?.errors ?? {}} base={base} />
+      <SeasonForm
+        key={editing?.id ?? `new-${seasons.length}`}
+        season={editing}
+        errors={actionData?.errors ?? {}}
+        base={base}
+        firstSeason={seasons.length === 0}
+        minEntries={league.minEntries}
+      />
     </AppPage>
   );
 }

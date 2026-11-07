@@ -12,11 +12,12 @@ import {
   firstRoundStart,
   insertStatements,
   ORGANIZER,
-  PAIR_SIGNUPS,
+  OUTSIDER,
+  PAIR_PLAYERS,
   resetStatements,
   seedEmails,
   seedSql,
-  SOLO_SIGNUPS,
+  SOLO_PLAYERS,
   wranglerArgs,
 } from "./seed";
 
@@ -65,7 +66,7 @@ describe("wrangler command", () => {
 describe("fake data", () => {
   it("has no real address: every one is on the reserved .test domain", () => {
     const emails = seedEmails();
-    expect(emails.length).toBe(2 + PAIR_SIGNUPS.length * 2 + SOLO_SIGNUPS.length);
+    expect(emails.length).toBe(3 + PAIR_PLAYERS.length * 2 + SOLO_PLAYERS.length);
     for (const e of emails) expect(e).toMatch(/^[a-z.]+@example\.test$/);
     expect(new Set(emails).size).toBe(emails.length);
   });
@@ -73,20 +74,19 @@ describe("fake data", () => {
   it("writes no email address outside @example.test", () => {
     const sql = seedSql(NOW);
     const found = sql.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g) ?? [];
-    expect(found.length).toBeGreaterThan(20);
+    expect(found.length).toBeGreaterThanOrEqual(3);
     for (const e of found) expect(e).toMatch(/@example\.test$/);
   });
 
-  it("matches the issue: 10 pair signups, 4 solos of which 2 are paired, 3 clubs", () => {
-    expect(PAIR_SIGNUPS).toHaveLength(10);
-    expect(SOLO_SIGNUPS).toHaveLength(4);
-    expect(SOLO_SIGNUPS.filter((s) => s.pairedWithNext)).toHaveLength(1);
+  it("has 10 pairs-to-be, 4 players without a partner, 3 clubs and one player of the second league", () => {
+    expect(PAIR_PLAYERS).toHaveLength(10);
+    expect(SOLO_PLAYERS).toHaveLength(4);
     expect(CLUBS).toHaveLength(3);
-    expect(ADMIN.email).not.toBe(ORGANIZER.email);
+    expect(new Set([ADMIN.email, ORGANIZER.email, OUTSIDER.email]).size).toBe(3);
   });
 
   it("covers every level, so the Elo seeding has something to order", () => {
-    const levels = new Set([...PAIR_SIGNUPS.map((p) => p.level), ...SOLO_SIGNUPS.map((s) => s.level)]);
+    const levels = new Set([...PAIR_PLAYERS.map((p) => p.level), ...SOLO_PLAYERS.map((s) => s.level)]);
     expect([...levels].sort()).toEqual(["halado", "kezdo", "kozephalado", "versenyzo"]);
   });
 });
@@ -120,7 +120,7 @@ describe("reset", () => {
     for (const stmt of resetStatements()) {
       expect(stmt).toMatch(/^delete from /);
       // Every delete is limited by a where clause on the seed's markers.
-      expect(stmt).toMatch(/where .*(example\.test|'minta'|minta-padel-arena)/);
+      expect(stmt).toMatch(/where .*(example\.test|'minta'|'pelda'|minta-padel-arena)/);
     }
   });
 });

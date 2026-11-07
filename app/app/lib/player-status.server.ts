@@ -23,7 +23,7 @@ const b = alias(users, "status_player_b");
 
 export type PlayerStatuses = {
   byId: Map<string, PlayerStatus>;
-  // Lowercased email -> status, to match interest signups to accounts.
+  // Lowercased email -> status, for tables that know players by address.
   byEmail: Map<string, PlayerStatus>;
 };
 

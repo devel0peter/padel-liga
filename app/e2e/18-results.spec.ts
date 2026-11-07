@@ -41,7 +41,7 @@ function versus(matchId: number): string {
 const status = (page: Page) => page.getByRole("region", { name: "Állapot" });
 const result = (page: Page) => content(page).getByRole("region", { name: "Eredmény" });
 
-// Recording is folded until the fixed time has started (D128): open it if it is.
+// Recording is folded until the fixed time has started (D133): open it if it is.
 async function openRecord(page: Page) {
   const fold = content(page).getByText("Már lejátszottátok? Rögzítsd az eredményt");
   if (await fold.isVisible()) await fold.click();
@@ -61,7 +61,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const [first] = annasMatches();
   const [opponent] = first!.opponents;
   const player = await as(browser, anna);
-  // Before any result the group card on Kezdőlap has the table without places (#201, #220, D128).
+  // Before any result the group card on Kezdőlap has the table without places (#201, #220, D133).
   await visit(player.page, "/home");
   const table = content(player.page).getByRole("table", { name: "Tabella" });
   await expect(table.getByRole("row").filter({ hasText: "(ti)" })).toContainText(anna.name);
@@ -114,7 +114,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   await visit(partner.page, "/home");
   await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText("Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
   // The table is ranked now (#201, #220): their row has the match, the win and
-  // its 3 points. Columns: #, Pár, M, Gy, V, Szett, Játék, P (D128).
+  // its 3 points. Columns: #, Pár, M, Gy, V, Szett, Játék, P (D133).
   await expect(content(partner.page)).not.toContainText("Még nincs végleges eredmény");
   const ours = content(partner.page).getByRole("table", { name: "Tabella" }).getByRole("row").filter({ hasText: "(ti)" });
   await expect(ours.getByRole("cell").nth(2)).toHaveText("1");

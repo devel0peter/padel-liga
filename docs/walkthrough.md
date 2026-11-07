@@ -1,6 +1,6 @@
 # Milestone 1 walkthrough (local)
 
-A click-through checklist for milestone 1, "Registration opens": from the registration invite to published groups. It runs on a local database filled with fake data (#90). Nothing in it can reach production, and nothing is ever emailed: the local dev server logs every email to the console.
+A click-through checklist for milestone 1, "Registration opens": from registering through the league's register button to published groups. It runs on a local database filled with fake data (#90). Nothing in it can reach production, and nothing is ever emailed: the local dev server logs every email to the console.
 
 The page labels below are the Hungarian ones you see on screen.
 
@@ -9,9 +9,8 @@ The page labels below are the Hungarian ones you see on screen.
 | Steps | Spec |
 |---|---|
 | 1-2 | [`01-admin-setup.spec.ts`](../app/e2e/01-admin-setup.spec.ts) |
-| 3-4 | [`02-invite.spec.ts`](../app/e2e/02-invite.spec.ts) |
+| 3 | [`10-landing.spec.ts`](../app/e2e/10-landing.spec.ts) |
 | 5-6 | [`03-register.spec.ts`](../app/e2e/03-register.spec.ts) |
-| 5, partner without an email (#96) | [`04-partner-email.spec.ts`](../app/e2e/04-partner-email.spec.ts) |
 | 7-9 | [`05-entries.spec.ts`](../app/e2e/05-entries.spec.ts) |
 | 10-12 | [`06-groups.spec.ts`](../app/e2e/06-groups.spec.ts) |
 | 11, a pair entering after publishing | [`07-late-entry.spec.ts`](../app/e2e/07-late-entry.spec.ts) |
@@ -19,6 +18,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 14 | [`09-pairs.spec.ts`](../app/e2e/09-pairs.spec.ts) |
 | 14, search, filter and Levél nekik (#148) | [`15-pairs-filter.spec.ts`](../app/e2e/15-pairs-filter.spec.ts) |
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
+| 15, the second league's player (#331) | [`28-league-members.spec.ts`](../app/e2e/28-league-members.spec.ts) |
 
 ## Set up
 
@@ -30,23 +30,24 @@ The page labels below are the Hungarian ones you see on screen.
    - `npm run db:seed:local -w app`
 3. Start the app with `npm run dev` and open <http://localhost:5173>.
 
-The seed takes no options and refuses `--remote`, a production environment and CI. It only writes the local D1. Run it again at any time to start over: it deletes everything on `@example.test`, and the city "Mintaváros" with its league, clubs and signups (including everything a walkthrough created on top: accounts, pairs, entries, groups, emails) and writes the same starting state again. Round 1 starts on the Monday about two weeks from the day you seed.
+The seed takes no options and refuses `--remote`, a production environment and CI. It only writes the local D1. Run it again at any time to start over: it deletes everything on `@example.test`, and the cities "Mintaváros" and "Példaváros" with their leagues and clubs (including everything a walkthrough created on top: accounts, pairs, entries, groups, emails) and writes the same starting state again. Round 1 starts on the Monday about two weeks from the day you seed.
 
 ### What the seed contains
 
 | Thing | Value |
 |---|---|
 | City | Mintaváros (listed), league "Padelpárbaj Mintaváros", slug `minta` |
+| Second city | Példaváros (listed), league "Padelpárbaj Példaváros", slug `pelda`, no season (#331) |
 | Clubs | Minta Padel Aréna, Teszt Sportcentrum, Példa Padel Club |
 | Season | "Teszt szezon": registration open since yesterday, closes the Sunday before round 1; round 1 starts about two weeks out |
 | Admin | `admin@example.test` (Teszt Admin) |
 | Szervező | `szervezo@example.test` (Teszt Szervező) of Mintaváros |
-| Signups | 10 pair signups and 4 solo signups, below |
-| Player accounts | none: players register in step 5 |
+| Second league's player | `idegen.ilona@example.test` (Idegen Ilona): joined Példaváros only, "Párt keresek" on there |
+| Player accounts | none in Mintaváros: players register in step 5 |
 
-The Admin and the Szervező already have accounts. Everyone else has only a signup, so they register themselves.
+The Admin and the Szervező already have accounts and belong to Mintaváros (D128). There is no interest list (#333): the players below have no account and nothing about them is stored; they register themselves through the league's register button, which makes them Mintaváros's players.
 
-Pair signups (both players are named, so both get the registration invite). The level is the pair's shared signup level; it prefills the first-login page.
+The pairs-to-be (each pair picks one level on the first-login page):
 
 | # | Player 1 | Player 2 | Level |
 |---|---|---|---|
@@ -61,14 +62,14 @@ Pair signups (both players are named, so both get the registration invite). The 
 | 9 | Lakatos Vivien `lakatos.vivien@example.test` | Gulyás Tamás `gulyas.tamas@example.test` | Kezdő |
 | 10 | Oláh Kinga `olah.kinga@example.test` | Fodor Péter `fodor.peter@example.test` | Kezdő |
 
-Solo signups:
+Players without a partner, who switch on "Párt keresek" for the Szervező to pair them:
 
-| Player | Level | State |
+| Player | Level | When |
 |---|---|---|
-| Varga Dóra `varga.dora@example.test` | Középhaladó | paired with Kiss Miklós by a Szervező |
-| Kiss Miklós `kiss.miklos@example.test` | Középhaladó | paired with Varga Dóra |
-| Pál Boglárka `pal.boglarka@example.test` | Kezdő | waiting for a partner |
-| Sándor Ákos `sandor.akos@example.test` | Haladó | waiting for a partner |
+| Varga Dóra `varga.dora@example.test` | Középhaladó | step 6, with Kiss Miklós |
+| Kiss Miklós `kiss.miklos@example.test` | Középhaladó | step 6, with Varga Dóra |
+| Pál Boglárka `pal.boglarka@example.test` | Kezdő | step 13 |
+| Sándor Ákos `sandor.akos@example.test` | Haladó | step 13 |
 
 ### Logging in as a seeded user
 
@@ -90,10 +91,10 @@ The links in those emails point to `https://padelparbaj.hu/...`. Locally, open t
 
 ```mermaid
 flowchart TD
-  A["1-2. Admin: look around"] --> B["3. Admin: registration invite"]
+  A["1-2. Admin: look around"] --> B["3. Visitor: the league's register button"]
   B --> C["4. Admin: Kimenő levelek, the log"]
-  C --> D["5. Players register"]
-  D --> E["6. Pairs form from the signups"]
+  C --> D["5. Players register through the button"]
+  D --> E["6. Pairs form with the pair link"]
   E --> F["7. Pairs enter: Nevezünk"]
   F --> G["8. Szervező sees the entered pairs"]
   G --> H["9. Admin checks the entry emails went out"]
@@ -103,7 +104,7 @@ flowchart TD
   K --> N["17. Players see their group"]
   N --> O["18. Propose and accept a slot"]
   O --> P["19. Record and confirm an agreed time"]
-  L["13. Szervező pairs the waiting solos"] --> B
+  L["13. Szervező pairs two who look for a partner"] -.-> F
   M["14. Szervező changes pairs"] -.-> F
 ```
 
@@ -124,55 +125,48 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 
 - Account: `admin@example.test`
 - Pages and expected results:
-  - `/admin/cities` ("Városok"): Mintaváros is there and listed (shown on the signup form).
-  - `/admin/leagues` ("Ligák"): Padelpárbaj Mintaváros with the organizer Teszt Szervező.
+  - `/admin` opens `/admin/leagues`; the sidebar has no "Jelentkezők", and `/admin/signups`, `/admin/poster` and `/admin/export.csv` lead to the admin home too (#333).
+  - `/admin/cities` ("Városok"): Mintaváros and Példaváros are there and listed.
+  - `/admin/leagues` ("Ligák"): Padelpárbaj Mintaváros with the organizer Teszt Szervező, and Padelpárbaj Példaváros.
   - `/admin/leagues/minta/clubs` ("Klubok: Mintaváros"): the three clubs. "Inaktiválás" on one turns it off, "Aktiválás" turns it on again (deactivate instead of delete, #19). Leave all three active.
   - `/admin/leagues/minta/seasons` ("Szezonok"): the Teszt szezon with its four rounds, a link under "Nevezések" (0 nevezett) and "Csoportok" under "1. kör". Try "Új szezon" with a start day that is not a Monday: it must be refused.
-  - `/privacy`: opens without login; check that it describes pairs, season entries, the group emails and how long email text is kept.
+  - `/privacy`: opens without login; check that it describes pairs, season entries, the group emails and how long email text is kept, and says nothing about a signup or interest list (#334).
 
-### 3. Admin sends the registration invite
+### 3. A visitor finds the league's register button
 
-- Page: `/admin/signups` ("Jelentkezők")
-- Account: `admin@example.test`
+- Page: `/` (logged out)
 - Expect:
-  - The header reads "14 jelentkezés · 10 pár · 4 egyéni · 24 játékos".
-  - At 1280 px every column of the list, up to the "Törlés" button, is inside its box: no sideways scroll (#278). At 390 px each signup is a card.
-  - The button reads "Regisztrációs meghívó (24 cím)": both players of the 10 pair signups (20) plus all 4 solos. Pál Boglárka and Sándor Ákos still wait for a partner, so theirs says "Még keresünk neked párt, addig regisztrálj."
-- Do: press the button, check the text of the dialog "Küldöd a regisztrációs meghívót?", press "Küldés".
-- Expect:
-  - The dialog says "Meghívók elindultak": "24 levél a háttérben megy ki, a napi limit szerint; ami ma nem fér bele, holnap. Hogy hol tart, a Kimenő levelek oldalon látod." The dialog answers at once; the emails go out right after it, in the background (#140). (Above 50, only the first 50 go at once and the rest with the cron every 10 minutes, within the daily limit.)
-  - The button is now disabled (everyone is invited once).
-  - The terminal prints 24 `[email] to=...` blocks, one per invited address, each with a link `https://padelparbaj.hu/login?email=<address>`.
+  - The "Mintaváros: a liga állása" card in the hero, with its register button ("Nevezek az 1. körre" before the groups are out). The button opens `/register?league=minta`: the league rides along, so whoever registers through it is Mintaváros's player at once (D128, #331).
+  - Példaváros has its own card, with its own button (`/register?league=pelda`).
 
 ### 4. Admin checks the log
 
 - Page: `/admin/outbox` ("Kimenő levelek")
 - Account: `admin@example.test`
 - Expect:
-  - A row "Regisztrációs meghívó" with 0 waiting, 24 sent, 0 failed, and no failure. Login codes and signup confirmations have their own rows once there are some.
+  - Only login codes so far. No registration invite: there is no interest list (#333).
   - No address anywhere on the page, and no button: nothing waits for the Admin.
 
-### 5. Players register
+### 5. Players register through the register button
 
-- Page: `/login?email=<address>` (on localhost), then `/welcome` ("Üdv!"), then `/home`
-- Accounts: the players from the tables above. Minimum: both players of 3 pair signups (6 logins, enough for one group of 3 pairs). For the full run use the 22 players who start with a partner: 11 pairs split into groups of 4, 4 and 3.
+- Page: `/register?league=minta` (the landing page's button, step 3), then `/welcome` ("Üdv!"), then `/home`
+- Accounts: the players from the tables above. Minimum: both players of 3 pairs (6 logins, enough for one group of 3 pairs). For the full run use the first 5 pairs and Varga Dóra and Kiss Miklós: 6 pairs before the draft (step 10), pair 6 for the late entry (step 11).
 - Per player:
-  1. Open the link from the terminal with the host changed to `http://localhost:5173`. The address is already filled in; press "Kódot kérek" and log in with the code from the terminal.
-  2. On "Üdv!": check the line "A jelentkezésedből már megvan a neved és a szinted. Csak a telefonszámod kell, és hogy férfi vagy nő vagy.", that "Neved" already holds the name from the table and "Szinted" the signup's level (#130), leave the phone empty (or try a Hungarian number), pick "Férfi" or "Nő" (nothing is preselected, #133), tick the privacy consent and press "Kész".
+  1. Type the address, press "Kódot kérek" and enter the code from the terminal ("Tovább"). The account belongs to Mintaváros from this login on, before the first-login page is done.
+  2. On "Üdv!": nothing is prefilled. Type the name from the table, pick the level in "Szinted", type a Hungarian phone number, pick "Férfi" or "Nő" (nothing is preselected, #133), tick the privacy consent and press "Kész".
 - Expect:
   - Without the consent, the name or Férfi/Nő, the form shows an error and stays.
-  - After "Kész" you land on Kezdőlap.
-  - The first player of a pair opens "Párom" (`/pair`) and sees "A párod, <name>, még nem regisztrált." (the name, never the address).
+  - After "Kész" you land on Kezdőlap: the "Teszt szezon" card and "Hívd meg a párodat" with the player's own pair link. No "Melyik ligában játszol?" card: they joined through the button.
 
-### 6. The second partner registers, the pair forms
+### 6. The partner accepts the pair link, the pair forms
 
-- Page: `/pair` ("Párom")
-- Account: the second player of the pair, right after step 5 for them
+- Pages: `/pair` ("Párom") of the first player, the link in the second player's window, `/pair` again
+- Account: the first player of a pair, then the second (registered in step 5)
+- Do: copy the link from "Hívd meg a párodat", open it as the second player, press "Elfogadom".
 - Expect:
-  - After "Kész" the pair exists: Párom shows the partner's name. No invite step is needed.
-  - The first partner sees the same after a reload.
+  - Párom shows "Mostantól párban vagytok." and the partner's name, email and phone; the first partner sees the same after a reload.
   - A "Nevezés" card with the "Teszt szezon" and a "Nevezünk" button.
-- Check for a pair of two solos (Varga Dóra and Kiss Miklós): the same, because the Szervező paired them before.
+- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" on Párom, and the Szervező pairs them on Párkeresők (`/admin/leagues/minta/solos`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
 
 ### 7. A pair enters the season
 
@@ -227,16 +221,16 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Account: `admin@example.test`
 - Expect: a row "Kihirdetett csoportok" with one sent email per player and nothing waiting.
 
-### 13. Szervező pairs the waiting solos (side path)
+### 13. Szervező pairs two who look for a partner (side path)
 
+- Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" on Párom (off by default, #333).
 - Page: `/admin/leagues/minta/solos` ("Párkeresők")
 - Account: `szervezo@example.test`
-- Expect: "2 egyedül jelentkező keres párt, 1 párt hoztál össze": Pál Boglárka and Sándor Ákos in the table, by level. The page never shows their addresses.
+- Expect: "2 regisztrált játékos keres párt, 1 párt hoztál össze": the two under "Regisztráltak", by level, with their phone numbers. No "Még nem regisztráltak" part and no address. Idegen Ilona, who looks for a partner in Példaváros, is not listed.
 - Do: tick both, press "Párba teszem (2/2)", confirm.
 - Expect:
-  - "0 egyedül jelentkező keres párt, 2 párt hoztál össze".
-  - The terminal prints the two "Párkeresők bemutatása" emails, and "Kimenő levelek" counts them as sent.
-  - They got the registration invite already (step 3). Register them as in steps 5 to 7: their pair forms like the others once both have registered. "Szétválasztom" on this page undoes a pairing.
+  - "0 regisztrált játékos keres párt, 2 párt hoztál össze"; the pair is under "Összehozott párok" and can be dissolved on Párok.
+  - Both get the in-app message "Párt találtunk neked" and the "Van párod" email; Párom shows the partner.
 
 ### 14. Szervező changes pairs (side path)
 
@@ -244,11 +238,11 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 
 - Page: `/admin/leagues/minta/pairs` ("Párok")
 - Account: `szervezo@example.test`
-- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("jelentkezésből" or "kézzel"), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
+- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("kézzel", "linkkel", "Párkeresők"; "jelentkezésből" on pairs from before #333), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
 - Expect, between the intro text and the filter: nothing (no counts table, #298). The filter options show their counts.
 - Expect, at 390px (#278): each pair is a card with both names, Elo, source, state, entry and its buttons; nothing is cut and nothing scrolls sideways. At desktop width it is the table.
 - Do:
-  1. "Pár létrehozása": pick two registered players without a pair (for example two whose signup partner hasn't registered), press "Létrehozás". The new pair shows with "kézzel".
+  1. "Pár létrehozása": pick two registered players without a pair (for example Török Hanna and Lakatos Vivien, registered as in step 5 but never paired), press "Létrehozás". Only Mintaváros's players are offered, never Idegen Ilona. The new pair shows with "kézzel".
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
   4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
@@ -260,9 +254,9 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
   - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" opens "Visszaléptetés a csoportból" (#34): it needs a reason, and says the pair's matches leave the table and the pair leaves the season. After it the pair reads "Visszavonva", its pair buttons work again, and "Benevezés" enters it for the next round. The group's table on `/league/minta` no longer lists it (it is named below the table, "Visszalépett: …"), its matches there are gone, its players' Kezdőlap shows no group, and the other pairs' group table on Kezdőlap leaves it out, names it below ("Visszalépett: …") and shows its week's match as off. Értesítések: the pair got "A szervező visszaléptetett titeket a körből" with the reason; the others "Visszalépett egy pár a csoportodból" with no reason. No email.
 
-### 15. A new player without a signup registers (side path)
+### 15. A new player registers without a league and chooses one (side path)
 
-Anyone can create an account, no invite needed (#113).
+Anyone can create an account, no invite needed (#113). Logging in on `/register` or `/login` directly, not through a league's button, the account belongs to no league until the player chooses one (D128, #331).
 
 - Page: `/register` (or `/login`), then `/welcome`, `/home` and `/pair` ("Párom")
 - Account: a new address that is not in the seed, for example `uj.jatekos@example.test`
@@ -271,8 +265,10 @@ Anyone can create an account, no invite needed (#113).
   - The code arrives like for anyone else; nothing about 2 November.
   - Under the code field: "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, vagy írj nekünk: hello@padelparbaj.hu." (with "lépj be Google-lel" / "regisztrálj Google-lel" before the last part when Google login is set up). The same line for every address, also one that gets no code (#123).
   - The first-login page names no partner and prefills no level.
-  - Kezdőlap and Párom: "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`.
+  - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párom says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
+  - After "Csatlakozom": the card is gone; Kezdőlap and Párom show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párom her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Párok lists only her, and Mintaváros's Párok, Párkeresők and Helyettes pick never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
@@ -294,7 +290,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Account: any player in a published group, for example the first pair's first player
 - Expect:
   - "Teendők" at the top: "Ajánlj időpontot (<names> ellen)" for each match, each a link to the match with the round's deadline under it.
-  - "Meccseitek": a card per week 1 to 3 (D128). With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét". Each match card: the week and its dates, the opponents, "Egyeztetésre vár", their two phone numbers as call buttons and "Egyeztetés és részletek" (the whole card opens the match). No email address anywhere.
+  - "Meccseitek": a card per week 1 to 3 (D133). With 6 pairs the groups have 3 pairs: 2 matches and one "Pihenőhét". Each match card: the week and its dates, the opponents, "Egyeztetésre vár", their two phone numbers as call buttons and "Egyeztetés és részletek" (the whole card opens the match). No email address anywhere.
   - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season, the round and the deadline, where the pair stands ("A létra csúcsán vagytok, 3 kör van hátra"), "Minden csoport" (the public league page), the table (place, pair, M, Gy, V, Szett, Játék, P; "–" instead of places and "Még nincs végleges eredmény: a sorrend a kiemelés." until a result is final, D85) and "A csoport meccsei": every match of the group by week, yours linked.
   - "Hamarosan itt lesz a csoportod" is gone.
 
@@ -304,7 +300,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Accounts: the player of step 17, then one of the opponents
 - Do: fill two times on the same day and press "Elküldöm az időpontokat"; then three times on two days, at least 48 hours ahead, and send again.
 - Expect:
-  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok időpontokat" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D128).
+  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok időpontokat" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D133).
   - The first try is refused: "Legalább 3 különböző időpontot ajánlj." and "Az időpontok legalább 2 különböző napra essenek." (a time before 7:00 or after 22:00, or under 48 hours ahead, gets its own message under its row).
   - The second goes through: "Elküldtük az időpontokat a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár". The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the link.
   - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, pick a time and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
@@ -390,7 +386,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Account: Szervező
 - Do: look at the table and the previews, switch "Automatikus emlékeztetők" on and confirm with "Bekapcsolom". Then run the cron job once: open `http://localhost:5173/cdn-cgi/local/scheduled`.
 - Expect:
-  - Off by default. The table lists the four situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0; a registration deadline under 24 hours away shortens the 2 days to 24 hours, never less.
+  - Off by default. The table lists the three situations with "Most kapná", "Elindult" and "Utoljára"; everyone in this walkthrough is newer than the waiting times (24 hours, 2 days), so "Most kapná" is 0; a registration deadline under 24 hours away shortens the 2 days to 24 hours, never less.
   - The note under the previews lists who never gets one, ending with "és aki ebben a szezonban már kapott emlékeztetőt".
   - With someone due, a preview shows their name and dates, never an email address, a phone number or the pair link's token.
   - Switching on sends nothing by itself; the scheduled run queues the reminders and prints them in the terminal, and a second run sends none again.
@@ -534,7 +530,7 @@ Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't
 
 ## A running round instead
 
-`npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every signup above has a finished account, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.
+`npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every pair-to-be above and Varga Dóra and Kiss Miklós have a finished account in Mintaváros, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.
 
 ## Start over
 

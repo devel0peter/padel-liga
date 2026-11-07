@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import type { Zone } from "~/lib/fixtures";
 import { cn } from "~/lib/utils";
 
-// A group's table (docs/player-ui.md section 2, D128): place, pair, played,
+// A group's table (docs/player-ui.md section 2, D133): place, pair, played,
 // wins, losses, sets and games won:lost, points; the places that move up or
 // down at the end of the round are marked. One component for Kezdőlap and the
 // public league page. Fits 390 px: the names wrap, the games column hides.

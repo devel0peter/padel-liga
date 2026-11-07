@@ -3,8 +3,8 @@ import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { rowSelect } from "~/db/insert-select";
-import { groupPairs, groups, interestSignups, leagues, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
-import { listedCities } from "~/lib/cities.server";
+import { groupPairs, groups, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
+import { listedLeagues, memberOf, pairMemberStatements } from "~/lib/league-members.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { auditEntry, auditIfChanged } from "~/lib/audit.server";
 import { averageElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
@@ -16,7 +16,6 @@ import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 
 import type { User } from "./auth/session.server";
-import { inLeagueCity, signupCities } from "./league-players";
 import { formatPhone } from "./phone";
 import { canDissolve, checkNewPair, DISSOLVE_REFUSED, NEW_PAIR_REFUSALS, type PairSource } from "./pairs";
 
@@ -28,16 +27,11 @@ export type PairLeague = { id: number; name: string };
 
 type Result = { ok: true } | { ok: false; error: string };
 
-// Where a player can be in a pair: every league in a listed city (players
-// don't belong to a league yet; a city still being set up stays hidden).
+// Where a pair can be made (a pair link works in): every league in a listed
+// city (a city still being set up stays hidden). What a player sees on
+// Kezdőlap and Párom is only their own leagues (playerLeagues, D128).
 export async function pairLeagues(): Promise<PairLeague[]> {
-  const listed = (await listedCities()).map((c) => c.slug);
-  if (listed.length === 0) return [];
-  return db
-    .select({ id: leagues.id, name: leagues.name })
-    .from(leagues)
-    .where(inArray(leagues.city, listed))
-    .orderBy(asc(leagues.name));
+  return (await listedLeagues()).map(({ id, name }) => ({ id, name }));
 }
 
 // Either player in an active pair of the league.
@@ -210,28 +204,23 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
 export type PairCandidate = { id: string; name: string; level: string | null; phone: string };
 
 // Registered players (first-login page done) of the league without an active
-// pair in it, by name. A player belongs to the league by their signups' city,
-// or to every league without a signup (league-players.ts, D73, D93); staff
-// accounts too. No address in the result: it goes to the page.
-export async function pairCandidates(league: { id: number; city: string }): Promise<PairCandidate[]> {
-  const [accounts, signups] = await db.batch([
-    db
-      .select({ id: users.id, name: users.name, level: users.level, email: users.email, phone: users.phone })
-      .from(users)
-      .where(
-        and(
-          isNotNull(users.consentAt),
-          sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
-            and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
-        ),
-      )
-      .orderBy(asc(users.name), asc(users.id)),
-    db.select({ email1: interestSignups.email1, email2: interestSignups.email2, city: interestSignups.city }).from(interestSignups),
-  ]);
-  const cities = signupCities(signups);
-  return accounts
-    .filter((a) => inLeagueCity(cities, a.email, league.city))
-    .map(({ id, name, level, phone }) => ({ id, name, level, phone: formatPhone(phone) }));
+// pair in it, by name: the league's players by D128 (league-members.server.ts,
+// replacing D93), staff accounts too. No address in the result: it goes to
+// the page.
+export async function pairCandidates(league: { id: number }): Promise<PairCandidate[]> {
+  const accounts = await db
+    .select({ id: users.id, name: users.name, level: users.level, phone: users.phone })
+    .from(users)
+    .where(
+      and(
+        isNotNull(users.consentAt),
+        memberOf(league.id, users.id),
+        sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
+          and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+      ),
+    )
+    .orderBy(asc(users.name), asc(users.id));
+  return accounts.map(({ id, name, level, phone }) => ({ id, name, level, phone: formatPhone(phone) }));
 }
 
 // Why `a` and `b` can't be a new pair, or null. `free`: the players who must
@@ -243,7 +232,9 @@ async function newPairRefusal(leagueId: number, a: string, b: string, free = [a,
     db
       .select({ id: users.id })
       .from(users)
-      .where(and(inArray(users.id, [a, b]), isNotNull(users.consentAt))),
+      // Registered, and the league's players (D128): a forged id must not make an
+      // outsider a member of the league through the pair (#331 review).
+      .where(and(inArray(users.id, [a, b]), isNotNull(users.consentAt), memberOf(leagueId, users.id))),
     db.select({ id: pairs.id }).from(pairs).where(activePairWith(leagueId, free)).limit(1),
   ]);
   const refusal = checkNewPair({ a, b, registered: registered.length === 2, paired: paired.length > 0 });
@@ -346,6 +337,7 @@ export async function createPair(
       detail: `league:${leagueId}; user:${a} + user:${b}`,
       leagueId,
     }),
+    ...pairMemberStatements(leagueId, a, b, () => "pair"),
   ]);
   // Someone was quicker with one of them.
   const id = await activePairOf(leagueId, a, b);
@@ -448,6 +440,7 @@ export async function changePartner(
         detail: `league:${leagueId}; from pair:${pairId}; user:${leaving} -> user:${partner}`,
         leagueId,
       }),
+      ...pairMemberStatements(leagueId, values.playerA, values.playerB, () => "pair"),
     ]);
   } catch (e) {
     if (!/UNIQUE/i.test(String(e))) throw e;

@@ -1,4 +1,4 @@
-// The fixture list, the up/down marks and the ladder line (D128,
+// The fixture list, the up/down marks and the ladder line (D133,
 // docs/player-ui.md sections 2-4).
 import { describe, expect, it } from "vitest";
 

@@ -179,6 +179,42 @@ describe("leagueLanding", () => {
   });
 });
 
+// A league's first season that starts at the minimum entries (D124, #335).
+describe("a first season that starts at the minimum entries", () => {
+  const waiting: LandingSeason = {
+    registrationOpensAt: budapestTime("2026-11-10", 9, 0),
+    registrationClosesAt: null,
+    phases: [],
+    startsAtMinimum: true,
+    entries: { count: 9, minimum: 12 },
+  };
+
+  it("while it waits: how many pairs entered and how many are still needed, entering round 1", () => {
+    const s = leagueLanding([waiting], at("2026-11-12"));
+    expect(s).toEqual({ kind: "waiting", entries: 9, minimum: 12, joining: { kind: "first" } });
+    expect(landingBlock(s)).toEqual({
+      title: "Nyitva a nevezés",
+      facts: [["Indulás", "9 pár nevezett, még 3 kell, utána indul."]],
+      joining: "Nevezz most, és az 1. körtől játszotok.",
+      chip: "9 pár nevezett",
+      cta: "Nevezek az 1. körre",
+      ctaNote: null,
+    });
+  });
+
+  it("once the start is fixed: the start day, no registration deadline", () => {
+    const fixed: LandingSeason = { ...season("2026-11-10", "2026-11-22", "2026-11-23"), startsAtMinimum: true };
+    const s = leagueLanding([fixed], at("2026-11-17"));
+    expect(s).toEqual({ kind: "registration", closes: null, firstRound: "2026-11-23", joining: { kind: "round", number: 1, start: "2026-11-23" } });
+    expect(landingBlock(s).facts).toEqual([["Indul", "nov. 23., hétfő"]]);
+  });
+
+  it("landingByCity hands the entries through", () => {
+    const blocks = landingByCity([{ id: 1, city: "uj", slug: "uj" }], [{ ...waiting, leagueId: 1 }], at("2026-11-12"));
+    expect(blocks.get("uj")?.facts).toEqual([["Indulás", "9 pár nevezett, még 3 kell, utána indul."]]);
+  });
+});
+
 describe("joiningSentence", () => {
   it("uses the right article", () => {
     expect(joiningSentence({ kind: "round", number: 1, start: "2026-11-09" })).toContain("az 1. körtől");
@@ -226,6 +262,9 @@ describe("landingByCity", () => {
     );
     expect(m.get("gyor")!.ladderPath).toBe("/league/gyor-liga");
     expect(m.get("pecs")!.ladderPath).toBeUndefined();
+    // The register button carries the league (D128, #331).
+    expect(m.get("gyor")!.registerPath).toBe("/register?league=gyor-liga");
+    expect(m.get("pecs")!.registerPath).toBeUndefined();
   });
 });
 

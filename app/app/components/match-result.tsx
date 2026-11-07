@@ -9,7 +9,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { NOTE_MAX, autoAcceptLine, outcomeText, scoreText } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
-// The result on the match page (#28, D128): record it, correct your own while
+// The result on the match page (#28, D133): record it, correct your own while
 // it waits, confirm or dispute the other pair's; a disputed or final result is
 // shown as it stands. The match page places these by the match's state. The
 // organizer's form (#29) uses ScoreFields too.
@@ -83,7 +83,7 @@ export function ScoreFields({
   );
 }
 
-// A score as a small board (D128): our pair on top, sets side by side, the
+// A score as a small board (D133): our pair on top, sets side by side, the
 // super tie-break last, the winning numbers in bold. `score` is in a/b order.
 export function ScoreBoard({ score, side, us, them }: { score: MatchScore; side: Side; us: string; them: string }) {
   const s = side === "a" ? score : flipScore(score);

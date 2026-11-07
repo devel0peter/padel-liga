@@ -33,7 +33,7 @@ test("a visitor sees the bands, group tables and every week's matches", async ({
   await expect(main).not.toContainText(PAIRS.late[0].name);
 
   // A table with 3 rows per group, all at zero and no places before the first result;
-  // the fixture list has every week with one match each in a group of 3 (D128).
+  // the fixture list has every week with one match each in a group of 3 (D133).
   const first = main.getByRole("region", { name: "1. csoport" });
   await expect(first.getByRole("row")).toHaveCount(4); // header + 3 pairs
   await expect(first).toContainText("Még nincs végleges eredmény: a sorrend a kiemelés.");

@@ -1,8 +1,6 @@
-// Phase 0 interest signup: parsing and validation of the landing page form.
-// Pure (no I/O) so it runs on both server and client and can be unit tested.
-
-import { findCity, isCity, OTHER_CITY, type City } from "./cities";
-import { normalizeRef, OTHER_CLUB } from "./clubs";
+// The playing levels and the email pattern, left from the landing page's
+// interest form (its parsing went with the interest list, #334, D132).
+// Pure (no I/O), used on both server and client.
 
 export const LEVELS = {
   kezdo: "Kezdő – most ismerkedünk a játékkal",
@@ -12,145 +10,9 @@ export const LEVELS = {
 } as const;
 
 export type Level = keyof typeof LEVELS;
-export type Mode = "pair" | "solo";
-
-export type InterestSignup = {
-  // A listed city's slug, or OTHER_CITY.
-  city: string;
-  cityOther: string | null;
-  mode: Mode;
-  name1: string;
-  email1: string;
-  name2: string | null;
-  email2: string | null;
-  level: Level;
-  note: string | null;
-  // Signup source from the landing page link (`?ref=`), see clubs.ts.
-  ref: string | null;
-  // Club slug where they play most, OTHER_CLUB, or null (optional field).
-  homeClub: string | null;
-  // "Szívesen szerveznék ligát" (other-city contact form).
-  wantsToOrganize: boolean;
-};
-
-export type InterestField =
-  | "city"
-  | "cityOther"
-  | "name1"
-  | "email1"
-  | "name2"
-  | "email2"
-  | "level"
-  | "note"
-  | "consent";
-
-export type InterestResult =
-  | { ok: true; data: InterestSignup }
-  | { ok: false; errors: Partial<Record<InterestField, string>> };
-
-const MAX_NAME = 100;
-const MAX_EMAIL = 254;
-const MAX_NOTE = 1000;
-
-export const LEAGUE_CITY_ERROR = "Itt már fut a liga: regisztrálj, és nevezz a ligába.";
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function str(form: FormData, key: string): string {
-  const value = form.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export function isLevel(value: string): value is Level {
   return Object.hasOwn(LEVELS, value);
-}
-
-// `clubs`: slugs of the city's clubs; an unknown home club is dropped, not an
-// error, since the field is optional and the list can change under the form.
-// `cities`: the listed cities (cities.server.ts listedCities).
-// `leagueCities`: slugs of the cities with a league. Those take no interest
-// signup: people register and enter the league instead (#83).
-export function parseInterest(
-  form: FormData,
-  clubs: readonly string[],
-  cities: readonly Pick<City, "slug" | "name">[],
-  leagueCities: readonly string[] = [],
-): InterestResult {
-  let city = str(form, "city");
-  let cityOther = city === OTHER_CITY ? str(form, "cityOther") : "";
-  // Someone typed a city we already support: file it there.
-  const typed = cityOther ? findCity(cityOther, cities) : null;
-  if (typed) {
-    city = typed;
-    cityOther = "";
-  }
-  const mode: Mode = str(form, "mode") === "solo" ? "solo" : "pair";
-  const name1 = str(form, "name1");
-  const email1 = str(form, "email1").toLowerCase();
-  const name2 = mode === "pair" ? str(form, "name2") : "";
-  const email2 = mode === "pair" ? str(form, "email2").toLowerCase() : "";
-  const level = str(form, "level");
-  const note = str(form, "note");
-  const consent = form.get("consent") != null;
-
-  const errors: Partial<Record<InterestField, string>> = {};
-
-  if (city === OTHER_CITY) {
-    if (!cityOther) errors.cityOther = "Írd be, melyik városban játszanál.";
-    else if (cityOther.length > MAX_NAME) errors.cityOther = "Ez a városnév túl hosszú.";
-  } else if (!isCity(city, cities)) errors.city = "Válaszd ki a várost.";
-  else if (leagueCities.includes(city))
-    errors[typed ? "cityOther" : "city"] = LEAGUE_CITY_ERROR;
-
-  if (!name1) errors.name1 = "Add meg a neved.";
-  else if (name1.length > MAX_NAME) errors.name1 = "Ez a név túl hosszú.";
-
-  if (!EMAIL_RE.test(email1) || email1.length > MAX_EMAIL)
-    errors.email1 = "Adj meg egy érvényes e-mail-címet.";
-
-  if (mode === "pair") {
-    if (!name2)
-      errors.name2 =
-        "Add meg a párod nevét, vagy válaszd az egyéni jelentkezést.";
-    else if (name2.length > MAX_NAME) errors.name2 = "Ez a név túl hosszú.";
-
-    if (email2 && (!EMAIL_RE.test(email2) || email2.length > MAX_EMAIL))
-      errors.email2 = "A párod e-mail-címe nem érvényes.";
-    else if (email2 && email2 === email1)
-      errors.email2 = "A párod e-mail-címe nem lehet ugyanaz, mint a tiéd.";
-  }
-
-  if (!isLevel(level)) errors.level = "Válaszd ki a szinteteket.";
-
-  if (note.length > MAX_NOTE)
-    errors.note = `A megjegyzés legfeljebb ${MAX_NOTE} karakter lehet.`;
-
-  if (!consent)
-    errors.consent = "A jelentkezéshez el kell fogadnod az adatkezelést.";
-
-  if (Object.keys(errors).length > 0) return { ok: false, errors };
-
-  return {
-    ok: true,
-    data: {
-      city,
-      cityOther: cityOther || null,
-      mode,
-      name1,
-      email1,
-      name2: name2 || null,
-      email2: email2 || null,
-      level: level as Level,
-      note: note || null,
-      ref: normalizeRef(str(form, "ref")),
-      homeClub: parseHomeClub(str(form, "homeClub"), city, clubs),
-      wantsToOrganize: form.get("organize") != null,
-    },
-  };
-}
-
-function parseHomeClub(value: string, city: string, clubs: readonly string[]): string | null {
-  if (city === OTHER_CITY) return null;
-  if (value === OTHER_CLUB || clubs.includes(value)) return value;
-  return null;
 }

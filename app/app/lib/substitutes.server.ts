@@ -15,14 +15,14 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, interestSignups, matches, matchSubstitutes, pairs, seasons, users } from "~/db/schema";
+import { groups, matches, matchSubstitutes, pairs, seasons, users } from "~/db/schema";
 import { auditIfChanged } from "~/lib/audit.server";
 import { logError, logInfo } from "~/lib/log";
 import { substituteAnnouncedMessage, substituteDecidedMessage, substituteRevokedMessage, type Message, type PlayerKind } from "~/lib/notifications";
 import { notifyPlayers, notifySubstituteRequested } from "~/lib/notifications.server";
 
 import { pairName } from "./groups";
-import { inLeagueCity, signupCities } from "./league-players";
+import { memberOf } from "./league-members.server";
 import { groupMembers, loadMatch, NOT_FOUND, noWithdrawnPair, sideOf, type MatchContext } from "./matches.server";
 import { SUBSTITUTE_CHANGED, SUBSTITUTE_REASON_MAX, SUBSTITUTE_REFUSALS, substituteStatusLabel } from "./substitutes";
 
@@ -99,18 +99,14 @@ async function groupPlayersOf(groupId: number): Promise<Set<string>> {
 }
 
 // The league's registered players (first-login page done, not deleted), by
-// the D93 rule (league-players.ts), by name. No address leaves here.
-async function leaguePlayers(city: string): Promise<{ id: string; name: string }[]> {
-  const [accounts, signups] = await db.batch([
-    db
-      .select({ id: users.id, name: users.name, email: users.email })
-      .from(users)
-      .where(and(isNotNull(users.consentAt), isNull(users.deletedAt)))
-      .orderBy(asc(users.name), asc(users.id)),
-    db.select({ email1: interestSignups.email1, email2: interestSignups.email2, city: interestSignups.city }).from(interestSignups),
-  ]);
-  const cities = signupCities(signups);
-  return accounts.filter((a) => inLeagueCity(cities, a.email, city)).map(({ id, name }) => ({ id, name: name || "Névtelen" }));
+// the D128 rule (league-members.server.ts), by name. No address leaves here.
+async function leaguePlayers(leagueId: number): Promise<{ id: string; name: string }[]> {
+  const accounts = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(and(isNotNull(users.consentAt), isNull(users.deletedAt), memberOf(leagueId, users.id)))
+    .orderBy(asc(users.name), asc(users.id));
+  return accounts.map(({ id, name }) => ({ id, name: name || "Névtelen" }));
 }
 
 const live = (rows: readonly RequestRow[]) => rows.filter((r) => isLiveSubstitute(r.status));
@@ -138,7 +134,7 @@ export async function substitutePanel(ctx: MatchContext, side: Side, userId: str
   let form: SubstitutePanel["form"] = null;
   if (open && absent.length > 0) {
     const excluded = new Set([...matchPlayersOf(ctx), ...(await groupPlayersOf(ctx.match.groupId)), ...live(rows).map((r) => r.substituteId)]);
-    form = { absent, candidates: (await leaguePlayers(ctx.city)).filter((p) => !excluded.has(p.id)) };
+    form = { absent, candidates: (await leaguePlayers(ctx.leagueId)).filter((p) => !excluded.has(p.id)) };
   }
   return {
     open,
@@ -191,7 +187,7 @@ export async function requestSubstitute(
     absentId: input.absentId,
     matchPlayers: matchPlayersOf(ctx),
     groupPlayers: open ? await groupPlayersOf(ctx.match.groupId) : new Set(),
-    registered: open && (await leaguePlayers(ctx.city)).some((p) => p.id === input.substituteId),
+    registered: open && (await leaguePlayers(ctx.leagueId)).some((p) => p.id === input.substituteId),
     substituteId: input.substituteId,
     live: live(rows),
   });
@@ -387,7 +383,7 @@ export async function decideSubstitute(
       open,
       matchPlayers: matchPlayersOf(ctx),
       groupPlayers: await groupPlayersOf(ctx.match.groupId),
-      registered: (await leaguePlayers(ctx.city)).some((p) => p.id === row.substituteId),
+      registered: (await leaguePlayers(ctx.leagueId)).some((p) => p.id === row.substituteId),
       substituteId: row.substituteId,
       live: live(rows).filter((r) => r.id !== requestId),
     });

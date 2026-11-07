@@ -5,7 +5,7 @@ import type { FixtureMatch, FixtureSide, FixtureWeek } from "~/lib/fixtures";
 import { cn } from "~/lib/utils";
 
 // A group's matches by week, like a fixture list (docs/player-ui.md section
-// 3, D128): pair A, the score or the time, pair B; the winner in bold; a match
+// 3, D133): pair A, the score or the time, pair B; the winner in bold; a match
 // without a final result says where it stands. The player's own matches link
 // to their page. One component for Kezdőlap and the public league page.
 
@@ -85,7 +85,7 @@ function Row({ m }: { m: FixtureMatch }) {
         <Middle m={m} />
       </span>
       <Side side={m.b} won={m.winner === "b"} align="left" />
-      {/* Under the names, so a long note never squeezes them (D128). */}
+      {/* Under the names, so a long note never squeezes them (D133). */}
       {m.state === "final" && !m.sets && m.note && <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span>}
     </>
   );

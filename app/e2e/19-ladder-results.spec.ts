@@ -16,7 +16,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
     .filter({ hasText: anna.name });
   await expect(group).toHaveCount(1);
 
-  // Column order: #, Pár, M, Gy, V, Szett, Játék, P (D128). Read the M and P cells of the body rows.
+  // Column order: #, Pár, M, Gy, V, Szett, Játék, P (D133). Read the M and P cells of the body rows.
   const column = (nth: number) =>
     group.locator("tbody tr").evaluateAll((rows, i) => rows.map((row) => row.querySelectorAll("td")[i]?.textContent?.trim() ?? ""), nth);
 
@@ -32,7 +32,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
 
   // The played match shows its sets (from the 1st pair's side, as in the app)
   // with the super tie-break in brackets, and the decision its note, each
-  // once, under its own week (#202, D128).
+  // once, under its own week (#202, D133).
   const played = group.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);

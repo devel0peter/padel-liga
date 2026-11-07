@@ -36,7 +36,7 @@ import { substituteLine } from "~/lib/substitutes";
 import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
 import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
-// A match (#25, #26, D128): a summary (state, when, where, score, phones,
+// A match (#25, #26, D133): a summary (state, when, where, score, phones,
 // calendar), the one main step of the state, every other step folded, and
 // the log. Only the two pairs' players see it; anyone else gets 404.
 
@@ -58,7 +58,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
   // Substitutes (#37) and no-shows (#33): only for the four players, like the rest of the page.
   const [substitutes, noShow] = await Promise.all([substitutePanel(ctx, page.side, user.id, now), noShowPanel(ctx, page.side, user.id, now)]);
-  // A fixed time that has started: recording the result becomes the main step (D128).
+  // A fixed time that has started: recording the result becomes the main step (D133).
   const started = page.state.status === "scheduled" && page.state.slot.getTime() <= now.getTime();
   return { ...page, substitutes, noShow, started };
 }
@@ -188,7 +188,7 @@ function Feedback({ result, intent, ok = false }: { result: ActionResult | undef
   );
 }
 
-// The page's two kinds of block (D128, docs/player-ui.md M2): the one main
+// The page's two kinds of block (D133, docs/player-ui.md M2): the one main
 // step of the state, open, and every other step folded behind a one-line
 // opener, so nothing is lost but only one thing asks for attention.
 function Panel({ title, description, children, tone }: { title: string; description?: React.ReactNode; children: React.ReactNode; tone?: "main" }) {
@@ -656,7 +656,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const failed = (intent: string) => result?.intent === intent && !result.ok;
   const keyed = m.log.length;
 
-  // The one main step (D128). Everything else is folded below it.
+  // The one main step (D133). Everything else is folded below it.
   const confirmResult = r.status === "recorded" && m.resultActions.confirm;
   const recordMain = r.status === "none" && m.resultActions.record && m.started;
   const recordFolded = m.resultActions.record && !recordMain && !confirmResult;

@@ -32,6 +32,8 @@ async function cookieFor(id: string, role: "player" | "superadmin", organizes?: 
     .prepare("insert into users (id, email, name, sex, consent_at, platform_role) values (?, ?, ?, 'female', 1, ?)")
     .run(id, `${id}@x.hu`, id, role);
   if (organizes) h.raw.prepare("insert into league_admins (league_id, user_id) values (?, ?)").run(organizes, id);
+  // Joined Győr, like today's staff (D128 backfill).
+  h.raw.prepare("insert into league_members (league_id, user_id, source) values (1, ?, 'carried')").run(id);
   return (await createSession(id)).split(";")[0];
 }
 
@@ -73,6 +75,8 @@ beforeEach(() => {
   h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec("2030-11-08T23:00:00Z"), sec("2030-11-29T22:59:00Z"));
   h.raw.exec(`insert into season_entries (season_id, pair_id, status, joins_phase) values (1, 1, 'approved', 1)`);
   h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'k', 1)`);
+  // Everyone above joined Győr (D128).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'carried' from users`);
   h.raw.exec(`insert into email_suppressions (email, reason) values ('d@x.hu', 'bounced')`);
 });
 
@@ -150,30 +154,29 @@ describe("Levél nekik from Párok opens the broadcast page with those players (
   });
 });
 
-describe("two leagues in two cities: each Párok has only its players (#175, D93)", () => {
+describe("two leagues in two cities: each Párok has only its players (#331, D128)", () => {
   beforeEach(() => {
     h.raw.exec("insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 1)");
     h.raw.exec("insert into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')");
     h.raw.exec("insert into users (id, email, name, consent_at) values ('h', 'h@x.hu', 'Hegedűs Hanna', 1)");
-    // Ákos and Hanna signed up in Debrecen (Hanna as the partner of a pair
-    // signup), Boglárka in Győr; Edit and Ferenc have no signup.
-    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, name2, email2, level, consent_at) values
-      ('deb', 'solo', 'Ákos', 'G@x.hu', null, null, 'kezdo', 1),
-      ('deb', 'pair', 'Valaki', 'valaki@x.hu', 'Hanna', 'h@x.hu', 'kezdo', 1),
-      ('gyor', 'solo', 'Boglárka', 'k@x.hu', null, null, 'kezdo', 1)`);
+    // Ákos and Hanna joined Debrecen only, Edit both leagues. Boglárka's
+    // Debrecen signup decides nothing (#331 requirement 4).
+    h.raw.exec("delete from league_members where user_id = 'g'");
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'g', 'register'), (2, 'h', 'chosen'), (2, 'e', 'chosen')`);
+    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('deb', 'solo', 'Boglárka', 'k@x.hu', 'kezdo', 1)`);
   });
   const solos = (rows: any[]) => rows.filter((r) => r.kind === "solo").map((r) => r.player.id);
 
-  it("lists, counts and offers for a new pair only the league's players; staff without a signup in both", async () => {
+  it("lists, counts and offers for a new pair only the league's players; staff only where they joined", async () => {
     const admin = await cookieFor("admin", "superadmin");
     const gyor = await Pairs.loader(args("http://localhost/admin/leagues/gyor/pairs", admin));
     expect(solos(gyor.rows)).toEqual(["admin", "e", "k", "f"]);
     expect(gyor.counts.no_pair).toBe(4);
     expect(gyor.candidates.map((c: any) => c.id)).toEqual(["admin", "e", "k", "f"]);
     const deb = await Pairs.loader(args("http://localhost/admin/leagues/deb/pairs", admin, "deb"));
-    // No pair in Debrecen yet: everyone from Győr's pairs without a signup counts there too.
-    expect(solos(deb.rows)).toEqual(["admin", "g", "h", "e", "a", "b", "c", "d", "f"]);
-    expect(deb.candidates.map((c: any) => c.id)).not.toContain("k");
+    expect(solos(deb.rows)).toEqual(["g", "h", "e"]);
+    expect(deb.counts.no_pair).toBe(3);
+    expect(deb.candidates.map((c: any) => c.id)).toEqual(["g", "h", "e"]);
   });
 
   it("Levél nekik addresses only the league's players", async () => {
@@ -181,8 +184,7 @@ describe("two leagues in two cities: each Párok has only its players (#175, D93
     const gyor = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=gyor&entry=no_pair", admin));
     expect(gyor.recipients.map((r: any) => r.email).sort()).toEqual(["admin@x.hu", "e@x.hu", "f@x.hu", "k@x.hu"]);
     const deb = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=deb&entry=no_pair", admin));
-    expect(deb.recipients.map((r: any) => r.email)).toEqual(expect.arrayContaining(["g@x.hu", "h@x.hu"]));
-    expect(deb.recipients.map((r: any) => r.email)).not.toContain("k@x.hu");
+    expect(deb.recipients.map((r: any) => r.email).sort()).toEqual(["e@x.hu", "g@x.hu", "h@x.hu"]);
     expect(h.sent).toEqual([]);
   });
 });

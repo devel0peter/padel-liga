@@ -5,6 +5,7 @@
 export const AUDIT_ACTIONS = {
   // Leagues and Szervezők
   "league.create": "Liga létrehozása",
+  "league.min_entries": "Minimum nevezés módosítása",
   "league_admin.grant": "Szervező kinevezése",
   "league_admin.invite": "Szervező meghívása",
   "league_admin.revoke": "Szervező elvétele",
@@ -39,11 +40,13 @@ export const AUDIT_ACTIONS = {
   "season_entry.withdraw": "Kivétel kihirdetett csoportból",
   "partner_search.on": "Párkeresés be",
   "partner_search.off": "Párkeresés ki",
+  "league.join": "Csatlakozás ligához",
   // Interest list
   "signup.update": "Jelentkezés módosítása",
   "signup.delete": "Jelentkezés törlése",
   "solo.pair": "Párkeresők összepárosítása",
   "solo.unpair": "Párosítás visszavonása",
+  "interest_list.delete": "Jelentkezési lista törlése",
   // Matches
   "match.decide": "Meccs eldöntése",
   "result.auto_accept": "Eredmény automatikus elfogadása",
@@ -75,7 +78,7 @@ export const SYSTEM_ACTOR = "Rendszer";
 
 // The actions written without an account: the cron and the command line.
 // Any other entry without an actor lost it when its account was deleted.
-export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "match.deadline", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
+export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "match.deadline", "interest_list.delete", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
 
 export function isSystemAction(code: string): boolean {
   return SYSTEM_ACTIONS.includes(code);

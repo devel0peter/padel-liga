@@ -4,17 +4,13 @@
 
 import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
-import { formatDeadline, formatShortDate } from "./format";
+import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
-import { LEVELS, type Level, type Mode } from "./interest";
+import { WAITING_START } from "./season-entries";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
 export const NOTIFICATION_KINDS = {
-  new_signup: {
-    label: "Új jelentkező",
-    description: "Ha valaki jelentkezik a ligádba.",
-  },
   result_disputed: {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
@@ -75,7 +71,10 @@ export type PlayerKind =
   // pairs, in the app and by push only, never by email. The organizers' kind
   // is `no_show_reported`; the strike's notice is its own kind.
   | "no_show_confirmed"
-  | "no_show_rejected";
+  | "no_show_rejected"
+  // A league's first season reached its minimum entries (D124, #335): every
+  // entered player, in the app and by push, plus one email (season_start).
+  | "season_start";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -97,7 +96,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested", "no_show_reported"] : [];
+  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["result_disputed", "substitute_requested", "no_show_reported"] : [];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -114,7 +113,7 @@ export function isEnabled(disabled: ReadonlySet<string>, kind: StoredKind): bool
 export const CHANNELS = {
   email: {
     label: "E-mail",
-    description: "Levélben is megkapod az értesítéseket. A belépési kódot és a jelentkezésed visszaigazolását mindig elküldjük.",
+    description: "Levélben is megkapod az értesítéseket. A belépési kódot mindig elküldjük.",
   },
   push: {
     label: "Push értesítés",
@@ -135,64 +134,17 @@ export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel):
   return !disabled.has(channelKey(channel));
 }
 
-// Emails that go out whatever the email switch says: only login codes and
-// signup confirmations (#115; Peter, 2026-10-29). Every other kind, a new one
-// too, broadcasts and the signup-list emails included, is skipped for an
-// address whose account switched email off. Addresses without an account
-// can't switch, so they get everything as before.
-export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code", "signup_confirmation"];
+// Emails that go out whatever the email switch says: only login codes
+// (#115; Peter, 2026-10-29; the signup confirmation went with the interest
+// list, #334). Every other kind, a new one too, broadcasts included, is
+// skipped for an address whose account switched email off.
+export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code"];
 
 export function followsEmailSwitch(kind: MessageKind): boolean {
   return !EMAIL_ALWAYS.includes(kind);
 }
 
 export type Message = { title: string; body: string; url: string };
-
-export type SignupRecipient = { userId: string; admin: boolean; leagueSlug: string | null };
-
-// A new signup goes to the Szervezők of that city's league and to every
-// Admin, once each. An Admin who is also the Szervező gets the Admin link.
-export function signupRecipients(
-  city: string,
-  organizers: readonly { userId: string; city: string; leagueSlug: string }[],
-  adminIds: readonly string[],
-): SignupRecipient[] {
-  const out = new Map<string, SignupRecipient>();
-  for (const id of adminIds) out.set(id, { userId: id, admin: true, leagueSlug: null });
-  for (const o of organizers)
-    if (o.city === city && !out.has(o.userId)) out.set(o.userId, { userId: o.userId, admin: false, leagueSlug: o.leagueSlug });
-  return [...out.values()];
-}
-
-export type SignupSummary = {
-  mode: Mode;
-  level: Level;
-  cityName: string;
-  // The city's signups so far, this one included (withdrawn ones not counted).
-  pairs: number;
-  solos: number;
-  // Ticked "Szívesen szerveznék ligát".
-  organize?: boolean;
-};
-
-// "Kezdő – most ismerkedünk…" -> "kezdő"
-const levelWord = (level: Level) => LEVELS[level].split(" – ")[0].toLowerCase();
-
-// No names or email addresses: a Szervező doesn't see the pair signups, and a
-// lock screen is not a private place.
-export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message {
-  const who = s.mode === "pair" ? `Új pár jelentkezett, ${levelWord(s.level)} szint.` : `Új egyéni jelentkező (párt keres), ${levelWord(s.level)} szint.`;
-  const url = to.admin || !to.leagueSlug
-    ? "/admin/signups"
-    : s.mode === "solo"
-      ? `/admin/leagues/${to.leagueSlug}/solos`
-      : `/admin/leagues/${to.leagueSlug}`;
-  return {
-    title: `Új jelentkező · ${s.cityName}`,
-    body: `${who}${s.organize ? " Szívesen szervezne ligát." : ""} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
-    url,
-  };
-}
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -203,8 +155,10 @@ export function seasonEntryMessage(
   input: {
     league: string;
     season: string;
-    // Where the pair starts; null: the next season. Not used for "removed".
-    joins: { phase: number; startsAt: Date } | null;
+    // Where the pair starts; null: the next season; startsAt null: a first
+    // season still waiting for its minimum entries (D124). Not used for
+    // "removed".
+    joins: { phase: number; startsAt: Date | null } | null;
   },
   event: "entered" | "entered_by_organizer" | "removed" = "entered",
 ): Message {
@@ -214,11 +168,23 @@ export function seasonEntryMessage(
   const start =
     input.joins === null
       ? "A következő szezontól játszotok."
-      : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
+      : input.joins.startsAt === null
+        ? WAITING_START
+        : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
     title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
     body: `${where} ${start}`,
     url: "/pair",
+  };
+}
+
+// The start of a league's first season is fixed (D124, #335): to every
+// entered player. The groups come out by the morning of the first day.
+export function seasonStartMessage(input: { league: string; season: string; start: Date }): Message {
+  return {
+    title: "Indul a szezon",
+    body: `${input.season}, ${input.league}. Az 1. kör kezdete: ${formatWeekdayDate(input.start)}. A csoportbeosztást legkésőbb aznap reggel megkapjátok.`,
+    url: "/home",
   };
 }
 
@@ -256,16 +222,6 @@ export function groupsPublishedMessage(input: {
     title: `Itt a csoportod: ${input.group}. csoport`,
     body: `${input.phase}. kör, ${input.season}, ${input.league}. Határidő: ${formatDeadline(input.deadline)}.`,
     url: "/home",
-  };
-}
-
-// A Szervező paired two solo signups (#115): for the one who has an account,
-// so it reaches them with email off too. No names; Párom shows the partner.
-export function pairIntroMessage(cityName: string): Message {
-  return {
-    title: "Párt találtunk neked",
-    body: `A szervező párba tett egy másik egyéni jelentkezővel (${cityName}). A Párom oldalon látod, ki az.`,
-    url: "/pair",
   };
 }
 

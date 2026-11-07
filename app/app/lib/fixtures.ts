@@ -1,4 +1,4 @@
-// A group's fixture list (docs/player-ui.md section 3, D128): every match by
+// A group's fixture list (docs/player-ui.md section 3, D133): every match by
 // week, each with its state, its time or its score and who won. One builder
 // for the public league page and the player's Kezdőlap. Pure (no I/O); the
 // loaders hand in what is stored. Names only.

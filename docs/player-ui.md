@@ -1,6 +1,6 @@
 # Player UI: requirements
 
-What the player-facing pages must do, compiled on 2026-11-07 from the spec, the rules, the decision log and Peter's review of the running round in the local seed (D127). The admin pages come later. The redesign that follows this document is D128.
+What the player-facing pages must do, compiled on 2026-11-07 from the spec, the rules, the decision log and Peter's review of the running round in the local seed (D127). The admin pages come later. The redesign that follows this document is D133.
 
 Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szabalyzat.md); [decisions.md](decisions.md) D67, D68, D74, D77, D80, D85, D103a, D106, D108, D109, D112, D121.
 

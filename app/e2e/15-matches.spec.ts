@@ -130,7 +130,7 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   await visit(player.page, `/matches/${second!.id}`);
   const offset = logOffset();
   // Late in the evening: an agreed time has no time window (spec 6.3). It is
-  // folded under the proposal form (D128).
+  // folded under the proposal form (D133).
   await player.page.getByText("Máshol már megbeszéltétek?").click();
   await player.page.getByLabel("Megbeszélt időpont").fill(slot(1, "23:00"));
   await player.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
@@ -187,7 +187,7 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   await visit(other.page, `/matches/${first!.id}`);
   await expect(status(other.page)).toContainText("Minta Padel Aréna, 2-es pálya");
 
-  // Days ahead: not late, back to scheduling for both. Cancelling is folded (D128).
+  // Days ahead: not late, back to scheduling for both. Cancelling is folded (D133).
   await main.getByText("Mégsem jó az időpont?").click();
   await main.getByRole("button", { name: "Lemondom a meccset" }).click();
   await expect(player.page.getByRole("alertdialog", { name: "Lemondod a meccset?" })).toBeVisible();

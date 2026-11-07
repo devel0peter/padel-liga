@@ -128,7 +128,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
   });
 });
 
-describe("buildLadder: the fixture list (D128)", () => {
+describe("buildLadder: the fixture list (D133)", () => {
   const slot = new Date("2026-11-10T17:30:00Z"); // Tue 18:30 Budapest
   const g = group(1, [
     played(1, 11, 12, 1, [
@@ -209,7 +209,7 @@ describe("buildLadder: the fixture list (D128)", () => {
   });
 });
 
-describe("buildLadder: up and down marks (spec 10, D128)", () => {
+describe("buildLadder: up and down marks (spec 10, D133)", () => {
   const ranked = (n: number) =>
     group(n, [
       played(n * 100, n * 10 + 1, n * 10 + 2, 1, [

@@ -7,7 +7,7 @@
 // is still open and counts.
 import { expect, test } from "@playwright/test";
 
-import { ORGANIZER, as, content, d1, visit } from "./support";
+import { ORGANIZER, OUTSIDER, as, content, d1, visit } from "./support";
 
 test("Helyettes: a player asks, the Szervező approves, the opponents see who plays", async ({ browser }) => {
   // An open match of a published group, no pair withdrawn, with its players.
@@ -27,7 +27,7 @@ test("Helyettes: a player asks, the Szervező approves, the opponents see who pl
   const asker = await as(browser, m!.asker as string);
   await visit(asker.page, `/matches/${m!.id}`);
   const main = content(asker.page);
-  // Folded until there is a request (D128).
+  // Folded until there is a request (D133).
   await main.getByText("Helyettes kell?").click();
   await main.getByRole("combobox", { name: "Ki nem tud játszani?" }).click();
   await asker.page.getByRole("option", { name: m!.partner as string }).click();
@@ -39,6 +39,8 @@ test("Helyettes: a player asks, the Szervező approves, the opponents see who pl
     expect(groupNames, `${n} plays in the group`).not.toContain(n);
     expect(n).not.toContain("@");
   }
+  // Only the league's players (D128): never the second league's player.
+  expect(names).not.toContain(OUTSIDER.name);
   const substitute = names[0]!;
   await options.first().click();
   await main.getByRole("button", { name: "Helyettest kérek" }).click();

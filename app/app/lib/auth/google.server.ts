@@ -5,7 +5,8 @@ import { redirect } from "react-router";
 
 import { db } from "~/db/client.server";
 import { oauthAccounts } from "~/db/schema";
-import { formSignupPairs } from "~/lib/signup-partners.server";
+import { leagueOfReturnTo } from "~/lib/league-members";
+import { joinFromRegisterButton } from "~/lib/league-members.server";
 
 import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.server";
 import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
@@ -106,8 +107,6 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
 
   logInfo("login", { method: "google", outcome: "ok", userId, created: decision.kind === "create" });
   await setProfileImage(userId, googlePicture(claims.picture));
-  // The pair from the interest signup, if the partner registered first (D27).
-  await formSignupPairs(userId);
 
   const headers = new Headers();
   headers.append("Set-Cookie", await createSession(userId));
@@ -118,5 +117,8 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
   } catch {
     // Malformed: safeReturnTo falls back to the default page.
   }
+  // Through a league's register button: that league, also before the
+  // first-login page is done (D128, #331).
+  await joinFromRegisterButton(userId, leagueOfReturnTo(safeReturnTo(back)));
   return redirect(safeReturnTo(back), { headers });
 }

@@ -7,11 +7,16 @@
 import { budapestDay, type Day } from "@padel-liga/rules";
 
 import { formatDay, formatDeadline, formatShortDay } from "./format";
-import type { Season } from "./seasons";
+import { waitingText, type Season } from "./seasons";
 
 // What the page needs of a season.
 export type LandingSeason = Pick<Season, "registrationOpensAt" | "registrationClosesAt"> & {
   phases: readonly { number: number; startsAt: Date; deadline: Date }[];
+  // A league's first season that starts at the minimum entries (D124): no
+  // registration deadline to show. While it waits (no phases yet), its
+  // entries and the league's minimum say how many pairs are still needed.
+  startsAtMinimum?: boolean;
+  entries?: { count: number; minimum: number };
   // Rounds whose groups are published (locked). A pair approved now joins
   // the first round that has not started and is not published (joinsPhase in
   // season-entries.ts), so the joining point skips them. Default: none.
@@ -24,11 +29,16 @@ export type Joining =
   // The next season's registration window.
   | { kind: "season"; opens: Day; closes: Day }
   // No next season is set up yet.
-  | { kind: "soon" };
+  | { kind: "soon" }
+  // A first season waiting for its minimum entries (D124): round 1, no date yet.
+  | { kind: "first" };
 
 export type LeagueLanding =
-  // Registration is open (the first round has not started).
-  | { kind: "registration"; closes: Day; firstRound: Day; joining: Joining }
+  // A first season waiting for its minimum entries (D124).
+  | { kind: "waiting"; entries: number; minimum: number; joining: Joining }
+  // Registration is open (the first round has not started). closes null: a
+  // first season started at the minimum, which has no deadline to show.
+  | { kind: "registration"; closes: Day | null; firstRound: Day; joining: Joining }
   // Registration is over, the first round has not started yet.
   | { kind: "starting"; firstRound: Day; joining: Joining }
   // A round is on.
@@ -39,20 +49,21 @@ export type LeagueLanding =
   | { kind: "between"; next: { opens: Day; closes: Day } | null; joining: Joining };
 
 type Round = { number: number; start: Day; end: Day; deadline: Date };
-type Prepared = { opens: Day; closes: Day; rounds: Round[]; end: Day; published: readonly number[] };
+type Prepared = { opens: Day; closes: Day; rounds: Round[]; end: Day; published: readonly number[]; minimum: boolean };
 
 function prepare(season: LandingSeason): Prepared | null {
   const rounds = season.phases
     .map((p) => ({ number: p.number, start: budapestDay(p.startsAt), end: budapestDay(p.deadline), deadline: p.deadline }))
     .sort((a, b) => a.number - b.number);
   const last = rounds[rounds.length - 1];
-  if (!last) return null;
+  if (!last || !season.registrationClosesAt) return null;
   return {
     opens: budapestDay(season.registrationOpensAt),
     closes: budapestDay(season.registrationClosesAt),
     rounds,
     end: last.end,
     published: season.publishedPhases ?? [],
+    minimum: !!season.startsAtMinimum,
   };
 }
 
@@ -64,6 +75,10 @@ function prepare(season: LandingSeason): Prepared | null {
  */
 export function leagueLanding(seasons: readonly LandingSeason[], now: Date): LeagueLanding {
   const today = budapestDay(now);
+  // A waiting first season is the league's only one (D124).
+  const waiting = seasons.find((s) => s.registrationClosesAt === null);
+  if (waiting && budapestDay(waiting.registrationOpensAt) <= today)
+    return { kind: "waiting", entries: waiting.entries?.count ?? 0, minimum: waiting.entries?.minimum ?? 0, joining: { kind: "first" } };
   const list = seasons
     .map(prepare)
     .filter((s): s is Prepared => s !== null)
@@ -86,7 +101,7 @@ export function leagueLanding(seasons: readonly LandingSeason[], now: Date): Lea
   }
   if (today < first.start) {
     return today <= current.closes
-      ? { kind: "registration", closes: current.closes, firstRound: first.start, joining: nextRound() }
+      ? { kind: "registration", closes: current.minimum ? null : current.closes, firstRound: first.start, joining: nextRound() }
       : { kind: "starting", firstRound: first.start, joining: nextRound() };
   }
   const on = current.rounds.find((r) => r.start <= today && today <= r.end);
@@ -108,6 +123,9 @@ export type LandingBlock = {
   // The league's public page (groups, tables, matches; #30), when the league
   // is known by its slug.
   ladderPath?: string;
+  // The register button: the league rides along, so the new account joins
+  // it (D128, #331).
+  registerPath?: string;
 };
 
 // The article before a round number: "az 1.", "a 2.", "az 5.".
@@ -128,12 +146,15 @@ export function joiningSentence(joining: Joining): string {
       return `A következő szezonra ${formatShortDay(joining.opens)} – ${formatShortDay(joining.closes)} között lehet nevezni.`;
     case "soon":
       return "A következő szezonra hamarosan nyílik a nevezés.";
+    case "first":
+      return "Nevezz most, és az 1. körtől játszotok.";
   }
 }
 
 // "Nevezek a 2. körre" when a round is open for new pairs; otherwise an
 // account is still worth making (anyone can sign up, #113).
 function cta(joining: Joining): Pick<LandingBlock, "cta" | "ctaNote"> {
+  if (joining.kind === "first") return { cta: "Nevezek az 1. körre", ctaNote: null };
   return joining.kind === "round"
     ? { cta: `Nevezek ${article(joining.number)} ${joining.number}. körre`, ctaNote: null }
     : { cta: "Regisztrálok", ctaNote: "Hozz létre fiókot, és nevezz, amint nyílik." };
@@ -146,13 +167,23 @@ export function landingBlock(state: LeagueLanding): LandingBlock {
 function stateBlock(state: LeagueLanding): Omit<LandingBlock, "cta" | "ctaNote"> {
   const joining = joiningSentence(state.joining);
   switch (state.kind) {
+    case "waiting":
+      return {
+        title: "Nyitva a nevezés",
+        facts: [["Indulás", waitingText(state.entries, state.minimum)]],
+        joining,
+        chip: `${state.entries} pár nevezett`,
+      };
     case "registration":
       return {
         title: "Nyitva a nevezés",
-        facts: [
-          ["Nevezés zárul", `${formatDay(state.closes)} 23:59`],
-          ["1. kör indul", formatDay(state.firstRound)],
-        ],
+        facts:
+          state.closes === null
+            ? [["Indul", formatDay(state.firstRound)]]
+            : [
+                ["Nevezés zárul", `${formatDay(state.closes)} 23:59`],
+                ["1. kör indul", formatDay(state.firstRound)],
+              ],
         joining,
         chip: "nevezés nyitva",
       };
@@ -213,7 +244,7 @@ export function landingByCity(
       city,
       {
         ...landingBlock(leagueLanding(seasons.filter((s) => s.leagueId === league.id), now)),
-        ...(league.slug ? { ladderPath: `/league/${league.slug}` } : {}),
+        ...(league.slug ? { ladderPath: `/league/${league.slug}`, registerPath: `/register?league=${league.slug}` } : {}),
       },
     ]),
   );

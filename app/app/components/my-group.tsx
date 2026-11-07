@@ -14,7 +14,7 @@ import { pairPath } from "~/lib/profiles";
 import { resultStatusView, resultTodo } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
-// Kezdőlap once the groups are out (#25, D128): the Teendők, the pair's
+// Kezdőlap once the groups are out (#25, D133): the Teendők, the pair's
 // matches as cards, and the group's table and fixture list. Mobile first:
 // nothing scrolls sideways at 390 px; wide screens put the two side by side.
 

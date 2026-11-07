@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { currentSeason, homeSeasons, parseSeason, previewPhases, registrationWindow, seasonActions, seasonEnd, type Season } from "./seasons";
+import {
+  currentSeason,
+  homeSeasons,
+  isWaiting,
+  movesFixedStart,
+  parseMinEntries,
+  parseSeason,
+  parseWaitingSeason,
+  previewPhases,
+  registrationWindow,
+  seasonActions,
+  seasonEnd,
+  waitingText,
+  type Season,
+} from "./seasons";
 
 const form = (fields: Record<string, string | string[]>) => {
   const f = new FormData();
@@ -180,8 +194,24 @@ const season = (id: number, leagueId: number, firstPhaseStart: string, registrat
     firstPhaseStart,
     breaks: [],
     phases: r.phases.map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline })),
+    startsAtMinimum: false,
+    startFixedAt: null,
   };
 };
+
+// A first season waiting for its minimum entries (D124): no dates, no phases.
+const waitingSeason = (id: number, leagueId: number): Season => ({
+  id,
+  leagueId,
+  name: `W${id}`,
+  registrationOpensAt: new Date("2026-11-01T00:00:00Z"),
+  registrationClosesAt: null,
+  firstPhaseStart: null,
+  breaks: [],
+  phases: [],
+  startsAtMinimum: true,
+  startFixedAt: null,
+});
 
 describe("seasonEnd and homeSeasons", () => {
   const first = season(1, 1, "2026-11-09"); // ends 14 Feb 2027
@@ -214,6 +244,13 @@ describe("seasonEnd and homeSeasons", () => {
   it("shows nothing when every season is over", () => {
     expect(homeSeasons([first], new Date("2028-01-01T00:00:00Z"))).toEqual([]);
   });
+
+  it("shows a first season waiting for its minimum entries (D124)", () => {
+    const waiting = waitingSeason(5, 3);
+    expect(isWaiting(waiting)).toBe(true);
+    expect(isWaiting(first)).toBe(false);
+    expect(homeSeasons([waiting, first], new Date("2026-11-20T12:00:00Z")).map((s) => s.id)).toEqual([1, 5]);
+  });
 });
 
 // The public table's season and the strikes on Párok (#294: strikes reset
@@ -227,8 +264,49 @@ describe("currentSeason", () => {
     expect(currentSeason([next, first], new Date("2027-02-20T12:00:00Z"))?.id).toBe(2);
   });
 
+  it("a league's waiting first season (D124) is its current one", () => {
+    expect(currentSeason([waitingSeason(5, 3)], new Date())?.id).toBe(5);
+  });
+
   it("the latest once every season is over, and none without seasons", () => {
     expect(currentSeason([next, first], new Date("2028-01-01T00:00:00Z"))?.id).toBe(2);
     expect(currentSeason([], new Date())).toBeUndefined();
+  });
+});
+
+describe("a first season that starts at the minimum entries (D124, #335)", () => {
+  it("its form takes only the name and the breaks", () => {
+    const r = parseWaitingSeason(form({ name: " Első  szezon ", breakStart: ["2026-12-21"], breakEnd: ["2027-01-03"] }));
+    expect(r).toEqual({ ok: true, data: { name: "Első szezon", breaks: [{ start: "2026-12-21", end: "2027-01-03" }] } });
+    expect(parseWaitingSeason(form({ name: "" }))).toEqual({ ok: false, errors: { name: "Add meg a szezon nevét." } });
+    const bad = parseWaitingSeason(form({ name: "X", breakStart: ["2027-01-03"], breakEnd: ["2026-12-21"] }));
+    expect(!bad.ok && Object.keys(bad.errors)).toEqual(["breaks"]);
+  });
+
+  it("the minimum is a whole number from 3 to 200", () => {
+    expect(parseMinEntries("12")).toEqual({ ok: true, value: 12 });
+    expect(parseMinEntries(" 3 ")).toEqual({ ok: true, value: 3 });
+    expect(parseMinEntries("200")).toEqual({ ok: true, value: 200 });
+    for (const bad of ["2", "201", "12.5", "", "tizenkettő", null]) expect(parseMinEntries(bad).ok, String(bad)).toBe(false);
+  });
+
+  it("the waiting text says how many pairs entered and how many are still needed", () => {
+    expect(waitingText(9, 12)).toBe("9 pár nevezett, még 3 kell, utána indul.");
+    expect(waitingText(0, 12)).toBe("0 pár nevezett, még 12 kell, utána indul.");
+    expect(waitingText(12, 12)).toBe("12 pár nevezett, hamarosan kiderül, mikor indul.");
+  });
+});
+
+describe("movesFixedStart (D124: a fixed start never moves)", () => {
+  const phases = (first: string) => previewPhases(first, [])!.map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline }));
+  const started = { startsAtMinimum: true, phases: phases("2026-11-23") };
+
+  it("refuses an edit that moves round 1 of a season started at the minimum", () => {
+    expect(movesFixedStart(started, phases("2026-11-30"))).toBe(true);
+    expect(movesFixedStart(started, phases("2026-11-23"))).toBe(false);
+  });
+
+  it("leaves a season with dates (Győr) editable as before", () => {
+    expect(movesFixedStart({ startsAtMinimum: false, phases: phases("2026-11-09") }, phases("2026-11-16"))).toBe(false);
   });
 });

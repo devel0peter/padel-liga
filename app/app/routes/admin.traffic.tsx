@@ -18,36 +18,31 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { refLabel } from "~/lib/clubs";
 import { listClubs } from "~/lib/clubs.server";
 import { formatDay, formatPercent } from "~/lib/format";
-import { buildFunnel, parsePeriod, type FunnelRow } from "~/lib/traffic";
+import { buildFunnel, parsePeriod } from "~/lib/traffic";
 import { currentPushStats, listPushDays, type PushStats } from "~/lib/push-stats.server";
-import { listLandings, listSignupStamps } from "~/lib/traffic.server";
+import { listLandings } from "~/lib/traffic.server";
 
 const CF_WEB_ANALYTICS = "https://dash.cloudflare.com/?to=/:account/web-analytics";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "traffic.view" });
   const period = parsePeriod(new URL(request.url).searchParams, new Date());
-  const [landings, signups, clubs, push, pushDays] = await Promise.all([
+  const [landings, clubs, push, pushDays] = await Promise.all([
     listLandings(period),
-    listSignupStamps(period),
     listClubs(),
     currentPushStats(),
     listPushDays(period),
   ]);
-  const funnel = buildFunnel(landings, signups, period);
+  const funnel = buildFunnel(landings, period);
   return {
     period,
     total: funnel.total,
     sources: funnel.sources.map((r) => ({ ...r, label: refLabel(r.ref, clubs) || "Forrás nélkül" })),
-    // Newest first, like the signups list.
+    // Newest first.
     days: funnel.days.reverse(),
     push,
     pushDays: pushDays.reverse(),
   };
-}
-
-function Rate({ row }: { row: Pick<FunnelRow, "conversion"> }) {
-  return <>{row.conversion === null ? "–" : formatPercent(row.conversion)}</>;
 }
 
 const num = "text-right tabular-nums";
@@ -91,11 +86,7 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
       </Form>
 
       <p className="text-lg">
-        <strong>{total.landings}</strong> látogatás · <strong>{total.signups}</strong> jelentkezés ·{" "}
-        <strong>
-          <Rate row={total} />
-        </strong>{" "}
-        konverzió
+        <strong>{total.landings}</strong> látogatás
       </p>
 
       <section className="grid gap-2">
@@ -105,14 +96,12 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
             <TableRow>
               <TableHead>Forrás</TableHead>
               <TableHead className={num}>Látogatás</TableHead>
-              <TableHead className={num}>Jelentkezés</TableHead>
-              <TableHead className={num}>Konverzió</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sources.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={2} className="text-muted-foreground">
                   Ebben az időszakban nincs adat.
                 </TableCell>
               </TableRow>
@@ -121,10 +110,6 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
               <TableRow key={r.ref ?? ""}>
                 <TableCell className={r.ref ? "" : "text-muted-foreground"}>{r.label}</TableCell>
                 <TableCell className={num}>{r.landings}</TableCell>
-                <TableCell className={num}>{r.signups}</TableCell>
-                <TableCell className={num}>
-                  <Rate row={r} />
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -132,10 +117,6 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
             <TableRow>
               <TableCell>Összesen</TableCell>
               <TableCell className={num}>{total.landings}</TableCell>
-              <TableCell className={num}>{total.signups}</TableCell>
-              <TableCell className={num}>
-                <Rate row={total} />
-              </TableCell>
             </TableRow>
           </TableFooter>
         </Table>
@@ -148,7 +129,6 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
             <TableRow>
               <TableHead>Nap</TableHead>
               <TableHead className={num}>Látogatás</TableHead>
-              <TableHead className={num}>Jelentkezés</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,7 +136,6 @@ export default function AdminTraffic({ loaderData }: Route.ComponentProps) {
               <TableRow key={d.day}>
                 <TableCell>{formatDay(d.day)}</TableCell>
                 <TableCell className={num}>{d.landings}</TableCell>
-                <TableCell className={num}>{d.signups}</TableCell>
               </TableRow>
             ))}
           </TableBody>

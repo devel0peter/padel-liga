@@ -1,6 +1,7 @@
 // A running phase 1 on top of the walkthrough seed (seed.ts), for trying the
-// match pages locally: every pair and paired solo signup has a finished
-// account, 11 approved pairs sit in 3 published groups (4, 4, 3), and today
+// match pages locally: the walkthrough's ten pairs-to-be and two of its
+// players without a partner (Varga Dóra, Kiss Miklós) have finished accounts
+// in the league (D128), 11 approved pairs sit in 3 published groups (4, 4, 3), and today
 // falls in week 2 of phase 1, with matches in every state (final, waiting for
 // confirmation, disputed, proposed, counter-proposed, agreed time, booked,
 // played without a result, open). Pure (no I/O): scripts/seed-season-local.ts
@@ -18,7 +19,7 @@ import {
   type Side,
 } from "@padel-liga/rules";
 
-import { LEAGUE, ORGANIZER, PAIR_SIGNUPS, SEASON_NAME, SOLO_SIGNUPS, seedSql } from "./seed";
+import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedSql } from "./seed";
 
 type Level = "kezdo" | "kozephalado" | "halado" | "versenyzo";
 type Person = { name: string; email: string };
@@ -70,11 +71,11 @@ export type SeasonPlan = {
   matches: SeedMatch[];
 };
 
-// 11 pairs, strongest first: the ten pair signups with the two paired solos
-// among the kozephalado pairs.
+// 11 pairs, strongest first: the ten pairs-to-be with Varga Dóra and Kiss
+// Miklós among the kozephalado pairs.
 export function seasonPairs(): SeasonPair[] {
-  const [v, k] = [SOLO_SIGNUPS[0]!, SOLO_SIGNUPS[1]!];
-  return [...PAIR_SIGNUPS.slice(0, 7), { a: v.who, b: k.who, level: v.level }, ...PAIR_SIGNUPS.slice(7)];
+  const [v, k] = [SOLO_PLAYERS[0]!, SOLO_PLAYERS[1]!];
+  return [...PAIR_PLAYERS.slice(0, 7), { a: v.who, b: k.who, level: v.level }, ...PAIR_PLAYERS.slice(7)];
 }
 
 export const SEASON_GROUPS = [
@@ -260,20 +261,25 @@ export function seasonStatements(now: Date): string[] {
   for (const p of phases)
     out.push(`insert into season_phases (season_id, number, starts_at, deadline) values (${SEASON}, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)})`);
 
-  // Finished accounts with a fake phone each, then the pairs, approved for phase 1.
+  // Finished accounts with a fake phone each, joined through the league's
+  // register button (D128), then the pairs, approved for phase 1.
   let phone = 1000001;
   pairs.forEach((p) =>
-    [p.a, p.b].forEach((who, j) =>
+    [p.a, p.b].forEach((who, j) => {
       out.push(
         `insert into users (id, email, name, level, sex, phone, consent_at, created_at) values (${q(seasonUserId(who))}, ${q(who.email)}, ` +
           `${q(who.name)}, ${q(p.level)}, ${q(j === 0 ? "female" : "male")}, ${q(`+3630${phone++}`)}, ${joined}, ${joined})`,
-      ),
-    ),
+      );
+      out.push(
+        `insert into league_members (league_id, user_id, source, joined_at) select id, ${q(seasonUserId(who))}, 'register', ${joined} ` +
+          `from leagues where slug = ${q(LEAGUE.slug)}`,
+      );
+    }),
   );
   pairs.forEach((p, i) => {
     out.push(
       `insert into pairs (league_id, player_a, player_b, source, created_at) select id, ${q(seasonUserId(p.a))}, ${q(seasonUserId(p.b))}, ` +
-        `'signup', ${joined} from leagues where slug = ${q(LEAGUE.slug)}`,
+        `'link', ${joined} from leagues where slug = ${q(LEAGUE.slug)}`,
     );
     out.push(
       `insert into season_entries (season_id, pair_id, status, decided_by, decided_at, joins_phase, created_at) values ` +

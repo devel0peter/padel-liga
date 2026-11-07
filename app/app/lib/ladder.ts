@@ -78,7 +78,7 @@ export type LadderGroup = {
   /** False before any final result: the order is only the seeding (D85). */
   ranked: boolean;
   rows: LadderRow[];
-  /** Every match of the group by week (D128); no database id leaves the server. */
+  /** Every match of the group by week (D133); no database id leaves the server. */
   weeks: FixtureWeek[];
   /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
   withdrawn: [string, string][];

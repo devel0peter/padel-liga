@@ -214,7 +214,7 @@ export type HomeGroup = {
   ranked: boolean;
   // "még 1 feljutás a divízió éléig, 3 kör van hátra" (spec 14).
   standing: string;
-  // The whole group's matches by week (D128); the pair's own link to their page.
+  // The whole group's matches by week (D133); the pair's own link to their page.
   fixtures: FixtureWeek[];
   // The pairs withdrawn mid-phase (#34), by name, shown below the table.
   withdrawn: string[];

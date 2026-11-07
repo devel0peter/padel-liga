@@ -18,6 +18,11 @@ test("the Szervező previews the reminders, switches them on, and the scheduled 
       `('emlek-cili', '${CILI.email}', '${CILI.name}', 'kezdo', '+36305551111', unixepoch() - 3 * 86400, unixepoch() - 3 * 86400), ` +
       `('emlek-bela', '${UNFINISHED}', '', null, null, null, unixepoch() - 2 * 86400)`,
   );
+  // Both came in through Mintaváros's register button (D128): its players.
+  d1Insert(
+    `insert into league_members (league_id, user_id, source) select id, 'emlek-cili', 'register' from leagues where slug = 'minta' ` +
+      `union all select id, 'emlek-bela', 'register' from leagues where slug = 'minta'`,
+  );
 
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta");

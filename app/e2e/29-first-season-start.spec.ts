@@ -112,8 +112,13 @@ test("a first season opens without dates and starts by itself at the minimum ent
   await expect(content(anon)).toContainText(/Az 1\. kör .+ indul\./);
   await anon.close();
 
-  // The minimum is locked once the season has its start.
+  // Once the season has its start the minimum means nothing: not shown.
   await visit(page, `/admin/leagues/${LEAGUE.slug}`);
-  await expect(content(page)).toContainText("Csak addig módosítható, amíg a liga első szezonja a nevezésekre vár.");
+  await expect(content(page).getByRole("heading", { name: "Minimum nevezés" })).toHaveCount(0);
+  // The fixed first Monday can't be moved by editing the season.
+  await visit(page, `/admin/leagues/${LEAGUE.slug}/seasons`);
+  await content(page).getByRole("row").filter({ hasText: SEASON }).getByRole("link", { name: "Szerkesztés" }).click();
+  await expect(content(page).locator("#firstPhaseStart")).toHaveAttribute("readonly", "");
+  await expect(content(page)).toContainText("A minimum elérésekor dőlt el, és a játékosok megkapták: nem módosítható.");
   await context.close();
 });

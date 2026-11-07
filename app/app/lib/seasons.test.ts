@@ -4,6 +4,7 @@ import {
   currentSeason,
   homeSeasons,
   isWaiting,
+  movesFixedStart,
   parseMinEntries,
   parseSeason,
   parseWaitingSeason,
@@ -293,5 +294,19 @@ describe("a first season that starts at the minimum entries (D124, #335)", () =>
     expect(waitingText(9, 12)).toBe("9 pár nevezett, még 3 kell, utána indul.");
     expect(waitingText(0, 12)).toBe("0 pár nevezett, még 12 kell, utána indul.");
     expect(waitingText(12, 12)).toBe("12 pár nevezett, hamarosan kiderül, mikor indul.");
+  });
+});
+
+describe("movesFixedStart (D124: a fixed start never moves)", () => {
+  const phases = (first: string) => previewPhases(first, [])!.map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline }));
+  const started = { startsAtMinimum: true, phases: phases("2026-11-23") };
+
+  it("refuses an edit that moves round 1 of a season started at the minimum", () => {
+    expect(movesFixedStart(started, phases("2026-11-30"))).toBe(true);
+    expect(movesFixedStart(started, phases("2026-11-23"))).toBe(false);
+  });
+
+  it("leaves a season with dates (Győr) editable as before", () => {
+    expect(movesFixedStart({ startsAtMinimum: false, phases: phases("2026-11-09") }, phases("2026-11-16"))).toBe(false);
   });
 });

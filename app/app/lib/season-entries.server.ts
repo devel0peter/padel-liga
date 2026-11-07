@@ -248,7 +248,14 @@ async function enter(
   if (started) await announceSeasonStart(season.id, start!.startsAt);
   if (!row) return null;
   if (phase === null) return { id: row.id, joins: null, started };
-  const startsAt = started ? start!.startsAt : waiting ? null : season.phases.find((p) => p.number === phase)!.startsAt;
+  const startsAt = started
+    ? start!.startsAt
+    : waiting
+      ? // Another entry may have fixed the start between our read and our
+        // batch, and announced it before this entry counted: then this
+        // pair's own notice carries the date (D124).
+        ((await getSeason(season.id))?.phases.find((p) => p.number === phase)?.startsAt ?? null)
+      : season.phases.find((p) => p.number === phase)!.startsAt;
   return { id: row.id, joins: { phase, startsAt }, started };
 }
 

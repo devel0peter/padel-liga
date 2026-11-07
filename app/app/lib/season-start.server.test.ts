@@ -156,6 +156,21 @@ describe("a first season waiting for its minimum entries (D124, #335)", () => {
     expect(all("select count(*) n from notifications where kind = 'season_start'")[0].n).toBe(6);
   });
 
+  it("an entry that read the season as waiting just before another fixed it still gets the date", async () => {
+    await E.applyToSeason(user("p1a"), 1, MONDAY);
+    await E.applyToSeason(user("p2a"), 1, MONDAY);
+    // Both read the season as waiting; the first batch fixes the start.
+    const results = await Promise.all([E.applyToSeason(user("p3a"), 1, MONDAY), E.applyToSeason(user("p4a"), 1, MONDAY)]);
+    const start = new Date("2026-11-22T23:00:00Z");
+    for (const r of results) expect(r).toEqual({ ok: true, joins: { phase: 1, startsAt: start } });
+    // Every player got the date: by the start notice, or (entered after it) in their own entry notice.
+    for (const n of [1, 2, 3, 4])
+      for (const side of ["a", "b"]) {
+        const told = h.mails.filter((m) => m.toEmail === `p${n}${side}@x.hu` && (m.kind === "season_start" || m.joins?.startsAt));
+        expect(told.length, `p${n}${side}`).toBeGreaterThan(0);
+      }
+  });
+
   it("the minimum: changed while waiting (audited), a minimum already reached starts it, locked afterwards", async () => {
     await E.applyToSeason(user("p1a"), 1, MONDAY);
     await E.applyToSeason(user("p2a"), 1, MONDAY);

@@ -48,6 +48,23 @@ export function isWaiting(season: Partial<Pick<Season, "firstPhaseStart">>): boo
   return season.firstPhaseStart === null;
 }
 
+// A first season started at the minimum entries (D124): every entered player
+// was sent its round 1 day, so editing it as an ordinary season can't move
+// that day (the name, the registration window, later phases' breaks can
+// still change).
+export const FIXED_START_LOCKED =
+  "Ennek a szezonnak a kezdését a minimum elérése döntötte el, és a játékosok már megkapták: az 1. kör kezdete nem módosítható.";
+
+export function movesFixedStart(
+  stored: Pick<Season, "startsAtMinimum" | "phases">,
+  phases: readonly { number: number; startsAt: Date }[],
+): boolean {
+  if (!stored.startsAtMinimum) return false;
+  const was = stored.phases.find((p) => p.number === 1)?.startsAt;
+  const next = phases.find((p) => p.number === 1)?.startsAt;
+  return !!was && next?.getTime() !== was.getTime();
+}
+
 export const WAITING_NO_GROUPS =
   "Ez a szezon még a nevezésekre vár: a csoportokat akkor készítheted el, ha összegyűlt a minimum, és kiderült a kezdés napja.";
 

@@ -26,8 +26,10 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { formatDate, formatShortDate } from "~/lib/format";
 import { getLeague, minEntriesByLeague } from "~/lib/leagues.server";
 import {
+  FIXED_START_LOCKED,
   isWaiting,
   MAX_BREAKS,
+  movesFixedStart,
   MAX_NAME,
   parseSeason,
   parseWaitingSeason,
@@ -125,6 +127,8 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
 
   const result = parseSeason(form);
   if (!result.ok) return { errors: result.errors };
+  // A start fixed at the minimum entries was sent to every player (D124).
+  if (stored && movesFixedStart(stored, result.phases)) return { errors: { firstPhaseStart: FIXED_START_LOCKED } };
   if (id) await updateSeason(id, result.data, result.phases, actor.id);
   else {
     // While the first season waits, it is the league's only one.
@@ -223,10 +227,22 @@ function SeasonForm({
             <Field
               name="firstPhaseStart"
               label="Első kör hétfője"
-              hint="Egy kör 3 hét, a határidő az utolsó vasárnap 23:59."
+              hint={
+                season?.startsAtMinimum
+                  ? "A minimum elérésekor dőlt el, és a játékosok megkapták: nem módosítható."
+                  : "Egy kör 3 hét, a határidő az utolsó vasárnap 23:59."
+              }
               error={errors.firstPhaseStart}
             >
-              <Input id="firstPhaseStart" name="firstPhaseStart" type="date" value={first} onChange={(e) => setFirst(e.target.value)} required />
+              <Input
+                id="firstPhaseStart"
+                name="firstPhaseStart"
+                type="date"
+                value={first}
+                onChange={(e) => setFirst(e.target.value)}
+                readOnly={season?.startsAtMinimum}
+                required
+              />
             </Field>
           </>
         )}

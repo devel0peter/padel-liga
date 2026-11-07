@@ -2,7 +2,10 @@ import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-// Phase 0 interest list from the landing page. Personal data: see spec section 17.
+// Phase 0 interest list from the landing page, retired (D123). Nothing writes
+// or reads it; the cron deletes every row once (#334, D132,
+// lib/interest-list-purge.server.ts). The table stays so the release is
+// additive; a later cleanup can drop it.
 export const interestSignups = sqliteTable("interest_signups", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   // City slug (tenant), see app/lib/cities.ts; "other" with cityOther set
@@ -696,8 +699,8 @@ export const seasonEntries = sqliteTable(
 
 // The automatic reminders already sent (#155, reminders.ts): one row per
 // reminder, so none goes out twice. `key` is "A:<email>", "B:<user id>",
-// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key holds
-// the address; deleting a signup deletes it (outbox.server.ts deleteMessagesTo).
+// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key held
+// a list address; the interest list's deletion removed them (#334).
 export const stuckReminders = sqliteTable(
   "stuck_reminders",
   {

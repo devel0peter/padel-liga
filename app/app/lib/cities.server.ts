@@ -49,8 +49,9 @@ export async function cityUsage(): Promise<Map<string, CityUsage>> {
   return out;
 }
 
-// Only a city nothing refers to: clubs and leagues keep a city slug. (The
-// interest list's signups don't count since #333.)
+// Only a city nothing refers to: clubs and leagues keep a city slug. The
+// interest list's signups don't count (#333) and the list is deleted (#334),
+// so none is left pointing at a deleted city.
 export async function deleteCity(slug: string, actorId: string): Promise<boolean> {
   const usage = (await cityUsage()).get(slug);
   if (usage && usage.clubs + usage.leagues > 0) return false;

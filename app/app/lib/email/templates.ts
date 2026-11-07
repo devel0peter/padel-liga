@@ -1,14 +1,9 @@
 // Email content. Pure (no I/O) so it can be unit tested and previewed in the
 // browser. Every email has an HTML and a plain-text version.
 
-import type { City } from "../cities";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "../format";
 import { withArticle } from "../groups";
-import type { InterestSignup } from "../interest";
-import { cityLabel, levelLabel } from "../signups-admin";
-import { SHARE_REFS, shareUrl } from "../share";
 import { SITE_NAME, SITE_URL } from "../site";
-
 
 export type Email = { subject: string; html: string; text: string };
 
@@ -94,49 +89,6 @@ function buildPlain(subject: string, paragraphs: string[], links: string[], foot
 }
 
 const SIGNATURE = `Péter\n${SITE_NAME}`;
-
-type Cities = readonly Pick<City, "slug" | "name">[];
-
-export function signupConfirmation(s: InterestSignup, cities: Cities = []): Email {
-  const otherCity = s.cityOther != null;
-  // The other-city form asks for no partner (contact only).
-  const lines = [
-    `Város: ${cityLabel(s, cities)}`,
-    ...(otherCity ? [] : [s.mode === "pair" && s.name2 ? `Párod: ${s.name2}` : "Egyedül jelentkeztél, párt keresel"]),
-    `Szint: ${levelLabel(s.level)}`,
-  ];
-  const next = otherCity
-    ? s.wantsToOrganize
-      ? `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Azt írtad, szívesen szerveznél: hamarosan írunk.`
-      : `Ott, ahol játszanál (${s.cityOther}), még nincs liga. Ha lesz szervező, szólunk.`
-    : s.mode === "solo"
-      ? "Segítünk párt találni, és írunk az indulásról."
-      : "Írunk az indulásról és a következő lépésekről.";
-  const share = otherCity
-    ? `Minél többen jelentkeztek, annál hamarabb indulhat nálatok is. Küldd el a helyi padeleseknek: ${shareUrl(SHARE_REFS.email)}`
-    : s.mode === "solo"
-      ? `Minél többen jelentkeznek, annál könnyebb hozzád illő párt találni. Ha ismersz más padeleseket, küldd el nekik: ${shareUrl(SHARE_REFS.email)}`
-      : `Ismersz még valakit, aki szívesen játszana? Küldd el neki: ${shareUrl(SHARE_REFS.email)}`;
-
-  return build(
-    `Megkaptuk a jelentkezésed – ${SITE_NAME}`,
-    [
-      `Szia ${s.name1}!`,
-      `Köszi, megkaptuk a jelentkezésed.`,
-      lines.join("\n"),
-      next,
-      share,
-      `Ha valamit rosszul adtál meg, vagy meggondoltad magad, csak válaszolj erre a levélre.`,
-      SIGNATURE,
-    ].join("\n\n"),
-    footer(`Azért kaptad ezt a levelet, mert jelentkeztél a ${SITE_URL.replace("https://", "")} oldalon.`),
-  );
-}
-
-// The partner notice's subject (the notice itself went with #333, D129): it
-// named the signer, and subjects stay in the outbox log, so an account
-// deletion (#152) still finds the old rows by it.
-export const partnerNoticeSubject = (name1: string) => `${name1} jelentkeztetett titeket a ${SITE_NAME}ra`;
 
 // An organizer put two registered players in a pair (Párkeresők, Párok or
 // "Partner cseréje", #260): each gets the partner's name, address and phone

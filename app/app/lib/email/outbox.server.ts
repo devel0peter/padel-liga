@@ -12,7 +12,6 @@ import {
   notificationOptOuts,
   users,
 } from "~/db/schema";
-import type { InterestSignup } from "~/lib/interest";
 import { channelKey, followsEmailSwitch } from "~/lib/notifications";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
@@ -23,7 +22,6 @@ import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.
 import { SITE_URL } from "~/lib/site";
 import { CODE_TTL_MS } from "~/lib/auth/rules";
 import { isAnonymizedEmail } from "~/lib/account-deletion";
-import { listCities } from "~/lib/cities.server";
 import { logError, logInfo, logWarn } from "~/lib/log";
 
 import {
@@ -38,7 +36,6 @@ import {
   pairCreated,
   seasonEntered,
   seasonStart,
-  signupConfirmation,
   strikeWarning,
   stuckReminder,
   type Email,
@@ -153,31 +150,6 @@ async function isSuppressed(email: string): Promise<boolean> {
 
 export async function suppress(email: string, reason: "unsubscribed" | "bounced" | "complained") {
   await db.insert(emailSuppressions).values({ email: email.toLowerCase(), reason }).onConflictDoNothing();
-}
-
-// At most one signup confirmation per address per day, so the signup form
-// can't be used to flood someone's inbox.
-const CONFIRMATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-// Signup confirmation (the landing form, #332). The partner notice went with
-// the interest list's flows (#333, D129): no email to a signed-up partner.
-export async function queueSignupEmails(signup: InterestSignup, now = new Date()): Promise<number[]> {
-  const cities = await listCities();
-  const [confirmed] = await db
-    .select({ n: count() })
-    .from(emailMessages)
-    .where(
-      and(
-        eq(emailMessages.kind, "signup_confirmation"),
-        eq(emailMessages.toEmail, signup.email1),
-        gt(emailMessages.createdAt, new Date(now.getTime() - CONFIRMATION_INTERVAL_MS)),
-      ),
-    );
-  const messages: NewMessage[] =
-    confirmed.n === 0
-      ? [{ kind: "signup_confirmation", toEmail: signup.email1, ...signupConfirmation(signup, cities) }]
-      : [];
-  return enqueue(messages);
 }
 
 // An organizer put two registered players in a pair (#260): one email each,
@@ -422,7 +394,7 @@ export async function sendTestBroadcast(draft: { subject: string; body: string }
 type Claimed = typeof emailMessages.$inferSelect;
 
 // The send order: login codes, other transactional emails, then bulk mail
-// (broadcasts and registration invites). Each group has its own budget
+// (broadcasts and the stuck reminders). Each group has its own budget
 // (budget.ts).
 const GROUPS = ["login", "transactional", "broadcast"] as const;
 type Group = (typeof GROUPS)[number];
@@ -531,7 +503,8 @@ export async function sentLast24h(now = Date.now()): Promise<number> {
 }
 
 // Sends pending emails within the daily budget: login codes first, then
-// signup emails, then broadcasts. With `ids`, only those messages (used right after a signup).
+// the other transactional emails, then bulk mail. With `ids`, only those
+// messages (used right after the request that queued them).
 // `at`: the cron run's scheduled time (#188); the time of the call otherwise.
 // `run`: the cron run's limits (#183); `left` says how many emails wait when
 // the run stopped early because of them.

@@ -113,7 +113,7 @@ export function isEnabled(disabled: ReadonlySet<string>, kind: StoredKind): bool
 export const CHANNELS = {
   email: {
     label: "E-mail",
-    description: "Levélben is megkapod az értesítéseket. A belépési kódot és a jelentkezésed visszaigazolását mindig elküldjük.",
+    description: "Levélben is megkapod az értesítéseket. A belépési kódot mindig elküldjük.",
   },
   push: {
     label: "Push értesítés",
@@ -134,12 +134,11 @@ export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel):
   return !disabled.has(channelKey(channel));
 }
 
-// Emails that go out whatever the email switch says: only login codes and
-// signup confirmations (#115; Peter, 2026-10-29). Every other kind, a new one
-// too, broadcasts and the signup-list emails included, is skipped for an
-// address whose account switched email off. Addresses without an account
-// can't switch, so they get everything as before.
-export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code", "signup_confirmation"];
+// Emails that go out whatever the email switch says: only login codes
+// (#115; Peter, 2026-10-29; the signup confirmation went with the interest
+// list, #334). Every other kind, a new one too, broadcasts included, is
+// skipped for an address whose account switched email off.
+export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code"];
 
 export function followsEmailSwitch(kind: MessageKind): boolean {
   return !EMAIL_ALWAYS.includes(kind);

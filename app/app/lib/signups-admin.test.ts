@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDateTime } from "./format";
-import { cityLabel, levelLabel } from "./signups-admin";
-
-const GYOR = [{ slug: "gyor", name: "Győr" }];
-
-describe("cityLabel", () => {
-  it("names supported and other cities", () => {
-    expect(cityLabel({ city: "gyor", cityOther: null }, GYOR)).toBe("Győr");
-    expect(cityLabel({ city: "other", cityOther: "Szeged" }, GYOR)).toBe("Szeged (más város)");
-    expect(cityLabel({ city: "other", cityOther: null }, GYOR)).toBe("Más város");
-  });
-});
+import { levelLabel } from "./signups-admin";
 
 describe("levelLabel", () => {
   it("is the level's name without its description; an unknown one as it is", () => {

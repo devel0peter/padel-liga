@@ -43,6 +43,8 @@ const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
 const SUBSTITUTES = await import("~/lib/substitutes.server");
 const NOSHOWS = await import("~/lib/no-shows.server");
+const PURGE = await import("~/lib/interest-list-purge.server");
+const { RunBudget } = await import("~/lib/run-usage");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs.
@@ -170,6 +172,15 @@ const STEPS: Step[] = [
   // One match resolved after the deadline (#11): nobody scheduled it, so both
   // pairs' players get a strike (#294), which the organizer then cancels.
   { action: "match.deadline", actor: null, run: () => DEADLINE.resolveDeadlines(AFTER_PHASE, undefined, 1).then((r) => expect(r.resolved).toBe(1)) },
+  {
+    action: "interest_list.delete",
+    actor: null,
+    run: async () => {
+      h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('gyor', 'solo', 'Régi', 'regi@x.hu', 'kezdo', 1)`);
+      await PURGE.purgeInterestList(AFTER_PHASE, { run: new RunBudget(), keep: { queries: 0, calls: 0 } });
+      expect(one("select count(*) as n from interest_signups").n).toBe(0);
+    },
+  },
   {
     action: "strike.cancel",
     actor: ORG,

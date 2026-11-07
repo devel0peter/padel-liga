@@ -27,10 +27,6 @@ export function isAnonymizedEmail(email: string): boolean {
   return /@deleted\.invalid$/i.test(email.trim());
 }
 
-// The logged subject of a partner notice the deleted person's signup sent,
-// in place of the one that names them.
-export const PARTNER_NOTICE_SUBJECT_REMOVED = "Párként jelentkeztettek (a jelentkező törölte az adatait)";
-
 // The mail kinds whose text names other people (a partner, opponents, the
 // signer): an unsent one with the deleted person's name in it is deleted.
 // Other kinds name only the recipient, whose own name may be the same.
@@ -115,7 +111,7 @@ export function deletionPlan(c: DeletionCheck, by: DeletionBy = "admin"): Deleti
 // What the confirmation dialog says will happen.
 export const DELETION_EFFECTS: Record<DeletionMode, string> = {
   remove:
-    "Nincs lejátszott múltja, ezért minden adata törlődik: a fiók, a párjai, a nevezései, a párkeresése, az értesítései, a jelentkezése és a címéhez tartozó minden tárolt adat, a leiratkozás vagy visszapattanás nyoma is. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. Ha volt párja, ő pár nélkül marad. Senki nem kap róla e-mailt.",
+    "Nincs lejátszott múltja, ezért minden adata törlődik: a fiók, a párjai, a nevezései, a párkeresése, az értesítései és a címéhez tartozó minden tárolt adat, a leiratkozás vagy visszapattanás nyoma is. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. Ha volt párja, ő pár nélkül marad. Senki nem kap róla e-mailt.",
   anonymize: `Volt már kihirdetett csoportban, ezért a fiók névtelen lesz: a neve „${DELETED_NAME}” lesz, az e-mail-címe, a telefonszáma, a belépései, az eszközei és a címéhez tartozó minden tárolt adat (a leiratkozás vagy visszapattanás nyoma is) törlődik, a régi eredményekben csak a névtelen neve marad. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. A csoportok és az eredmények nem változnak. Az aktív párja felbomlik. Senki nem kap róla e-mailt.`,
 };
 
@@ -124,7 +120,7 @@ export const DELETED = { remove: "A fiók törölve.", anonymize: "A fiók névt
 // What the player's own confirmation says (#38), in their words.
 export const OWN_DELETION_EFFECTS: Record<DeletionMode, string> = {
   remove:
-    "Még nem szerepeltél a ligában, ezért minden adatod törlődik: a fiókod, a párosaid, a nevezéseid, a párkeresésed, az értesítéseid és a jelentkezésed. Ha van párod, ő pár nélkül marad.",
+    "Még nem szerepeltél a ligában, ezért minden adatod törlődik: a fiókod, a párosaid, a nevezéseid, a párkeresésed és az értesítéseid. Ha van párod, ő pár nélkül marad.",
   anonymize: `Már szerepeltél a ligában, ezért a fiókod névtelen lesz: a neved helyén „${DELETED_NAME}” áll, az e-mail-címed, a telefonszámod és a belépéseid törlődnek. Az eredmények és a tabellák nem változnak. Ha van párod, a párosotok felbomlik.`,
 };
 

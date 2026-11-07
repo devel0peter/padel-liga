@@ -142,9 +142,8 @@ describe("channels (#115)", () => {
     expect(isEnabled(new Set([channelKey("email"), channelKey("push")]), "result_disputed")).toBe(true);
   });
 
-  it("only login codes and signup confirmations ignore the switch (Peter, 2026-10-29)", () => {
+  it("only login codes ignore the switch (Peter, 2026-10-29; signup confirmations went with the list, #334)", () => {
     expect(followsEmailSwitch("login_code")).toBe(false);
-    expect(followsEmailSwitch("signup_confirmation")).toBe(false);
     for (const kind of [
       "partner_notice",
       "pair_intro",

@@ -23,7 +23,7 @@ test("7a. a player switches email notifications off on the profile", async ({ br
   // Both on by default.
   await expect(emailSwitch(page)).toBeChecked();
   await expect(page.getByRole("switch", { name: "Push értesítés" })).toBeChecked();
-  await expect(section).toContainText("A belépési kódot és a jelentkezésed visszaigazolását mindig elküldjük.");
+  await expect(section).toContainText("A belépési kódot mindig elküldjük.");
   await expect(section).toContainText("iPhone-on iOS 16.4 vagy újabb kell");
   await flipEmail(page);
   await expect(emailSwitch(page)).not.toBeChecked();

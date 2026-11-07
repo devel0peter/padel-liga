@@ -176,9 +176,8 @@ function DeleteClub({ club }: { club: Club }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Törlöd a klubot?</AlertDialogTitle>
           <AlertDialogDescription>
-            {club.name} lekerül a listáról. A jelentkezések
-            megmaradnak, ahol ez a klub szerepel, ott „{club.slug}” lesz. Ha csak nem akarod
-            többé felkínálni, inkább inaktiváld.
+            {club.name} lekerül a listáról. Ha csak nem akarod többé
+            felkínálni, inkább inaktiváld.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { InterestSignup } from "../interest";
 import {
   broadcastEmail,
   groupsPublished,
@@ -14,26 +13,8 @@ import {
   pairCreated,
   seasonEntered,
   seasonStart,
-  signupConfirmation,
   textToHtml,
 } from "./templates";
-
-const GYOR = [{ slug: "gyor", name: "Győr" }];
-
-const pair: InterestSignup = {
-  city: "gyor",
-  cityOther: null,
-  mode: "pair",
-  name1: "Nagy Anna",
-  email1: "anna@example.com",
-  name2: "Kovács Béla",
-  email2: "bela@example.com",
-  level: "kezdo",
-  note: null,
-  ref: null,
-  homeClub: null,
-  wantsToOrganize: false,
-};
 
 describe("textToHtml", () => {
   it("splits paragraphs, keeps line breaks and escapes HTML", () => {
@@ -50,51 +31,6 @@ describe("textToHtml", () => {
 
   it("does not turn an escaped javascript: text into a link", () => {
     expect(textToHtml('javascript:alert("x")')).not.toContain("<a");
-  });
-});
-
-describe("signupConfirmation", () => {
-  it("greets the signer and summarises the signup", () => {
-    const e = signupConfirmation(pair, GYOR);
-    expect(e.subject).toBe("Megkaptuk a jelentkezésed – Padelpárbaj");
-    expect(e.text).toContain("Szia Nagy Anna!");
-    expect(e.text).toContain("Párod: Kovács Béla");
-    expect(e.text).toContain("Szint: Kezdő");
-    expect(e.text).toContain("Város: Győr");
-    expect(e.html).toContain("Szia Nagy Anna!");
-    expect(e.text).not.toContain("Leiratkozás");
-  });
-
-  it("tells solo players we help find a partner", () => {
-    const e = signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null });
-    expect(e.text).toContain("Egyedül jelentkeztél");
-    expect(e.text).toContain("Segítünk párt találni");
-  });
-
-  it("says there is no league yet in another city", () => {
-    const e = signupConfirmation({ ...pair, city: "other", cityOther: "Pécs" });
-    expect(e.text).toContain("(Pécs), még nincs liga");
-  });
-
-  it("escapes names in the HTML", () => {
-    expect(signupConfirmation({ ...pair, name1: "<script>" }).html).not.toContain("<script>");
-  });
-
-  it("never says the start waits for enough pairs (#83)", () => {
-    const solo = { ...pair, mode: "solo", name2: null, email2: null } as const;
-    const other = { ...pair, city: "other", cityOther: "Pécs" };
-    for (const s of [pair, solo, other]) {
-      const e = signupConfirmation(s, GYOR);
-      expect(e.text).not.toMatch(/elég pár|összegyűl/);
-      expect(e.html).not.toMatch(/elég pár|összegyűl/);
-    }
-    expect(signupConfirmation(pair, GYOR).text).toContain("Írunk az indulásról és a következő lépésekről.");
-    expect(signupConfirmation(solo, GYOR).text).toContain("Segítünk párt találni, és írunk az indulásról.");
-    expect(signupConfirmation(other, GYOR).text).toContain("Ha lesz szervező, szólunk.");
-    expect(signupConfirmation(other, GYOR).text).not.toContain("párt keresel");
-    expect(signupConfirmation({ ...other, wantsToOrganize: true }, GYOR).text).toContain(
-      "Azt írtad, szívesen szerveznél: hamarosan írunk.",
-    );
   });
 });
 
@@ -132,19 +68,6 @@ describe("loginCode", () => {
   });
 });
 
-describe("signupConfirmation share link", () => {
-  it("asks to pass the page on, with the email's own source", () => {
-    expect(signupConfirmation(pair, GYOR).text).toContain("Küldd el neki: https://padelparbaj.hu/?ref=megosztas-email");
-    expect(signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null }, GYOR).text).toContain(
-      "könnyebb hozzád illő párt találni",
-    );
-    expect(signupConfirmation({ ...pair, mode: "solo", name2: null, email2: null }, GYOR).text).not.toContain(
-      "játszana veled",
-    );
-    expect(signupConfirmation({ ...pair, city: "other", cityOther: "Pécs" }).text).toContain("a helyi padeleseknek");
-  });
-});
-
 describe("every email we write", () => {
   const decision = {
     to: "Nagy Anna",
@@ -169,7 +92,6 @@ describe("every email we write", () => {
       loginCode("123456", 10),
       seasonEntered(decision),
       groupsPublished(groups),
-      signupConfirmation(pair, GYOR),
     ];
     for (const e of all) expect(e.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");
   });

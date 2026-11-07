@@ -47,6 +47,12 @@ describe("Melyik ligában játszol? (#331)", () => {
     expect(joinableLeagues(leagues, seasons, day("2026-11-07T12:00:00Z")).map((l) => l.id)).toEqual([1, 2]);
   });
 
+  it("offers a league whose only season is a first season waiting for its minimum entries (D124), once it has opened", () => {
+    const waiting = { leagueId: 3, registrationOpensAt: day("2026-11-05T00:00:00Z"), phases: [], firstPhaseStart: null };
+    expect(joinableLeagues(leagues, [waiting], day("2026-11-07T12:00:00Z")).map((l) => l.id)).toEqual([3]);
+    expect(joinableLeagues(leagues, [waiting], day("2026-11-04T12:00:00Z"))).toEqual([]);
+  });
+
   it("with one such league, that one; with none, nothing", () => {
     expect(joinableLeagues(leagues, seasons.slice(0, 1), day("2026-11-07T12:00:00Z")).map((l) => l.id)).toEqual([1]);
     expect(joinableLeagues(leagues, [], day("2026-11-07T12:00:00Z"))).toEqual([]);

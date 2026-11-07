@@ -4,7 +4,7 @@
 // league in the address, and which leagues the Kezdőlap card offers. The D1
 // side is league-members.server.ts.
 
-import { seasonEnd, type Season } from "./seasons";
+import { isWaiting, seasonEnd, type Season } from "./seasons";
 
 // The query parameter the landing page's register button carries
 // (`/register?league=<slug>`), kept through login, Google and the
@@ -51,17 +51,20 @@ export type JoinableLeague = { id: number; city: string; cityName: string; name:
 
 // "Melyik ligában játszol?": the leagues (of listed cities, as given) with a
 // season open for entries or running: registration opened and the last phase
-// not over. By city name, then league name.
+// not over, or a first season waiting for its minimum entries (D124: open
+// for entries, no phases yet). By city name, then league name.
 export function joinableLeagues(
   leagues: readonly JoinableLeague[],
-  seasons: readonly Pick<Season, "leagueId" | "registrationOpensAt" | "phases">[],
+  seasons: readonly (Pick<Season, "leagueId" | "registrationOpensAt" | "phases"> & Partial<Pick<Season, "firstPhaseStart">>)[],
   now: Date,
 ): JoinableLeague[] {
   const live = new Set(
     seasons
       .filter((s) => {
+        if (s.registrationOpensAt > now) return false;
+        if (isWaiting(s)) return true;
         const end = seasonEnd(s);
-        return s.registrationOpensAt <= now && end !== null && end >= now;
+        return end !== null && end >= now;
       })
       .map((s) => s.leagueId),
   );

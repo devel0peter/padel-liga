@@ -1,11 +1,12 @@
 import type { Phase } from "@padel-liga/rules";
-import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
+import { rowSelect } from "~/db/insert-select";
 import { groups, seasonEntries, seasonPhases, seasons } from "~/db/schema";
 
-import { auditEntry, auditWhen } from "./audit.server";
-import { registrationWindow, type Season, type SeasonInput } from "./seasons";
+import { auditEntry, auditIfChanged, auditWhen } from "./audit.server";
+import { registrationWindow, type Season, type SeasonInput, type WaitingSeasonInput } from "./seasons";
 
 // Seasons of one league (or every league), newest first, each with its phases.
 export async function listSeasons(leagueId?: number): Promise<Season[]> {
@@ -25,18 +26,30 @@ export async function listSeasons(leagueId?: number): Promise<Season[]> {
         : inArray(seasonPhases.seasonId, db.select({ id: seasons.id }).from(seasons).where(eq(seasons.leagueId, leagueId))),
     )
     .orderBy(asc(seasonPhases.seasonId), asc(seasonPhases.number));
-  return rows.map((r) => ({
-    id: r.id,
-    leagueId: r.leagueId,
-    name: r.name,
-    registrationOpensAt: r.registrationOpensAt,
-    registrationClosesAt: r.registrationClosesAt,
-    firstPhaseStart: r.firstPhaseStart,
-    breaks: r.breaks,
-    phases: phases
-      .filter((p) => p.seasonId === r.id)
-      .map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline })),
-  }));
+  return rows.map((r) =>
+    toSeason(
+      r,
+      phases.filter((p) => p.seasonId === r.id).map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline })),
+    ),
+  );
+}
+
+// A stored row as the pages see it. A waiting first season (D124) stores ''
+// as its first Monday and its opening as its closing: both read as not set.
+function toSeason(row: typeof seasons.$inferSelect, phases: Season["phases"]): Season {
+  const waiting = row.startsAtMinimum && row.startFixedAt === null;
+  return {
+    id: row.id,
+    leagueId: row.leagueId,
+    name: row.name,
+    registrationOpensAt: row.registrationOpensAt,
+    registrationClosesAt: waiting ? null : row.registrationClosesAt,
+    firstPhaseStart: waiting ? null : row.firstPhaseStart,
+    breaks: row.breaks,
+    phases,
+    startsAtMinimum: row.startsAtMinimum,
+    startFixedAt: row.startFixedAt,
+  };
 }
 
 export async function seasonInLeague(id: number, leagueId: number): Promise<boolean> {
@@ -56,16 +69,7 @@ export async function getSeason(id: number): Promise<Season | undefined> {
     .from(seasonPhases)
     .where(eq(seasonPhases.seasonId, id))
     .orderBy(asc(seasonPhases.number));
-  return {
-    id: row.id,
-    leagueId: row.leagueId,
-    name: row.name,
-    registrationOpensAt: row.registrationOpensAt,
-    registrationClosesAt: row.registrationClosesAt,
-    firstPhaseStart: row.firstPhaseStart,
-    breaks: row.breaks,
-    phases,
-  };
+  return toSeason(row, phases);
 }
 
 // Whether the phase 1 groups are published (#24) and how many pairs entered
@@ -109,6 +113,62 @@ export async function createSeason(leagueId: number, input: SeasonInput, phases:
     db.insert(seasonPhases).values(phaseRows(newest, phases)),
     auditEntry({ actorId, action: "season.create", target: sql`'season:' || ${newest}`, detail: input.name, leagueId }),
   ]);
+}
+
+// A league's first season that starts at the minimum entries (D124): open
+// for entries from now, with no deadline, start or phases until the entry
+// that reaches the minimum fixes them (season-start.server.ts). Only while
+// the league has no season, checked in the insert. False if it has one.
+export async function createWaitingSeason(leagueId: number, input: WaitingSeasonInput, actorId: string, now = new Date()): Promise<boolean> {
+  const newest = sql`(select max(${seasons.id}) from ${seasons})`;
+  const seconds = Math.floor(now.getTime() / 1000);
+  const [inserted] = await db.batch([
+    db
+      .insert(seasons)
+      .select(
+        rowSelect(
+          seasons,
+          {
+            id: sql`null`,
+            leagueId: sql`${leagueId}`,
+            name: sql`${input.name}`,
+            registrationOpensAt: sql`${seconds}`,
+            // Not set while waiting: toSeason reads these as null.
+            registrationClosesAt: sql`${seconds}`,
+            firstPhaseStart: sql`''`,
+            breaks: sql`${JSON.stringify(input.breaks)}`,
+            startsAtMinimum: sql`1`,
+            startFixedAt: sql`null`,
+            updatedAt: sql`null`,
+            createdAt: sql`unixepoch()`,
+          },
+          sql`where not exists (select 1 from ${seasons} where ${seasons.leagueId} = ${leagueId})`,
+        ),
+      )
+      .returning({ id: seasons.id }),
+    auditIfChanged({ actorId, action: "season.create", target: sql`'season:' || ${newest}`, detail: input.name, leagueId }),
+  ]);
+  return inserted.length > 0;
+}
+
+// The name and breaks of a first season while it still waits (D124),
+// checked in the update. False once its start is fixed.
+export async function updateWaitingSeason(id: number, input: WaitingSeasonInput, actorId: string): Promise<boolean> {
+  const [updated] = await db.batch([
+    db
+      .update(seasons)
+      .set({ name: input.name, breaks: input.breaks, updatedAt: new Date() })
+      .where(and(eq(seasons.id, id), eq(seasons.startsAtMinimum, true), isNull(seasons.startFixedAt)))
+      .returning({ id: seasons.id }),
+    auditIfChanged({
+      actorId,
+      action: "season.update",
+      target: `season:${id}`,
+      detail: input.name,
+      leagueId: sql`(select ${seasons.leagueId} from ${seasons} where ${seasons.id} = ${id})`,
+    }),
+  ]);
+  return updated.length > 0;
 }
 
 // Rewrites the season and its phases in one batch (one transaction in D1).

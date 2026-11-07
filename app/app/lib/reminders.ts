@@ -20,7 +20,7 @@
 
 import { isSeeking } from "./partner-search";
 import { entryOpen } from "./season-entries";
-import { homeSeasons, type Season } from "./seasons";
+import { homeSeasons, isWaiting, type Season } from "./seasons";
 
 export const SITUATIONS = ["B", "C", "D"] as const;
 export type Situation = (typeof SITUATIONS)[number];
@@ -117,8 +117,10 @@ export function personKey(seasonId: number, email: string): string {
 }
 
 // The season of the league that accepts entries now, the earliest if more do.
+// A first season waiting for its minimum entries (D124) has no deadline or
+// round to name, so it sends no reminder.
 export function entrySeason(seasons: readonly Season[], leagueId: number, now: Date): Season | null {
-  return homeSeasons(seasons, now).find((s) => s.leagueId === leagueId && entryOpen(s, now)) ?? null;
+  return homeSeasons(seasons, now).find((s) => s.leagueId === leagueId && !isWaiting(s) && entryOpen(s, now)) ?? null;
 }
 
 // Due: in the situation since `since` for its waiting time, or for 24 hours
@@ -126,6 +128,7 @@ export function entrySeason(seasons: readonly Season[], leagueId: number, now: D
 export function isDue(situation: Situation, since: Date, season: Pick<Season, "registrationClosesAt">, now: Date): boolean {
   const stuck = now.getTime() - since.getTime();
   if (stuck >= WAIT_MS[situation]) return true;
+  if (!season.registrationClosesAt) return false;
   const left = season.registrationClosesAt.getTime() - now.getTime();
   return stuck >= MIN_WAIT_MS && left > 0 && left < DEADLINE_RUSH_MS;
 }

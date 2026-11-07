@@ -148,7 +148,9 @@ export default function Privacy() {
               meccseid kevésbé sürgős híreiről, a meccs-emlékeztetőkről és a holnapi
               meccsedről csak az oldalon és push értesítésben szólunk, e-mailben
               nem. A fekete pontról az oldalon és push értesítésben szólunk; a
-              másodiknál egy figyelmeztető levelet is küldünk.
+              másodiknál egy figyelmeztető levelet is küldünk. Ha egy új liga
+              első szezonja összegyűjti a szükséges nevezéseket, minden nevezett
+              játékosnak egy levelet küldünk az indulás napjával.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (megkaptad a meghívót, de nem

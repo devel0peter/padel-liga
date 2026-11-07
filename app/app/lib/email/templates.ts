@@ -228,15 +228,18 @@ export function seasonEntered(input: {
   partnerName: string;
   league: string;
   season: string;
-  // Where the pair starts; null: the next season.
-  joins: { phase: number; startsAt: Date } | null;
+  // Where the pair starts; null: the next season; startsAt null: a first
+  // season still waiting for its minimum entries (D124).
+  joins: { phase: number; startsAt: Date | null } | null;
 }): Email {
   const pairPage = `${SITE_URL}/pair`;
   const where = `${input.season}, ${input.league}`;
   const start =
     input.joins === null
       ? "A szezon utolsó köre már elindult, ezért a következő szezontól játszotok."
-      : `${input.joins.phase === 1 ? "Az" : "A"} ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
+      : input.joins.startsAt === null
+        ? "A szezon akkor indul, ha elég pár nevezett. Amint összegyűlnek, megírjuk, mikor kezdődik az 1. kör."
+        : `${input.joins.phase === 1 ? "Az" : "A"} ${input.joins.phase}. körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}). A csoportotokat a kör elején küldjük.`;
   return buildPlain(
     `Beneveztetek – ${SITE_NAME}`,
     [
@@ -248,6 +251,27 @@ export function seasonEntered(input: {
       SIGNATURE,
     ],
     [pairPage],
+    footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
+// A league's first season reached its minimum entries (D124, #335): every
+// entered player learns when round 1 starts and that the groups come out by
+// that morning. Names only the recipient.
+export function seasonStart(input: { to: string; league: string; season: string; start: Date }): Email {
+  const home = `${SITE_URL}/home`;
+  const day = formatWeekdayDate(input.start);
+  return buildPlain(
+    `Indul a szezon: ${day} – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Összegyűlt elég nevezés, így eldőlt, mikor indul a szezon (${input.season}, ${input.league}).`,
+      `Az 1. kör kezdete: ${day}. A csoportbeosztást legkésőbb aznap reggel megkapjátok e-mailben és az oldalon.`,
+      `A kezdést a Kezdőlapon is látod:`,
+      home,
+      SIGNATURE,
+    ],
+    [home],
     footer(`Azért kaptad ezt a levelet, mert a pároddal neveztetek a ${SITE_URL.replace("https://", "")} oldalon.`),
   );
 }

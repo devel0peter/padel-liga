@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
-import { formatDeadline, formatShortDate } from "~/lib/format";
+import { formatDeadline, formatShortDate, formatWeekdayDate } from "~/lib/format";
 import {
   CHOOSE_LEAGUE_BUTTON,
   CHOOSE_LEAGUE_TEXT,
@@ -23,12 +23,12 @@ import {
   parseLeagueParam,
 } from "~/lib/league-members";
 import { chooseLeague, leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
-import { listLeagues } from "~/lib/leagues.server";
+import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState } from "~/lib/partner-search.server";
-import { homeSeasons } from "~/lib/seasons";
-import { applyToSeason, entryViews } from "~/lib/season-entries.server";
+import { homeSeasons, isWaiting, waitingText } from "~/lib/seasons";
+import { applyToSeason, entryCounts, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { SITE_NAME } from "~/lib/site";
 import { myStrikes } from "~/lib/strikes.server";
@@ -66,12 +66,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const views = await entryViews(user, shown, now);
   // The player's own strikes (#294): only here and nowhere public.
   const strikes = new Map((await myStrikes(user.id)).map(({ seasonId, ...s }) => [seasonId, s]));
+  // A first season waiting for its minimum entries (D124): how many are still needed.
+  const waiting = shown.filter(isWaiting);
+  const [counts, minimums] = await Promise.all([
+    entryCounts(waiting.map((s) => s.id)),
+    minEntriesByLeague([...new Set(waiting.map((s) => s.leagueId))]),
+  ]);
   const seasons = shown.map((s) => ({
     id: s.id,
     name: s.name,
     league: leagueName.get(s.leagueId)!,
     registrationOpensAt: s.registrationOpensAt,
     registrationClosesAt: s.registrationClosesAt,
+    waiting: isWaiting(s) ? waitingText(counts.get(s.id) ?? 0, minimums.get(s.leagueId) ?? 0) : null,
+    startsAtMinimum: s.startsAtMinimum,
     phases: s.phases,
     entry: views.get(s.id) ?? null,
     strikes: strikes.get(s.id) ?? { count: 0, leaving: false },
@@ -202,10 +210,23 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
             <CardDescription>{s.league}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
-            <p>
-              <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} –{" "}
-              {formatDeadline(s.registrationClosesAt)}
-            </p>
+            {s.waiting ? (
+              <p>
+                <span className="font-medium">Indulás:</span> {s.waiting}
+              </p>
+            ) : s.startsAtMinimum || !s.registrationClosesAt ? (
+              // Started at the minimum entries (D124): no deadline, only the start.
+              s.phases[0] && (
+                <p>
+                  <span className="font-medium">Indul:</span> {formatWeekdayDate(new Date(s.phases[0].startsAt))}
+                </p>
+              )
+            ) : (
+              <p>
+                <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} –{" "}
+                {formatDeadline(s.registrationClosesAt)}
+              </p>
+            )}
             <PhaseList phases={s.phases} />
             {(s.strikes.count > 0 || s.strikes.leaving) && <StrikeLine {...s.strikes} />}
             {actionData?.season === s.id && (

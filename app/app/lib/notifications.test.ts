@@ -29,6 +29,7 @@ import {
   kindsFor,
   pairWithdrawnMessage,
   seasonEntryMessage,
+  seasonStartMessage,
   parseSubscription,
   pushPayload,
   safeTarget,
@@ -169,6 +170,18 @@ describe("player messages (#115)", () => {
       "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
     );
     expect(seasonEntryMessage({ ...base, joins: null }).body).toBe("2026/27 tél, Padelpárbaj Győr. A következő szezontól játszotok.");
+    // A first season waiting for its minimum entries (D124): no date yet.
+    expect(seasonEntryMessage({ ...base, joins: { phase: 1, startsAt: null } }).body).toBe(
+      "2026/27 tél, Padelpárbaj Győr. A szezon akkor indul, ha elég pár nevezett: a kezdés napját megírjuk.",
+    );
+  });
+
+  it("D124: the start of a first season, with the day and the groups by that morning", () => {
+    expect(seasonStartMessage({ ...base, start: new Date("2026-11-22T23:00:00Z") })).toEqual({
+      title: "Indul a szezon",
+      body: "2026/27 tél, Padelpárbaj Győr. Az 1. kör kezdete: nov. 23., hétfő. A csoportbeosztást legkésőbb aznap reggel megkapjátok.",
+      url: "/home",
+    });
   });
 
   it("the groups: group, phase and deadline in Budapest time", () => {

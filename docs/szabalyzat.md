@@ -54,6 +54,7 @@ A részleteket lent találod.
   - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
 - **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
+- **Új liga első szezonja:** nincs nevezési határidő, a szezon akkor indul, amikor elég pár nevezett (a liga minimuma, alapból 12 pár). Amint a nevezések elérik a minimumot, az 1. kör a legalább 7 nappal későbbi első hétfőn indul (ha szünet esik rá, a szünet után), és ez a dátum akkor sem változik, ha később kevesebb nevezés marad.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.

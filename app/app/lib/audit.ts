@@ -5,6 +5,7 @@
 export const AUDIT_ACTIONS = {
   // Leagues and Szervezők
   "league.create": "Liga létrehozása",
+  "league.min_entries": "Minimum nevezés módosítása",
   "league_admin.grant": "Szervező kinevezése",
   "league_admin.invite": "Szervező meghívása",
   "league_admin.revoke": "Szervező elvétele",

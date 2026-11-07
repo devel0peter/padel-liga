@@ -22,15 +22,21 @@ const MIGRATIONS = new URL("../../drizzle/", import.meta.url);
 
 const D1_MAX_PARAMS = 100;
 
-// A fresh in-memory database with every migration applied.
-export function migratedDatabase(): any {
+// A fresh in-memory database with every migration applied, or only those
+// before `before` (a file name prefix such as "0054"), so a test can fill
+// the old schema and then apply the rest with applyMigrations.
+export function migratedDatabase(before?: string): any {
   const raw = new DatabaseSync(":memory:");
   raw.exec("PRAGMA foreign_keys = ON");
-  const files = (readdirSync(MIGRATIONS) as string[]).filter((f) => f.endsWith(".sql")).sort();
+  applyMigrations(raw, (f) => before === undefined || f < before);
+  return raw;
+}
+
+export function applyMigrations(raw: any, which: (file: string) => boolean): void {
+  const files = (readdirSync(MIGRATIONS) as string[]).filter((f) => f.endsWith(".sql") && which(f)).sort();
   for (const f of files)
     for (const stmt of readFileSync(new URL(f, MIGRATIONS), "utf8").split("--> statement-breakpoint"))
       if (stmt.trim()) raw.exec(stmt);
-  return raw;
 }
 
 // The module that replaces ~/db/client.server: `db` runs on whatever

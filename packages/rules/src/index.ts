@@ -10,6 +10,7 @@ export * from "./promotion";
 export * from "./reporting";
 export * from "./results";
 export * from "./scheduling";
+export * from "./season-start";
 export * from "./seeding";
 export * from "./slots";
 export * from "./standings";

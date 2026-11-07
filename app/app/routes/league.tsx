@@ -201,9 +201,10 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
             <div className="grid gap-2 rounded-2xl border-2 border-court p-5">
               <h2 className="font-display text-2xl font-bold">Még nincsenek kint a csoportok</h2>
               <p className="text-lg">
-                {page.next
-                  ? `${capitalize(withArticle(page.next.round))} kör ${page.next.startsOn} indul. A csoportok az indulás előtt kerülnek ki ide.`
-                  : "A következő szezon időpontja hamarosan kiderül."}
+                {page.starting ??
+                  (page.next
+                    ? `${capitalize(withArticle(page.next.round))} kör ${page.next.startsOn} indul. A csoportok az indulás előtt kerülnek ki ide.`
+                    : "A következő szezon időpontja hamarosan kiderül.")}
               </p>
               <p>
                 <Link to="/" className="font-bold underline">

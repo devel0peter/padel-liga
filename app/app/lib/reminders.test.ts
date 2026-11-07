@@ -37,6 +37,8 @@ function season(over: Partial<Season> = {}): Season {
       startsAt: new Date(first + i * 21 * DAY),
       deadline: new Date(first + (i + 1) * 21 * DAY - 60_000),
     })),
+    startsAtMinimum: false,
+    startFixedAt: null,
     ...over,
   };
 }

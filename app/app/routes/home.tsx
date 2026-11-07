@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { data, Link } from "react-router";
 
 import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { OWN_DELETED } from "~/lib/account-deletion";
 import { getUser } from "~/lib/auth/session.server";
-import { SignupForm, type SignupActionData } from "~/components/signup-form";
 import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import {
   Accordion,
@@ -14,24 +13,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { landingPairCounts, listedCities } from "~/lib/cities.server";
+import { listedCities } from "~/lib/cities.server";
 import { STEPS } from "~/lib/how-it-works";
-import { activeVenues } from "~/lib/clubs";
-import { listClubs } from "~/lib/clubs.server";
-import { parseInterest } from "~/lib/interest";
 import { landingByCity } from "~/lib/landing-league";
-import { listLeagues } from "~/lib/leagues.server";
+import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { publishedPhases } from "~/lib/groups.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { LeagueStatus } from "~/components/league-status";
-import { saveInterest } from "~/lib/interest.server";
-import { organizationJsonLd, pageMeta } from "~/lib/site";
+import { entryCounts } from "~/lib/season-entries.server";
+import { CONTACT_EMAIL, organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
-import { deliver, queueSignupEmails } from "~/lib/email/outbox.server";
-import { turnstileError } from "~/lib/turnstile";
-import { turnstileSiteKey, verifyTurnstile } from "~/lib/turnstile.server";
-import { logError } from "~/lib/log";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -51,73 +43,50 @@ export function meta({ location }: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const listed = await listedCities();
-  const pairs = await landingPairCounts(listed);
   // A listed city with a league shows where it is and sends visitors to
-  // registration; the others keep the interest signup (#83).
+  // registration (#83). There is no interest form any more (#332, D123):
+  // a city without a league isn't shown, the contact line covers it.
   const slugs = new Set(listed.map((c) => c.slug));
   const published = await publishedPhases();
+  const leagues = (await listLeagues()).filter((l) => slugs.has(l.city));
+  const seasons = await listSeasons();
+  // A first season waiting for its minimum entries (D124) shows how many
+  // pairs are still needed.
+  const waiting = seasons.filter((s) => s.firstPhaseStart === null);
+  const [counts, minimums] = await Promise.all([
+    entryCounts(waiting.map((s) => s.id)),
+    minEntriesByLeague([...new Set(waiting.map((s) => s.leagueId))]),
+  ]);
   const league = landingByCity(
-    (await listLeagues()).filter((l) => slugs.has(l.city)),
-    (await listSeasons()).map((s) => ({ ...s, publishedPhases: published.get(s.id) })),
+    leagues,
+    seasons.map((s) => ({
+      ...s,
+      publishedPhases: published.get(s.id),
+      entries: counts.has(s.id) ? { count: counts.get(s.id)!, minimum: minimums.get(s.leagueId) ?? 0 } : undefined,
+    })),
     new Date(),
   );
-  const cities = listed.map(({ slug, name }) => ({
-    slug,
-    name,
-    pairs: pairs.get(slug) ?? null,
-    league: league.get(slug) ?? null,
-  }));
+  const cities = listed.flatMap(({ slug, name }) => {
+    const block = league.get(slug);
+    return block ? [{ slug, name, league: block }] : [];
+  });
   const params = new URL(request.url).searchParams;
   const ref = landingSource(params, request.headers.get("Referer"));
   // Back from the player's own "Fiók törlése" (#38), logged out. Only for a
   // visitor without a session, so a link with it can't tell a logged-in
   // player their account is gone.
   const accountDeleted = params.get("accountDeleted") === "1" && !(await getUser(request));
-  return { ref, cities, turnstileSiteKey: turnstileSiteKey(), accountDeleted };
+  return { ref, cities, accountDeleted };
 }
 
-export async function action({ request }: Route.ActionArgs): Promise<SignupActionData> {
-  const form = await request.formData();
+// The interest form is gone (#332, D123): a post from an old page (or a bot)
+// is refused and nothing is stored.
+export const INTEREST_CLOSED =
+  "Ez a jelentkezés már nem működik. Ha a városodban van liga, regisztrálj és nevezz; ha nincs, írj nekünk: " + CONTACT_EMAIL;
 
-  // Honeypot filled in: pretend success so bots don't retry.
-  const honeypot = form.get("website");
-  if (typeof honeypot === "string" && honeypot !== "") return { ok: true };
-
-  const [clubs, cities, leagues] = await Promise.all([listClubs(), listedCities(), listLeagues()]);
-  // A city with a league takes no interest signup (#83): people register.
-  const result = parseInterest(
-    form,
-    activeVenues(clubs, String(form.get("city"))).map((c) => c.slug),
-    cities,
-    leagues.map((l) => l.city),
-  );
-  if (!result.ok) return result;
-
-  // After the field checks, so a typo doesn't use up the single-use token.
-  const check = await verifyTurnstile(form, request, "signup");
-  if (check !== "ok") return { ok: false, formError: turnstileError(check) };
-
-  try {
-    await saveInterest(result.data);
-  } catch (error) {
-    logError("interest signup insert failed", { error });
-    return {
-      ok: false,
-      formError: "Nem sikerült elküldeni a jelentkezést. Próbáld újra pár perc múlva.",
-    };
-  }
-  // The signup is saved; an email problem must not fail it. Anything not sent
-  // now stays queued for the cron.
-  try {
-    await deliver(await queueSignupEmails(result.data));
-  } catch (error) {
-    logError("signup email failed", { error });
-  }
-  return { ok: true, cityOther: result.data.cityOther };
+export async function action(_args: Route.ActionArgs) {
+  return data({ error: INTEREST_CLOSED }, { status: 410 });
 }
-
-
-
 
 function SectionHead({ title, lede }: { title: string; lede?: string }) {
   return (
@@ -143,7 +112,7 @@ const RULES = [
 
 const FAQ = [
   ["Mennyibe kerül?", "Nevezési díj nincs, csak a pályadíjat kell kifizetni, amit a négy játékos egyenlő arányban áll."],
-  ["Mikor csatlakozhatok?", "Ahol már fut a liga, nevezhetsz rögtön: a következő kör elejétől játszotok, a dátumot az oldal tetején látod. Ahol még nincs liga, írd fel magad, és e-mailben szólunk, ha indul."],
+  ["Mikor csatlakozhatok?", "Ahol már fut a liga, nevezhetsz rögtön: a következő kör elejétől játszotok, a dátumot az oldal tetején látod. Ahol még nincs liga, írj nekünk, ha játszanál vagy szerveznél."],
   ["Nincs párom. Nevezhetek?", "Igen. Regisztrálj egyedül, és a szervező hasonló szintű párt keres neked."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
@@ -172,16 +141,12 @@ function useLandingCount(source: string | null) {
   }, []);
 }
 
-export default function Home({ loaderData }: Route.ComponentProps) {
+export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const { cities } = loaderData;
   // The source as the page was opened. Loaders run again later (a "#" link,
   // back from the rules) on the cleaned address, which has no source.
   const [ref] = useState(loaderData.ref);
   useLandingCount(ref);
-  const leagueCities = cities.filter((c) => c.league);
-  // The city typed in the other-city form; a chip of a listed city without a
-  // league fills it in.
-  const [cityText, setCityText] = useState("");
   return (
     <>
       <SiteHeader />
@@ -194,6 +159,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <AlertDescription>{OWN_DELETED}</AlertDescription>
                 </Alert>
               )}
+              {actionData?.error && (
+                <Alert variant="destructive" role="alert">
+                  <AlertDescription>{actionData.error}</AlertDescription>
+                </Alert>
+              )}
               <h1 className="font-display text-[clamp(2.4rem,6vw,4.25rem)] font-black tracking-tight">
                 Ki a legjobb páros a városban?
               </h1>
@@ -201,13 +171,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Négyes csoportok, heti egy meccs. Aki nyer, feljebb lép. Aki
                 nem, a következő körben visszavághat.
               </p>
-              {leagueCities.map((c) => c.league && <LeagueStatus key={c.slug} city={c.name} block={c.league} />)}
+              {cities.map((c) => <LeagueStatus key={c.slug} city={c.name} block={c.league} />)}
               <div className="flex flex-wrap gap-x-6 gap-y-2 font-bold">
                 <a href="#hogyan" className="underline">
                   Hogyan működik?
                 </a>
                 <a href="#mas-varos" className="underline">
-                  {leagueCities.length > 0 ? "Más városban játszol?" : "Jelentkezem"}
+                  Más városban játszol?
                 </a>
               </div>
               <div className="grid gap-2">
@@ -218,8 +188,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   {cities.map((c) => (
                     <li key={c.slug}>
                       <a
-                        href={c.league ? "#" : "#mas-varos"}
-                        onClick={c.league ? (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); } : () => setCityText(c.name)}
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
                         className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
                       >
                         <span className="relative flex size-2.5">
@@ -228,7 +201,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                         </span>
                         {c.name}
                         <span className="text-sm font-medium opacity-80">
-                          · {c.league ? c.league.chip : c.pairs ? `${c.pairs} pár jelentkezett` : "jelentkezés nyitva"}
+                          · {c.league.chip}
                         </span>
                       </a>
                     </li>
@@ -236,8 +209,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <li>
                     <a
                       href="#mas-varos"
-                      onClick={() => setCityText("")}
-                      title="Szólunk, ha nálatok is indul"
                       className="inline-flex items-center rounded-full border-[1.5px] border-dashed px-4 py-2 font-bold text-muted-foreground no-underline"
                     >
                       + A te városod?
@@ -304,18 +275,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </section>
 
         <section id="mas-varos" className="scroll-mt-4 bg-muted py-16">
-          <Wrap className="grid items-start gap-12 lg:grid-cols-[1fr_1.2fr]">
-            <SectionHead
-              title="Nálatok még nincs liga?"
-              lede="Hagyd itt az elérhetőséged, és szólunk, ha nálatok is indul. Ha szívesen szerveznél egyet, jelöld be, és felvesszük veled a kapcsolatot. Nem kötelez semmire."
-            />
-            <SignupForm
-              signupRef={ref}
-              cities={cities}
-              cityText={cityText}
-              onCityTextChange={setCityText}
-              turnstileSiteKey={loaderData.turnstileSiteKey}
-            />
+          <Wrap>
+            <p className="max-w-[40em] text-xl font-semibold">
+              Nincs még liga a városodban? Ha játszanál vagy szerveznél, írj nekünk:{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold underline">
+                {CONTACT_EMAIL}
+              </a>
+            </p>
           </Wrap>
         </section>
       </main>

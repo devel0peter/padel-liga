@@ -330,6 +330,13 @@
       "when": 1794006092281,
       "tag": "0053_league_members",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1794011315431,
+      "tag": "0054_first_season_minimum",
+      "breakpoints": true
     }
   ]
 }

@@ -61,7 +61,7 @@ export default function AdminCities({ loaderData, actionData }: Route.ComponentP
   return (
     <AppPage
       title="Városok"
-      description="Egy városnak lehetnek klubjai és ligái. Ami „látszik”, az megjelenik a jelentkezési űrlapon és a főoldalon; a többiekre a „Más város” mezőben lehet jelentkezni."
+      description="Egy városnak lehetnek klubjai és ligái. Ami „látszik”, az megjelenik a főoldalon, ha van ligája."
     >
       <div className="rounded-lg border">
         <Table>
@@ -145,7 +145,7 @@ export default function AdminCities({ loaderData, actionData }: Route.ComponentP
         <div className="flex items-start gap-3">
           <Checkbox id="listed" name="listed" className="mt-0.5" />
           <Label htmlFor="listed" className="block font-normal leading-relaxed">
-            Látszik a jelentkezési űrlapon és a főoldalon. Csak akkor kapcsold be, ha van szervezője.
+            A főoldalon látszik, ha van ligája. Csak akkor kapcsold be, ha van szervezője.
           </Label>
         </div>
         <div>

@@ -60,7 +60,7 @@ export default function Privacy() {
               <li>a neved és az e-mail-címed,</li>
               <li>
                 a szinted (kezdő, középhaladó, haladó vagy versenyző), amit te
-                állítasz be, és amiből az induló értékszámod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
+                állítasz be, és amiből az induló Élő-pontod lesz; amint részt veszel egy szezonban, a profilodban már nem módosíthatod, mert innentől a liga eredményei döntik el,
               </li>
               <li>
                 a telefonszámod (magyar szám lehet; kötelező, mert a meccseket
@@ -107,7 +107,7 @@ export default function Privacy() {
             </ul>
             <p>
               Amikor elindul a liga, ehhez jön még a meccseid története
-              (kivel, mikor és milyen eredménnyel játszottál), az értékszámod,
+              (kivel, mikor és milyen eredménnyel játszottál), az Élő-pontod,
               és ha kapsz, a fekete pontjaid (mikor és miért; ha a szervező
               töröl egyet, az indoka is). A fekete pontjaidat csak te és a
               szervező látja; ha törlöd a fiókodat, a törlések indokát is
@@ -157,15 +157,16 @@ export default function Privacy() {
           <Section title="Ki mit lát?">
             <ul className={list}>
               <li>
-                <strong>Nyilvános</strong> (a csoportok kihirdetésétől): a neved,
-                a párod neve és a csoportod tabellája a ligaoldalon; a liga
-                indulása után a meccsek eredménye is.
+                <strong>Nyilvánosan semmi</strong> nem jelenik meg a ligáról:
+                se a neved, se a tabella, se az eredmények.
               </li>
               <li>
-                <strong>Csak a belépett játékosok látják:</strong> a pár és a
-                játékos profilját (a csoportjaitokat, a liga indulása után az
-                eredményeiteket), és az értékszámodat meg annak alakulását.
-                Ezek nyilvánosan nem jelennek meg.
+                <strong>Csak a belépett játékosok látják:</strong> a ligaoldalt
+                (a csoportok kihirdetésétől a neved, a párod neve és a csoportod
+                tabellája, a liga indulása után a meccsek eredménye is), a pár
+                és a játékos profilját (a csoportjaitokat, a liga indulása után
+                az eredményeiteket és a statisztikádat), és az Élő-pontodat meg
+                annak alakulását.
               </li>
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
@@ -178,11 +179,12 @@ export default function Privacy() {
                 érni egymást. Te is az övét.
               </li>
               <li>
-                <strong>A telefonszámodat</strong> rajta kívül azok látják, akikkel az
-                aktuális körben meccsed van, hogy egyeztetni tudjatok: a csoportok
-                kihirdetése után a Kezdőlapjukon és a meccs oldalán, a kör
-                határidejéig; utána már nem. Látja még a ligád szervezője és az
-                oldal adminja, hogy fel tudjanak hívni a ligával kapcsolatban
+                <strong>A telefonszámodat és az e-mail-címedet</strong> rajta kívül
+                azok látják, akikkel az aktuális körben meccsed van, hogy egyeztetni
+                tudjatok: a csoportok kihirdetése után a Kezdőlapjukon és a meccs
+                oldalán, amíg a meccs eredménye nem végleges, legfeljebb a kör
+                határidejéig; utána már nem. A telefonszámodat látja még a ligád szervezője és az
+                oldal adminja is, hogy fel tudjanak hívni a ligával kapcsolatban
                 (párkeresés, nevezés, elakadt meccs): a szervező a ligája
                 játékosaiét a szervezői oldalakon, az admin mindenkiét. Más
                 játékos nem látja.
@@ -204,7 +206,7 @@ export default function Privacy() {
               <li>
                 <strong>A helyettes kérést</strong> (ki kérte, ki helyett ki
                 játszana, és a szervező döntése) a pár és a liga szervezője meg
-                az oldal adminja látja; a szervező a két játékos Elóját is,
+                az oldal adminja látja; a szervező a két játékos Élő-pontját is,
                 hogy dönthessen. A jóváhagyott helyettes nevét az ellenfeleid is
                 látják a meccs oldalán. A szervező indoklását csak a pár látja,
                 és ha törlöd a fiókodat, töröljük. Ha regisztráltál, a neved
@@ -232,7 +234,7 @@ export default function Privacy() {
               </li>
               <li>
                 A csoportok összeállításakor a szervező a pár két tagjának nevét
-                és az értékszámotokat látja. A csoportbeosztásról mindenki
+                és az Élő-pontotokat látja. A csoportbeosztásról mindenki
                 értesítést kap (e-mailben is, ha nem kapcsolta ki), benne az
                 ellenfelei nevével; az e-mail-címeteket és a telefonszámotokat
                 nem.

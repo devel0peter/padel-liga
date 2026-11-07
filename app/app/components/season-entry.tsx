@@ -19,7 +19,7 @@ export function enteredNotice(joins: { phase: number; startsAt: Date | null } | 
 
 const BLOCKED_LINKS: Partial<Record<Extract<EntryView, { kind: "blocked" }>["reason"], { to: string; label: string }>> = {
   no_pair: { to: "/pair", label: "Párom" },
-  no_level: { to: "/profile#adatok", label: "Megadom a szintem" },
+  no_level: { to: "/profile?tab=settings#adatok", label: "Megadom a szintem" },
 };
 
 export function SeasonEntry({ seasonId, view }: { seasonId: number; view: EntryView }) {

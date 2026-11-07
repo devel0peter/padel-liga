@@ -5,7 +5,6 @@ export default [
   index("routes/home.tsx"),
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
-  route("league/:league", "routes/league.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
@@ -27,6 +26,10 @@ export default [
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("matches/:id", "routes/match.tsx"),
+    // The league page ("Tabella"): for logged-in players only (D134).
+    route("league/:league", "routes/league.tsx"),
+    // The Ranglista: players and pairs by Élő-pont (D137).
+    route("league/:league/rankings", "routes/rankings.tsx"),
     // Pair and player profiles: for logged-in members only (D112).
     route("players/:id", "routes/player-profile.tsx"),
     route("pairs/:id", "routes/pair-profile.tsx"),

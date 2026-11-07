@@ -168,6 +168,21 @@ describe("once the league has started", () => {
     expect((await pairProfile(2, DURING))!.matches).toHaveLength(1);
   });
 
+  it("the summary (D136): seasons, rounds, matches, wins, losses, for the player and the pair", async () => {
+    match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    match(g1, 3, 1, 2, "final", JSON.stringify({ kind: "walkover", winner: "a" }));
+    // A pending result is not a match yet (D80).
+    match(g1, 2, 3, 3, "result_pending", played([[4, 0], [4, 0]]));
+    const summary = { seasons: 1, rounds: 1, matches: 2, wins: 1, losses: 1 };
+    expect((await playerProfile("ua", DURING))!.stats).toEqual(summary);
+    const p = (await pairProfile(1, DURING))!;
+    expect(p.stats).toEqual(summary);
+    // The pair's Élő-pont: its players' average, a whole number.
+    expect(Number.isInteger(p.elo)).toBe(true);
+    // Before the round starts nothing is counted and no rating shows.
+    expect((await pairProfile(1, BEFORE))!).toMatchObject({ elo: null, stats: { seasons: 0, rounds: 0, matches: 0 } });
+  });
+
   it("the group's place is the league page's table (final results only)", async () => {
     match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
     match(g1, 3, 2, 2, "final", played([[4, 2], [4, 2]]));

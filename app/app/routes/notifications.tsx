@@ -89,7 +89,7 @@ export default function Notifications({ loaderData: { items } }: Route.Component
       description={
         <>
           Itt mind megvan. Hogy e-mailben és push értesítésben is szóljunk-e, a{" "}
-          <Link to="/profile#ertesitesek">profilodon</Link> állítod be.
+          <Link to="/profile?tab=settings#ertesitesek">profilodon</Link> állítod be.
         </>
       }
       actions={

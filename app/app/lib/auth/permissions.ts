@@ -62,7 +62,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
+export type NavIcon = "home" | "pair" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.

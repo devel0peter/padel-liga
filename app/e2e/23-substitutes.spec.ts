@@ -27,7 +27,8 @@ test("Helyettes: a player asks, the Szervező approves, the opponents see who pl
   const asker = await as(browser, m!.asker as string);
   await visit(asker.page, `/matches/${m!.id}`);
   const main = content(asker.page);
-  await expect(main.getByText("Helyettes", { exact: true })).toBeVisible();
+  // Folded until there is a request (D133).
+  await main.getByText("Helyettes kell?").click();
   await main.getByRole("combobox", { name: "Ki nem tud játszani?" }).click();
   await asker.page.getByRole("option", { name: m!.partner as string }).click();
   await main.getByRole("combobox", { name: "Ki helyettesít?" }).click();

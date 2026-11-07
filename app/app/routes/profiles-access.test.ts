@@ -19,6 +19,7 @@ const { createSession } = await import("~/lib/auth/session.server");
 const Player = await import("~/routes/player-profile");
 const Pair = await import("~/routes/pair-profile");
 const League = await import("~/routes/league");
+const { SidebarProvider } = await import("~/components/ui/sidebar");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -134,39 +135,40 @@ describe("profiles: logged-in members only (D112)", () => {
   });
 });
 
-describe("league page: profile links for members only, no rating (D112)", () => {
-  async function render(cookie?: string): Promise<{ html: string; data: unknown }> {
+describe("league page: logged-in players only (D134), no rating (D112)", () => {
+  async function render(cookie: string): Promise<{ html: string; data: unknown }> {
     const data = await League.loader(args("/league/gyor", { league: "gyor" }, cookie));
-    const Stub = createRoutesStub([{ path: "/league/gyor", Component: () => createElement(League.default, { loaderData: data } as any) }]);
+    // In the app shell (D134): AppPage needs the sidebar's context.
+    const Page = () => createElement(SidebarProvider, null, createElement(League.default, { loaderData: data } as any));
+    const Stub = createRoutesStub([{ path: "/league/gyor", Component: Page }]);
     return { html: renderToStaticMarkup(createElement(Stub, { initialEntries: ["/league/gyor"] })), data };
   }
 
-  it("a visitor sees the names, the table and the results as plain text, without a profile link", async () => {
-    const { html, data } = await render();
-    expect(data).toMatchObject({ kind: "ladder", member: false });
-    expect(html).toContain("Kis Anna");
-    expect(html).toContain("4:1, 4:2");
-    expect(html).not.toContain('href="/pairs/');
-    expect(html).not.toContain('href="/players/');
+  it("a visitor goes to the login page and comes back, for an unknown league too", async () => {
+    const page = await thrown(League.loader(args("/league/gyor", { league: "gyor" })));
+    expect(page.status).toBe(302);
+    expect(page.headers.get("Location")).toBe("/login?returnTo=%2Fleague%2Fgyor");
+    const unknown = await thrown(League.loader(args("/league/nincs", { league: "nincs" })));
+    expect(unknown.headers.get("Location")).toBe("/login?returnTo=%2Fleague%2Fnincs");
   });
 
-  it("an account mid first-login gets no profile link either", async () => {
-    const { html, data } = await render(midFirstLogin);
-    expect(data).toMatchObject({ member: false });
-    expect(html).not.toContain('href="/pairs/');
+  it("an account mid first-login finishes it first", async () => {
+    const page = await thrown(League.loader(args("/league/gyor", { league: "gyor" }, midFirstLogin)));
+    expect(page.status).toBe(302);
+    expect(page.headers.get("Location")).toMatch(/^\/welcome/);
   });
 
-  it("a logged-in member gets each pair's name as a link to its profile", async () => {
+  it("a logged-in player sees the names, the results and each pair's name as a link to its profile", async () => {
     const { html, data } = await render(member);
-    expect(data).toMatchObject({ member: true });
+    expect(data).toMatchObject({ kind: "ladder" });
+    expect(html).toContain("Kis Anna");
     for (const id of [1, 2, 3]) expect(html).toContain(`href="/pairs/${id}"`);
   });
 
-  it("shows no rating to anyone: none in the page or its data", async () => {
-    for (const cookie of [undefined, member]) {
-      const { html, data } = await render(cookie);
-      expect(html).not.toMatch(/értékszám|1412/i);
-      expect(JSON.stringify(data)).not.toMatch(/"elo"|1412/);
-    }
+  it("shows no rating: none in the page or its data", async () => {
+    const { html, data } = await render(member);
+    expect(html).not.toMatch(/Élő-pont|1412/i);
+    expect(JSON.stringify(data)).not.toMatch(/"elo"|1412/);
   });
 });
+

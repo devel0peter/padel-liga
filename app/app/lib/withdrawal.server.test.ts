@@ -197,8 +197,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     const without = never.bands[0]!.groups[0]!;
     expect(group.rows).toEqual(without.rows);
     expect(group.rows.map((r) => r.points)).toEqual([4, 4, 4]);
-    expect(group.results).toEqual(without.results);
-    expect(group.weekMatches).toEqual(without.weekMatches);
+    expect(group.weeks).toEqual(without.weeks);
     expect(group.withdrawn).toEqual([["Játékos G", "Játékos H"]]);
     expect(without.withdrawn).toEqual([]);
   });

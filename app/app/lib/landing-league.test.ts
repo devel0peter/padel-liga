@@ -251,7 +251,7 @@ describe("landingByCity", () => {
     expect(m.get("gyor")!.title).toBe("Nyitva a nevezés");
   });
 
-  it("links the league's public page (#30) when the league has a slug", () => {
+  it("links no league page: it is for players only (D134)", () => {
     const m = landingByCity(
       [
         { id: 1, city: "gyor", slug: "gyor-liga" },
@@ -260,8 +260,7 @@ describe("landingByCity", () => {
       [{ ...FIRST, leagueId: 1 }],
       now,
     );
-    expect(m.get("gyor")!.ladderPath).toBe("/league/gyor-liga");
-    expect(m.get("pecs")!.ladderPath).toBeUndefined();
+    expect(m.get("gyor")).not.toHaveProperty("ladderPath");
     // The register button carries the league (D128, #331).
     expect(m.get("gyor")!.registerPath).toBe("/register?league=gyor-liga");
     expect(m.get("pecs")!.registerPath).toBeUndefined();

@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { accountInvites, leagueAdminInvites, leagueAdmins, leagues, users } from "~/db/schema";
+import { accountInvites, leagueAdminInvites, leagueAdmins, leagues, pairs, users } from "~/db/schema";
+import { playerLeagues } from "~/lib/league-members.server";
 
 import { auditEntry, auditIfChanged } from "./audit.server";
 import type { LeagueRef } from "./auth/permissions";
@@ -12,6 +13,23 @@ export async function listLeagues(): Promise<LeagueRef[]> {
     .select({ id: leagues.id, slug: leagues.slug, city: leagues.city, name: leagues.name })
     .from(leagues)
     .orderBy(asc(leagues.name));
+}
+
+/**
+ * The league whose table a player's "Tabella" opens (D133, D134): the league
+ * of their active pair, else the first of the leagues they belong to (D128);
+ * null when they belong to none.
+ */
+export async function playerLeagueSlug(userId: string): Promise<string | null> {
+  const [own] = await db
+    .select({ slug: leagues.slug })
+    .from(pairs)
+    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
+    .where(and(eq(pairs.status, "active"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))))
+    .orderBy(asc(pairs.id))
+    .limit(1);
+  if (own) return own.slug;
+  return (await playerLeagues(userId))[0]?.slug ?? null;
 }
 
 export async function getLeague(slug: string): Promise<LeagueRef | undefined> {

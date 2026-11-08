@@ -324,24 +324,26 @@ function AgreedForm({ clubs, result, now, deadline }: { clubs: { id: number; nam
 }
 
 // The club (required) and the court (optional free text): the city's active
-// clubs only. The venue form's fields (#27), and the result form's while the
-// match has no club (D146).
+// clubs only. The venue form's fields (#27); the result form, while the match
+// has no club, asks only for the club (D146: the court doesn't matter there).
 function VenueFields({
   clubs,
   id,
   label,
   clubId = null,
   court = null,
+  withCourt = true,
 }: {
   clubs: { id: number; name: string }[];
   id: string;
   label: string;
   clubId?: number | null;
   court?: string | null;
+  withCourt?: boolean;
 }) {
   const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className={cn("grid gap-3", withCourt && "sm:grid-cols-2")}>
       <div className="grid gap-1.5">
         <Label htmlFor={`${id}-club`}>{label}</Label>
         <Select name="club" defaultValue={current} required>
@@ -357,10 +359,12 @@ function VenueFields({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-court`}>Pálya (nem kötelező)</Label>
-        <Input id={`${id}-court`} name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
-      </div>
+      {withCourt && (
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${id}-court`}>Pálya (nem kötelező)</Label>
+          <Input id={`${id}-court`} name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
+        </div>
+      )}
     </div>
   );
 }
@@ -749,7 +753,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           {recordMain && (
             <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main">
               <RecordResult key={`r${keyed}`} m={m} feedback={result}>
-                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" />}
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
               </RecordResult>
             </Panel>
           )}
@@ -867,7 +871,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               open={failed("result-record")}
             >
               <RecordResult key={`r${keyed}`} m={m} feedback={result}>
-                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" />}
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
               </RecordResult>
             </Fold>
           )}

@@ -49,13 +49,13 @@ async function openRecord(page: Page) {
 }
 
 // Where it was played (D146): asked with the result while the match has no
-// club (neither of these two got one at booking). The venue form, when it
-// shows, has its own fields: these are the result form's.
-async function pickVenue(page: Page, court = "") {
+// club (neither of these two got one at booking); the club only, no court.
+// The venue form, when it shows, has its own fields: this is the result form's.
+async function pickVenue(page: Page) {
   const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
   await form.getByRole("combobox", { name: "Hol játszottatok?" }).click();
   await page.getByRole("option", { name: "Minta Padel Aréna" }).click();
-  if (court) await form.getByLabel("Pálya (nem kötelező)").fill(court);
+  await expect(form.getByLabel("Pálya (nem kötelező)")).toHaveCount(0);
 }
 
 async function fillScore(page: Page, rows: [string, string][]) {
@@ -79,7 +79,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
 
   await visit(player.page, `/matches/${first!.id}`);
   await openRecord(player.page);
-  await pickVenue(player.page, "1-es pálya");
+  await pickVenue(player.page);
 
   // 4:3 doesn't end a set: the engine's Hungarian message.
   await fillScore(player.page, [
@@ -99,7 +99,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
   await expect(status(player.page)).toContainText("Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár");
   // The venue given with the result is the match's now (D146).
-  await expect(status(player.page)).toContainText("Minta Padel Aréna, 1-es pálya");
+  await expect(status(player.page)).toContainText("Minta Padel Aréna");
 
   // Instant email to the other pair, the score from their side, the link.
   const sent = await waitForEmails(offset, 2, (m) => m.subject.startsWith("Erősítsd meg a meccs eredményét"));

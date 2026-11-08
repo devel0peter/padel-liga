@@ -167,7 +167,7 @@ describe("Profil: Fiók törlése", () => {
   });
 });
 
-// Párod (D140, #346: the Párom page before) and Korábbi párjaid (D141, #347)
+// Párod (D141, #346: the Párom page before) and Korábbi párjaid (D142, #347)
 // on the Játékosprofil tab: the loader's data and the section's own posts.
 describe("Profil: Párod and Korábbi párjaid", () => {
   let anna: string;

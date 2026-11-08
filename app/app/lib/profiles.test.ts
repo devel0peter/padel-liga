@@ -147,7 +147,7 @@ describe("playerStats (D136)", () => {
   });
 });
 
-describe("Korábbi párjaid (#347, D141)", () => {
+describe("Korábbi párjaid (#347, D142)", () => {
   const g = (season: string, phase: number, startsAt: string) => ({ season, phase, startsAt: new Date(startsAt) });
 
   describe("roundsText", () => {

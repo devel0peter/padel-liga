@@ -15,10 +15,10 @@ import { pairPath } from "~/lib/profiles";
 import { resultStatusView, resultTodo } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
-// Kezdőlap once the groups are out (#25, D133, D136): three separate cards,
-// Teendők (only when there is one), Meccseitek (a row per week, the next match
-// open) and the group: its table and, under it, every match of the group with
-// its result, to read only (D138).
+// Kezdőlap once the groups are out (#25, D133, D136, D140): Teendők (only
+// when there is one), Következő meccsetek (the next match with the opponents'
+// contacts, only while there is one) and the group: its table and, under it,
+// every match of the group with its result, the pair's own rows a link.
 
 const TONE: Record<Tone, string> = {
   todo: "bg-nav-active-bg text-nav-active",
@@ -131,78 +131,40 @@ function whenWhere(m: HomeMatch): string | null {
   return null;
 }
 
-function WeekRow({ g, week, current, open }: { g: HomeGroup; week: number; current: boolean; open: boolean }) {
-  const m = g.matches.find((x) => x.week === week) ?? null;
-  const off = g.offWeeks.find((o) => o.week === week) ?? null;
-  const head = (
-    <p className="text-xs text-muted-foreground">
-      <span className="font-semibold text-foreground">{week}. hét</span> · {weekRange(g.phaseStartsAt, week)}
-      {current && <span className="font-semibold text-court"> · ez a hét</span>}
-    </p>
-  );
-  if (!m)
-    return (
-      <li className="grid gap-0.5 py-3">
-        {head}
-        <p className="text-sm text-muted-foreground">
-          {off ? `${off.opponents} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.` : "Pihenőhét: ezen a héten nem játszotok."}
-        </p>
-      </li>
-    );
+// Következő meccsetek (docs/player-ui.md H2, D140): the first match whose
+// result isn't final yet: opponents, its state, when and where once fixed,
+// the opponents' contacts and the way in. Nothing once every match is final;
+// the group's fixture list under the table has them all.
+export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
+  const m = nextMatch(g);
+  if (!m) return null;
   const status = statusOf(m);
-  const body = (
-    <div className="grid min-w-0 flex-1 gap-0.5">
-      {head}
-      <p className="font-semibold break-words">{m.opponents}</p>
-      <p className={cn("text-sm", LINE[status.tone])}>{status.label}</p>
-    </div>
-  );
-  if (!open)
-    return (
-      <li>
-        <Link to={`/matches/${m.id}`} className="-mx-2 flex items-center gap-2 rounded-lg px-2 py-3 text-foreground no-underline hover:bg-muted/50 sm:-mx-3 sm:px-3">
-          {body}
-          <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        </Link>
-      </li>
-    );
-  // The next match: when and where, the opponents' contacts, and the way in.
   const fixed = whenWhere(m);
+  const current = g.fixtures.find((w) => w.current)?.week === m.week;
   return (
-    <li className="-mx-2 my-1 grid gap-3 rounded-lg bg-muted/60 p-2 sm:-mx-3 sm:p-3">
-      {body}
-      {fixed && <p className="text-sm font-medium">{fixed}</p>}
-      <Contacts contacts={m.contacts} />
-      <Button asChild size="sm" className="w-fit">
-        <Link to={`/matches/${m.id}`} className="no-underline">
-          A meccs oldala
-          <ChevronRight aria-hidden />
-        </Link>
-      </Button>
-    </li>
-  );
-}
-
-// Meccseitek (docs/player-ui.md H2): a row per week, the next match open.
-export function MyMatches({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
-  const current = g.fixtures.find((w) => w.current)?.week ?? null;
-  const next = nextMatch(g);
-  return (
-    <Card role="region" aria-labelledby={`meccseitek-${g.groupId}`}>
+    <Card role="region" aria-labelledby={`kovetkezo-${g.groupId}`}>
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} id={`meccseitek-${g.groupId}`} className="font-display text-lg font-bold">
-          Meccseitek{multiLeague ? ` · ${g.league}` : ""}
+        <CardTitle role="heading" aria-level={2} id={`kovetkezo-${g.groupId}`} className="font-display text-lg font-bold">
+          Következő meccsetek{multiLeague ? ` · ${g.league}` : ""}
         </CardTitle>
         <CardDescription>
-          {g.phase}. kör · határidő: {formatDeadline(g.deadline)}
+          {m.week}. hét · {weekRange(g.phaseStartsAt, m.week)}
+          {current && <span className="font-semibold text-court"> · ez a hét</span>}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <ul className="grid divide-y" aria-label="Meccseitek">
-          {[1, 2, 3].map((week) => (
-            <WeekRow key={week} g={g} week={week} current={week === current} open={next?.week === week} />
-          ))}
-        </ul>
+      <CardContent className="grid gap-3">
+        <div className="grid gap-0.5">
+          <p className="font-semibold break-words">{m.opponents} ellen</p>
+          <p className={cn("text-sm", LINE[status.tone])}>{status.label}</p>
+          {fixed && <p className="text-sm font-medium">{fixed}</p>}
+        </div>
+        <Contacts contacts={m.contacts} />
+        <Button asChild size="sm" className="w-fit">
+          <Link to={`/matches/${m.id}`} className="no-underline">
+            A meccs oldala
+            <ChevronRight aria-hidden />
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );
@@ -210,13 +172,9 @@ export function MyMatches({ group: g, multiLeague }: { group: HomeGroup; multiLe
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-// The fixture list without the links into the pair's own matches.
-const readOnly = (weeks: HomeGroup["fixtures"]): HomeGroup["fixtures"] =>
-  weeks.map((w) => ({ ...w, matches: w.matches.map((m) => ({ ...m, href: null })) }));
-
 // The group (docs/player-ui.md H3): its table, where the pair stands on the
-// ladder and the group's matches with their results (D138). Read only: no
-// links into the matches here, Meccseitek has the pair's own.
+// ladder and the group's matches with their results (D138); the pair's own
+// rows are marked and open their match page (D140).
 export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
   const title = groupLine(g.number, g.groupCount);
   return (
@@ -240,7 +198,7 @@ export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; mul
         <StandingsTable rows={g.pairs} ranked={g.ranked} linkFor={pairPath} />
         {g.withdrawn.length > 0 && <p className="text-sm text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>}
         <h3 className="mt-2 font-semibold">A csoport meccsei</h3>
-        <FixtureList weeks={readOnly(g.fixtures)} label="A csoport meccsei" />
+        <FixtureList weeks={g.fixtures} label="A csoport meccsei" />
       </CardContent>
     </Card>
   );

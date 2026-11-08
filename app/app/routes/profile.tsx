@@ -40,9 +40,9 @@ import { formerPairs, playerProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx), in two tabs (D136):
-// "Játékosprofil": first the player's pair, "Párod" (D140, #346: the Párom
+// "Játékosprofil": first the player's pair, "Párod" (D141, #346: the Párom
 // page before; /pair leads to #parod), and their former pairs, "Korábbi
-// párjaid" (D141, #347), then what other players see (the summary,
+// párjaid" (D142, #347), then what other players see (the summary,
 // Élő-pont, pairs, matches); and "Beállításaim" (`?tab=settings`): name, level, phone number,
 // sex (#133; the phone is never shown on a public page), notification
 // settings, logout everywhere, deleting the account (#38).
@@ -63,7 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     formerPairs(user.id),
   ]);
   return {
-    // Párod (D140) and Korábbi párjaid (D141).
+    // Párod (D141) and Korábbi párjaid (D142).
     pair,
     former,
     // Fiók törlése (#38): what it would do now, or why it can't.
@@ -96,7 +96,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 // Saves the profile form, or switches email or push (#115) or one
 // notification kind on or off (Értesítések section). Párod's "Nevezünk" and
-// "Párt keresek" (D140) too; Kezdőlap's "Párt keresek" posts here as well.
+// "Párt keresek" (D141) too; Kezdőlap's "Párt keresek" posts here as well.
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;

@@ -112,7 +112,8 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   // Played for anna's side too, on Kezdőlap.
   const partner = await as(browser, PAIRS.p1[1]);
   await visit(partner.page, "/home");
-  await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText("Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
+  // The group's matches show the score from pair A's side (D140).
+  await expect(content(partner.page).getByRole("group", { name: "A csoport meccsei" }).getByLabel(/^Eredmény: /)).toHaveCount(1);
   // The table is ranked now (#201, #220): their row has the match, the win and
   // its 3 points. Columns: #, Pár, M, Gy, V, Szett, Játék, P (D133).
   await expect(content(partner.page)).not.toContainText("Még nincs végleges eredmény");

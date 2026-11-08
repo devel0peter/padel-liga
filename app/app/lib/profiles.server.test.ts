@@ -267,7 +267,7 @@ describe("once the league has started", () => {
   });
 });
 
-describe("formerPairs: Korábbi párjaid on the own Profil (#347, D141)", () => {
+describe("formerPairs: Korábbi párjaid on the own Profil (#347, D142)", () => {
   const dissolve = (id: number, iso: string) =>
     h.raw.prepare("update pairs set status = 'dissolved', dissolved_at = ?, dissolved_by = 'ua' where id = ?").run(sec(iso), id);
   // What "Partner cseréje" stores (changePartner): the old pair dissolved, a

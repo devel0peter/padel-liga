@@ -146,7 +146,7 @@ describe("sidebar", () => {
     expect(nav[1].label).toBe("Padelpárbaj Győr");
   });
 
-  it("shows a player only the app home and notifications: no Párom, the pair is in Profil (D140)", () => {
+  it("shows a player only the app home and notifications: no Párom, the pair is in Profil (D141)", () => {
     expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home", "/notifications"]]);
     expect(adminHome(player)).toBeNull();
   });

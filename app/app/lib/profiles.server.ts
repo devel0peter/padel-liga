@@ -323,7 +323,7 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
 }
 
 /**
- * "Korábbi párjaid" on the player's own Profil (#347, D141): their dissolved
+ * "Korábbi párjaid" on the player's own Profil (#347, D142): their dissolved
  * pairs with a pair page (a published group in a listed city's league), the
  * newest ended first, with how each ended. Selects the partner's name only.
  */

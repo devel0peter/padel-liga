@@ -95,7 +95,7 @@ describe("pairPageDescription (#124)", () => {
   });
 });
 
-describe("the Párod section of Profil (D140, #346)", () => {
+describe("the Párod section of Profil (D141, #346)", () => {
   it("is Profil's Játékosprofil tab at the section", () => {
     expect(PAIR_SECTION_PATH).toBe("/profile#parod");
     expect(pairSectionUrl()).toBe("/profile#parod");

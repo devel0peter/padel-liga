@@ -5,7 +5,7 @@ import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { PARTNER_SEARCH_LABEL, PARTNER_SEARCH_OFF, PARTNER_SEARCH_ON, PARTNER_SEARCH_TITLE } from "~/lib/partner-search";
 
-// "Párt keresek" (D59) on Kezdőlap and in Profil's Párod section (D140),
+// "Párt keresek" (D59) on Kezdőlap and in Profil's Párod section (D141),
 // while the player has no pair in the league: on, Párkeresők lists them for
 // the organizer. The switch posts to Profil's action wherever it is shown.
 // `bare`: inside a card of its own page, so no card around it.

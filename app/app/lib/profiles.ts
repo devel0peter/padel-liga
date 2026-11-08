@@ -210,10 +210,10 @@ export function playerStats(
   return { seasons: new Set(played.map((g) => g.season)).size, rounds: played.length, matches: wins + losses, wins, losses };
 }
 
-/** How a former pair ended (#347, D141). */
+/** How a former pair ended (#347, D142). */
 export type PairEnd = "Felbontva" | "Partnercsere";
 
-/** A former pair on the player's own Profil, "Korábbi párjaid" (#347, D141). */
+/** A former pair on the player's own Profil, "Korábbi párjaid" (#347, D142). */
 export type FormerPairView = {
   pairId: number;
   /** The former partner: "Törölt játékos" with no id when deleted or anonymized. */
@@ -261,7 +261,7 @@ export function roundsText(groups: readonly { season: string; phase: number; sta
 }
 
 /**
- * The pairs a partner change ended (#347, D141): "Partner cseréje" writes a
+ * The pairs a partner change ended (#347, D142): "Partner cseréje" writes a
  * pair.change audit entry whose detail names the old pair, "league:1; from
  * pair:12; user:… -> user:…" (changePartner in pairs.server.ts). Every other
  * end (a dissolve, an account deletion) is "Felbontva".
@@ -285,7 +285,7 @@ export type FormerPairInput = {
 };
 
 /**
- * "Korábbi párjaid" (#347, D141): the player's dissolved pairs that played in
+ * "Korábbi párjaid" (#347, D142): the player's dissolved pairs that played in
  * a published group (one without has no pair page and is left out), the
  * newest ended first. Names only: never a partner's email or phone.
  */

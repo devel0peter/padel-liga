@@ -304,7 +304,7 @@ describe("pairCreated (#260, D121)", () => {
     league: "Padelpárbaj Győr",
   };
 
-  it("names the partner and the league, and links Párod on Profil (D140)", () => {
+  it("names the partner and the league, and links Párod on Profil (D141)", () => {
     const e = pairCreated(input);
     expect(e.subject).toBe("Van párod – Padelpárbaj");
     expect(e.text).toContain("Szia Nagy Anna!");

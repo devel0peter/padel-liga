@@ -10,7 +10,7 @@ import { applyToSeason, entryViews } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
 
-// The "Párod" section of Profil (D140, #346; the "Párom" page before): the
+// The "Párod" section of Profil (D141, #346; the "Párom" page before): the
 // pair (by pair link, or made by a Szervező, #97) and the league's open
 // seasons to enter together (#23). Without a pair: the player's own pair
 // link to send to a partner (2026-10-31), and the "Párt keresek" switch

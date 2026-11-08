@@ -13,8 +13,8 @@ import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, PAIR_SECTION_ID, pairPageDescription 
 import type { FormerPairView } from "~/lib/profiles";
 import { CONTACT_EMAIL } from "~/lib/site";
 
-// Profil's "Párod" section (D140, #346; the "Párom" page before) and
-// "Korábbi párjaid" under it (D141, #347), on the Játékosprofil tab. The data
+// Profil's "Párod" section (D141, #346; the "Párom" page before) and
+// "Korábbi párjaid" under it (D142, #347), on the Játékosprofil tab. The data
 // comes from pair-section.server.ts and formerPairs (profiles.server.ts).
 
 type Overview = PairSectionData["overview"][number];
@@ -186,7 +186,7 @@ export function PairSection({ data: d, actionData }: { data: PairSectionData; ac
   );
 }
 
-// "Korábbi párjaid" (D141, #347): only when there is one. Names only, never
+// "Korábbi párjaid" (D142, #347): only when there is one. Names only, never
 // a former partner's email or phone; a deleted partner without a link.
 export function FormerPairs({ list }: { list: FormerPairView[] }) {
   if (list.length === 0) return null;

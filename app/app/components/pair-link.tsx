@@ -56,7 +56,7 @@ export function PairLinkBox({ url, league, bare = false }: { url: string; league
       </div>
     </div>
   );
-  // Inside a card of its own page (Profil's Párod section, D140): no card around it.
+  // Inside a card of its own page (Profil's Párod section, D141): no card around it.
   if (bare)
     return (
       <div className="grid content-start gap-3">

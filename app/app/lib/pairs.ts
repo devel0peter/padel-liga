@@ -20,7 +20,7 @@ export const SOURCE_LABELS: Record<PairSource, string> = {
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
 
-// The pair lives in the "Párod" section of Profil (D140, #346; a page of its
+// The pair lives in the "Párod" section of Profil (D141, #346; a page of its
 // own, "Párom" at /pair, before). /pair still leads there, query kept, for
 // links in mail and notices sent before.
 export const PAIR_SECTION_ID = "parod";

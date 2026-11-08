@@ -107,7 +107,7 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
   // First, unlabelled: the app home and the notifications, for everyone (the
-  // pair is a section of Profil, D140).
+  // pair is a section of Profil, D141).
   const sections: NavSection[] = [
     {
       label: "",

@@ -30,7 +30,7 @@ function annasMatches(): { id: number; week: number; opponents: Player[] }[] {
 
 const status = (page: Page) => page.getByRole("region", { name: "Állapot" });
 
-test("17. Kezdőlap shows the group, the division line, the matches by week with the week off, Teendők and phones", async ({ browser }) => {
+test("17. Kezdőlap shows the group, the division line, the next match with phones, the group's matches with the week off, Teendők", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/home");
   const main = content(page);
@@ -38,27 +38,25 @@ test("17. Kezdőlap shows the group, the division line, the matches by week with
   // Two groups: group 1 is Bronz, group 2 Réz (spec 4).
   await expect(main.getByText(/^(Bronz divízió, 1\. csoport|Réz divízió, 2\. csoport)$/)).toBeVisible();
   await expect(main.getByText("Hamarosan itt lesz a csoportod")).toHaveCount(0);
-  // A group of 3: 2 matches and the week off.
-  const matches = main.getByRole("list", { name: "Meccseitek" });
-  await expect(matches.locator(":scope > li")).toHaveCount(3);
-  await expect(matches.getByText("Pihenőhét: ezen a héten nem játszotok.")).toHaveCount(1);
-  // Each match is one link (the next one opens as a block with "A meccs oldala", D136).
-  await expect(matches.locator('a[href^="/matches/"]')).toHaveCount(2);
-  await expect(matches.getByRole("link", { name: "A meccs oldala" })).toHaveCount(1);
-  await expect(matches.getByText("Egyeztetésre vár")).toHaveCount(2);
-  // Both matches are a Teendő; the next match's opponents are tap to call and to write (D135).
+  // The group's matches under its table (D138): a group of 3, so 3 weeks, one
+  // match each, and the pair rests one week; Anna's 2 matches open their page (D140).
+  const fixtures = main.getByRole("group", { name: "A csoport meccsei" });
+  await expect(fixtures.locator("li")).toHaveCount(3);
+  await expect(fixtures.getByText(`Pihen: ${anna.name} – ${PAIRS.p1[1].name}`)).toHaveCount(1);
+  await expect(fixtures.locator('a[href^="/matches/"]')).toHaveCount(2);
+  // Both matches are a Teendő.
   await expect(main.getByRole("link", { name: /^Ajánlj időpontot/ })).toHaveCount(2);
+  // Következő meccsetek (D140): the earliest match, its opponents tap to call and to write (D135).
   const [next] = annasMatches().sort((x, y) => x.week - y.week);
-  await expect(matches.locator('a[href^="tel:"]')).toHaveCount(2);
-  for (const o of next!.opponents) await expect(matches.locator(`a[href="mailto:${o.email}"]`)).toHaveCount(1);
+  const card = main.getByRole("region", { name: "Következő meccsetek" });
+  await expect(card).toContainText("Egyeztetésre vár");
+  await expect(card.getByRole("link", { name: "A meccs oldala" })).toHaveAttribute("href", `/matches/${next!.id}`);
+  await expect(card.locator('a[href^="tel:"]')).toHaveCount(2);
+  for (const o of next!.opponents) await expect(card.locator(`a[href="mailto:${o.email}"]`)).toHaveCount(1);
   // No other address: not Anna's, not her partner's.
   await expect(main.locator('a[href^="mailto:"]')).toHaveCount(2);
   await expect(main).not.toContainText(anna.email);
-  // Under the group's table: every match of the group by week, to read only (D138).
-  const fixtures = main.getByRole("group", { name: "A csoport meccsei" });
-  await expect(fixtures).toBeVisible();
   await expect(fixtures.getByRole("region", { name: "1. hét" })).toBeVisible();
-  await expect(fixtures.locator("a")).toHaveCount(0);
   await context.close();
 });
 
@@ -129,7 +127,8 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   // Anna's partner sees it scheduled too.
   const partner = await as(browser, PAIRS.p1[1]);
   await visit(partner.page, "/home");
-  await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText(/Lefixálva: .*19:30/);
+  // In the group's matches the fixed one shows its time (D140).
+  await expect(content(partner.page).getByRole("group", { name: "A csoport meccsei" }).locator(`a[href="/matches/${first!.id}"]`)).toContainText("19:30");
   await partner.context.close();
   await player.context.close();
 });

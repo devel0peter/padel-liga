@@ -19,7 +19,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 14, search, filter and Levél nekik (#148) | [`15-pairs-filter.spec.ts`](../app/e2e/15-pairs-filter.spec.ts) |
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
 | 15, the second league's player (#331) | [`28-league-members.spec.ts`](../app/e2e/28-league-members.spec.ts) |
-| 37, Párod and Korábbi párjaid on Profil (D140, D141) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
+| 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
 
 ## Set up
 
@@ -548,7 +548,7 @@ Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't
 
 ### 37. A player finds their pair and former pairs on Profil (after step 6)
 
-The pair is a section of Profil, and Profil lists the pairs that ended (decision log (`docs/decisions.md`) D140, D141; `app/e2e/30-pair-in-profile.spec.ts`).
+The pair is a section of Profil, and Profil lists the pairs that ended (decision log (`docs/decisions.md`) D141, D142; `app/e2e/30-pair-in-profile.spec.ts`).
 
 - Page: `/pair` (the old Párom address), then `/profile`
 - Account: a player of step 6; then `idegen.ilona@example.test` with a second league (add a `league_members` row for Mintaváros by hand)

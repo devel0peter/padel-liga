@@ -228,7 +228,6 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
     expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
-    expect(mine!.offWeeks).toEqual([{ week: 2, opponents: "Játékos G – Játékos H" }]);
     const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
     freshDb({ withPair4: false });
     const [never] = await M.currentGroups("a", NOW);

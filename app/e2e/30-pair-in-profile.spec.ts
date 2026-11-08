@@ -1,4 +1,4 @@
-// Walkthrough step 37 (D140, #346; D141, #347): the pair is a section of
+// Walkthrough step 37 (D141, #346; D142, #347): the pair is a section of
 // Profil. The old Párom address (/pair) leads to Profil's Párod section with
 // its query; no menu has Párom; a player in two leagues sees a card per
 // league. "Korábbi párjaid" lists a pair that ended after playing: the

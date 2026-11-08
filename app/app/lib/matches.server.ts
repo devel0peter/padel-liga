@@ -229,8 +229,6 @@ export type HomeGroup = {
   // The pairs withdrawn mid-phase (#34), by name, shown below the table.
   withdrawn: string[];
   matches: HomeMatch[];
-  // The weeks whose match is off because the opponents withdrew (#34).
-  offWeeks: { week: number; opponents: string }[];
 };
 
 /**
@@ -340,9 +338,6 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
           { phaseStartsAt: g.startsAt, currentWeek: started ? week : null, mine: g.pairId },
         ),
         withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
-        offWeeks: ours
-          .filter((m) => voided(m, byId))
-          .map((m) => ({ week: m.week, opponents: pairName(other(m)?.players ?? []) })),
         matches: own.map((m) => {
           const side: Side = m.pairA === g.pairId ? "a" : "b";
           const them = other(m);

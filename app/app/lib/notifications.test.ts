@@ -299,7 +299,7 @@ describe("result messages (#28, #29, spec 13)", () => {
 describe("pairWithdrawnMessage (#34)", () => {
   const input = { league: "Padelpárbaj Győr", season: "2026/27 tél", phase: 1, group: 2, reason: "Sérülés." };
 
-  it("tells the pair it is out of the round and the season, with the reason, and links to Párod on Profil (D140)", () => {
+  it("tells the pair it is out of the round and the season, with the reason, and links to Párod on Profil (D141)", () => {
     const m = pairWithdrawnMessage(input, "pair");
     expect(m.title).toBe("A szervező visszaléptetett titeket a körből");
     expect(m.body).toContain("2. csoport, 1. kör, 2026/27 tél, Padelpárbaj Győr.");

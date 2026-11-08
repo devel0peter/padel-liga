@@ -74,13 +74,24 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
   return (
     <Card role="region" aria-label={`${group.number}. csoport`} className={cn("@container/group", group.mine && "ring-2 ring-nav-active/60")}>
       <CardHeader>
-        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
-        <CardDescription className="flex items-center gap-1.5">
+        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold whitespace-nowrap">{group.number}. csoport</CardTitle>
+        <CardDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
           {label}
+          {/* On a phone the badge sits here; the header's right side has only the switch. */}
+          {group.mine && (
+            <Badge variant="secondary" className="@[30rem]/group:hidden">
+              A ti csoportotok
+            </Badge>
+          )}
         </CardDescription>
-        <CardAction className="flex flex-col items-end gap-1.5">
-          {group.mine && <Badge variant="secondary">A ti csoportotok</Badge>}
+        {/* The badge and the switch side by side once the card has room (D143). */}
+        <CardAction className="flex items-center justify-end gap-2">
+          {group.mine && (
+            <Badge variant="secondary" className="hidden @[30rem]/group:inline-flex">
+              A ti csoportotok
+            </Badge>
+          )}
           <ViewSwitch view={view} onChange={setView} count={count} />
         </CardAction>
       </CardHeader>

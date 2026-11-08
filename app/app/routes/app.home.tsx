@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
 import { GroupStanding, MyMatches, Todos, todos } from "~/components/my-group";
-import { PhaseList } from "~/components/season-calendar";
+import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
@@ -81,6 +81,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     waiting: isWaiting(s) ? waitingText(counts.get(s.id) ?? 0, minimums.get(s.leagueId) ?? 0) : null,
     startsAtMinimum: s.startsAtMinimum,
     phases: s.phases,
+    // The round being played, marked in the list (D139).
+    current: currentPhase(s.phases, now),
     entry: views.get(s.id) ?? null,
     strikes: strikes.get(s.id) ?? { count: 0, leaving: false },
   }));
@@ -200,13 +202,13 @@ function SeasonDates({ s }: { s: SeasonView }) {
           <span className="font-medium">Nevezés:</span> {formatShortDate(s.registrationOpensAt)} – {formatDeadline(s.registrationClosesAt)}
         </p>
       )}
-      <PhaseList phases={s.phases} />
+      <PhaseList phases={s.phases} current={s.current} />
     </>
   );
 }
 
-// A season: entry and strikes; once it runs (`running`) a small card whose
-// dates are folded away (docs/player-ui.md H6).
+// A season: its dates with the round being played marked, entry and
+// strikes; once it runs (`running`) a smaller card (docs/player-ui.md H6, D139).
 function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolean; actionData: Route.ComponentProps["actionData"] }) {
   return (
     <Card size={running ? "sm" : "default"} className={running ? undefined : "max-w-2xl"}>
@@ -215,16 +217,7 @@ function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolea
         <CardDescription>{s.league}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm">
-        {running ? (
-          <details className="group">
-            <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">A szezon naptára</summary>
-            <div className="grid gap-3 pt-3">
-              <SeasonDates s={s} />
-            </div>
-          </details>
-        ) : (
-          <SeasonDates s={s} />
-        )}
+        <SeasonDates s={s} />
         {(s.strikes.count > 0 || s.strikes.leaving) && <StrikeLine {...s.strikes} />}
         {actionData?.season === s.id && (
           <p role={actionData.error ? "alert" : "status"} className={actionData.error ? "font-semibold text-destructive" : "font-medium"}>

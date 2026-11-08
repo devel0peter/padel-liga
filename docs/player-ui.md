@@ -51,7 +51,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), to read only. | D67, D85, D136, D138 |
 | H4 | Where the pair stands on the ladder: "Réz divízió, 2. csoport · még 1 feljutás a divízió éléig, 3 kör van hátra". | spec 14 |
 | H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
-| H6 | The season card stays (entry button, strikes count) but small: the phase dates are folded away once the season runs. | D103a, #23, D136 |
+| H6 | The season card stays (entry button, strikes count) but small; its rounds are listed with their dates, the round being played highlighted. | D103a, #23, D136, D139 |
 | H7 | Before the groups are out: pair link, "Párt keresek", entry, as today. | D55, D59, #23 |
 
 ## 5. Match page

@@ -9,7 +9,6 @@ import { FixtureList } from "~/components/fixture-list";
 import { HelpTip } from "~/components/help-tip";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { DIVISION_DOT } from "~/lib/division-colors";
 import type { LadderBand, LadderGroup } from "~/lib/ladder";
@@ -41,29 +40,53 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+// "Tabella | Meccsek" in the card's header, only on a card too narrow for the
+// two side by side (D143). Pressed state for a screen reader.
+function ViewSwitch({ view, onChange, count }: { view: "table" | "matches"; onChange: (v: "table" | "matches") => void; count: number }) {
+  const item = (v: "table" | "matches", icon: React.ReactNode, text: string) => (
+    <button
+      type="button"
+      aria-pressed={view === v}
+      onClick={() => onChange(v)}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&_svg]:size-3.5",
+        view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {icon}
+      {text}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Nézet" className="inline-flex rounded-lg bg-muted p-0.5 @[46rem]/group:hidden">
+      {item("table", <Table2 aria-hidden />, "Tabella")}
+      {item("matches", <ListOrdered aria-hidden />, `Meccsek (${count})`)}
+    </div>
+  );
+}
+
 // One group: its table and, beside it, its matches by week when the card is
-// wide enough (a container query, 44rem); on a narrower card one of the two
-// shows at a time and "Mérkőzések" / "Tabella" switches between them (D143).
+// wide enough (a container query on the card, 46rem); on a narrower card one
+// of the two shows at a time, switched in the header (D143).
 function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
   const [view, setView] = useState<"table" | "matches">("table");
   const count = group.weeks.reduce((n, w) => n + w.matches.length, 0);
   return (
-    <Card role="region" aria-label={`${group.number}. csoport`} className={group.mine ? "ring-2 ring-nav-active/60" : undefined}>
+    <Card role="region" aria-label={`${group.number}. csoport`} className={cn("@container/group", group.mine && "ring-2 ring-nav-active/60")}>
       <CardHeader>
         <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
         <CardDescription className="flex items-center gap-1.5">
           <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
           {label}
         </CardDescription>
-        {group.mine && (
-          <CardAction>
-            <Badge variant="secondary">A ti csoportotok</Badge>
-          </CardAction>
-        )}
+        <CardAction className="flex flex-col items-end gap-1.5">
+          {group.mine && <Badge variant="secondary">A ti csoportotok</Badge>}
+          <ViewSwitch view={view} onChange={setView} count={count} />
+        </CardAction>
       </CardHeader>
-      <CardContent className="@container">
-        <div className="grid gap-4 @[44rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[44rem]:gap-6">
-          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[44rem]:grid")}>
+      <CardContent>
+        <div className="grid gap-4 @[46rem]/group:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[46rem]/group:gap-6">
+          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[46rem]/group:grid")}>
             <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
             {group.withdrawn.length > 0 && (
               <p className="text-sm text-muted-foreground">
@@ -71,23 +94,9 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
               </p>
             )}
           </div>
-          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[44rem]:grid")}>
+          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[46rem]/group:grid")}>
             <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} compact />
           </div>
-          {/* Only when the two don't fit side by side. */}
-          <Button variant="outline" className="w-full @[44rem]:hidden" onClick={() => setView(view === "table" ? "matches" : "table")}>
-            {view === "table" ? (
-              <>
-                <ListOrdered aria-hidden />
-                Mérkőzések ({count})
-              </>
-            ) : (
-              <>
-                <Table2 aria-hidden />
-                Tabella
-              </>
-            )}
-          </Button>
         </div>
       </CardContent>
     </Card>

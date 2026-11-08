@@ -50,7 +50,7 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(main.getByRole("region", { name: "Bronz divízió", exact: true }).getByRole("region", { name: "1. csoport" })).toHaveCount(1);
 
   // The matches sit beside the table on a wide card (D143): every week with one match in a group of 3.
-  await expect(first.getByRole("button", { name: /^Mérkőzések/ })).toBeHidden();
+  await expect(first.getByRole("group", { name: "Nézet" })).toBeHidden();
   const panel = first.getByRole("group", { name: "1. csoport meccsei" });
   for (const week of ["1. hét", "2. hét", "3. hét"]) await expect(panel.getByRole("region", { name: week, exact: true })).toBeVisible();
   await expect(panel.getByRole("listitem")).toHaveCount(3);
@@ -77,14 +77,16 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(tip).toContainText("Egy fel, egy le");
   await expect(main.getByRole("heading", { level: 1, name: "Tabella", exact: true })).toBeVisible();
 
-  // On a phone the card shows one of the two; "Mérkőzések" switches to the matches and back (D143).
+  // On a phone the card shows one of the two; the header's switch flips to the matches and back (D143).
   await page.setViewportSize({ width: 390, height: 844 });
+  const view = first.getByRole("group", { name: "Nézet" });
   await expect(first.getByRole("table")).toBeVisible();
   await expect(panel).toBeHidden();
-  await first.getByRole("button", { name: "Mérkőzések (3)" }).click();
+  await view.getByRole("button", { name: "Meccsek (3)" }).click();
+  await expect(view.getByRole("button", { name: "Meccsek (3)" })).toHaveAttribute("aria-pressed", "true");
   await expect(panel).toBeVisible();
   await expect(first.getByRole("table")).toBeHidden();
-  await first.getByRole("button", { name: "Tabella" }).click();
+  await view.getByRole("button", { name: "Tabella" }).click();
   await expect(first.getByRole("table")).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 720 });
 

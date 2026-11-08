@@ -119,7 +119,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - You land on Kezdőlap with a "Teszt szezon" card (league Padelpárbaj Mintaváros): "Nevezés" dates, the four rounds with their deadlines, "Szezon vége:".
   - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Párkeresők, Klubok.
-  - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet, és még nincs párod." with a link to Párom.
+  - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet, és még nincs párod." with the link "Párod a Profilban".
 
 ### 2. Admin checks the setup pages
 
@@ -160,17 +160,17 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 
 ### 6. The partner accepts the pair link, the pair forms
 
-- Pages: `/pair` ("Párom") of the first player, the link in the second player's window, `/pair` again
+- Pages: `/profile` (Profil, "Párod") of the first player, the link in the second player's window, `/profile` again
 - Account: the first player of a pair, then the second (registered in step 5)
 - Do: copy the link from "Hívd meg a párodat", open it as the second player, press "Elfogadom".
 - Expect:
-  - Párom shows "Mostantól párban vagytok." and the partner's name, email and phone; the first partner sees the same after a reload.
+  - Párod shows "Mostantól párban vagytok." and the partner's name, email and phone; the first partner sees the same after a reload.
   - A "Nevezés" card with the "Teszt szezon" and a "Nevezünk" button.
-- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" on Párom, and the Szervező pairs them on Párkeresők (`/admin/leagues/minta/solos`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
+- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" in Párod (Profil), and the Szervező pairs them on Párkeresők (`/admin/leagues/minta/solos`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
 
 ### 7. A pair enters the season
 
-- Pages: `/pair` or `/home`
+- Pages: `/profile` or `/home`
 - Account: either player of a pair
 - Do: press "Nevezünk".
 - Expect:
@@ -223,14 +223,14 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 
 ### 13. Szervező pairs two who look for a partner (side path)
 
-- Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" on Párom (off by default, #333).
+- Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" in Párod (Profil) (off by default, #333).
 - Page: `/admin/leagues/minta/solos` ("Párkeresők")
 - Account: `szervezo@example.test`
 - Expect: "2 regisztrált játékos keres párt, 1 párt hoztál össze": the two under "Regisztráltak", by level, with their phone numbers. No "Még nem regisztráltak" part and no address. Idegen Ilona, who looks for a partner in Példaváros, is not listed.
 - Do: tick both, press "Párba teszem (2/2)", confirm.
 - Expect:
   - "0 regisztrált játékos keres párt, 2 párt hoztál össze"; the pair is under "Összehozott párok" and can be dissolved on Párok.
-  - Both get the in-app message "Párt találtunk neked" and the "Van párod" email; Párom shows the partner.
+  - Both get the in-app message "Párt találtunk neked" and the "Van párod" email; Párod shows the partner.
 
 ### 14. Szervező changes pairs (side path)
 
@@ -246,41 +246,41 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
   2. "Partner cseréje" on a pair: pick who stays and the new partner, press "Csere". The old pair reads "Felbontva", the new one "kézzel".
   3. "Felbontás" on a pair, confirm. It reads "Felbontva"; an entry it hasn't played in reads "Visszavonva".
   4. "Benevezés" under "Nem nevezett" on the new pair, confirm (the dialog names the pair). It reads "Nevezett", with the round it starts in ("a 2. körtől" after step 11). Try it on a pair where a player has no level: refused, naming the player.
-  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again. Pick "Visszavonva" in the filter: the rows' badge uses the same word. Both players' Párom reads "A szervező kivett titeket a szezonból. Ha újra játszanátok, szóljatok neki…", with no "Nevezünk" button.
+  5. "Kivétel a szezonból" on that pair, confirm. It reads "Visszavonva" and stays "Aktív"; "Benevezés" enters it again. Pick "Visszavonva" in the filter: the rows' badge uses the same word. Both players' Párod reads "A szervező kivett titeket a szezonból. Ha újra játszanátok, szóljatok neki…", with no "Nevezünk" button.
   6. Type a name in "Keresés" without accents (for example "kovacs"): only the matching rows stay, and the address has `?q=`. "Szűrők törlése" brings every row back.
   7. Press "Nincs a ligában (N)": exactly N rows, the players without a pair ("Nincs párja", "Párt keres" where the switch is on) and the pairs without an entry. A reload keeps it. As `admin@example.test`, "Levél nekik" opens "Új körlevél" with those players as recipients ("Lista"); don't send.
 - Expect:
   - Nothing new in the terminal or on Kimenő levelek: no email goes out for a pair change or an entry change.
-  - The players see the change on Párom; an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
+  - The players see the change in Párod (Profil); an entry change also on Értesítések ("A szervező benevezett titeket", "A szervező kivett titeket a szezonból"). From here a new pair can also enter the season itself (step 7).
   - After step 11, a pair in a published group has both pair buttons disabled, with the reason, and "Kivétel a szezonból" opens "Visszaléptetés a csoportból" (#34): it needs a reason, and says the pair's matches leave the table and the pair leaves the season. After it the pair reads "Visszavonva", its pair buttons work again, and "Benevezés" enters it for the next round. The group's table on `/league/minta` no longer lists it (it is named below the table, "Visszalépett: …"), its matches there are gone, its players' Kezdőlap shows no group, and the other pairs' group table on Kezdőlap leaves it out, names it below ("Visszalépett: …") and shows its week's match as off. Értesítések: the pair got "A szervező visszaléptetett titeket a körből" with the reason; the others "Visszalépett egy pár a csoportodból" with no reason. No email.
 
 ### 15. A new player registers without a league and chooses one (side path)
 
 Anyone can create an account, no invite needed (#113). Logging in on `/register` or `/login` directly, not through a league's button, the account belongs to no league until the player chooses one (D128, #331).
 
-- Page: `/register` (or `/login`), then `/welcome`, `/home` and `/pair` ("Párom")
+- Page: `/register` (or `/login`), then `/welcome`, `/home` and `/profile` (Profil, "Párod")
 - Account: a new address that is not in the seed, for example `uj.jatekos@example.test`
 - Do: ask for a login code, enter the code from the terminal, then fill in the first-login page (name, level, phone, consent) and press "Kész".
 - Expect:
   - The code arrives like for anyone else; nothing about 2 November.
   - Under the code field: "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, vagy írj nekünk: hello@padelparbaj.hu." (with "lépj be Google-lel" / "regisztrálj Google-lel" before the last part when Google login is set up). The same line for every address, also one that gets no code (#123).
   - The first-login page names no partner and prefills no level.
-  - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párom says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
-  - After "Csatlakozom": the card is gone; Kezdőlap and Párom show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párom also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
+  - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párod says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
+  - After "Csatlakozom": the card is gone; Kezdőlap and Párod show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párod also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
-  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párom her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Párok lists only her, and Mintaváros's Párok, Párkeresők and Helyettes pick never list her.
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Párok lists only her, and Mintaváros's Párok, Párkeresők and Helyettes pick never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
 A player without a pair sends their own link; the partner registers and accepts (decision log (`docs/decisions.md`), 2026-10-31).
 
-- Page: `/home` as the player of step 15, then the link in a private window, `/register`, `/welcome`, the link again, `/pair`
+- Page: `/home` as the player of step 15, then the link in a private window, `/register`, `/welcome`, the link again, `/profile`
 - Account: another new address, for example `link.partner@example.test`
 - Do: copy the link from "Hívd meg a párodat", open it in a private window, press "Regisztrálok", ask for a code, enter it, fill in the first-login page, then press "Elfogadom".
 - Expect:
   - Logged out, the link shows "Új Játékos meghívott, hogy legyél a párja." and the league, never an email.
   - `/register` says "Regisztráció" and "Regisztráció Google-lel", the code step "Tovább"; it is the login flow.
-  - After "Kész" the partner is back on the link; "Elfogadom" opens Párom with "Mostantól párban vagytok." and the partner's name.
+  - After "Kész" the partner is back on the link; "Elfogadom" opens Profil's Párod section (`/profile?joined=1#parod`) with "Mostantól párban vagytok." and the partner's name.
   - Both players' link boxes are gone; on "Párok" the pair's source is "linkkel". No email was queued.
   - The player's own link, opened by themselves, says "Ez a saját linked."
 
@@ -482,7 +482,7 @@ Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
 Profiles, for logged-in members only (#36, decision log (`docs/decisions.md`) D110, D112).
 
 - Page: `/league/minta`, then a pair's name in a group table
-- Account: none (logged out) first; then the player of step 27, on the Tabella, Profil and Párom
+- Account: none (logged out) first; then the player of step 27, on the Tabella and Profil
 - Do: logged out, open a profile's address; logged in, press the player's pair in their group table, then one of the two names on the pair page.
 - Expect:
   - Logged out: a profile's address goes to the login page and back to the profile after logging in.
@@ -490,7 +490,7 @@ Profiles, for logged-in members only (#36, decision log (`docs/decisions.md`) D1
   - The pair page (`/pairs/<id>`): both names (each a link), "Csoportok" with "<season>, 1. kör: <n>. csoport (<division>)" and the pair's place in the table, the same as on the league page, and "Meccsek" with the step 27 win and the step 28 decision from the pair's side ("Győzelem · 4:1, 2:4, szuper tie-break 10:8", "Vereség · Mindkét pár vereséget kap (0:4, 0:4)"). A result still waiting or disputed is not listed.
   - The player page (`/players/<id>`): the name, the summary (D136: Élő-pont as a whole number, Szezon 1, Kör 1, Meccs, Győzelem, Vereség from the final results), "Párja" with the pair and its group, and the matches; the step 27 win has an "Élő-pont: +… → …" line, the decision has none (no Elo change). After two rated matches a small chart shows the rating.
   - No email address or phone number on either page. An unknown id, or a deleted player's page, is the 404 page ("Ez az oldal nem létezik."); a deleted player is "Törölt játékos" without a link.
-  - Profil's "Játékosprofil" tab shows the same as the player page (with a link to it), and Párom "A párotok oldala", once the pair is in a published group.
+  - Profil's "Játékosprofil" tab shows the same as the player page (with a link to it), and its Párod section "A párotok oldala", once the pair is in a published group.
 
 ### 33a. A player opens the Ranglista (after step 33)
 
@@ -544,6 +544,18 @@ Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't
   - "Jóváhagyom": the match is final, a 4-0 4-0 walkover for the reporting pair (the group table and the Tabella count it); the log has "Nem jöttek el: a szervező jóváhagyta a bejelentést. <indok>". The other pair's two players get a strike ("Nem jelentetek meg egy lefixált meccsen."), which Párok lists with "Nem jelent meg". Both pairs are told in the app and by push; no email (a 2nd strike sends its own warning).
   - "Elutasítom" instead: nothing changes on the match; both pairs see "A szervező elutasította …" with the reason on the match page, and a new report can be made.
   - Napló lists "Nem jöttek el: jóváhagyás" (or "elutasítás") with the match. The deadline resolution leaves a match with a waiting report alone until the Szervező decides.
+
+### 37. A player finds their pair on Profil (after step 6)
+
+The pair is a section of Profil (decision log (`docs/decisions.md`) D140; `app/e2e/30-pair-in-profile.spec.ts`).
+
+- Page: `/pair` (the old Párom address), then `/profile`
+- Account: a player of step 6; then `idegen.ilona@example.test` with a second league (add a `league_members` row for Mintaváros by hand)
+- Do: open `/pair` and `/pair?joined=1`; look at the sidebar and, at 390px, the bottom bar.
+- Expect:
+  - `/pair` lands on Profil's "Játékosprofil" tab at the "Párod" card, with the query kept (`/profile?joined=1#parod` says "Mostantól párban vagytok."). The card shows what Párom showed: the partner's name, email and phone, "A párotok oldala" once the pair is in a published group, and the season's entry; without a pair, "Hívd meg a párodat" with the pair link and the "Párt keresek" switch.
+  - Neither the sidebar nor the bottom bar has Párom; Profil stays.
+  - A player in two leagues sees one card per league under "Párod", each named after its league.
 
 ## A running round instead
 

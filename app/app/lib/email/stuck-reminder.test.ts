@@ -45,8 +45,8 @@ describe("stuckReminder", () => {
         "Szia Anna!",
         "Még nincs párod (Padelpárbaj Győr). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.",
         "https://padelparbaj.hu/pair/join/tok",
-        "Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:",
-        "https://padelparbaj.hu/pair",
+        "Ha nincs kivel játszanod, a Profil oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:",
+        "https://padelparbaj.hu/profile#parod",
         "Nevezési határidő: nov. 6., péntek 23:59. Az 1. kör nov. 9., hétfő indul.",
         "Péter\nPadelpárbaj",
       ].join("\n\n"),
@@ -59,8 +59,8 @@ describe("stuckReminder", () => {
     expect(body(input)).toBe(
       [
         "Szia Anna!",
-        "Béla pároddal még nem neveztetek (2026/27 tél, Padelpárbaj Győr). Egyikőtök nyomja meg a „Nevezünk” gombot a Párom oldalon:",
-        "https://padelparbaj.hu/pair",
+        "Béla pároddal még nem neveztetek (2026/27 tél, Padelpárbaj Győr). Egyikőtök nyomja meg a „Nevezünk” gombot a Profil oldalon:",
+        "https://padelparbaj.hu/profile#parod",
         "Nevezési határidő: nov. 6., péntek 23:59. Az 1. kör nov. 9., hétfő indul.",
         "Péter\nPadelpárbaj",
       ].join("\n\n"),

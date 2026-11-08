@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { canDissolve, checkNewPair, checkPairLink, NEW_PAIR_REFUSALS, pairPageDescription, PAIR_LINK_REFUSALS, SOURCE_LABELS } from "./pairs";
+import {
+  canDissolve,
+  checkNewPair,
+  checkPairLink,
+  NEW_PAIR_REFUSALS,
+  PAIR_LINK_REFUSALS,
+  PAIR_SECTION_PATH,
+  pairPageDescription,
+  pairSectionUrl,
+  SOURCE_LABELS,
+} from "./pairs";
 
 describe("checkNewPair (#97)", () => {
   const ok = { a: "a", b: "b", registered: true, paired: false };
@@ -82,5 +92,17 @@ describe("pairPageDescription (#124)", () => {
     expect(text).toBe("Egy ligában egy párod lehet.");
     expect(text).not.toContain("a@b.hu");
     expect(text).not.toContain("változna");
+  });
+});
+
+describe("the Párod section of Profil (D140, #346)", () => {
+  it("is Profil's Játékosprofil tab at the section", () => {
+    expect(PAIR_SECTION_PATH).toBe("/profile#parod");
+    expect(pairSectionUrl()).toBe("/profile#parod");
+    expect(pairSectionUrl("?")).toBe("/profile#parod");
+  });
+  it("keeps the old address's query", () => {
+    expect(pairSectionUrl("?joined=1")).toBe("/profile?joined=1#parod");
+    expect(pairSectionUrl("?joined=1&league=gyor")).toBe("/profile?joined=1&league=gyor#parod");
   });
 });

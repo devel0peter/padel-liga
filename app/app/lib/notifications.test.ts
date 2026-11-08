@@ -163,7 +163,7 @@ describe("player messages (#115)", () => {
     expect(seasonEntryMessage({ ...base, joins: { phase: 1, startsAt: new Date("2026-11-08T23:00:00Z") } })).toEqual({
       title: "Beneveztetek",
       body: "2026/27 tél, Padelpárbaj Győr. Az 1. körtől játszotok (kezdés: nov. 9.).",
-      url: "/pair",
+      url: "/profile#parod",
     });
     expect(seasonEntryMessage({ ...base, joins: { phase: 2, startsAt: new Date("2026-11-29T23:00:00Z") } }).body).toBe(
       "2026/27 tél, Padelpárbaj Győr. A 2. körtől játszotok (kezdés: nov. 30.).",
@@ -299,13 +299,13 @@ describe("result messages (#28, #29, spec 13)", () => {
 describe("pairWithdrawnMessage (#34)", () => {
   const input = { league: "Padelpárbaj Győr", season: "2026/27 tél", phase: 1, group: 2, reason: "Sérülés." };
 
-  it("tells the pair it is out of the round and the season, with the reason, and links to Párom", () => {
+  it("tells the pair it is out of the round and the season, with the reason, and links to Párod on Profil (D140)", () => {
     const m = pairWithdrawnMessage(input, "pair");
     expect(m.title).toBe("A szervező visszaléptetett titeket a körből");
     expect(m.body).toContain("2. csoport, 1. kör, 2026/27 tél, Padelpárbaj Győr.");
     expect(m.body).toContain("a szezonból is kikerültetek");
     expect(m.body).toMatch(/Indok: Sérülés\.$/);
-    expect(m.url).toBe("/pair");
+    expect(m.url).toBe("/profile#parod");
   });
 
   it("tells the group's other pairs without the reason", () => {

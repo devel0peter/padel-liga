@@ -37,7 +37,7 @@ test("7. every pair enters once and is in at once; the partner sees it too", asy
   const offset = logOffset();
   for (const [first] of GROUP_PAIRS) {
     const { context, page } = await as(browser, first);
-    await visit(page, "/pair");
+    await visit(page, "/profile");
     await page.getByRole("button", { name: "Nevezünk" }).click();
     await expect(page.getByRole("status")).toContainText("Beneveztetek: az 1. körtől játszotok (kezdés:");
     await page.reload();
@@ -57,7 +57,7 @@ test("7. every pair enters once and is in at once; the partner sees it too", asy
 
   for (const player of PAIRS.p1) {
     const p = await as(browser, player);
-    await visit(p.page, "/pair");
+    await visit(p.page, "/profile");
     await expect(content(p.page)).toContainText("Beneveztetek: az 1. körtől játszotok.");
     // On Értesítések whatever the email switch says.
     await visit(p.page, "/notifications");

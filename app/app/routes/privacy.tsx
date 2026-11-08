@@ -174,7 +174,7 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>A párod</strong> látja az e-mail-címedet és a
-                telefonszámodat a Párom oldalon, és megkapja a levélben, amiben
+                telefonszámodat a Profil oldalon, és megkapja a levélben, amiben
                 a szervező értesít, hogy párba tett titeket, hogy el tudjátok
                 érni egymást. Te is az övét.
               </li>
@@ -244,7 +244,7 @@ export default function Privacy() {
 
           <Section title="Ha linkkel hívod meg a párodat">
             <p>
-              Amíg nincs párod, a Kezdőlapon és a Párom oldalon kapsz egy saját
+              Amíg nincs párod, a Kezdőlapon és a Profil oldalon kapsz egy saját
               linket, amit te küldesz el annak, akivel játszanál. Aki megnyitja,
               a neved és a liga nevét látja, az e-mail-címedet és a
               telefonszámodat nem. Ha regisztrál és elfogadja, pár lesztek. A
@@ -253,7 +253,7 @@ export default function Privacy() {
           </Section>
           <Section title="Ha párt keresel">
             <p>
-              Amíg nincs párod, a Párom oldalon bekapcsolhatod a „Párt keresek”
+              Amíg nincs párod, a Profil oldalon bekapcsolhatod a „Párt keresek”
               jelzést. Ilyenkor a szervező látja a neved, a szinted, a
               telefonszámod és azt, hogy mióta keresel párt, és párba tehet egy
               másik párkeresővel. Erről az oldalon és e-mailben is szólunk, benne

@@ -31,7 +31,7 @@ export async function pairLinkFor(userId: string, leagueId: number): Promise<str
 
 export type PairLinkBox = { league: PairLeague; token: string };
 
-// The links /home and /pair show: one per league of the player (D128) where they have no
+// The links /home and Párod show: one per league of the player (D128) where they have no
 // active pair.
 export async function pairLinkBoxes(user: Pick<User, "id">, list?: PairLeague[]): Promise<PairLinkBox[]> {
   const shown = list ?? (await playerLeagues(user.id));

@@ -11,7 +11,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | C1 | Everything on screen is Hungarian, informal ("tegező") and short. Dates as "nov. 10., kedd 19:00", 24-hour time, Budapest time, decimal comma. | CLAUDE.md, spec 16 |
 | C2 | Mobile first: most visits come from a phone link. At 390 px nothing scrolls sideways and nothing is cut off; tap targets are at least 40 px high. | spec 16, #146, `27-table-fit` |
 | C3 | Desktop uses the width: no single narrow column with an empty right half. | Peter, 2026-11-07 |
-| C4 | Phone numbers and email addresses: only the current phase's opponents, while the match is still to be played (tap to call, `mailto:`), and the active partner (Párom). Never on a public page. | spec 3, D67, D121, D135 |
+| C4 | Phone numbers and email addresses: only the current phase's opponents, while the match is still to be played (tap to call, `mailto:`), and the active partner (Profil's Párod section, D140). Never on a public page. | spec 3, D67, D121, D135 |
 | C5 | Group tables count final results only (confirmed, auto-accepted, organizer or deadline decision). A result waiting for confirmation or disputed never counts. One table computation (`groupTable`) for every page. | D80, D85 |
 | C6 | Results read the same everywhere: pair A first, "4:2, 2:4, szuper tie-break 10:7"; both lose as "Mindkét pár vereséget kap (0:4, 0:4)". | D85 |
 | C7 | Nothing about the league is public: tables, results and profiles are for logged-in players only (the league page sits in the app shell). The league page shows names, tables and results only; no rating on it. Public stay the landing page, rules, privacy, login and register. | spec 14, D112, D134 |
@@ -79,6 +79,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | P2 | The rating is "Élő-pont" wherever a player reads it, with the one-tap explanation. | Peter, 2026-11-07 (D136) |
 | P3 | A summary on every player and pair profile: Élő-pont (a pair's: its players' average), seasons and rounds played in, matches, wins, losses. Final results only (D80). | Peter, 2026-11-07 (D136) |
 | P4 | Játékosprofil shows what other players see on `/players/<id>`, the same component. The player's pairs are links to their pages ("A pár oldala"). | D112, D136 |
+| P5 | "Párod" first on Játékosprofil, above the summary: what Párom showed, one card per league (named only when there are several). `/pair` leads to `/profile#parod`, query kept. | Peter, 2026-11-08 (D140) |
 
 ## 7. League page and navigation
 
@@ -88,10 +89,10 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | L2 | At 390 px pair names don't break into four lines; at desktop width the table doesn't spread its numbers across the page. | Peter, 2026-11-07 |
 | L3 | A Ranglista: players and pairs by Élő-pont in two tabs, the viewer marked, each name linking its profile; one tap from the Tabella and in the sidebar. Ties share a place until #345. Each row shows its pair's division in the Tabella's colours, with a legend. | Peter, 2026-11-07 (D137); 2026-11-08 (D138) |
 | L4 | "Hogyan működik a létra?" is behind a "?" next to the Tabella's title, in a tooltip (hover, tap or focus). | Peter, 2026-11-08 (D138) |
-| N1 | On a phone the player's own sections are one tap away (bottom bar: Kezdőlap, Tabella, Párom, Értesítések with the unread count, Profil); the sidebar stays for the organizer and admin sections. | Peter, 2026-11-07; spec 16 |
+| N1 | On a phone the player's own sections are one tap away (bottom bar: Kezdőlap, Tabella, Értesítések with the unread count, Profil; the pair is a section of Profil since D140); the sidebar stays for the organizer and admin sections. | Peter, 2026-11-07; spec 16 |
 
 ## 8. Not in this round
 
 - The admin pages (Áttekintés, Meccsek as a fixture list, groups one under the other): next round, reusing sections 2 and 3.
-- Párom statistics beyond the link to the pair's profile.
+- Pair statistics in Párod beyond the link to the pair's profile.
 - The Értesítések list itself (empty in the seed because the seed writes no notices).

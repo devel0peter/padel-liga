@@ -38,7 +38,7 @@ test("she sees her own league only: no Mintaváros season, no league to choose",
   await expect(content(page)).not.toContainText("Melyik ligában játszol?");
   await expect(content(page)).not.toContainText("Teszt szezon");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page).getByRole("switch", { name: "Párt keresek" })).toBeChecked();
   await expect(content(page)).not.toContainText("Mintaváros");
   await context.close();

@@ -119,7 +119,7 @@ export function entryStatusText(entry: { status: EntryStatus; joinsPhase: number
   }
 }
 
-// A withdrawn entry on Párom and Kezdőlap (#174): the organizer took the pair
+// A withdrawn entry on Párod and Kezdőlap (#174): the organizer took the pair
 // out (between rounds, or mid-round, #34); only they can enter it again. A
 // dissolved pair's withdrawn entry never shows (entryFor skips it).
 export const TAKEN_OUT_TEXT =

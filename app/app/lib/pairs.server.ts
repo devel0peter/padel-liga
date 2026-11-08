@@ -20,7 +20,7 @@ import { formatPhone } from "./phone";
 import { canDissolve, checkNewPair, DISSOLVE_REFUSED, NEW_PAIR_REFUSALS, type PairSource } from "./pairs";
 
 // Pairs in D1. The rules are in pairs.ts. Players only see their pair
-// (/pair); a Szervező changes pairs on the Párok page (#97). No email goes
+// (Profil, Párod); a Szervező changes pairs on the Párok page (#97). No email goes
 // out for a dissolve: the organizer tells the players.
 
 export type PairLeague = { id: number; name: string };
@@ -29,7 +29,7 @@ type Result = { ok: true } | { ok: false; error: string };
 
 // Where a pair can be made (a pair link works in): every league in a listed
 // city (a city still being set up stays hidden). What a player sees on
-// Kezdőlap and Párom is only their own leagues (playerLeagues, D128).
+// Kezdőlap and Párod is only their own leagues (playerLeagues, D128).
 export async function pairLeagues(): Promise<PairLeague[]> {
   return (await listedLeagues()).map(({ id, name }) => ({ id, name }));
 }
@@ -43,12 +43,12 @@ export function activePairWith(leagueId: number, userIds: string[]) {
 export type PairOverview = {
   league: PairLeague;
   // The partner's address and phone (D121): partners have to reach each
-  // other, also when the organizer paired two strangers. Only on Párom, to
+  // other, also when the organizer paired two strangers. Only on Párod, to
   // the pair's own two players. Phone formatted, "" when none.
   pair: { id: number; partnerName: string; partnerEmail: string; partnerPhone: string } | null;
 };
 
-// What /pair shows, per league: the active pair, if any.
+// What Párod shows, per league: the active pair, if any.
 export async function pairOverview(user: User, list: PairLeague[]): Promise<PairOverview[]> {
   if (list.length === 0) return [];
   const partner = alias(users, "partner");

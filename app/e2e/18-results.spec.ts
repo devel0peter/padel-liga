@@ -48,6 +48,16 @@ async function openRecord(page: Page) {
   await expect(content(page).getByRole("button", { name: "Rögzítem az eredményt" })).toBeVisible();
 }
 
+// Where it was played (D146): asked with the result while the match has no
+// club (neither of these two got one at booking). The venue form, when it
+// shows, has its own fields: these are the result form's.
+async function pickVenue(page: Page, court = "") {
+  const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
+  await form.getByRole("combobox", { name: "Hol játszottatok?" }).click();
+  await page.getByRole("option", { name: "Minta Padel Aréna" }).click();
+  if (court) await form.getByLabel("Pálya (nem kötelező)").fill(court);
+}
+
 async function fillScore(page: Page, rows: [string, string][]) {
   const labels = ["1. szett", "2. szett", "Szuper tie-break (csak 1:1-nél)"];
   const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
@@ -69,6 +79,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
 
   await visit(player.page, `/matches/${first!.id}`);
   await openRecord(player.page);
+  await pickVenue(player.page, "1-es pálya");
 
   // 4:3 doesn't end a set: the engine's Hungarian message.
   await fillScore(player.page, [
@@ -87,6 +98,8 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   await player.page.getByRole("button", { name: "Rögzítem az eredményt" }).click();
   await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
   await expect(status(player.page)).toContainText("Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár");
+  // The venue given with the result is the match's now (D146).
+  await expect(status(player.page)).toContainText("Minta Padel Aréna, 1-es pálya");
 
   // Instant email to the other pair, the score from their side, the link.
   const sent = await waitForEmails(offset, 2, (m) => m.subject.startsWith("Erősítsd meg a meccs eredményét"));
@@ -132,6 +145,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${second!.id}`);
   await openRecord(player.page);
+  await pickVenue(player.page);
   await fillScore(player.page, [
     ["4", "2"],
     ["5", "3"],

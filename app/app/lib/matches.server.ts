@@ -42,7 +42,7 @@ import { eventText, schedulingEmailDue } from "./matches";
 import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } from "./calendar";
 import { SITE_URL } from "./site";
 import { pairName } from "./groups";
-import { COURT_MAX } from "./matches";
+import { COURT_MAX, venueLine } from "./matches";
 import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseWeek, type TableRow } from "./ladder";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureWeek, type Zone } from "./fixtures";
 import { formatPhone } from "./phone";
@@ -283,9 +283,15 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
   const states = new Map(
     matchRows.map((m) => [m.id, schedulingState((events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)), now)]),
   );
-  const venues = await clubNames(
-    [...states.values()].map((s) => (s.status === "to_schedule" ? null : s.clubId)),
-  );
+  // The match's own club too: one given with the result (D146).
+  const venues = await clubNames([
+    ...[...states.values()].map((s) => (s.status === "to_schedule" ? null : s.clubId)),
+    ...matchRows.map((m) => m.clubId),
+  ]);
+  const venueOf = (m: { id: number; clubId: number | null }) => {
+    const state = states.get(m.id)!;
+    return (state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null)) ?? (m.clubId ? (venues.get(m.clubId) ?? null) : null);
+  };
   const results = await resultsOf(matchRows);
 
   return Promise.all(
@@ -325,7 +331,6 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
         fixtures: fixtureWeeks(
           pairsOf.filter((p) => !p.withdrawn).map((p) => ({ id: p.pairId, names: namesOf(p.players) })),
           groupMatches.map((m) => {
-            const state = states.get(m.id)!;
             const counted = countedOutcome(m);
             return {
               id: m.id,
@@ -335,7 +340,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
               status: m.status,
               scheduledAt: m.scheduledAt,
               outcome: counted && isValidOutcome(counted) ? counted : null,
-              venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
+              venue: venueOf(m),
             };
           }),
           { phaseStartsAt: g.startsAt, currentWeek: started ? week : null, mine: g.pairId },
@@ -352,7 +357,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
             contacts: (them?.players ?? []).map(contactOf),
             side,
             state,
-            venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
+            venue: venueOf(m),
             result: results.get(m.id)?.state ?? { status: "none" },
           };
         }),
@@ -522,6 +527,11 @@ export type MatchPage = {
   contacts: Opponent[];
   state: SchedulingState;
   venue: string | null;
+  // The summary's "Helyszín": the fixed time's venue and court, else the club
+  // given with the result (D146), else a proposal's club.
+  where: string | null;
+  // Recording the result asks where it was played: no club is known (D146).
+  venueAsked: boolean;
   actions: ReturnType<typeof schedulingActions>;
   // Cancelling now would be late (under 24 hours before the slot, #27).
   cancelLate: boolean;
@@ -579,8 +589,12 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     .from(clubs)
     .where(and(eq(clubs.city, ctx.city), eq(clubs.active, true)))
     .orderBy(asc(clubs.name));
-  const venues = await clubNames([...ctx.events.map((e) => e.clubId), state.status === "to_schedule" ? null : state.clubId]);
   const results = await resultOf(ctx.match);
+  // The club given with the result (D146): the last one that carried it.
+  const played = [...results.events].reverse().find((e) => e.kind === "result_recorded" && e.clubId !== null);
+  const venues = await clubNames([...ctx.events.map((e) => e.clubId), state.status === "to_schedule" ? null : state.clubId, ctx.match.clubId]);
+  const venue = state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null);
+  const known = knownClubId(ctx, state);
   const result = results.state;
   const scheduling = schedulingActions(state, side, now, ctx.match.deadline);
   const log: MatchPage["log"] = [
@@ -638,7 +652,11 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     // A withdrawn pair's match (#34): the two are no opponents any more.
     contacts: running && !ctx.voided ? theirs.players.map(contactOf) : [],
     state,
-    venue: state.status === "to_schedule" ? null : (venues.get(state.clubId ?? -1) ?? null),
+    venue,
+    where:
+      (state.status === "scheduled" ? venueLine(venue, state.court) : null) ??
+      (known !== null ? venueLine(venues.get(known), played?.clubId === known ? played.court : null) : venue),
+    venueAsked: known === null && cityClubs.length > 0,
     actions: result.status === "none" && !ctx.voided ? scheduling : NO_SCHEDULING,
     cancelLate: !ctx.voided && result.status === "none" && state.status === "scheduled" && isLateCancel(state.slot, now),
     clubs: cityClubs,
@@ -711,6 +729,31 @@ const STARTED = "A meccs időpontja már elkezdődött, nem lehet lemondani.";
 const NO_CLUB = "Válassz helyszínt a listából.";
 const LONG_COURT = `A pálya legfeljebb ${COURT_MAX} karakter lehet.`;
 
+// The venue as the venue step (#27) and a result without one (D146) take it:
+// an active club of the league's city and an optional court. The error, or
+// null.
+export async function venueError(clubId: number | null, court: string, city: string): Promise<string | null> {
+  if (clubId === null || !(await clubAllowed(clubId, city))) return NO_CLUB;
+  return court.trim().length > COURT_MAX ? LONG_COURT : null;
+}
+
+// The match's club once it is known (D146): booked with the fixed time or
+// recorded afterwards (#27), or given with the result. The match mirrors it.
+export const knownClubId = (ctx: MatchContext, state: SchedulingState): number | null =>
+  ctx.match.clubId ?? (state.status === "scheduled" ? state.clubId : null);
+
+// Recording a result asks where it was played while the club isn't known
+// (D146); a city with no active club can't be asked.
+export async function venueAsked(ctx: MatchContext, state: SchedulingState): Promise<boolean> {
+  if (knownClubId(ctx, state) !== null) return false;
+  const [row] = await db
+    .select({ id: clubs.id })
+    .from(clubs)
+    .where(and(eq(clubs.city, ctx.city), eq(clubs.active, true)))
+    .limit(1);
+  return !!row;
+}
+
 
 async function clubAllowed(clubId: number | null, city: string): Promise<boolean> {
   if (clubId === null) return true;
@@ -764,8 +807,8 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   switch (input.kind) {
     case "venue": {
       const court = input.court.trim();
-      if (input.clubId === null || !(await clubAllowed(input.clubId, ctx.city))) return { ok: false, error: NO_CLUB };
-      if (court.length > COURT_MAX) return { ok: false, error: LONG_COURT };
+      const error = await venueError(input.clubId, court, ctx.city);
+      if (error) return { ok: false, error };
       event = { kind: "venue", clubId: input.clubId, court: court || null };
       notice = "Rögzítettük a helyszínt.";
       break;

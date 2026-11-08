@@ -99,7 +99,7 @@ async function disputed() {
   const id = matchOf(1, 3);
   const a = matchRow(id).pair_a as number;
   const b = a === 1 ? 3 : 1;
-  await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+  await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
   await R.resultStep(`p${b}b`, id, { kind: "dispute", score: LOSS, note: "Fordítva volt." }, PLAYED);
   h.raw.exec("delete from notifications");
   return { id, a, b };
@@ -233,7 +233,7 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
     const id = matchOf(1, 3);
     const a = matchRow(id).pair_a as number;
     const b = a === 1 ? 3 : 1;
-    await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+    await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
     await R.resultStep(`p${b}a`, id, { kind: "confirm" }, PLAYED);
     expect((await D.decideMatch("o", 1, id, { kind: "walkover", winner: "b" }, "Nem jelent meg az 1. pár.", LATER)).ok).toBe(true);
     expect((await D.decideMatch("o", 1, id, { kind: "unplayed" }, "Mégis elmaradt.", new Date(LATER.getTime() + 60_000))).ok).toBe(true);
@@ -274,7 +274,7 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
   it("a decision is not auto-accepted over", async () => {
     const id = matchOf(1, 3);
     const a = matchRow(id).pair_a as number;
-    await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+    await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
     await D.decideMatch("o", 1, id, { kind: "walkover", winner: "a" }, "A napló alapján.", LATER);
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 100 * 3600_000))).toBe(0);
     expect(decisions(id)).toHaveLength(1);

@@ -223,7 +223,8 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   // The venue: only the city's active clubs; both pairs see it.
   await player.page.getByLabel("Helyszín").click();
   await player.page.getByRole("option", { name: "Minta Padel Aréna" }).click();
-  await player.page.getByLabel("Pálya (nem kötelező)").fill("2-es pálya");
+  // The folded result form has its own court field (D146): this one is the venue form's.
+  await main.getByRole("region", { name: "Hol lesz a meccs?" }).getByLabel("Pálya (nem kötelező)").fill("2-es pálya");
   await player.page.getByRole("button", { name: "Mentem a helyszínt" }).click();
   await expect(main.getByRole("status").filter({ hasText: "Rögzítettük a helyszínt." })).toBeVisible();
   await expect(status(player.page)).toContainText("Minta Padel Aréna, 2-es pálya");

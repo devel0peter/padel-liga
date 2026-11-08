@@ -105,6 +105,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - Court booking: 60 minutes is usually enough (Győr clubs only take 60-minute bookings).
 - Court time runs out: the match is unfinished. The pairs note the score and finish it from there in a new slot before the deadline. Only the final result is recorded.
 - One pair records the result, and the other confirms or disputes it.
+- **Where it was played (D146):** while the match has no club (none came with the booking, D74, and none was recorded after it), recording the result asks for one: the club is required (one of the city's active clubs), the court optional (at most 40 characters). Both go on the `result_recorded` event, and the match keeps the club (`matches.club_id`), so the match page's "Helyszín" shows it and a correction doesn't ask again. Once a club is known the result form doesn't ask, and a club sent anyway is ignored. A city with no active club can't be asked. The organizer's rulings don't ask.
 - Not confirmed within 48 hours: the result is accepted automatically.
 - A disputed result goes to the organizer, who decides.
 - The page, corrections, the dispute's own version and the auto-accept run: decision log, 2026-11-02 (D77). The organizer's "Viták" page, decisions and overrides with a required reason: D78.

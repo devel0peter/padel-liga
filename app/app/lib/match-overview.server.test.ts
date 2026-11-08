@@ -198,10 +198,10 @@ async function results() {
   const played = matchOf(2, 4);
   const waiting = matchOf(1, 3);
   const disputed = matchOf(6, 7);
-  expect((await R.resultStep(`p${pairA(played)}a`, played, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(played)}a`, played, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -1))).ok).toBe(true);
   expect((await R.resultStep(`p${pairB(played)}b`, played, { kind: "confirm" }, hours(NOW, -0.5))).ok).toBe(true);
-  expect((await R.resultStep(`p${pairA(waiting)}a`, waiting, { kind: "record", score: WIN }, hours(NOW, -0.25))).ok).toBe(true);
-  expect((await R.resultStep(`p${pairA(disputed)}a`, disputed, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(waiting)}a`, waiting, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -0.25))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(disputed)}a`, disputed, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -1))).ok).toBe(true);
   expect((await R.resultStep(`p${pairB(disputed)}a`, disputed, { kind: "dispute", score: LOSS, note: "" }, hours(NOW, -0.75))).ok).toBe(true);
   return { played, waiting, disputed };
 }

@@ -188,7 +188,7 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
     const win = { sets: [[4, 1], [4, 2]] as [number, number][] };
     for (const id of [played, waiting, disputed]) {
       const a = one("select p.player_a as p from matches m join pairs p on p.id = m.pair_a where m.id = ?", id).p;
-      expect(await R.resultStep(a, id, { kind: "record", score: win }, at("2026-11-29", 20))).toMatchObject({ ok: true });
+      expect(await R.resultStep(a, id, { kind: "record", clubId: 1, score: win }, at("2026-11-29", 20))).toMatchObject({ ok: true });
     }
     const other = (id: number) => one("select p.player_a as p from matches m join pairs p on p.id = m.pair_b where m.id = ?", id).p;
     expect(await R.resultStep(other(played), played, { kind: "confirm" }, at("2026-11-29", 21))).toMatchObject({ ok: true });
@@ -206,7 +206,7 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
   it("a result recorded after the deadline but before 06:00 is left to auto-accept", async () => {
     const id = matchOf(1, 3).id;
     const a = one("select p.player_a as p from matches m join pairs p on p.id = m.pair_a where m.id = ?", id).p;
-    expect(await R.resultStep(a, id, { kind: "record", score: { sets: [[4, 1], [4, 2]] } }, at("2026-11-30", 1))).toMatchObject({ ok: true });
+    expect(await R.resultStep(a, id, { kind: "record", clubId: 1, score: { sets: [[4, 1], [4, 2]] } }, at("2026-11-30", 1))).toMatchObject({ ok: true });
     await resolveDeadlines(MONDAY_6, undefined, 25);
     expect(row(id).status).toBe("result_pending");
   });

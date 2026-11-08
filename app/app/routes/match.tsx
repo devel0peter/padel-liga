@@ -27,7 +27,7 @@ import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ConfirmResult, RecordResult, ResultStatus, ScoreBoard } from "~/components/match-result";
-import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, statusView, venueLine } from "~/lib/matches";
+import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, statusView } from "~/lib/matches";
 import { cn } from "~/lib/utils";
 import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
 import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
@@ -103,7 +103,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       intent === "result-confirm"
         ? { kind: "confirm" }
         : intent === "result-record"
-          ? { kind: "record", score: parseScore(form, page.side) }
+          ? // Where it was played: read only while no club is known (D146).
+            { kind: "record", score: parseScore(form, page.side), clubId: clubId(form) ?? null, court: String(form.get("court") ?? "") }
           : {
               kind: "dispute",
               score: parseScore(form, page.side),
@@ -322,8 +323,49 @@ function AgreedForm({ clubs, result, now, deadline }: { clubs: { id: number; nam
   );
 }
 
-// Whoever booked the court records where (#27); both pairs see it. Only the
-// city's active clubs; the court is optional free text.
+// The club (required) and the court (optional free text): the city's active
+// clubs only. The venue form's fields (#27), and the result form's while the
+// match has no club (D146).
+function VenueFields({
+  clubs,
+  id,
+  label,
+  clubId = null,
+  court = null,
+}: {
+  clubs: { id: number; name: string }[];
+  id: string;
+  label: string;
+  clubId?: number | null;
+  court?: string | null;
+}) {
+  const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${id}-club`}>{label}</Label>
+        <Select name="club" defaultValue={current} required>
+          <SelectTrigger id={`${id}-club`} className="w-full">
+            <SelectValue placeholder="Válassz klubot" />
+          </SelectTrigger>
+          <SelectContent>
+            {clubs.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${id}-court`}>Pálya (nem kötelező)</Label>
+        <Input id={`${id}-court`} name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+// Whoever booked the court records where (#27); both pairs see it.
 function VenueForm({
   clubs,
   clubId,
@@ -336,31 +378,10 @@ function VenueForm({
   result?: ActionResult;
 }) {
   const busy = useNavigation().state !== "idle";
-  const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
   return (
     <Form method="post" className="grid gap-3">
       <input type="hidden" name="intent" value="venue" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="venue-club">Helyszín</Label>
-          <Select name="club" defaultValue={current} required>
-            <SelectTrigger id="venue-club" className="w-full">
-              <SelectValue placeholder="Válassz klubot" />
-            </SelectTrigger>
-            <SelectContent>
-              {clubs.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="venue-court">Pálya (nem kötelező)</Label>
-          <Input id="venue-court" name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
-        </div>
-      </div>
+      <VenueFields clubs={clubs} id="venue" label="Helyszín" clubId={clubId} court={court} />
       <Feedback result={result} intent="venue" />
       <div>
         <Button type="submit" variant="outline" disabled={busy}>
@@ -645,7 +666,6 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const r = m.result;
   const theirs = m.state.status !== "to_schedule" && m.state.status !== "scheduled" && m.state.by !== m.side;
   const ours = (m.state.status === "proposed" || m.state.status === "agreed_time") && !theirs;
-  const where = m.state.status === "scheduled" ? venueLine(m.venue, m.state.court) : m.venue;
   const failed = (intent: string) => result?.intent === intent && !result.ok;
   const keyed = m.log.length;
 
@@ -682,7 +702,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
                 {whenLine(m)}
               </Fact>
               <Fact icon={MapPin} label="Helyszín">
-                {where ?? "Még nincs megadva"}
+                {m.where ?? "Még nincs megadva"}
               </Fact>
             </div>
             <p className="flex items-center gap-2 text-sm">
@@ -728,7 +748,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {recordMain && (
             <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main">
-              <RecordResult key={`r${keyed}`} m={m} feedback={result} />
+              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" />}
+              </RecordResult>
             </Panel>
           )}
 
@@ -844,7 +866,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               hint={r.status === "recorded" ? "A 48 óra újraindul." : "Ha a meccs megvolt, itt írjátok be."}
               open={failed("result-record")}
             >
-              <RecordResult key={`r${keyed}`} m={m} feedback={result} />
+              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" />}
+              </RecordResult>
             </Fold>
           )}
 

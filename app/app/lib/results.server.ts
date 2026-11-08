@@ -21,7 +21,7 @@ import { queueMatchEmails } from "~/lib/email/outbox.server";
 import { matchResultConfirmedMessage, matchResultDisputedMessage, matchResultMessage, type Message } from "~/lib/notifications";
 import { notifyPlayers, notifyResultDisputed } from "~/lib/notifications.server";
 
-import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, VOIDED, type MatchContext } from "./matches.server";
+import { CHANGED, loadMatch, noWithdrawnPair, NOT_FOUND, sideOf, stateOf, venueAsked, venueError, VOIDED, type MatchContext } from "./matches.server";
 import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { neutralScoreText, NOTE_MAX, scoreText } from "./results";
 import { logError } from "~/lib/log";
@@ -33,14 +33,17 @@ import { updateElo } from "./elo.server";
 // the match log (match_events; the auto-accept into match_decisions) and is
 // mirrored on the match (status, outcome) for lists and the standings.
 
+// `clubId`/`court`: where it was played, asked only while the match has no
+// club (D146); ignored once it has one.
 export type ResultInput =
-  | { kind: "record"; score: MatchScore }
+  | { kind: "record"; score: MatchScore; clubId?: number | null; court?: string }
   | { kind: "confirm" }
   | { kind: "dispute"; score: MatchScore; note: string };
 
 export type ResultStepResult = { ok: true; notice: string } | { ok: false; error: string };
 
 const NOTHING_TO_DO = "Ezt most nem lehet. Frissítsd az oldalt.";
+export const NO_VENUE = "Add meg, hol játszottatok.";
 
 // The match's status and outcome columns for a result state.
 export function mirror(state: ResultState): { status: "result_pending" | "disputed" | "final"; outcome: (typeof matches.$inferSelect)["outcome"] } {
@@ -82,12 +85,22 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
   let kind: ResultEventKind;
   let score: MatchScore | null = null;
   let note: string | null = null;
+  // The venue given with the result (D146), when the match had none.
+  let venue: { clubId: number; court: string | null } | null = null;
   let notice: string;
   switch (input.kind) {
     case "record": {
       if (!can.record) return { ok: false, error: NOTHING_TO_DO };
       const v = validateScore(input.score);
       if (!v.ok) return { ok: false, error: v.errors.map((e) => e.message).join(" ") };
+      if (await venueAsked(ctx, stateOf(ctx, now))) {
+        const clubId = input.clubId ?? null;
+        const court = (input.court ?? "").trim();
+        if (clubId === null) return { ok: false, error: NO_VENUE };
+        const error = await venueError(clubId, court, ctx.city);
+        if (error) return { ok: false, error };
+        venue = { clubId, court: court || null };
+      }
       kind = "result_recorded";
       score = input.score;
       notice = before.state.status === "recorded" ? "Javítottuk. A másik pár megerősíti." : "Rögzítettük. A másik pár megerősíti.";
@@ -120,10 +133,21 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
   const revision = ctx.match.revision;
   try {
     await db.batch([
-      db.insert(matchEvents).values({ matchId: guardedMatchId(matchId, revision), pairId, userId, kind, score, note, at: now }),
+      db.insert(matchEvents).values({
+        matchId: guardedMatchId(matchId, revision),
+        pairId,
+        userId,
+        kind,
+        score,
+        note,
+        clubId: venue?.clubId ?? null,
+        court: venue?.court ?? null,
+        at: now,
+      }),
       db
         .update(matches)
-        .set({ revision: revision + 1, ...mirror(after) })
+        // The match keeps the club given with the result (D146).
+        .set({ revision: revision + 1, ...mirror(after), ...(venue ? { clubId: venue.clubId } : {}) })
         .where(and(eq(matches.id, matchId), eq(matches.revision, revision))),
     ]);
   } catch (e) {

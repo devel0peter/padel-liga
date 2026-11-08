@@ -80,6 +80,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | P3 | A summary on every player and pair profile: Élő-pont (a pair's: its players' average), seasons and rounds played in, matches, wins, losses. Final results only (D80). | Peter, 2026-11-07 (D136) |
 | P4 | Játékosprofil shows what other players see on `/players/<id>`, the same component. The player's pairs are links to their pages ("A pár oldala"). | D112, D136 |
 | P5 | "Párod" first on Játékosprofil, above the summary: what Párom showed, one card per league (named only when there are several). `/pair` leads to `/profile#parod`, query kept. | Peter, 2026-11-08 (D140) |
+| P6 | "Korábbi párjaid" under Párod, only when there is one: former partner (pair page link; "Törölt játékos" without one), league, seasons and rounds, "Felbontva" or "Partnercsere" and the day, newest first. No contact data. | Peter, 2026-11-08 (D141) |
 
 ## 7. League page and navigation
 

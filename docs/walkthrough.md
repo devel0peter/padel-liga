@@ -545,9 +545,9 @@ Spec section 8, decision log (`docs/decisions.md`) D108 (#33). A past slot can't
   - "Elutasítom" instead: nothing changes on the match; both pairs see "A szervező elutasította …" with the reason on the match page, and a new report can be made.
   - Napló lists "Nem jöttek el: jóváhagyás" (or "elutasítás") with the match. The deadline resolution leaves a match with a waiting report alone until the Szervező decides.
 
-### 37. A player finds their pair on Profil (after step 6)
+### 37. A player finds their pair and former pairs on Profil (after step 6)
 
-The pair is a section of Profil (decision log (`docs/decisions.md`) D140; `app/e2e/30-pair-in-profile.spec.ts`).
+The pair is a section of Profil, and Profil lists the pairs that ended (decision log (`docs/decisions.md`) D140, D141; `app/e2e/30-pair-in-profile.spec.ts`).
 
 - Page: `/pair` (the old Párom address), then `/profile`
 - Account: a player of step 6; then `idegen.ilona@example.test` with a second league (add a `league_members` row for Mintaváros by hand)
@@ -556,6 +556,7 @@ The pair is a section of Profil (decision log (`docs/decisions.md`) D140; `app/e
   - `/pair` lands on Profil's "Játékosprofil" tab at the "Párod" card, with the query kept (`/profile?joined=1#parod` says "Mostantól párban vagytok."). The card shows what Párom showed: the partner's name, email and phone, "A párotok oldala" once the pair is in a published group, and the season's entry; without a pair, "Hívd meg a párodat" with the pair link and the "Párt keresek" switch.
   - Neither the sidebar nor the bottom bar has Párom; Profil stays.
   - A player in two leagues sees one card per league under "Párod", each named after its league.
+  - "Korábbi párjaid" is under Párod only once a pair of the player ended after playing in a published group (a Szervező's dissolve or partner change between rounds, or a partner's account deletion; the seed has none): the former partner (a link to the pair's page; "Törölt játékos" without a link for a deleted account), the league, the seasons and rounds ("Teszt szezon, 1. kör"), "Felbontva" or "Partnercsere" and the day it ended ("2026. 11. 30."), the newest first. No email address or phone number of a former partner.
 
 ## A running round instead
 

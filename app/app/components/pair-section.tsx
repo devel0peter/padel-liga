@@ -1,4 +1,4 @@
-import { Mail, Phone } from "lucide-react";
+import { ChevronRight, Mail, Phone } from "lucide-react";
 import { Link } from "react-router";
 
 import { PairLinkBox } from "~/components/pair-link";
@@ -10,10 +10,12 @@ import { NO_LEAGUE_TEXT } from "~/lib/league-members";
 import { telHref } from "~/lib/matches";
 import type { PairSection as PairSectionData, PairSectionActionData } from "~/lib/pair-section.server";
 import { NO_PAIR_TEXT, PAIR_LINK_ACCEPTED, PAIR_SECTION_ID, pairPageDescription } from "~/lib/pairs";
+import type { FormerPairView } from "~/lib/profiles";
 import { CONTACT_EMAIL } from "~/lib/site";
 
-// Profil's "Párod" section (D140, #346; the "Párom" page before), on the
-// Játékosprofil tab. The data comes from pair-section.server.ts.
+// Profil's "Párod" section (D140, #346; the "Párom" page before) and
+// "Korábbi párjaid" under it (D141, #347), on the Játékosprofil tab. The data
+// comes from pair-section.server.ts and formerPairs (profiles.server.ts).
 
 type Overview = PairSectionData["overview"][number];
 type Entry = PairSectionData["entries"][number];
@@ -181,5 +183,51 @@ export function PairSection({ data: d, actionData }: { data: PairSectionData; ac
         ))}
       </div>
     </section>
+  );
+}
+
+// "Korábbi párjaid" (D141, #347): only when there is one. Names only, never
+// a former partner's email or phone; a deleted partner without a link.
+export function FormerPairs({ list }: { list: FormerPairView[] }) {
+  if (list.length === 0) return null;
+  return (
+    <Card role="region" aria-label="Korábbi párjaid">
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">
+          Korábbi párjaid
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-2 lg:grid-cols-2">
+          {list.map((p) => {
+            const body = (
+              <span className="grid min-w-0 flex-1 gap-0.5">
+                <span className="font-semibold break-words">{p.partner.name}</span>
+                <span className="text-muted-foreground">
+                  {p.league}, {p.rounds}
+                </span>
+                <span>
+                  {p.end}
+                  {p.endedOn && <span className="text-muted-foreground">: {p.endedOn}</span>}
+                </span>
+              </span>
+            );
+            const row = "flex items-center gap-2 rounded-lg border px-3 py-2 text-foreground no-underline";
+            return (
+              <li key={p.pairId}>
+                {p.link ? (
+                  <Link to={p.link} className={cn(row, "hover:bg-muted/50")}>
+                    {body}
+                    <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ) : (
+                  <div className={row}>{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

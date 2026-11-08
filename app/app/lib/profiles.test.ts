@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { eloSeries, matchViews, pairName, pairPath, personView, playerPath, playerStats, shownElo, type ProfileMatchInput, type ProfilePair } from "./profiles";
+import {
+  changedPairIds,
+  eloSeries,
+  formerPairViews,
+  matchViews,
+  pairName,
+  pairPath,
+  personView,
+  playerPath,
+  playerStats,
+  roundsText,
+  shownElo,
+  type FormerPairInput,
+  type ProfileMatchInput,
+  type ProfilePair,
+} from "./profiles";
 
 const pairOf = (id: number, a: string, b: string): ProfilePair => ({
   id,
@@ -129,5 +144,95 @@ describe("playerStats (D136)", () => {
 
   it("is all zero for a player without a started round", () => {
     expect(playerStats([], [], now)).toEqual({ seasons: 0, rounds: 0, matches: 0, wins: 0, losses: 0 });
+  });
+});
+
+describe("Korábbi párjaid (#347, D141)", () => {
+  const g = (season: string, phase: number, startsAt: string) => ({ season, phase, startsAt: new Date(startsAt) });
+
+  describe("roundsText", () => {
+    it("one round, and consecutive rounds as a range", () => {
+      expect(roundsText([g("2026/27 tél", 1, "2026-11-08T23:00:00Z")])).toBe("2026/27 tél, 1. kör");
+      expect(roundsText([g("2026/27 tél", 2, "2026-11-29T23:00:00Z"), g("2026/27 tél", 1, "2026-11-08T23:00:00Z")])).toBe(
+        "2026/27 tél, 1–2. kör",
+      );
+    });
+
+    it("a gap splits the range; a round twice counts once", () => {
+      const list = [1, 2, 3, 5, 5].map((n) => g("2026/27 tél", n, "2026-11-08T23:00:00Z"));
+      expect(roundsText(list)).toBe("2026/27 tél, 1–3., 5. kör");
+    });
+
+    it("several seasons, the oldest first", () => {
+      const list = [g("2027 tavasz", 1, "2027-03-01T00:00:00Z"), g("2026/27 tél", 3, "2026-12-20T23:00:00Z")];
+      expect(roundsText(list)).toBe("2026/27 tél, 3. kör; 2027 tavasz, 1. kör");
+    });
+  });
+
+  describe("changedPairIds", () => {
+    it("reads the old pair from a pair.change entry's detail", () => {
+      const details = ["league:1; from pair:12; user:a -> user:b", "league:1; from pair:3; user:c -> user:d", null];
+      expect(changedPairIds(details)).toEqual(new Set([12, 3]));
+    });
+
+    it("does not mistake another pair's id or another kind of detail for it", () => {
+      expect(changedPairIds(["league:1", "league:1; from pair:120x; user:a", "pair:12"])).toEqual(new Set());
+    });
+  });
+
+  describe("formerPairViews", () => {
+    const anna = personView({ id: "ua", name: "Anna", deletedAt: null });
+    const gone = personView({ id: "ub", name: "Régi Név", deletedAt: new Date() });
+    const former = (over: Partial<FormerPairInput>): FormerPairInput => ({
+      pairId: 1,
+      partner: anna,
+      league: "Padelpárbaj Győr",
+      dissolvedAt: new Date("2026-12-01T10:00:00Z"),
+      groups: [g("2026/27 tél", 1, "2026-11-08T23:00:00Z")],
+      ...over,
+    });
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+
+    it("a row: partner, the pair page, league, rounds, how and when it ended", () => {
+      expect(formerPairViews([former({})], new Set(), day)).toEqual([
+        {
+          pairId: 1,
+          partner: anna,
+          link: "/pairs/1",
+          league: "Padelpárbaj Győr",
+          rounds: "2026/27 tél, 1. kör",
+          end: "Felbontva",
+          endedOn: "2026-12-01",
+        },
+      ]);
+    });
+
+    it("Partnercsere for a pair a partner change ended, Felbontva for the rest", () => {
+      const views = formerPairViews([former({ pairId: 1 }), former({ pairId: 2 })], new Set([2]), day);
+      expect(views.map((v) => [v.pairId, v.end])).toEqual([
+        [2, "Partnercsere"],
+        [1, "Felbontva"],
+      ]);
+    });
+
+    it("the newest ended first; a pair with no stored end last", () => {
+      const list = [
+        former({ pairId: 1, dissolvedAt: new Date("2026-12-01T10:00:00Z") }),
+        former({ pairId: 2, dissolvedAt: null }),
+        former({ pairId: 3, dissolvedAt: new Date("2027-01-05T10:00:00Z") }),
+      ];
+      const views = formerPairViews(list, new Set(), day);
+      expect(views.map((v) => v.pairId)).toEqual([3, 1, 2]);
+      expect(views[2]!.endedOn).toBe("");
+    });
+
+    it("leaves out a pair that never played in a published group", () => {
+      expect(formerPairViews([former({ groups: [] })], new Set(), day)).toEqual([]);
+    });
+
+    it("a deleted partner is Törölt játékos without a link", () => {
+      const [v] = formerPairViews([former({ partner: gone })], new Set(), day);
+      expect(v).toMatchObject({ partner: { id: null, name: "Törölt játékos" }, link: null });
+    });
   });
 });

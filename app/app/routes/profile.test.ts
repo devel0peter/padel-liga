@@ -167,9 +167,9 @@ describe("Profil: Fiók törlése", () => {
   });
 });
 
-// Párod (D140, #346: the Párom page before)
+// Párod (D140, #346: the Párom page before) and Korábbi párjaid (D141, #347)
 // on the Játékosprofil tab: the loader's data and the section's own posts.
-describe("Profil: Párod", () => {
+describe("Profil: Párod and Korábbi párjaid", () => {
   let anna: string;
   let lone: string;
   const form = (cookie: string, fields: Record<string, string>) =>
@@ -211,6 +211,22 @@ describe("Profil: Párod", () => {
     ]);
   });
 
+  it("Korábbi párjaid: the old pair as Partnercsere, without the former partner's email or phone", async () => {
+    const d: any = await P.loader(args(get(anna)));
+    expect(d.former).toEqual([
+      {
+        pairId: 1,
+        partner: { id: "cili", name: "Kovács Cili" },
+        link: "/pairs/1",
+        league: "Padelpárbaj Győr",
+        rounds: "2026/27 tél, 1. kör",
+        end: "Partnercsere",
+        endedOn: "2025. 12. 06.",
+      },
+    ]);
+    expect(JSON.stringify(d.former)).not.toMatch(/cili@x\.hu|\+36|3012345/);
+  });
+
   it("two leagues: a card for each, without a pair the pair link and Párt keresek", async () => {
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'lone', 'chosen')`);
     const d: any = await P.loader(args(get(lone)));
@@ -220,6 +236,7 @@ describe("Profil: Párod", () => {
       ["Padelpárbaj Győr 2", null, false],
     ]);
     expect(d.pair.overview.every((o: any) => /\/pair\/join\/[\w-]+$/.test(o.link))).toBe(true);
+    expect(d.former).toEqual([]);
   });
 
   it("Párt keresek posts to Profil and is saved per league", async () => {

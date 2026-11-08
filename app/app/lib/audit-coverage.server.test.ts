@@ -13,6 +13,9 @@ import { AUDIT_ACTIONS, isSystemAction, type AuditAction } from "~/lib/audit";
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
+// Substitutes are hidden in the first season (D145); their audit entries are
+// covered with the feature on.
+vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => true }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({

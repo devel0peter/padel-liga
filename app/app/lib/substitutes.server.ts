@@ -24,7 +24,7 @@ import { notifyPlayers, notifySubstituteRequested } from "~/lib/notifications.se
 import { pairName } from "./groups";
 import { memberOf } from "./league-members.server";
 import { groupMembers, loadMatch, NOT_FOUND, noWithdrawnPair, sideOf, type MatchContext } from "./matches.server";
-import { SUBSTITUTE_CHANGED, SUBSTITUTE_REASON_MAX, SUBSTITUTE_REFUSALS, substituteStatusLabel } from "./substitutes";
+import { SUBSTITUTE_CHANGED, SUBSTITUTE_REASON_MAX, SUBSTITUTE_REFUSALS, SUBSTITUTES_OFF, substitutesEnabled, substituteStatusLabel } from "./substitutes";
 
 // Substitutes (#37, spec 4, D109) in D1. A player of either pair asks for a
 // substitute for an absent player of their pair, from the match page, before
@@ -177,6 +177,8 @@ export async function requestSubstitute(
   if (!ctx) return { ok: false, error: NOT_FOUND, notFound: true };
   const side = sideOf(ctx, userId);
   if (!side) return { ok: false, error: NOT_FOUND, notFound: true };
+  // Hidden in the first season (D145).
+  if (!substitutesEnabled()) return { ok: false, error: SUBSTITUTES_OFF };
   if (!input.substituteId) return { ok: false, error: "Válaszd ki a helyettest a listából." };
   const pair = ctx.pairs[side];
   const { open } = windowOf(ctx.match, ctx.voided, now);
@@ -215,6 +217,7 @@ export async function requestSubstitute(
 export async function withdrawSubstitute(userId: string, matchId: number, requestId: number): Promise<StepResult> {
   const ctx = await loadMatch(matchId);
   if (!ctx || !sideOf(ctx, userId)) return { ok: false, error: NOT_FOUND, notFound: true };
+  if (!substitutesEnabled()) return { ok: false, error: SUBSTITUTES_OFF };
   const row = (await requestsOf(matchId)).find((r) => r.id === requestId);
   if (!row) return { ok: false, error: NOT_FOUND, notFound: true };
   const refusal = withdrawalRefusal(row, userId);

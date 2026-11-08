@@ -24,6 +24,7 @@ import { entryCounts } from "~/lib/season-entries.server";
 import { CONTACT_EMAIL, organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
+import { substitutesEnabled } from "~/lib/substitutes";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -116,7 +117,13 @@ const FAQ = [
   ["Nincs párom. Nevezhetek?", "Igen. Regisztrálj egyedül, és a szervező hasonló szintű párt keres neked."],
   ["Milyen szinten kell játszanom?", "Bármilyen szinten. A csoportokat szint szerint állítjuk össze, kezdőktől a versenyzőkig."],
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
-  ["Mi van, ha megsérül a párom?", "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."],
+  [
+    "Mi van, ha megsérül a párom?",
+    // No substitutes in the first season (D145).
+    substitutesEnabled()
+      ? "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."
+      : "Ebben a szezonban még nincs helyettes. Ha nem tudjátok folytatni, szólj a szervezőnek. A pár két kör között cserélhető.",
+  ],
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
 

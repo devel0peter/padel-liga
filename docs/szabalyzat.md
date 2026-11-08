@@ -46,12 +46,7 @@ A részleteket lent találod.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.
 - **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni Élő-pontja alapján soroljuk be.
-- **Helyettes:** ha a párod megsérül vagy nem ér rá, a szervező jóváhagyásával helyettes játszhat helyette egy vagy több meccsen a körön belül.
-  - A kérést a meccs előtt kell beadni az oldalon, a helyettes nevével. Az ellenfelek látják, ki játszik.
-  - A helyettes nagyjából azonos vagy alacsonyabb szintű legyen, és nem játszhat másik párban ugyanebben a csoportban.
-  - Az eredmény a párnak számít, ugyanúgy, mint bármelyik meccs.
-  - A helyettes Élő-pontja változik, a hiányzó játékosé nem.
-  - Jóváhagyott helyettes nélkül az elmaradt meccsekre vonatkozó szabályok érvényesek.
+- **Helyettes:** ebben a szezonban még nincs rá lehetőség. Ha a párod nem tud játszani, az elmaradt meccsekre vonatkozó szabályok érvényesek.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
 - **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
 - **Új liga első szezonja:** nincs nevezési határidő, a szezon akkor indul, amikor elég pár nevezett (a liga minimuma, alapból 12 pár). Amint a nevezések elérik a minimumot, az 1. kör a legalább 7 nappal későbbi első hétfőn indul (ha szünet esik rá, a szünet után), és ez a dátum akkor sem változik, ha később kevesebb nevezés marad.
@@ -97,7 +92,6 @@ Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
   - a határidőig nem próbált egyeztetni (ha egyik pár sem próbált, mindkét pár kap), vagy
   - 24 órán belül lemondta a meccset, és az nem jött létre a határidőig.
 - Nem jár fekete pont, ha mindkét pár próbált egyeztetni, de nem jutottatok megegyezésre.
-- A helyettes nem kap fekete pontot, a pár két játékosa igen.
 - A fekete pont a játékosé, párcserénél is veled marad. Minden szezon elején nullázódik.
 - A **második** fekete pontnál figyelmeztetést küldünk.
 - A **harmadiknál** a párotok a kör végén kikerül a ligából. Az addigi eredmények megmaradnak. A párod új párral folytathatja. A következő szezonra ugyanúgy nevezhettek, mint bárki más.
@@ -150,7 +144,7 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - A szezon végeredménye: az utolsó kör csoportja és helyezése.
 - **Díjak:** az utolsó kör tabellája dönt, a feljutás és a kiesés előtt.
   - Díjat minden **divíziógyőztes** kap: az egyes divíziók (Bronz, Réz, Rookie) legfelső csoportjának első helyezettje. Háromnál kevesebb csoportnál kevesebb divízió van (1 csoportnál csak a Bronz, 2 csoportnál a Bronz és a Réz), így annyi díj jár, ahány divízió van. Páronként egy díj jár. A többi csoportgyőztes nem kap díjat.
-  - Díjat az a pár kaphat, amelynek mindkét tagja legalább 2 körben játszott a szezonban (akár más-más párral; helyettesként nem számít).
+  - Díjat az a pár kaphat, amelynek mindkét tagja legalább 2 körben játszott a szezonban (akár más-más párral).
   - Ha a divízió legfelső csoportját nem jogosult pár nyeri, az eredmény és a feljutás marad, a díjat pedig a csoport legjobb helyezett jogosult párja kapja. Ha nincs ilyen pár, a díj elmarad.
   - A díjakat és a felajánlókat szezononként az oldalon hirdetjük meg. A díjátadó a szezon után egy rövid találkozó a felajánló klubban, közös fotóval.
 - A szezon végén e-mailben küldjük az összesítődet. A lezárt szezonok tabellái az oldalon visszanézhetők.

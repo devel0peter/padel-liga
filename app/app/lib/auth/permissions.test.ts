@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Substitutes are hidden in the first season (D145); one test switches them on.
+const h = vi.hoisted(() => ({ subs: false }));
+vi.mock("../substitutes", async (original) => ({ ...(await original<typeof import("../substitutes")>()), substitutesEnabled: () => h.subs }));
 
 import { adminHome, appNav, can, navLeagues, roleLabel, type Actor, type Permission } from "./permissions";
 
@@ -101,7 +105,7 @@ describe("sidebar", () => {
       "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
-      "/admin/leagues/gyor/substitutes",
+      // No "Helyettesek" in the first season (D145).
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -129,8 +133,18 @@ describe("sidebar", () => {
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
-    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták", "Helyettesek"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták"]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
+  });
+
+  it("offers Helyettesek only while substitutes are on (D145)", () => {
+    h.subs = true;
+    try {
+      const items = appNav(organizer, [gyor])[1]!.items;
+      expect(items.at(-1)).toMatchObject({ label: "Helyettesek", to: "/admin/leagues/gyor/substitutes" });
+    } finally {
+      h.subs = false;
+    }
   });
 
   it("Viták (#29): the league's Szervező and the Admin, not another league's Szervező or a player", () => {

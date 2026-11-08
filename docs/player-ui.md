@@ -68,7 +68,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | M8 | Fixed and started, or played without the app: recording the result is the main action. | D77 |
 | M9 | Their result waiting: "Megerősítem" is the main action with the score and the auto-accept time; the dispute form opens from "Nem így volt?". | D77 |
 | M10 | Our result waiting, disputed, final: shown as it stands, with who decided. | D77, D78 |
-| M11 | Substitute and no-show: folded unless something is already pending or decided. | D108, D109 |
+| M11 | Substitute and no-show: folded unless something is already pending or decided. The substitute part is hidden in the first season. | D108, D109, D145 |
 | M12 | The log stays visible to both pairs, compact. | spec 6.5 |
 
 ## 6. Profile

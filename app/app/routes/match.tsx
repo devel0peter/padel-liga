@@ -34,7 +34,7 @@ import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/
 import { parseScore, resultStatusView } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
-import { substituteLine } from "~/lib/substitutes";
+import { substituteLine, substitutesEnabled } from "~/lib/substitutes";
 import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
 import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
@@ -58,8 +58,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const ctx = await loadMatch(matchId(params));
   const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
-  // Substitutes (#37) and no-shows (#33): only for the four players, like the rest of the page.
-  const [substitutes, noShow] = await Promise.all([substitutePanel(ctx, page.side, user.id, now), noShowPanel(ctx, page.side, user.id, now)]);
+  // Substitutes (#37) and no-shows (#33): only for the four players, like the
+  // rest of the page. No substitutes in the first season (D145).
+  const [substitutes, noShow] = await Promise.all([
+    substitutesEnabled() ? substitutePanel(ctx, page.side, user.id, now) : null,
+    noShowPanel(ctx, page.side, user.id, now),
+  ]);
   // A fixed time that has started: recording the result becomes the main step (D133).
   const started = page.state.status === "scheduled" && page.state.slot.getTime() <= now.getTime();
   // `now`: the time pickers draw their days and hours from the server's clock.
@@ -111,7 +115,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     return fail(done.error);
   }
 
-  // A substitute for an absent player of the pair (#37, D109).
+  // A substitute for an absent player of the pair (#37, D109); while hidden
+  // (D145) both steps refuse.
   if (intent === "substitute-request" || intent === "substitute-withdraw") {
     const done =
       intent === "substitute-request"
@@ -650,7 +655,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const recordFolded = m.resultActions.record && !recordMain && !confirmResult;
   const venueMain = m.state.status === "scheduled" && m.actions.venue && !m.started && m.state.clubId === null && m.clubs.length > 0;
   const proposeMain = m.actions.propose && m.state.status === "to_schedule";
-  const substitutesShown = m.substitutes.approved.length > 0 || m.substitutes.ours.length > 0;
+  const subs = m.substitutes;
+  const substitutesShown = !!subs && (subs.approved.length > 0 || subs.ours.length > 0);
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
 
   return (
@@ -806,9 +812,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Panel>
           )}
 
-          {substitutesShown && (
+          {subs && substitutesShown && (
             <Panel title="Helyettes">
-              <SubstituteBody key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
+              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
             </Panel>
           )}
 
@@ -854,9 +860,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Fold>
           )}
 
-          {m.substitutes.form && !substitutesShown && (
+          {subs?.form && !substitutesShown && (
             <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani." open={failed("substitute-request")}>
-              <SubstituteBody key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
+              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
             </Fold>
           )}
 

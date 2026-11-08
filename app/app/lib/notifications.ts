@@ -8,6 +8,7 @@ import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
 import { PAIR_SECTION_PATH } from "./pairs";
 import { WAITING_START } from "./season-entries";
+import { substitutesEnabled } from "./substitutes";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
@@ -97,7 +98,9 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["result_disputed", "substitute_requested", "no_show_reported"] : [];
+  if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
+  // No substitutes in the first season (D145): no switch for their requests.
+  return substitutesEnabled() ? ["result_disputed", "substitute_requested", "no_show_reported"] : ["result_disputed", "no_show_reported"];
 }
 
 // No row means on: a setting is stored only once someone changes it.

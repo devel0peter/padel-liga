@@ -5,9 +5,12 @@
 // played (spec 11). Email is stubbed; nothing here sends any.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ raw: null as any }));
+// `subs`: the feature is hidden in the first season (D145); these tests drive
+// it switched on, one checks it refuses while off.
+const h = vi.hoisted(() => ({ raw: null as any, subs: true }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
+vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => h.subs }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueSeasonEntered: async () => {},
@@ -62,7 +65,10 @@ function freshDb() {
   h.raw.prepare("insert into matches (id, group_id, pair_a, pair_b, week, deadline) values (2, 1, 3, 4, 1, ?)").run(DEADLINE);
 }
 
-beforeEach(() => freshDb());
+beforeEach(() => {
+  h.subs = true;
+  freshDb();
+});
 
 const one = (q: string, ...p: unknown[]) => h.raw.prepare(q).get(...p);
 const all = (q: string, ...p: unknown[]) => h.raw.prepare(q).all(...p);
@@ -187,6 +193,24 @@ describe("asking for a substitute (#37 requirement 1)", () => {
     expect(one("select status from match_substitutes")).toEqual({ status: "withdrawn" });
     // The player can be asked for again.
     await asked();
+  });
+});
+
+describe("hidden in the first season (D145)", () => {
+  it("refuses asking and withdrawing while off, and writes nothing", async () => {
+    const id = await asked();
+    h.subs = false;
+    const { SUBSTITUTES_OFF } = await import("~/lib/substitutes");
+    expect(await S.requestSubstitute("c", 1, { absentId: "d", substituteId: "t" }, NOW)).toEqual({ ok: false, error: SUBSTITUTES_OFF });
+    expect(await S.withdrawSubstitute("a", 1, id)).toEqual({ ok: false, error: SUBSTITUTES_OFF });
+    expect(all("select absent_id, status from match_substitutes")).toEqual([{ absent_id: "b", status: "requested" }]);
+    // Anyone else still gets not found.
+    expect(await S.requestSubstitute("x", 1, { absentId: "b", substituteId: "s" }, NOW)).toMatchObject({ ok: false, notFound: true });
+  });
+
+  it("is off in the code (no request from the match page this season)", async () => {
+    const { SUBSTITUTES_ENABLED } = await import("~/lib/substitutes");
+    expect(SUBSTITUTES_ENABLED).toBe(false);
   });
 });
 

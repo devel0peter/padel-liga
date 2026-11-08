@@ -39,10 +39,10 @@ import {
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers disputed results, substitute requests and no-shows to Szervezők and Admins only (no new signups since #333)", () => {
+  it("offers disputed results and no-shows to Szervezők and Admins only (no new signups since #333; no substitutes this season, D145)", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "no_show_reported"]);
   });
 });
 

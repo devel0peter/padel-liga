@@ -1,20 +1,25 @@
 import { currentElo } from "@padel-liga/rules";
-import { and, asc, eq, inArray, isNotNull, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { cities, eloChanges, groupPairs, groups, leagues, matches, pairs, seasonPhases, seasons, users } from "~/db/schema";
+import { auditLog, cities, eloChanges, groupPairs, groups, leagues, matches, pairs, seasonPhases, seasons, users } from "~/db/schema";
 
-import { formatShortDate } from "./format";
+import { formatDate, formatShortDate } from "./format";
 import {
+  changedPairIds,
   eloSeries,
+  formerPairViews,
   groupHistory,
   matchViews,
   personView,
+  playerStats,
   shownElo,
   type EloChangeInput,
+  type FormerPairView,
   type GroupHistoryRow,
   type GroupInput,
+  type PlayerStats,
   type ProfileMatchInput,
   type ProfileMatchView,
   type ProfilePair,
@@ -198,6 +203,10 @@ export type PairProfile = {
   started: boolean;
   groups: GroupHistoryRow[];
   matches: ProfileMatchView[];
+  /** The pair's Élő-pont, its two players' average, rounded; null before the league starts. */
+  elo: number | null;
+  /** Seasons, rounds, matches, wins, losses (D136), as on a player profile. */
+  stats: PlayerStats;
 };
 
 /** A pair's public profile, or null: no such pair, or never in a published group of a listed city's league. */
@@ -213,12 +222,23 @@ export async function pairProfile(pairId: number, now = new Date()): Promise<Pai
   ]);
   const pair = details.pairById.get(pairId)!;
   const own = new Set([pairId]);
+  const isStarted = started.has(leagueId);
+  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => p.id === pairId));
+  const rating = ownGroups.flatMap((g) => g.pairs).find((p) => p.id === pairId)?.elo;
   return {
     pair,
     league: league!,
-    started: started.has(leagueId),
+    started: isStarted,
     groups: groupHistory(pairId, details.inputs, now),
-    matches: matchViews(own, matchInputs(own, list, details, started), formatShortDate),
+    matches: matchList,
+    elo: isStarted && rating ? shownElo(rating) : null,
+    // One league: the season name is unique in it.
+    stats: playerStats(
+      ownGroups.map((g) => ({ season: g.season, startsAt: g.startsAt })),
+      matchList,
+      now,
+    ),
   };
 }
 
@@ -233,6 +253,8 @@ export type PlayerProfile = {
   /** The player's pairs with a profile, newest group first, with that group. */
   pairs: { pair: ProfilePair; league: string; latest: GroupHistoryRow }[];
   matches: ProfileMatchView[];
+  /** Seasons, rounds, matches, wins, losses (D136). */
+  stats: PlayerStats;
 };
 
 /** A player's public profile, or null: no such account, a deleted or anonymized one, or no published group yet. */
@@ -281,14 +303,72 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     .map(({ at: _, ...p }) => p);
 
   const eloByMatch = new Map<number, EloChangeInput>(changes.map((c) => [c.matchId, c]));
+  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  // A season is one league's: the same name in two leagues is two seasons.
+  const leagueOf = new Map(list.map((g) => [g.id, g.leagueId]));
+  const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => own.has(p.id)));
   return {
     player: personView(user),
     started: isStarted,
     elo: isStarted && rating !== null ? shownElo(rating) : null,
     eloHistory: isStarted ? eloSeries(changes).map(shownElo) : [],
     pairs: pairsShown,
-    matches: matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch),
+    matches: matchList,
+    stats: playerStats(
+      ownGroups.map((g) => ({ season: `${leagueOf.get(g.id)}:${g.season}`, startsAt: g.startsAt })),
+      matchList,
+      now,
+    ),
   };
+}
+
+/**
+ * "Korábbi párjaid" on the player's own Profil (#347, D142): their dissolved
+ * pairs with a pair page (a published group in a listed city's league), the
+ * newest ended first, with how each ended. Selects the partner's name only.
+ */
+export async function formerPairs(userId: string): Promise<FormerPairView[]> {
+  const partner = alias(users, "former_partner");
+  const rows = await db
+    .select({
+      pairId: pairs.id,
+      leagueId: pairs.leagueId,
+      league: leagues.name,
+      dissolvedAt: pairs.dissolvedAt,
+      partnerId: partner.id,
+      partnerName: partner.name,
+      partnerDeleted: partner.deletedAt,
+    })
+    .from(pairs)
+    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
+    .innerJoin(partner, sql`${partner.id} = case when ${pairs.playerA} = ${userId} then ${pairs.playerB} else ${pairs.playerA} end`)
+    .where(and(eq(pairs.status, "dissolved"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))));
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.pairId);
+  const [list, members, changes] = await Promise.all([
+    publicGroups(inArray(groupPairs.pairId, ids)),
+    db.select({ pairId: groupPairs.pairId, groupId: groupPairs.groupId }).from(groupPairs).where(inArray(groupPairs.pairId, ids)),
+    // Partner changes write the old pair into the detail (changePartner).
+    db
+      .select({ detail: auditLog.detail })
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "pair.change"), inArray(auditLog.leagueId, [...new Set(rows.map((r) => r.leagueId))]))),
+  ]);
+  const byId = new Map(list.map((g) => [g.id, g]));
+  return formerPairViews(
+    rows.map((r) => ({
+      pairId: r.pairId,
+      partner: personView({ id: r.partnerId, name: r.partnerName, deletedAt: r.partnerDeleted }),
+      league: r.league,
+      dissolvedAt: r.dissolvedAt,
+      groups: members.flatMap((m) => {
+        const g = m.pairId === r.pairId ? byId.get(m.groupId) : undefined;
+        return g ? [{ season: g.season, phase: g.phase, startsAt: g.startsAt }] : [];
+      }),
+    })),
+    changedPairIds(changes.map((c) => c.detail)),
+    formatDate,
+  );
 }
 
 /** Which of `pairIds` have a profile (a published group in a listed city's league). */

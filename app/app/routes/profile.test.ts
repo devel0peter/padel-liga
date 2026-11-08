@@ -1,4 +1,4 @@
-// The profile page's level lock and értékszám (#135) on a real SQLite
+// The profile page's level lock and Élő-pont (#135) on a real SQLite
 // (~/test/sqlite) with the real session lookup.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +26,7 @@ const post = (cookie: string, fields: Record<string, string>) =>
   });
 const level = (id: string) => h.raw.prepare("select level from users where id = ?").get(id).level as string;
 
-describe("Profil: level lock and értékszám", () => {
+describe("Profil: level lock and Élő-pont", () => {
   let placed: string;
   let free: string;
 
@@ -72,7 +72,7 @@ describe("Profil: level lock and értékszám", () => {
     expect(h.raw.prepare("select name, level from users where id = 'placed'").get()).toEqual({ name: "Újabb Anna", level: "halado" });
   });
 
-  it("shows the starting értékszám of the level, nothing without one", async () => {
+  it("shows the starting Élő-pont of the level, nothing without one", async () => {
     expect(await P.loader(args(get(placed)))).toMatchObject({ rating: 1400 });
     expect(await P.loader(args(get(free)))).toMatchObject({ rating: 1200 });
     const nolevel = (await createSession("nolevel")).split(";")[0]!;
@@ -164,5 +164,94 @@ describe("Profil: Fiók törlése", () => {
     expect(refused.init.status).toBe(409);
     expect(refused.data.deleteError).toBe("Adminként a saját fiókodat nem törölheted.");
     expect(count("select count(*) n from sessions where user_id = 'admin'")).toBe(1);
+  });
+});
+
+// Párod (D141, #346: the Párom page before) and Korábbi párjaid (D142, #347)
+// on the Játékosprofil tab: the loader's data and the section's own posts.
+describe("Profil: Párod and Korábbi párjaid", () => {
+  let anna: string;
+  let lone: string;
+  const form = (cookie: string, fields: Record<string, string>) =>
+    new Request("http://localhost/profile", { method: "POST", headers: { Cookie: cookie }, body: new URLSearchParams(fields) });
+
+  beforeEach(async () => {
+    h.raw = migratedDatabase();
+    h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
+    h.raw.exec(`insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr'), (2, 'gyor', 'gyor2', 'Padelpárbaj Győr 2')`);
+    h.raw.exec(`insert into users (id, email, name, level, phone, sex, consent_at) values
+      ('anna', 'anna@x.hu', 'Nagy Anna', 'halado', '+36301234567', 'female', 1),
+      ('bela', 'bela@x.hu', 'Kis Béla', 'kezdo', '+36301234568', 'male', 1),
+      ('cili', 'cili@x.hu', 'Kovács Cili', 'kezdo', '+36301234569', 'female', 1),
+      ('lone', 'lone@x.hu', 'Magányos Lili', 'kezdo', null, 'female', 1)`);
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'lone', 'chosen')`);
+    h.raw.exec(`insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start)
+      values (1, 1, '2026/27 tél', 1, 2, '2026-11-09')`);
+    h.raw.exec(`insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, 1762642800, 1764456000)`);
+    h.raw.exec(`insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, 1000)`);
+    // Anna played round 1 with Cili, then the organizer changed her partner to Béla.
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b, status, dissolved_at) values (1, 1, 'anna', 'cili', 'dissolved', 1765000000)`);
+    h.raw.exec(`insert into pairs (id, league_id, player_a, player_b, status) values (2, 1, 'anna', 'bela', 'active')`);
+    h.raw.exec(`insert into audit_log (actor_id, action, target, detail, league_id) values ('anna', 'pair.change', 'pair:2', 'league:1; from pair:1; user:cili -> user:bela', 1)`);
+    h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1)`);
+    anna = (await createSession("anna")).split(";")[0]!;
+    lone = (await createSession("lone")).split(";")[0]!;
+  });
+
+  it("Párod: one league, the active partner with email and phone", async () => {
+    const d: any = await P.loader(args(get(anna)));
+    expect(d.pair.multi).toBe(false);
+    expect(d.pair.overview).toEqual([
+      expect.objectContaining({
+        league: expect.objectContaining({ id: 1, name: "Padelpárbaj Győr" }),
+        pair: { id: 2, partnerName: "Kis Béla", partnerEmail: "bela@x.hu", partnerPhone: "+36 30 123 4568" },
+        link: null,
+        seeking: null,
+      }),
+    ]);
+  });
+
+  it("Korábbi párjaid: the old pair as Partnercsere, without the former partner's email or phone", async () => {
+    const d: any = await P.loader(args(get(anna)));
+    expect(d.former).toEqual([
+      {
+        pairId: 1,
+        partner: { id: "cili", name: "Kovács Cili" },
+        link: "/pairs/1",
+        league: "Padelpárbaj Győr",
+        rounds: "2026/27 tél, 1. kör",
+        end: "Partnercsere",
+        endedOn: "2025. 12. 06.",
+      },
+    ]);
+    expect(JSON.stringify(d.former)).not.toMatch(/cili@x\.hu|\+36|3012345/);
+  });
+
+  it("two leagues: a card for each, without a pair the pair link and Párt keresek", async () => {
+    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'lone', 'chosen')`);
+    const d: any = await P.loader(args(get(lone)));
+    expect(d.pair.multi).toBe(true);
+    expect(d.pair.overview.map((o: any) => [o.league.name, o.pair, o.seeking])).toEqual([
+      ["Padelpárbaj Győr", null, false],
+      ["Padelpárbaj Győr 2", null, false],
+    ]);
+    expect(d.pair.overview.every((o: any) => /\/pair\/join\/[\w-]+$/.test(o.link))).toBe(true);
+    expect(d.former).toEqual([]);
+  });
+
+  it("Párt keresek posts to Profil and is saved per league", async () => {
+    expect(await P.action(args(form(lone, { intent: "partner_search", league: "1", seeking: "1" })))).toEqual({ intent: "partner_search", ok: true });
+    expect(h.raw.prepare("select seeking from partner_searches where user_id = 'lone' and league_id = 1").get().seeking).toBe(1);
+    const d: any = await P.loader(args(get(lone)));
+    expect(d.pair.overview[0].seeking).toBe(true);
+    // Not a league of hers: refused.
+    const refused: any = await P.action(args(form(lone, { intent: "partner_search", league: "2", seeking: "1" }))).catch((e) => e);
+    expect(refused.status).toBe(400);
+  });
+
+  it("the old address's ?joined=1 shows the accepted pair link's line", async () => {
+    const d: any = await P.loader(args(new Request("http://localhost/profile?joined=1", { headers: { Cookie: anna } })));
+    expect(d.pair.joined).toBe(true);
+    expect(((await P.loader(args(get(anna)))) as any).pair.joined).toBe(false);
   });
 });

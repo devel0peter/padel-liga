@@ -1,7 +1,7 @@
 // A pair withdrawn mid-round (#34, D87) and what taken-out players see
 // (#174): the Szervező takes a pair that plays in the running round out of
 // the season on "Párok", with a reason. Its matches leave the group's table,
-// the other pairs see it marked, and both players read on Párom that the
+// the other pairs see it marked, and both players read in Párod that the
 // organizer took them out and is the one to ask. No email goes out. Runs
 // last: it changes a published group.
 import { expect, test, type Page } from "@playwright/test";
@@ -15,7 +15,7 @@ const pairText = (a: Player, b: Player) => `(?:${esc(a.name)} – ${esc(b.name)}
 const row = (page: Page, a: Player, b: Player) =>
   page.getByRole("row").filter({ hasText: a.name }).filter({ hasText: b.name });
 
-test("Kivétel a szezonból mid-round: a reason, the table without the pair, Párom says who to ask", async ({ browser }) => {
+test("Kivétel a szezonból mid-round: a reason, the table without the pair, Párod says who to ask", async ({ browser }) => {
   const [x, y] = PAIRS.p5;
   // The players of the other pairs in p5's group, from the suite's D1. A
   // pair's two players are stored in either order, so both sides count.
@@ -51,10 +51,10 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   await expect(row(page, x, y)).toContainText("Visszavonva");
   await context.close();
 
-  // Both players: Párom names the organizer as the one to ask, no "Nevezünk".
+  // Both players: Párod names the organizer as the one to ask, no "Nevezünk".
   for (const player of [x, y]) {
     const p = await as(browser, player);
-    await visit(p.page, "/pair");
+    await visit(p.page, "/profile");
     await expect(content(p.page)).toContainText("A szervező kivett titeket a szezonból.");
     await expect(content(p.page)).toContainText("szóljatok neki");
     await expect(content(p.page).getByRole("button", { name: "Nevezünk" })).toHaveCount(0);
@@ -65,26 +65,27 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   }
 
   // A pair of the same group: on Kezdőlap the group's table leaves the
-  // withdrawn pair out and names it below; its week's match is off. The
+  // withdrawn pair out and names it below; its matches are gone. The
   // notice comes without the reason.
   const mate = await as(browser, others[0]![0]);
   await visit(mate.page, "/home");
   const card = content(mate.page);
   await expect(card).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
   await expect(card.getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
-  await expect(card.getByRole("listitem").filter({ hasText: "visszalépett a körből: ez a meccs elmarad" })).toHaveCount(1);
+  // The group's matches leave its matches out (D140: no Meccseitek row for the week off).
+  await expect(card.getByRole("group", { name: "A csoport meccsei" })).not.toContainText(x.name);
   await visit(mate.page, "/notifications");
   await expect(content(mate.page)).toContainText("Visszalépett egy pár a csoportodból");
   await expect(content(mate.page)).not.toContainText(REASON);
   await mate.context.close();
 
-  // The public table: the pair is named below its group, not in the table.
-  const visitor = await browser.newPage();
-  await visit(visitor, "/league/minta");
-  await expect(content(visitor)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
-  await expect(content(visitor).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
-  await expect(content(visitor)).not.toContainText(REASON);
-  await visitor.close();
+  // The Tabella (players only, D134): the pair is named below its group, not in the table.
+  const viewer = await as(browser, others[0]![0]);
+  await visit(viewer.page, "/league/minta");
+  await expect(content(viewer.page)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
+  await expect(content(viewer.page).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
+  await expect(content(viewer.page)).not.toContainText(REASON);
+  await viewer.context.close();
 
   expect(d1("select count(*) as n from email_messages")[0]!.n).toBe(emailsBefore);
 });

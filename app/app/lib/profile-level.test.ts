@@ -1,4 +1,4 @@
-// The profile level lock and the értékszám shown (profile-level.ts, #135).
+// The profile level lock and the Élő-pont shown (profile-level.ts, #135).
 import { describe, expect, it } from "vitest";
 
 import { LEVEL_LOCKED_ERROR, ratingFor, resolveLevel } from "./profile-level";

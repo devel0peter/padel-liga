@@ -58,6 +58,7 @@ import {
 } from "~/lib/round-switch";
 import { draftOutdated, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch } from "~/lib/round-switch.server";
 import { seasonOfLeague } from "~/lib/season-entries.server";
+import { isWaiting, WAITING_NO_GROUPS } from "~/lib/seasons";
 import { SITE_NAME } from "~/lib/site";
 
 // A season's groups for the league's Szervezők, one round at a time.
@@ -126,6 +127,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     rounds: [...new Set([...withGroups.map((w) => w.phase), number])].sort((a, b) => a - b),
     phase: phase && { startsAt: phase.startsAt, deadline: phase.deadline },
     lastPhase: number === Math.max(...season.phases.map((p) => p.number)),
+    // A first season waiting for its minimum entries (D124): no rounds yet.
+    waiting: isWaiting(season),
   };
 
   const stored = await phaseGroups(season.id, number);
@@ -192,6 +195,8 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
   const form = await request.formData();
   const intent = form.get("intent");
   const phase = phaseParam(form.get("phase")) ?? FIRST_PHASE;
+  // A first season waiting for its minimum entries (D124) has no rounds yet.
+  if (isWaiting(season)) return { error: WAITING_NO_GROUPS };
   if (!season.phases.some((p) => p.number === phase)) throw new Response("Hibás kérés.", { status: 400 });
   if (intent === "generate") {
     if (phase === FIRST_PHASE) {
@@ -361,7 +366,7 @@ function GenerateButton({ label, variant, phase }: { label: string; variant: "de
 
 function Actions({ d }: { d: LoaderData }) {
   const busy = useNavigation().state !== "idle";
-  if (d.publishedAt) return null;
+  if (d.publishedAt || d.waiting) return null;
   const empty = d.groups.length === 0;
   if (d.number === FIRST_PHASE) {
     return empty ? (
@@ -466,6 +471,7 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
       back={{ to: `/admin/leagues/${d.league.slug}/seasons`, label: "Szezonok" }}
       actions={<Actions d={d} />}
     >
+      {d.waiting && <p className="text-muted-foreground">{WAITING_NO_GROUPS}</p>}
       {d.rounds.length > 1 && (
         <nav aria-label="Körök" className="flex flex-wrap gap-2">
           {d.rounds.map((n) => (

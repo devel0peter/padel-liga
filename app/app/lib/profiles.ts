@@ -118,7 +118,7 @@ export type ProfileMatchView = {
   verdict: string;
   /** From the pair's side: "4:1, 2:4, szuper tie-break 10:8", "Játék nélküli győzelem (4:0, 4:0)". */
   result: string;
-  /** "Visszalépés miatt nem számít a tabellába." */
+  /** "Visszalépés miatt nem számít bele a tabellába." */
   note: string | null;
   /** The player's Elo change, on a player profile: "+12", and the rating after it. */
   elo: { delta: string; after: number } | null;
@@ -170,7 +170,7 @@ export function matchViews(
         date: m.scheduledAt ? formatDate(m.scheduledAt) : null,
         opponents: side === "a" ? m.b : m.a,
         ...text,
-        note: m.withdrawn ? "Visszalépés miatt nem számít a tabellába." : null,
+        note: m.withdrawn ? "Visszalépés miatt nem számít bele a tabellába." : null,
         elo: change ? { delta: signed(Math.round(change.delta)), after: shownElo(change.after) } : null,
       },
     });
@@ -188,4 +188,122 @@ export function eloSeries(changes: readonly EloChangeInput[]): number[] {
   const ordered = [...changes].sort((x, y) => x.at.getTime() - y.at.getTime() || x.matchId - y.matchId);
   if (ordered.length === 0) return [];
   return [ordered[0]!.before, ...ordered.map((c) => c.after)];
+}
+
+/** A player's summary on their profile (D136). */
+export type PlayerStats = { seasons: number; rounds: number; matches: number; wins: number; losses: number };
+
+/**
+ * The summary of a player profile (D136): the seasons and rounds (phases)
+ * the player played in, a published group whose phase has started, and the
+ * matches with a final result (D80), split into wins and losses. `groups`:
+ * one row per group of the player's pairs, `season` unique per league.
+ */
+export function playerStats(
+  groups: readonly { season: string; startsAt: Date }[],
+  matches: readonly Pick<ProfileMatchView, "verdict">[],
+  now: Date,
+): PlayerStats {
+  const played = groups.filter((g) => g.startsAt <= now);
+  const wins = matches.filter((m) => m.verdict === "Győzelem").length;
+  const losses = matches.filter((m) => m.verdict === "Vereség").length;
+  return { seasons: new Set(played.map((g) => g.season)).size, rounds: played.length, matches: wins + losses, wins, losses };
+}
+
+/** How a former pair ended (#347, D142). */
+export type PairEnd = "Felbontva" | "Partnercsere";
+
+/** A former pair on the player's own Profil, "Korábbi párjaid" (#347, D142). */
+export type FormerPairView = {
+  pairId: number;
+  /** The former partner: "Törölt játékos" with no id when deleted or anonymized. */
+  partner: ProfilePerson;
+  /** The pair's page; none for a deleted or anonymized partner. */
+  link: string | null;
+  league: string;
+  /** "2026/27 tél, 1–2. kör" */
+  rounds: string;
+  end: PairEnd;
+  /** "2026. 11. 08.", Budapest; "" when the pair has no stored end. */
+  endedOn: string;
+};
+
+// "1–3., 5." from [1, 2, 3, 5]: runs of consecutive rounds as a range.
+function roundRuns(phases: readonly number[]): string {
+  const sorted = [...new Set(phases)].sort((x, y) => x - y);
+  const runs: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j]! + 1) j++;
+    runs.push(j > i ? `${sorted[i]}–${sorted[j]}.` : `${sorted[i]}.`);
+    i = j + 1;
+  }
+  return runs.join(", ");
+}
+
+/**
+ * The seasons and rounds a pair played in, oldest season first:
+ * "2026/27 tél, 1–2. kör; 2027 tavasz, 1. kör". `groups`: one row per
+ * published group of the pair.
+ */
+export function roundsText(groups: readonly { season: string; phase: number; startsAt: Date }[]): string {
+  const bySeason = new Map<string, { first: number; phases: number[] }>();
+  for (const g of groups) {
+    const s = bySeason.get(g.season) ?? { first: g.startsAt.getTime(), phases: [] };
+    s.first = Math.min(s.first, g.startsAt.getTime());
+    s.phases.push(g.phase);
+    bySeason.set(g.season, s);
+  }
+  return [...bySeason]
+    .sort(([, x], [, y]) => x.first - y.first)
+    .map(([season, s]) => `${season}, ${roundRuns(s.phases)} kör`)
+    .join("; ");
+}
+
+/**
+ * The pairs a partner change ended (#347, D142): "Partner cseréje" writes a
+ * pair.change audit entry whose detail names the old pair, "league:1; from
+ * pair:12; user:… -> user:…" (changePartner in pairs.server.ts). Every other
+ * end (a dissolve, an account deletion) is "Felbontva".
+ */
+export function changedPairIds(details: readonly (string | null)[]): Set<number> {
+  const ids = new Set<number>();
+  for (const d of details) {
+    const m = d ? /(?:^|; )from pair:(\d+)(?:;|$)/.exec(d) : null;
+    if (m) ids.add(Number(m[1]));
+  }
+  return ids;
+}
+
+/** A former pair as stored, with its published groups. */
+export type FormerPairInput = {
+  pairId: number;
+  partner: ProfilePerson;
+  league: string;
+  dissolvedAt: Date | null;
+  groups: readonly { season: string; phase: number; startsAt: Date }[];
+};
+
+/**
+ * "Korábbi párjaid" (#347, D142): the player's dissolved pairs that played in
+ * a published group (one without has no pair page and is left out), the
+ * newest ended first. Names only: never a partner's email or phone.
+ */
+export function formerPairViews(
+  list: readonly FormerPairInput[],
+  changed: ReadonlySet<number>,
+  formatDate: (d: Date) => string,
+): FormerPairView[] {
+  return list
+    .filter((p) => p.groups.length > 0)
+    .sort((x, y) => (y.dissolvedAt?.getTime() ?? 0) - (x.dissolvedAt?.getTime() ?? 0) || y.pairId - x.pairId)
+    .map((p) => ({
+      pairId: p.pairId,
+      partner: p.partner,
+      link: p.partner.id ? pairPath(p.pairId) : null,
+      league: p.league,
+      rounds: roundsText(p.groups),
+      end: changed.has(p.pairId) ? "Partnercsere" : "Felbontva",
+      endedOn: p.dissolvedAt ? formatDate(p.dissolvedAt) : "",
+    }));
 }

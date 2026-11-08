@@ -1,5 +1,5 @@
-import { ArrowLeft, Bell } from "lucide-react";
-import { Link, useRouteLoaderData } from "react-router";
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router";
 
 import { SidebarTrigger } from "~/components/ui/sidebar";
 
@@ -12,17 +12,18 @@ export function AppPage({
   description,
   actions,
   back,
+  help,
   children,
 }: {
   title: React.ReactNode;
+  // A HelpTip next to the title (D138), outside the <h1> so its name stays the title.
+  help?: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   // A parent page, shown above the title (e.g. Körlevelek above Új körlevél).
   back?: { to: string; label: string };
   children: React.ReactNode;
 }) {
-  // Phones don't see the sidebar's badge: a bell next to the title instead.
-  const unread = useRouteLoaderData<{ unread?: number }>("routes/app")?.unread ?? 0;
   return (
     <div className="grid grid-cols-1 content-start gap-6 px-4 py-4 sm:px-6 lg:px-8 lg:py-6 [&>*]:min-w-0">
       <header className="flex flex-wrap items-start gap-x-3 gap-y-3">
@@ -39,22 +40,17 @@ export function AppPage({
               {back.label}
             </Link>
           )}
-          <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+          {help ? (
+            <div className="relative flex items-center gap-2">
+              <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+              {help}
+            </div>
+          ) : (
+            <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+          )}
           {description && <div className="max-w-3xl text-sm text-muted-foreground">{description}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-        <Link
-          to="/notifications"
-          aria-label={unread > 0 ? `Értesítések, ${unread} új` : "Értesítések"}
-          className="relative -mr-1.5 grid size-8 shrink-0 place-items-center rounded-md text-foreground no-underline hover:bg-muted md:hidden"
-        >
-          <Bell className="size-5" />
-          {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-nav-active px-1 text-[10px] font-bold text-white">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          )}
-        </Link>
       </header>
       {children}
     </div>

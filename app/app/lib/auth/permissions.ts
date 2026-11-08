@@ -1,6 +1,8 @@
 // Who may do what (docs/admin-plan.md, spec section 2). Pure: the guard in
 // admin.server.ts loads the actor and asks can(); every rule is unit tested.
 
+import { substitutesEnabled } from "../substitutes";
+
 export type PlatformRole = "player" | "superadmin";
 
 export type LeagueRef = { id: number; slug: string; city: string; name: string };
@@ -19,9 +21,8 @@ export type Permission =
   | { kind: "app.enter" }
   // See the admin area at all.
   | { kind: "admin.enter" }
-  // Admin (superadmin) only: the interest list (and its CSV), broadcasts, the
-  // outbox log, traffic, leagues and Szervező appointments, the user list.
-  | { kind: "signups.manage" }
+  // Admin (superadmin) only: broadcasts, the outbox log, traffic, leagues and
+  // Szervező appointments, the user list.
   | { kind: "broadcasts.send" }
   | { kind: "outbox.manage" }
   | { kind: "traffic.view" }
@@ -63,7 +64,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "pair" | "notifications" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "signups" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
+export type NavIcon = "home" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "solos" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -73,7 +74,6 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Ligák", to: "/admin/leagues", icon: "leagues", permission: { kind: "leagues.manage" } },
   { label: "Városok", to: "/admin/cities", icon: "cities", permission: { kind: "cities.manage" } },
   { label: "Felhasználók", to: "/admin/users", icon: "users", permission: { kind: "users.view" } },
-  { label: "Jelentkezők", to: "/admin/signups", icon: "signups", permission: { kind: "signups.manage" } },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
@@ -92,8 +92,11 @@ function leagueItems(league: LeagueRef): NavItem[] {
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
     // Disputed results and decisions on any match (#29).
     { label: "Viták", to: `${base}/disputes`, icon: "disputes", permission: { kind: "league.manage", league: league.slug } },
-    // Substitute requests to approve (#37, D109).
-    { label: "Helyettesek", to: `${base}/substitutes`, icon: "substitutes", permission: { kind: "league.manage", league: league.slug } },
+    // Substitute requests to approve (#37, D109); hidden in the first season
+    // (D145), the page stays reachable by URL.
+    ...(substitutesEnabled()
+      ? ([{ label: "Helyettesek", to: `${base}/substitutes`, icon: "substitutes", permission: { kind: "league.manage", league: league.slug } }] satisfies NavItem[])
+      : []),
   ];
 }
 
@@ -108,13 +111,13 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 // section with nothing in it isn't shown.
 export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
-  // First, unlabelled: the app home, the pair and the notifications, for everyone.
+  // First, unlabelled: the app home and the notifications, for everyone (the
+  // pair is a section of Profil, D141).
   const sections: NavSection[] = [
     {
       label: "",
       items: [
         { label: "Kezdőlap", to: "/home", icon: "home", permission: { kind: "app.enter" } },
-        { label: "Párom", to: "/pair", icon: "pair", permission: { kind: "app.enter" } },
         { label: "Értesítések", to: "/notifications", icon: "notifications", permission: { kind: "app.enter" } },
       ],
     },
@@ -126,10 +129,10 @@ export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []
     .filter((s) => s.items.length > 0);
 }
 
-// Where /admin sends you: the Admin to the signups, a Szervező to their
+// Where /admin sends you: the Admin to the leagues, a Szervező to their
 // (first) league. Null: nothing to open yet.
 export function adminHome(actor: Actor): string | null {
-  if (actor.platformRole === "superadmin") return "/admin/signups";
+  if (actor.platformRole === "superadmin") return "/admin/leagues";
   const league = actor.leagues[0];
   return league ? `/admin/leagues/${league.slug}` : null;
 }

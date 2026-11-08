@@ -13,6 +13,9 @@ import { AUDIT_ACTIONS, isSystemAction, type AuditAction } from "~/lib/audit";
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
+// Substitutes are hidden in the first season (D145); their audit entries are
+// covered with the feature on.
+vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => true }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
@@ -30,20 +33,23 @@ const CITIES = await import("~/lib/cities.server");
 const LEAGUES = await import("~/lib/leagues.server");
 const CLUBS = await import("~/lib/clubs.server");
 const SEASONS = await import("~/lib/seasons.server");
+const START = await import("~/lib/season-start.server");
 const REMINDERS = await import("~/lib/reminders.server");
 const PAIRS = await import("~/lib/pairs.server");
 const ENTRIES = await import("~/lib/season-entries.server");
 const GROUPS = await import("~/lib/groups.server");
 const RESULTS = await import("~/lib/results.server");
 const DECISIONS = await import("~/lib/decisions.server");
-const SIGNUPS = await import("~/lib/signups-admin.server");
-const SOLO = await import("~/lib/solo-pairing.server");
 const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
 const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
 const SUBSTITUTES = await import("~/lib/substitutes.server");
 const NOSHOWS = await import("~/lib/no-shows.server");
+const MATCHES = await import("~/lib/matches.server");
+const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
+const PURGE = await import("~/lib/interest-list-purge.server");
+const { RunBudget } = await import("~/lib/run-usage");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
 // Workers types, which have no node:fs.
@@ -97,12 +103,8 @@ function world() {
   for (const id of ["q1", "q2", "r1", "r2", "r3", "gone"])
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, 'halado', 1)").run(id, `${id}@x.hu`, `Játékos ${id}`);
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (9, 1, 'r1', 'r2')`);
-  // Interest list: two solos to pair, one to edit and delete, one to invite.
-  const signup = h.raw.prepare("insert into interest_signups (id, mode, name1, email1, level, consent_at) values (?, ?, ?, ?, 'halado', 1)");
-  signup.run(1, "solo", "Solo Egy", "s1@x.hu");
-  signup.run(2, "solo", "Solo Kettő", "s2@x.hu");
-  signup.run(3, "pair", "Jel Entkező", "j1@x.hu");
-  signup.run(4, "pair", "Meg Hívott", "inv@x.hu");
+  // Every account here joined the league (D128).
+  h.raw.exec(`insert into league_members (league_id, user_id, source) select 1, id, 'carried' from users`);
 }
 
 const lastId = () => (one("select coalesce(max(id), 0) as n from audit_log").n as number);
@@ -135,6 +137,11 @@ const STEPS: Step[] = [
   { action: "season.create", actor: ORG, run: () => SEASONS.createSeason(1, SPRING, phaseCalendar(SPRING.firstPhaseStart, []), ORG) },
   { action: "season.update", actor: ORG, run: () => SEASONS.updateSeason(springId(), { ...SPRING, name: "Tavasz!" }, phaseCalendar(SPRING.firstPhaseStart, []), ORG) },
   { action: "season.delete", actor: ORG, run: () => SEASONS.deleteSeason(springId(), ORG) },
+  // A first season that starts at the minimum entries (D124), in the league
+  // made above, which has no season yet.
+  { action: "season.create", actor: ORG, run: () => SEASONS.createWaitingSeason(gyor2Id(), { name: "Első", breaks: [] }, ORG) },
+  { action: "season.update", actor: ORG, run: () => SEASONS.updateWaitingSeason(firstId(), { name: "Első!", breaks: [] }, ORG) },
+  { action: "league.min_entries", actor: ORG, run: () => expectOk(START.setMinEntries({ id: ORG }, gyor2Id(), 8)) },
   { action: "reminders.on", actor: ORG, run: () => REMINDERS.setReminders(ORG, league, true) },
   { action: "reminders.off", actor: ORG, run: () => REMINDERS.setReminders(ORG, league, false) },
   { action: "pair.create", actor: ORG, run: () => expectOk(PAIRS.createPair(ORG, 1, "q1", "q2")) },
@@ -166,26 +173,42 @@ const STEPS: Step[] = [
       expect(await RESULTS.autoAcceptResults(AFTER_48H)).toBe(1);
     },
   },
+  {
+    // An agreed time the other pair never answered (D148): fixed by itself
+    // 24 hours later, written by the cron; the player's step has no entry.
+    action: "match.agreed_auto_fix",
+    actor: null,
+    run: async () => {
+      const id = matchIds()[5]!;
+      const [pa] = all("select p.player_a from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+      await expectOk(MATCHES.matchStep(pa.player_a, id, { kind: "agreed", slot: new Date("2026-11-14T17:00:00Z"), clubId: null }, IN_PHASE));
+      expect(await AUTOFIX.autoFixAgreedTimes(AFTER_48H)).toEqual({ fixed: 1, left: false });
+    },
+  },
   { action: "season_entry.withdraw", actor: ORG, run: () => expectOk(ENTRIES.withdrawPairMidPhase({ id: ORG }, 1, 7, 1, "Sérülés.", IN_PHASE)) },
   // One match resolved after the deadline (#11): nobody scheduled it, so both
   // pairs' players get a strike (#294), which the organizer then cancels.
   { action: "match.deadline", actor: null, run: () => DEADLINE.resolveDeadlines(AFTER_PHASE, undefined, 1).then((r) => expect(r.resolved).toBe(1)) },
   {
+    action: "interest_list.delete",
+    actor: null,
+    run: async () => {
+      h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('gyor', 'solo', 'Régi', 'regi@x.hu', 'kezdo', 1)`);
+      await PURGE.purgeInterestList(AFTER_PHASE, { run: new RunBudget(), keep: { queries: 0, calls: 0 } });
+      expect(one("select count(*) as n from interest_signups").n).toBe(0);
+    },
+  },
+  {
     action: "strike.cancel",
     actor: ORG,
     run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
   },
-  { action: "signup.update", actor: ADMIN, run: () => SIGNUPS.updateSignup(3, { status: "contacted", adminNote: "hívd fel" }, ADMIN) },
-  { action: "signup.delete", actor: ADMIN, run: () => SIGNUPS.deleteSignup(3, ADMIN) },
-  { action: "solo.pair", actor: ORG, run: () => SOLO.pairSolos(ORG, 1, 1, 2, "gyor", "Győr").then((e) => expect(e).toBeNull()) },
-  { action: "solo.unpair", actor: ORG, run: () => SOLO.unpairSolo(ORG, 1, 1, "gyor") },
   {
     action: "broadcast.send",
     actor: ADMIN,
     run: () =>
       OUTBOX.createBroadcast({ subject: "Hír", body: "Szia {név}!", audience: "Jelentkezők · „anna@x.hu”", recipients: [{ email: "p1a@x.hu", name: "Játékos 1a" }], createdBy: "adm@x.hu", actorId: ADMIN }),
   },
-  { action: "registration_invites.send", actor: ADMIN, run: () => OUTBOX.queueRegistrationInvites(ENTRY_TIME, undefined, ADMIN).then((n) => expect(n).toBeGreaterThan(0)) },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },
   {
     action: "account.anonymize",
@@ -198,6 +221,8 @@ const STEPS: Step[] = [
 const SPRING = { name: "Tavasz", registrationOpens: "2027-03-01", registrationCloses: "2027-03-20", firstPhaseStart: "2027-03-22", breaks: [] };
 const clubId = () => one("select id from clubs where slug = 'ace'").id as number;
 const springId = () => one("select id from seasons where name like 'Tavasz%'").id as number;
+const gyor2Id = () => one("select id from leagues where slug = 'gyor2'").id as number;
+const firstId = () => one("select id from seasons where name like 'Első%'").id as number;
 const pairOf = (player: string) => one("select id from pairs where player_a = ? order by id desc", player).id as number;
 const firstPairOfGroup = (n: number) => one("select gp.pair_id from group_pairs gp join groups g on g.id = gp.group_id where g.number = ? order by gp.seed", n).pair_id as number;
 const matchIds = () => all("select id from matches order by id").map((r: any) => r.id as number);
@@ -225,8 +250,11 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search (their own tests check the entry).
-const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off"];
+// and partner search, and joining a league (their own tests check the entry).
+// RETIRED: written by flows that went with the interest list (#333, D129);
+// Napló still names their old entries, nothing writes new ones.
+const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
+const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send"];
 
 // Every admin page with an action, and the audit actions its action writes.
 const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
@@ -237,12 +265,12 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
-  "admin.league-solos.tsx": ["pair.create", "solo.pair", "solo.unpair"],
+  "admin.league-solos.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
-  "admin.signups.tsx": ["signup.update", "signup.delete", "registration_invites.send"],
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
+  "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
 };
 
@@ -285,6 +313,6 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
     const stepped = new Set(STEPS.flatMap((s) => [s.action, ...(s.also ?? [])]));
     for (const action of Object.values(ROUTE_ACTIONS).flat()) expect(stepped, action).toContain(action);
     // And every action Napló knows is either stepped here or written outside.
-    for (const action of Object.keys(AUDIT_ACTIONS) as AuditAction[]) expect(stepped.has(action) || OUTSIDE.includes(action), action).toBe(true);
+    for (const action of Object.keys(AUDIT_ACTIONS) as AuditAction[]) expect(stepped.has(action) || OUTSIDE.includes(action) || RETIRED.includes(action), action).toBe(true);
   });
 });

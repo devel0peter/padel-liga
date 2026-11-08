@@ -1,5 +1,5 @@
 // "Párt keresek" (D59): two new players without a signup switch it on, one on
-// Párom and one on Kezdőlap; the Szervező finds both on Párkeresők and pairs
+// Párod and one on Kezdőlap; the Szervező finds both on Párkeresők and pairs
 // them at once, with a message in the app and an email (#260). The pair shows
 // in Összehozott párok until it is dissolved on Párok (#297). Runs after the
 // admin status spec, so its counts stay as they were.
@@ -23,7 +23,8 @@ const madeRow = (page: Page) =>
     .filter({ hasText: KATA.name })
     .filter({ hasText: KRISTOF.name });
 
-// A new account with no signup: the first-login page by hand, then /home.
+// A new account: the first-login page by hand, then /home, where it joins
+// the league on "Melyik ligában játszol?" (D128, #331).
 async function newPlayer(browser: Browser, who: { name: string; email: string }) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -37,6 +38,8 @@ async function newPlayer(browser: Browser, who: { name: string; email: string })
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
+  await content(page).getByRole("button", { name: "Csatlakozom" }).click();
+  await expect(content(page)).not.toContainText("Melyik ligában játszol?");
   await save(context, who.email);
   return { context, page };
 }
@@ -46,14 +49,14 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   const emailsBefore = d1(OTHER);
   const lastBefore = d1("select max(id) as id from email_messages")[0].id ?? 0;
 
-  // Kata on Párom: off by default (no solo signup), then on.
+  // Kata in Párod: off by default (#333), then on.
   const kata = await newPlayer(browser, KATA);
-  await visit(kata.page, "/pair");
+  await visit(kata.page, "/profile");
   const kataSwitch = content(kata.page).getByRole("switch", { name: "Párt keresek" });
   await expect(kataSwitch).not.toBeChecked();
   await kataSwitch.click();
   await expect(content(kata.page)).toContainText("A szervező látja, hogy párt keresel");
-  await visit(kata.page, "/pair");
+  await visit(kata.page, "/profile");
   await expect(content(kata.page).getByRole("switch", { name: "Párt keresek" })).toBeChecked();
   await kata.context.close();
 
@@ -93,13 +96,13 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
     d1(`select p.source, p.status from pairs p join users a on a.id = p.player_a join users b on b.id = p.player_b
       where a.email = '${KATA.email}' and b.email = '${KRISTOF.email}'`),
   ).toEqual([{ source: "search", status: "active" }]);
-  // One email each (#260), nothing else; a message in the app, and Párom
+  // One email each (#260), nothing else; a message in the app, and Párod
   // shows the partner.
   const pairMails = d1(`select lower(to_email) as to_email from email_messages where kind = 'pair_created' and id > ${lastBefore}`);
   expect(pairMails.map((r) => r.to_email).sort()).toEqual([KATA.email, KRISTOF.email].map((e) => e.toLowerCase()).sort());
   expect(d1(OTHER)).toEqual(emailsBefore);
   const back = await as(browser, KATA.email);
-  await visit(back.page, "/pair");
+  await visit(back.page, "/profile");
   await expect(content(back.page)).toContainText(KRISTOF.name);
   await expect(content(back.page).getByRole("switch", { name: "Párt keresek" })).toHaveCount(0);
   await visit(back.page, "/notifications");

@@ -323,6 +323,20 @@
       "when": 1793901527634,
       "tag": "0052_round_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1794006092281,
+      "tag": "0053_league_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1794011315431,
+      "tag": "0054_first_season_minimum",
+      "breakpoints": true
     }
   ]
 }

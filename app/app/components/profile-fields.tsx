@@ -62,7 +62,7 @@ export function LevelField({
           ))}
         </SelectContent>
       </Select>
-      <p className="text-sm text-muted-foreground">Őszintén válassz: innen indul az értékszámod.</p>
+      <p className="text-sm text-muted-foreground">Őszintén válassz: innen indul az Élő-pontod.</p>
     </Field>
   );
 }

@@ -15,8 +15,8 @@ const toObjects = (entries: readonly Entry[]): RouteObject[] =>
 const fileFor = (path: string) => matchRoutes(toObjects(routes as Entry[]), path)?.at(-1)?.route.id ?? null;
 
 describe("routes", () => {
-  it("serves /pair and the organizer's Párok page (#97)", () => {
-    expect(fileFor("/pair")).toBe("routes/pair.tsx");
+  it("serves /pair (the old Párom, now a redirect to Profil, D141) and the organizer's Párok page (#97)", () => {
+    expect(fileFor("/pair")).toBe("routes/pair.ts");
     expect(fileFor("/admin/leagues/gyor/pairs")).toBe("routes/admin.league-pairs.tsx");
   });
 

@@ -6,10 +6,10 @@ import { join } from "node:path";
 
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { ADMIN, ORGANIZER, PAIR_SIGNUPS, SOLO_SIGNUPS } from "../app/lib/seed";
+import { ADMIN, LEAGUE, ORGANIZER, OUTSIDER, PAIR_PLAYERS, SOLO_PLAYERS } from "../app/lib/seed";
 import { APP_DIR, AUTH_DIR, SERVER_LOG, wranglerLocal } from "./env";
 
-export { ADMIN, ORGANIZER };
+export { ADMIN, ORGANIZER, OUTSIDER };
 
 // The level names as the pages show them (LEVELS in app/lib/interest.ts, up
 // to the dash).
@@ -18,13 +18,13 @@ const LEVEL_LABELS = { kezdo: "Kezdő", kozephalado: "Középhaladó", halado: "
 export type Player = { name: string; email: string; level: keyof typeof LEVEL_LABELS };
 
 const pair = (i: number): [Player, Player] => {
-  const p = PAIR_SIGNUPS[i];
+  const p = PAIR_PLAYERS[i];
   return [
     { ...p.a, level: p.level },
     { ...p.b, level: p.level },
   ];
 };
-const solo = (i: number): Player => ({ ...SOLO_SIGNUPS[i].who, level: SOLO_SIGNUPS[i].level });
+const solo = (i: number): Player => ({ ...SOLO_PLAYERS[i].who, level: SOLO_PLAYERS[i].level });
 
 // The seeded players the walkthrough uses, by role in the story.
 export const PAIRS = {
@@ -33,13 +33,13 @@ export const PAIRS = {
   p3: pair(2),
   p4: pair(3),
   p5: pair(4),
-  // Two solos a Szervező paired in the seed.
+  // Two players without a partner the Szervező pairs on Párkeresők (step 6).
   solo: [solo(0), solo(1)] as [Player, Player],
   // Kept out until the groups are published: it joins round 2.
   late: pair(5),
 };
-// The waiting solos (step 13) and two players whose partner never registers
-// (step 14, "Pár létrehozása").
+// Two more who look for a partner (step 13) and two players whose partner
+// never registers (step 14, "Pár létrehozása").
 export const WAITING_SOLOS: [Player, Player] = [solo(2), solo(3)];
 export const LONE = { torok: pair(6)[0], lakatos: pair(8)[0] };
 
@@ -98,8 +98,10 @@ export async function loginCode(email: string, offset: number): Promise<string> 
 
 // --- Logging in -----------------------------------------------------------------
 
-export async function logIn(page: Page, email: string): Promise<void> {
-  await visit(page, `/login?email=${encodeURIComponent(email)}`);
+// `league`: through that league's register button (D128, #331), so a new
+// account joins it at login.
+export async function logIn(page: Page, email: string, league?: string): Promise<void> {
+  await visit(page, `/login?${league ? `league=${league}&` : ""}email=${encodeURIComponent(email)}`);
   await expect(page.getByLabel("E-mail-cím")).toHaveValue(email);
   const offset = logOffset();
   await page.getByRole("button", { name: "Kódot kérek" }).click();
@@ -112,7 +114,9 @@ export async function logIn(page: Page, email: string): Promise<void> {
 const authFile = (email: string) => join(AUTH_DIR, `${email}.json`);
 
 // A page logged in as `email`: the saved session if there is one, else a
-// login (and, for a new player, the first-login page). Close the context.
+// login (and, for a new player, the first-login page). A seeded player logs
+// in through Mintaváros's register button, so they are its player (D128).
+// Close the context.
 export async function as(browser: Browser, who: string | Player): Promise<{ context: BrowserContext; page: Page }> {
   const email = typeof who === "string" ? who : who.email;
   if (existsSync(authFile(email))) {
@@ -121,7 +125,7 @@ export async function as(browser: Browser, who: string | Player): Promise<{ cont
   }
   const context = await browser.newContext();
   const page = await context.newPage();
-  await logIn(page, email);
+  await logIn(page, email, typeof who === "string" ? undefined : LEAGUE.slug);
   if (typeof who !== "string" && new URL(page.url()).pathname === "/welcome") await completeWelcome(page, who);
   await save(context, email);
   return { context, page };
@@ -132,13 +136,14 @@ export async function save(context: BrowserContext, email: string): Promise<void
   await context.storageState({ path: authFile(email) });
 }
 
-// "Üdv!": the name and the level from the signup (already set, #130), a phone
-// number, consent, Kész.
+// "Üdv!": name, level, phone number, Férfi or Nő, consent, Kész. Nothing is
+// prefilled since the interest list went (#333).
 export async function completeWelcome(page: Page, player: Player): Promise<void> {
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
-  await expect(page.getByText("A jelentkezésedből már megvan a neved és a szinted")).toBeVisible();
-  await expect(page.getByLabel("Neved")).toHaveValue(player.name);
-  await expect(page.getByLabel("Szinted")).toContainText(levelLabel(player));
+  await expect(page.getByLabel("Neved")).toHaveValue("");
+  await page.getByLabel("Neved").fill(player.name);
+  await page.getByLabel("Szinted").click();
+  await page.getByRole("option", { name: new RegExp(`^${levelLabel(player)}`) }).click();
   // Never prefilled (#133): the player picks.
   await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
   await page.getByLabel("Nő", { exact: true }).click();
@@ -146,6 +151,45 @@ export async function completeWelcome(page: Page, player: Player): Promise<void>
   await page.getByLabel(/hozzájárulok/).check();
   await page.getByRole("button", { name: "Kész" }).click();
   await expect(page).toHaveURL(/\/home$/);
+}
+
+// Two registered players of Mintaváros make their pair with the first one's
+// pair link (2026-10-31): what a real pair does now that no pair forms from
+// the interest list (#333).
+export async function pairUp(browser: Browser, [a, b]: [Player, Player]): Promise<void> {
+  const owner = await as(browser, a);
+  await visit(owner.page, "/profile");
+  const url = await content(owner.page).getByLabel("A meghívó linked").inputValue();
+  await owner.context.close();
+  const partner = await as(browser, b);
+  await visit(partner.page, new URL(url).pathname);
+  await partner.page.getByRole("button", { name: "Elfogadom" }).click();
+  await expect(partner.page).toHaveURL(/\/profile\?joined=1#parod$/);
+  await partner.context.close();
+}
+
+// A registered player switches "Párt keresek" on, in Profil's Párod section.
+export async function seekPartner(browser: Browser, who: Player): Promise<void> {
+  const { context, page } = await as(browser, who);
+  await visit(page, "/profile");
+  const toggle = content(page).getByRole("switch", { name: "Párt keresek" });
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await expect(content(page)).toContainText("A szervező látja, hogy párt keresel");
+  await context.close();
+}
+
+// The Szervező pairs two players who look for a partner on Párkeresők.
+export async function pairSeekers(browser: Browser, [a, b]: [Player, Player]): Promise<void> {
+  const { context, page } = await as(browser, ORGANIZER.email);
+  await visit(page, "/admin/leagues/minta/solos");
+  const registered = page.getByRole("region", { name: "Regisztráltak", exact: true });
+  await registered.getByRole("checkbox", { name: `${a.name} kijelölése` }).check();
+  await registered.getByRole("checkbox", { name: `${b.name} kijelölése` }).check();
+  await registered.getByRole("button", { name: "Párba teszem (2/2)" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Párba teszem" }).click();
+  await expect(registered).not.toContainText(a.name);
+  await context.close();
 }
 
 // Registers players (login, first-login page) a few at a time.

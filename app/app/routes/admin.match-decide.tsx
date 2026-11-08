@@ -83,7 +83,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
     { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (4:0, 4:0)` },
     { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (4:0, 4:0)` },
     { value: "both-inactive", label: MATCH_LOST_BOTH_TEXT },
-    { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít a tabellába)" },
+    { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít bele a tabellába)" },
   ];
   const current: OutcomeChoice | undefined = !m.current
     ? undefined
@@ -132,7 +132,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
             <Form key={`ns${noShow.id}`} method="post" className="grid gap-3">
               <input type="hidden" name="report" value={noShow.id} />
               <p className="text-sm">
-                Ha jóváhagyod: 4-0 4-0 a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
+                Ha jóváhagyod: 4:0, 4:0 a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
                 bejelentés előtt. Mindkét pár értesítést kap.
               </p>
               <div className="grid gap-1.5">
@@ -156,7 +156,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
 
       {m.voided ? (
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Az egyik pár visszalépett a körből: ez a meccs nem számít a tabellában, nincs miről dönteni.
+          Az egyik pár visszalépett a körből: ez a meccs nem számít bele a tabellába, nincs miről dönteni.
         </p>
       ) : (
         <Card className="max-w-2xl">

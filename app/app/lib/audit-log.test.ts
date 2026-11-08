@@ -81,6 +81,7 @@ describe("Napló wording (#226)", () => {
     ]);
     expect(renderDetail("12 pairs", names)).toBe("12 pár");
     expect(renderDetail("3 groups, 9 matches", names)).toBe("3 csoport, 9 meccs");
+    expect(renderDetail("12 signups, 30 emails, 2 reminder records", names)).toBe("12 jelentkezés, 30 levél, 2 emlékeztető-bejegyzés");
     expect(renderDetail("league:1; a + b", names)).toBe("Győr; a és b");
     expect(renderDetail("league:1; user:a + user:b", names)).toBe("Győr; Anna és Béla");
     expect(renderDetail("league:1; from pair:8; user:b -> user:c", names)).toBe("Győr; előtte: Anna – Béla; Béla → Cili");

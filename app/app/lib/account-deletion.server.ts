@@ -8,9 +8,9 @@ import {
   emailMessages,
   emailSuppressions,
   groups,
-  interestSignups,
   leagueAdminInvites,
   leagueAdmins,
+  leagueMembers,
   loginCodes,
   matchDecisions,
   matches,
@@ -29,7 +29,6 @@ import {
   stuckReminderPeople,
   users,
 } from "~/db/schema";
-import { partnerNoticeSubject } from "~/lib/email/templates";
 import { NO_SHOW_DECISION_PREFIX, noShowDecisionReason } from "~/lib/no-shows";
 import { auditIfChanged, auditWhen } from "~/lib/audit.server";
 import { dissolveStatements } from "~/lib/pairs.server";
@@ -41,7 +40,6 @@ import {
   DELETION_REFUSALS,
   deletionPlan,
   mailNamesPerson,
-  PARTNER_NOTICE_SUBJECT_REMOVED,
   type DeletionBy,
   type DeletionMode,
   type DeletionPlan,
@@ -116,27 +114,18 @@ export function planOwnDeletion(userId: string, now = new Date()): Promise<Delet
 const lower = (column: SQLWrapper) => sql`lower(${column})`;
 
 // What finds the stored mail to other people that names the deleted person
-// (review of #152): the partner notices their own pair signups sent (the
-// subject has their name), and the unsent mail whose text has their address
-// or, in a kind that names other people, their name (mailNamesPerson).
-type MailContext = { notices: { to: string; subject: string }[]; unsentIds: number[] };
+// (review of #152): the unsent mail whose text has their address or, in a
+// kind that names other people, their name (mailNamesPerson). The partner
+// notices that named a signer went with the interest list (#334).
+type MailContext = { unsentIds: number[] };
 
 async function mailContext(email: string, name: string): Promise<MailContext> {
-  const [signups, unsent] = await Promise.all([
-    db
-      .select({ name1: interestSignups.name1, email2: interestSignups.email2 })
-      .from(interestSignups)
-      .where(and(eq(lower(interestSignups.email1), email), eq(interestSignups.mode, "pair"), isNotNull(interestSignups.email2))),
-    // Pending, sending or failed: few rows (mail goes out at once, #112).
-    db
-      .select({ id: emailMessages.id, kind: emailMessages.kind, text: emailMessages.text })
-      .from(emailMessages)
-      .where(ne(emailMessages.status, "sent")),
-  ]);
-  return {
-    notices: signups.map((s) => ({ to: s.email2!.toLowerCase(), subject: partnerNoticeSubject(s.name1) })),
-    unsentIds: unsent.filter((m) => mailNamesPerson(m, { email, name })).map((m) => m.id),
-  };
+  // Pending, sending or failed: few rows (mail goes out at once, #112).
+  const unsent = await db
+    .select({ id: emailMessages.id, kind: emailMessages.kind, text: emailMessages.text })
+    .from(emailMessages)
+    .where(ne(emailMessages.status, "sent"));
+  return { unsentIds: unsent.filter((m) => mailNamesPerson(m, { email, name })).map((m) => m.id) };
 }
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
@@ -146,17 +135,11 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
 }
 
 // Stored mail to other people that names the deleted person. A sent mail
-// keeps only its subject (the body is cleared on sending), and only the
-// partner notice's subject names someone, so it is rewritten. An unsent one
-// is deleted, as the signup, partner or opponent it is about is gone.
+// keeps only its subject (the body is cleared on sending), and no subject
+// names anyone but the recipient since the partner notices went (#334). An
+// unsent one is deleted, as the partner or opponent it is about is gone.
 function otherPeoplesMail(mail: MailContext, mine: (c: SQL | undefined) => SQL | undefined) {
-  const notice = (n: MailContext["notices"][number]) =>
-    and(eq(emailMessages.kind, "partner_notice"), eq(lower(emailMessages.toEmail), n.to), eq(emailMessages.subject, n.subject));
   return [
-    ...mail.notices.flatMap((n) => [
-      db.delete(emailMessages).where(mine(and(notice(n), ne(emailMessages.status, "sent")))),
-      db.update(emailMessages).set({ subject: PARTNER_NOTICE_SUBJECT_REMOVED }).where(mine(notice(n))),
-    ]),
     // Still unsent by the time the batch runs (D1: at most 100 bound
     // parameters per statement).
     ...chunks(mail.unsentIds, 90).map((ids) =>
@@ -181,6 +164,7 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
     db.delete(notificationOptOuts).where(mine(eq(notificationOptOuts.userId, userId))),
     db.delete(pairLinks).where(mine(eq(pairLinks.ownerId, userId))),
     db.delete(partnerSearches).where(mine(eq(partnerSearches.userId, userId))),
+    db.delete(leagueMembers).where(mine(eq(leagueMembers.userId, userId))),
     db.delete(leagueAdmins).where(mine(eq(leagueAdmins.userId, userId))),
     db.delete(pairInvites).where(mine(or(eq(pairInvites.inviterId, userId), eq(lower(pairInvites.inviteeEmail), email)))),
     db.delete(loginCodes).where(mine(eq(loginCodes.email, email))),
@@ -188,27 +172,8 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
     // Who got a stuck reminder this season (#191), by address.
     db.delete(stuckReminderPeople).where(mine(eq(stuckReminderPeople.email, email))),
     db.delete(leagueAdminInvites).where(mine(eq(lower(leagueAdminInvites.email), email))),
-    // Interest list: a solo paired with one of their signups goes back to
-    // the waiting list (as deleteSignup does); their own signups go; on
-    // someone else's pair signup only their name and address go, and the
-    // signer is asked for a partner's address again (D35).
-    db
-      .update(interestSignups)
-      .set({ pairedWith: null, status: "new", updatedAt: new Date() })
-      .where(
-        mine(
-          inArray(
-            interestSignups.pairedWith,
-            db.select({ id: interestSignups.id }).from(interestSignups).where(eq(lower(interestSignups.email1), email)),
-          ),
-        ),
-      ),
-    db.delete(interestSignups).where(mine(eq(lower(interestSignups.email1), email))),
-    db
-      .update(interestSignups)
-      .set({ name2: null, email2: null, invited2At: null, updatedAt: new Date() })
-      .where(mine(eq(lower(interestSignups.email2), email))),
-    // Every stored email to them, sent or not (as for a signup deletion).
+    // The interest list is gone (#334): nothing of it to delete here.
+    // Every stored email to them, sent or not.
     db.delete(emailMessages).where(mine(eq(lower(emailMessages.toEmail), email))),
     db.delete(emailSuppressions).where(mine(eq(lower(emailSuppressions.email), email))),
     // Old log rows that name the address (Szervező appointments).

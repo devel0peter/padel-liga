@@ -1,5 +1,5 @@
 // "Törlés" on Felhasználók (#152): the Admin deletes a test account without
-// history, which goes completely, with its interest signup; a player whose
+// history, which goes completely; a player whose
 // pair plays in a published group can't be deleted, and neither can the
 // Admin's own account. No email goes out. Runs last: the earlier specs'
 // counts stay as they were. Anonymizing an account with history needs a
@@ -11,12 +11,9 @@ import { ADMIN, PAIRS, as, content, d1, d1Insert, visit } from "./support";
 
 const TEST = { id: "e2e-delete-me", name: "Teszt Törlendő", email: "torlendo@example.test" };
 
-test("Törlés: an account without history is removed with its signup", async ({ browser }) => {
+test("Törlés: an account without history is removed", async ({ browser }) => {
   d1Insert(
     `insert into users (id, email, name, level, phone, sex, consent_at) values ('${TEST.id}', '${TEST.email}', '${TEST.name}', 'kezdo', '+36305551234', 'male', unixepoch())`,
-  );
-  d1Insert(
-    `insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('minta', 'solo', '${TEST.name}', '${TEST.email}', 'kezdo', unixepoch())`,
   );
   const emailsBefore = d1("select count(*) as n from email_messages")[0].n;
 
@@ -33,11 +30,8 @@ test("Törlés: an account without history is removed with its signup", async ({
   await expect(content(page).getByRole("status")).toHaveText("A fiók törölve.");
   await expect(page.getByRole("row").filter({ hasText: TEST.name })).toHaveCount(0);
 
-  // Gone from Jelentkezők too, and from the database.
-  await visit(page, `/admin/signups?q=${encodeURIComponent(TEST.name)}`);
-  await expect(page.getByRole("row").filter({ hasText: TEST.name })).toHaveCount(0);
+  // Gone from the database (the interest list is gone too, #334).
   expect(d1(`select count(*) as n from users where email = '${TEST.email}'`)[0].n).toBe(0);
-  expect(d1(`select count(*) as n from interest_signups where email1 = '${TEST.email}'`)[0].n).toBe(0);
   expect(d1("select count(*) as n from email_messages")[0].n).toBe(emailsBefore);
   expect(d1("select actor_id, target from audit_log where action = 'account.delete'")).toEqual([
     { actor_id: ADMIN.id, target: `user:${TEST.id}` },

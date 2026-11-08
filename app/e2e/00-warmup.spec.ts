@@ -18,13 +18,11 @@ test("warm up the dev server", async ({ browser }) => {
   const { context, page } = await as(browser, ADMIN.email);
   for (const path of [
     "/home",
-    "/pair",
     "/notifications",
     "/admin",
     "/admin/cities",
     "/admin/clubs",
     "/admin/leagues",
-    "/admin/signups",
     "/admin/outbox",
     "/admin/users",
   ]) {

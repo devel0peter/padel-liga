@@ -4,17 +4,18 @@
 
 import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
-import { formatDeadline, formatShortDate } from "./format";
+import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
-import { LEVELS, type Level, type Mode } from "./interest";
+
+// "Az 1." / "A 2.": the article and number, starting a sentence.
+const capitalArticle = (n: number) => withArticle(n).replace(/^a/, "A");
+import { PAIR_SECTION_PATH } from "./pairs";
+import { WAITING_START } from "./season-entries";
+import { substitutesEnabled } from "./substitutes";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
 export const NOTIFICATION_KINDS = {
-  new_signup: {
-    label: "Új jelentkező",
-    description: "Ha valaki jelentkezik a ligádba.",
-  },
   result_disputed: {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
@@ -75,7 +76,10 @@ export type PlayerKind =
   // pairs, in the app and by push only, never by email. The organizers' kind
   // is `no_show_reported`; the strike's notice is its own kind.
   | "no_show_confirmed"
-  | "no_show_rejected";
+  | "no_show_rejected"
+  // A league's first season reached its minimum entries (D124, #335): every
+  // entered player, in the app and by push, plus one email (season_start).
+  | "season_start";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -97,7 +101,9 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["new_signup", "result_disputed", "substitute_requested", "no_show_reported"] : [];
+  if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
+  // No substitutes in the first season (D145): no switch for their requests.
+  return substitutesEnabled() ? ["result_disputed", "substitute_requested", "no_show_reported"] : ["result_disputed", "no_show_reported"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -114,7 +120,7 @@ export function isEnabled(disabled: ReadonlySet<string>, kind: StoredKind): bool
 export const CHANNELS = {
   email: {
     label: "E-mail",
-    description: "Levélben is megkapod az értesítéseket. A belépési kódot és a jelentkezésed visszaigazolását mindig elküldjük.",
+    description: "Levélben is megkapod az értesítéseket. A belépési kódot mindig elküldjük.",
   },
   push: {
     label: "Push értesítés",
@@ -135,64 +141,17 @@ export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel):
   return !disabled.has(channelKey(channel));
 }
 
-// Emails that go out whatever the email switch says: only login codes and
-// signup confirmations (#115; Peter, 2026-10-29). Every other kind, a new one
-// too, broadcasts and the signup-list emails included, is skipped for an
-// address whose account switched email off. Addresses without an account
-// can't switch, so they get everything as before.
-export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code", "signup_confirmation"];
+// Emails that go out whatever the email switch says: only login codes
+// (#115; Peter, 2026-10-29; the signup confirmation went with the interest
+// list, #334). Every other kind, a new one too, broadcasts included, is
+// skipped for an address whose account switched email off.
+export const EMAIL_ALWAYS: readonly MessageKind[] = ["login_code"];
 
 export function followsEmailSwitch(kind: MessageKind): boolean {
   return !EMAIL_ALWAYS.includes(kind);
 }
 
 export type Message = { title: string; body: string; url: string };
-
-export type SignupRecipient = { userId: string; admin: boolean; leagueSlug: string | null };
-
-// A new signup goes to the Szervezők of that city's league and to every
-// Admin, once each. An Admin who is also the Szervező gets the Admin link.
-export function signupRecipients(
-  city: string,
-  organizers: readonly { userId: string; city: string; leagueSlug: string }[],
-  adminIds: readonly string[],
-): SignupRecipient[] {
-  const out = new Map<string, SignupRecipient>();
-  for (const id of adminIds) out.set(id, { userId: id, admin: true, leagueSlug: null });
-  for (const o of organizers)
-    if (o.city === city && !out.has(o.userId)) out.set(o.userId, { userId: o.userId, admin: false, leagueSlug: o.leagueSlug });
-  return [...out.values()];
-}
-
-export type SignupSummary = {
-  mode: Mode;
-  level: Level;
-  cityName: string;
-  // The city's signups so far, this one included (withdrawn ones not counted).
-  pairs: number;
-  solos: number;
-  // Ticked "Szívesen szerveznék ligát".
-  organize?: boolean;
-};
-
-// "Kezdő – most ismerkedünk…" -> "kezdő"
-const levelWord = (level: Level) => LEVELS[level].split(" – ")[0].toLowerCase();
-
-// No names or email addresses: a Szervező doesn't see the pair signups, and a
-// lock screen is not a private place.
-export function newSignupMessage(s: SignupSummary, to: SignupRecipient): Message {
-  const who = s.mode === "pair" ? `Új pár jelentkezett, ${levelWord(s.level)} szint.` : `Új egyéni jelentkező (párt keres), ${levelWord(s.level)} szint.`;
-  const url = to.admin || !to.leagueSlug
-    ? "/admin/signups"
-    : s.mode === "solo"
-      ? `/admin/leagues/${to.leagueSlug}/solos`
-      : `/admin/leagues/${to.leagueSlug}`;
-  return {
-    title: `Új jelentkező · ${s.cityName}`,
-    body: `${who}${s.organize ? " Szívesen szervezne ligát." : ""} Eddig ${s.pairs} pár és ${s.solos} egyéni jelentkező.`,
-    url,
-  };
-}
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -203,22 +162,36 @@ export function seasonEntryMessage(
   input: {
     league: string;
     season: string;
-    // Where the pair starts; null: the next season. Not used for "removed".
-    joins: { phase: number; startsAt: Date } | null;
+    // Where the pair starts; null: the next season; startsAt null: a first
+    // season still waiting for its minimum entries (D124). Not used for
+    // "removed".
+    joins: { phase: number; startsAt: Date | null } | null;
   },
   event: "entered" | "entered_by_organizer" | "removed" = "entered",
 ): Message {
   const where = `${input.season}, ${input.league}.`;
   if (event === "removed")
-    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: "/pair" };
+    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: PAIR_SECTION_PATH };
   const start =
     input.joins === null
       ? "A következő szezontól játszotok."
-      : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
+      : input.joins.startsAt === null
+        ? WAITING_START
+        : `${capitalize(withArticle(input.joins.phase))} körtől játszotok (kezdés: ${formatShortDate(input.joins.startsAt)}).`;
   return {
     title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
     body: `${where} ${start}`,
-    url: "/pair",
+    url: PAIR_SECTION_PATH,
+  };
+}
+
+// The start of a league's first season is fixed (D124, #335): to every
+// entered player. The groups come out by the morning of the first day.
+export function seasonStartMessage(input: { league: string; season: string; start: Date }): Message {
+  return {
+    title: "Indul a szezon",
+    body: `${input.season}, ${input.league}. Az 1. kör kezdete: ${formatWeekdayDate(input.start)}. A csoportbeosztást legkésőbb aznap reggel megkapjátok.`,
+    url: "/home",
   };
 }
 
@@ -234,7 +207,7 @@ export function pairWithdrawnMessage(
     return {
       title: "A szervező visszaléptetett titeket a körből",
       body: `${where} A meccseitek nem számítanak, és a szezonból is kikerültetek. Ha újra játszanátok, szóljatok a szervezőnek. Indok: ${input.reason}`,
-      url: "/pair",
+      url: PAIR_SECTION_PATH,
     };
   return {
     title: "Visszalépett egy pár a csoportodból",
@@ -259,24 +232,14 @@ export function groupsPublishedMessage(input: {
   };
 }
 
-// A Szervező paired two solo signups (#115): for the one who has an account,
-// so it reaches them with email off too. No names; Párom shows the partner.
-export function pairIntroMessage(cityName: string): Message {
-  return {
-    title: "Párt találtunk neked",
-    body: `A szervező párba tett egy másik egyéni jelentkezővel (${cityName}). A Párom oldalon látod, ki az.`,
-    url: "/pair",
-  };
-}
-
 // A Szervező paired two registered players who asked for a partner ("Párt
 // keresek", D59; Párok, #260). In the app and as a push; the email is
-// pairCreated. Párom shows the partner, with address and phone (D121).
+// pairCreated. Párod shows the partner, with address and phone (D121).
 export function partnerFoundMessage(league: string): Message {
   return {
     title: "Párt találtunk neked",
-    body: `A szervező párba tett valakivel (${league}). A Párom oldalon látod, ki az.`,
-    url: "/pair",
+    body: `A szervező párba tett valakivel (${league}). A Profil oldalon látod, ki az.`,
+    url: PAIR_SECTION_PATH,
   };
 }
 
@@ -287,28 +250,33 @@ export function partnerFoundMessage(league: string): Message {
 const matchUrl = (matchId: number) => `/matches/${matchId}`;
 
 // To the other pair: a proposal or counter-proposal arrived (instant).
-export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; slots: number }): Message {
+// `days`: on how many days their ranges are (D144).
+export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; days: number }): Message {
   return {
     title: input.counter ? "Új időpontokat ajánlottak" : "Időpontokat ajánlottak",
-    body: `Az ellenfeletek ${input.slots} időpontot ajánlott a ${input.week}. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.`,
+    body: `Az ellenfeleitek megírták, mikor érnek rá ${withArticle(input.week)} heti meccsetekre (${input.days} nap). Válasszatok egy időpontot, vagy ajánljatok mást.`,
     url: matchUrl(input.matchId),
   };
 }
 
 // To the other pair: an agreed time waits for confirmation (instant).
-export function matchAgreedTimeMessage(input: { matchId: number; slot: Date }): Message {
+// It becomes fixed by itself at `fixesAt` unless they say otherwise (D148).
+export function matchAgreedTimeMessage(input: { matchId: number; slot: Date; fixesAt: Date }): Message {
   return {
-    title: "Erősítsd meg az időpontot",
-    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.`,
+    title: "Megbeszélt időpont",
+    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek.`,
     url: matchUrl(input.matchId),
   };
 }
 
 // To the pair that proposed or recorded: the match is scheduled (digest item).
-export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean }): Message {
+// `auto`: to both pairs, the agreed time became fixed by itself (D148).
+export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean; auto?: boolean }): Message {
   return {
     title: "Lefixálva a meccsetek",
-    body: `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
+    body: input.auto
+      ? `Magától fix lett a megbeszélt időpont: ${formatDeadline(input.slot)}.`
+      : `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
     url: matchUrl(input.matchId),
   };
 }
@@ -377,7 +345,7 @@ export function disputeRecipients(organizerIds: readonly string[], adminIds: rea
 export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Vitatott eredmény · ${input.leagueName}`,
-    body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
+    body: `${capitalArticle(input.week)} heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -389,7 +357,7 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
 export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Helyettes kérés · ${input.leagueName}`,
-    body: `Egy pár helyettest kér a ${input.week}. heti meccsére. A jóváhagyás rád vár.`,
+    body: `Egy pár helyettest kér ${withArticle(input.week)} heti meccsére. A jóváhagyás rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/substitutes`,
   };
 }
@@ -438,7 +406,7 @@ export function substituteRevokedMessage(input: SubstituteNotice & { ours: boole
 export function noShowReportedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Nem jöttek el · ${input.leagueName}`,
-    body: `Egy pár jelezte, hogy az ellenfele nem jött el a ${input.week}. heti meccsre. A döntés rád vár.`,
+    body: `Egy pár jelezte, hogy az ellenfele nem jött el ${withArticle(input.week)} heti meccsre. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -449,10 +417,10 @@ export function noShowDecidedMessage(input: { matchId: number; confirmed: boolea
   const url = matchUrl(input.matchId);
   if (input.confirmed)
     return input.reported
-      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4-0 4-0-val megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.", url }
       : {
           title: "A szervező szerint nem jöttetek el",
-          body: "A meccs 0-4 0-4-es vereség nektek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          body: "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
           url,
         };
   return input.reported

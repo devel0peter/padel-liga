@@ -11,18 +11,21 @@
 
 import { currentElo, pairElo } from "@padel-liga/rules";
 
-import type { Season, StoredPhase } from "./seasons";
+import { isWaiting, type Season, type StoredPhase } from "./seasons";
 
 export type EntryStatus = "pending" | "approved" | "rejected" | "withdrawn";
-type Calendar = Pick<Season, "registrationOpensAt" | "registrationClosesAt" | "phases">;
+// firstPhaseStart null: a waiting first season (D124); left out: a season with dates.
+type Calendar = Pick<Season, "registrationOpensAt" | "registrationClosesAt" | "phases"> & Partial<Pick<Season, "firstPhaseStart">>;
 
 function lastPhase(phases: readonly StoredPhase[]): StoredPhase | undefined {
   return phases.reduce<StoredPhase | undefined>((a, p) => (!a || p.number > a.number ? p : a), undefined);
 }
 
 // Whether a pair can apply now: registration has opened and the last phase
-// hasn't started (D18).
+// hasn't started (D18). A first season waiting for its minimum entries
+// (D124) takes entries from its opening on.
 export function entryOpen(season: Calendar, now: Date): boolean {
+  if (isWaiting(season)) return now >= season.registrationOpensAt;
   const last = lastPhase(season.phases);
   return !!last && now >= season.registrationOpensAt && now < last.startsAt;
 }
@@ -43,6 +46,17 @@ export function joinsPhase(phases: readonly StoredPhase[], at: Date, published: 
     .find((p) => p.startsAt > at && !published.includes(p.number));
   return next?.number ?? null;
 }
+
+// The phase of an entry made at `at` in this season: phase 1 while a first
+// season waits for its minimum entries (D124; its start is at least 7 days
+// after the entry that fixes it), else joinsPhase.
+export function entryPhase(season: Pick<Season, "phases"> & Partial<Pick<Season, "firstPhaseStart">>, at: Date, published: readonly number[] = []): number | null {
+  return isWaiting(season) ? 1 : joinsPhase(season.phases, at, published);
+}
+
+// An entry in a first season that waits for its minimum entries (D124): no
+// date yet.
+export const WAITING_START = "A szezon akkor indul, ha elég pár nevezett: a kezdés napját megírjuk.";
 
 export type EntryRefusal = "no_pair" | "closed" | "entered" | "no_level" | "partner_no_level";
 
@@ -105,7 +119,7 @@ export function entryStatusText(entry: { status: EntryStatus; joinsPhase: number
   }
 }
 
-// A withdrawn entry on Párom and Kezdőlap (#174): the organizer took the pair
+// A withdrawn entry on Párod and Kezdőlap (#174): the organizer took the pair
 // out (between rounds, or mid-round, #34); only they can enter it again. A
 // dissolved pair's withdrawn entry never shows (entryFor skips it).
 export const TAKEN_OUT_TEXT =

@@ -103,16 +103,12 @@ export function daysOf({ from, to }: Period): string[] {
 }
 
 export type LandingCount = { day: string; ref: string | null; count: number };
-export type SignupStamp = { createdAt: Date; ref: string | null };
 
-export type FunnelRow = {
-  ref: string | null; // null: no source
-  landings: number;
-  signups: number;
-  conversion: number | null; // signups / landings, null without landings
-};
+// Landing page views only: the signups and the conversion beside them came
+// from the interest list and went with its flows (#333, D129).
+export type FunnelRow = { ref: string | null; landings: number }; // ref null: no source
 
-export type DayRow = { day: string; landings: number; signups: number };
+export type DayRow = { day: string; landings: number };
 
 export type Funnel = {
   sources: FunnelRow[];
@@ -120,58 +116,27 @@ export type Funnel = {
   days: DayRow[];
 };
 
-function conversion(signups: number, landings: number): number | null {
-  return landings > 0 ? signups / landings : null;
-}
-
-// Landings and signups per source and per day within the period. Sources are
-// sorted by landings, then signups; "no source" is always listed last.
-export function buildFunnel(
-  landings: readonly LandingCount[],
-  signups: readonly SignupStamp[],
-  period: Period,
-): Funnel {
+// Landings per source and per day within the period. Sources are sorted by
+// landings; "no source" is always listed last.
+export function buildFunnel(landings: readonly LandingCount[], period: Period): Funnel {
   const inPeriod = (day: string) => day >= period.from && day <= period.to;
-  const bySource = new Map<string, { landings: number; signups: number }>();
-  const byDay = new Map<string, DayRow>(daysOf(period).map((day) => [day, { day, landings: 0, signups: 0 }]));
-  const source = (ref: string | null) => {
-    const key = ref ?? "";
-    let row = bySource.get(key);
-    if (!row) bySource.set(key, (row = { landings: 0, signups: 0 }));
-    return row;
-  };
-
+  const bySource = new Map<string, number>();
+  const byDay = new Map<string, DayRow>(daysOf(period).map((day) => [day, { day, landings: 0 }]));
   for (const l of landings) {
     if (!inPeriod(l.day)) continue;
-    source(l.ref).landings += l.count;
+    bySource.set(l.ref ?? "", (bySource.get(l.ref ?? "") ?? 0) + l.count);
     byDay.get(l.day)!.landings += l.count;
   }
-  for (const s of signups) {
-    const day = budapestDay(s.createdAt);
-    if (!inPeriod(day)) continue;
-    source(s.ref).signups += 1;
-    byDay.get(day)!.signups += 1;
-  }
-
   const sources = [...bySource]
-    .map(([key, c]) => ({ ref: key || null, ...c, conversion: conversion(c.signups, c.landings) }))
+    .map(([key, n]) => ({ ref: key || null, landings: n }))
     .sort(
       (a, b) =>
-        Number(a.ref === null) - Number(b.ref === null) ||
-        b.landings - a.landings ||
-        b.signups - a.signups ||
-        (a.ref ?? "").localeCompare(b.ref ?? ""),
+        Number(a.ref === null) - Number(b.ref === null) || b.landings - a.landings || (a.ref ?? "").localeCompare(b.ref ?? ""),
     );
-  const totalLandings = sources.reduce((n, r) => n + r.landings, 0);
-  const totalSignups = sources.reduce((n, r) => n + r.signups, 0);
   return {
     sources,
-    total: {
-      ref: null,
-      landings: totalLandings,
-      signups: totalSignups,
-      conversion: conversion(totalSignups, totalLandings),
-    },
+    total: { ref: null, landings: sources.reduce((n, r) => n + r.landings, 0) },
     days: [...byDay.values()],
   };
 }
+

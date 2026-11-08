@@ -1,4 +1,4 @@
-import { data, Form, Link, redirect, useFetcher, useNavigation } from "react-router";
+import { data, Form, Link, redirect, useFetcher, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
@@ -15,9 +15,12 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { ProfileFields } from "~/components/profile-fields";
-import { RatingInfo } from "~/components/rating-info";
+import { FormerPairs, PairSection } from "~/components/pair-section";
+import { PlayerProfileView } from "~/components/player-profile-view";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { hasGoogleLogin, updateProfile } from "~/lib/auth/accounts.server";
@@ -32,12 +35,17 @@ import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } f
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
-import { hasProfile } from "~/lib/profiles.server";
+import { pairSection, pairSectionAction } from "~/lib/pair-section.server";
+import { formerPairs, playerProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
-// The profile, inside the app shell (app.tsx): name, level, phone number, sex (#133)
-// (the phone is never shown to anyone else on this page or any public page),
-// notification settings, logout everywhere, deleting the account (#38).
+// The profile, inside the app shell (app.tsx), in two tabs (D136):
+// "Játékosprofil": first the player's pair, "Párod" (D141, #346: the Párom
+// page before; /pair leads to #parod), and their former pairs, "Korábbi
+// párjaid" (D142, #347), then what other players see (the summary,
+// Élő-pont, pairs, matches); and "Beállításaim" (`?tab=settings`): name, level, phone number,
+// sex (#133; the phone is never shown on a public page), notification
+// settings, logout everywhere, deleting the account (#38).
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Profil – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -46,13 +54,18 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const [disabled, levelLocked, withProfile, deletion] = await Promise.all([
+  const [disabled, levelLocked, profile, deletion, pair, former] = await Promise.all([
     disabledKindsFor(user.id),
     hasTakenPartInSeason(user.id),
-    hasProfile(user.id),
+    playerProfile(user.id),
     planOwnDeletion(user.id),
+    pairSection(user, request),
+    formerPairs(user.id),
   ]);
   return {
+    // Párod (D141) and Korábbi párjaid (D142).
+    pair,
+    former,
     // Fiók törlése (#38): what it would do now, or why it can't.
     deletion: deletion.ok
       ? { effect: `${OWN_DELETION_EFFECTS[deletion.mode]} ${ownDeletionNote(actor.leagues.length > 0)}` }
@@ -65,8 +78,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     levelLocked,
     rating: ratingFor(user.level, user.elo),
     rated: user.elo !== null,
-    // The profile (#36, members only: D112), once the player has been in a published group.
-    profilePath: withProfile ? `/players/${user.id}` : null,
+    // What other players see on /players/<id> (#36, D112), once the player
+    // has been in a published group: the "Játékosprofil" tab (D136).
+    profile,
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -81,11 +95,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 // Saves the profile form, or switches email or push (#115) or one
-// notification kind on or off (Értesítések section).
+// notification kind on or off (Értesítések section). Párod's "Nevezünk" and
+// "Párt keresek" (D141) too; Kezdőlap's "Párt keresek" posts here as well.
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
   const form = await request.formData();
+  const pairResult = await pairSectionAction(user, form);
+  if (pairResult) return pairResult;
   if (form.get("intent") === "delete-account") {
     // The same deletion as the Admin's (#152, D60); it ends every session
     // of the account, and this response clears this device's cookie.
@@ -167,108 +184,141 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+// One block of the settings: a card with a heading (D136).
+function Block({ id, title, description, children }: { id?: string; title: string; description?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Card role="region" id={id} aria-label={title} className="scroll-mt-6">
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="grid gap-4">{children}</CardContent>
+    </Card>
+  );
+}
+
 export default function Profile({ loaderData: d, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const errors: ProfileErrors = (actionData && "errors" in actionData ? actionData.errors : null) ?? {};
   const saved = !!actionData && "saved" in actionData && actionData.saved;
+  // The tab lives in the address (?tab=settings), so a link can open it.
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "settings" ? "settings" : "player";
   return (
-    <AppPage title="Profil">
-      <div className="flex items-center gap-4">
-        <Avatar className="size-16">
-          {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
-          <AvatarFallback className="bg-nav-active-bg text-lg font-bold text-nav-active">{d.initials}</AvatarFallback>
-        </Avatar>
-        <div className="grid gap-0.5">
-          <p className="font-display text-xl font-extrabold">{d.name}</p>
-          <p className="text-muted-foreground">{d.role}</p>
-        </div>
-      </div>
+    <AppPage
+      title={
+        <span className="flex items-center gap-3">
+          <Avatar className="size-11">
+            {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
+            <AvatarFallback className="bg-nav-active-bg text-base font-bold text-nav-active">{d.initials}</AvatarFallback>
+          </Avatar>
+          {d.name}
+        </span>
+      }
+      description={d.role}
+    >
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setParams(value === "settings" ? { tab: "settings" } : {}, { replace: true, preventScrollReset: true })}
+        className="gap-6"
+      >
+        <TabsList>
+          <TabsTrigger value="player">Játékosprofil</TabsTrigger>
+          <TabsTrigger value="settings">Beállításaim</TabsTrigger>
+        </TabsList>
 
-      <section id="adatok" className="grid max-w-2xl scroll-mt-6 gap-4">
-        <h2 className="font-display text-lg font-extrabold">Adataid</h2>
-        {d.rating != null && <RatingInfo rating={d.rating} rated={d.rated} />}
-        {d.profilePath && (
-          <p className="text-sm">
-            <Link to={d.profilePath} className="font-semibold underline">
-              A profilod
-            </Link>
-            <span className="text-muted-foreground">
-              : ezt látják rólad a belépett játékosok (az eredményeidet és az értékszámodat a liga indulása után).
-            </span>
-          </p>
-        )}
-        {!d.level && (
-          <p role="status" className="rounded-md border border-dashed p-3 text-sm">
-            Még nem adtad meg a szinted. Kell a jelentkezéshez.
-          </p>
-        )}
-        <Form method="post" className="grid gap-5">
-          <input type="hidden" name="intent" value="profile" />
-          <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
-          <div className="flex items-center gap-3">
-            <Button type="submit" disabled={busy}>
-              Mentés
-            </Button>
-            {saved && !busy && (
-              <p role="status" className="text-sm text-muted-foreground">
-                Elmentettük.
+        <TabsContent value="player" className="grid gap-6">
+          <PairSection data={d.pair} actionData={actionData && "intent" in actionData ? actionData : null} />
+          <FormerPairs list={d.former} />
+          <div className="grid gap-3">
+            {d.profile && (
+              <p className="text-sm text-muted-foreground">
+                Ezt látják rólad a belépett játékosok a{" "}
+                <Link to={`/players/${d.profile.player.id}`} className="font-medium">
+                  profilodon
+                </Link>
+                .
               </p>
             )}
+            <PlayerProfileView profile={d.profile} own={{ rating: d.rating, rated: d.rated }} />
           </div>
-        </Form>
-      </section>
+        </TabsContent>
 
-      <dl className="grid max-w-2xl gap-4 border-t pt-6">
-        <Row label="E-mail-cím">{d.email}</Row>
-        <Row label="Belépés">{d.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</Row>
-        {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}
-      </dl>
+        <TabsContent value="settings" className="grid max-w-2xl gap-6">
+          <Block id="adatok" title="Adataid">
+            {!d.level && (
+              <p role="status" className="rounded-md border border-dashed p-3 text-sm">
+                Még nem adtad meg a szinted. Kell a jelentkezéshez.
+              </p>
+            )}
+            <Form method="post" className="grid gap-5">
+              <input type="hidden" name="intent" value="profile" />
+              <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={busy}>
+                  Mentés
+                </Button>
+                {saved && !busy && (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    Elmentettük.
+                  </p>
+                )}
+              </div>
+            </Form>
+          </Block>
 
-      <section id="ertesitesek" className="grid max-w-2xl scroll-mt-6 gap-4 border-t pt-6">
-        <div className="grid gap-1">
-          <h2 className="font-display text-lg font-extrabold">Értesítések</h2>
-          <p className="text-sm text-muted-foreground">
-            Az <Link to="/notifications">Értesítések</Link> oldalon mindet látod, akármit állítasz itt. Itt azt választod, hogy
-            e-mailben, push értesítésben vagy mindkettőben is szóljunk.
-          </p>
-        </div>
-        <SettingSwitch
-          id="channel-email"
-          label={CHANNELS.email.label}
-          description={CHANNELS.email.description}
-          enabled={d.emailOn}
-          fields={{ intent: "channel", channel: "email" }}
-        />
-        <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
-        {d.kinds.length > 0 && (
-          <div className="grid gap-4 border-t pt-4">
-            <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>
-            {d.kinds.map((k) => (
-              <SettingSwitch
-                key={k.kind}
-                id={`kind-${k.kind}`}
-                label={k.label}
-                description={k.description}
-                enabled={k.enabled}
-                fields={{ kind: k.kind }}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          <Block title="Fiók">
+            <dl className="grid gap-4">
+              <Row label="E-mail-cím">
+                {d.email}
+                <p className="text-sm text-muted-foreground">Az aktuális ellenfeleid is látják, hogy egyeztetni tudjatok. Nyilvános oldalon sosem jelenik meg.</p>
+              </Row>
+              <Row label="Belépés">{d.google ? "Google-fiókkal vagy e-mailben kapott kóddal" : "E-mailben kapott kóddal"}</Row>
+              {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}
+            </dl>
+            <div className="grid gap-2 border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                Ha egy eszközödet elhagytad, vagy idegen gépen felejtetted bejelentkezve, lépj ki mindenhonnan.
+              </p>
+              <Form method="post" action="/logout">
+                <Button type="submit" name="everywhere" value="1" variant="outline">
+                  Kilépés minden eszközön
+                </Button>
+              </Form>
+            </div>
+          </Block>
 
-      <div className="grid max-w-2xl gap-3 border-t pt-6">
-        <p className="text-sm text-muted-foreground">
-          Ha egy eszközödet elhagytad, vagy idegen gépen felejtetted bejelentkezve, lépj ki mindenhonnan.
-        </p>
-        <Form method="post" action="/logout">
-          <Button type="submit" name="everywhere" value="1" variant="outline">
-            Kilépés minden eszközön
-          </Button>
-        </Form>
-      </div>
+          <Block
+            id="ertesitesek"
+            title="Értesítések"
+            description={
+              <>
+                Az <Link to="/notifications">Értesítések</Link> oldalon mindet látod, akármit állítasz itt. Itt azt választod, hogy e-mailben,
+                push értesítésben vagy mindkettőben is szóljunk.
+              </>
+            }
+          >
+            <SettingSwitch
+              id="channel-email"
+              label={CHANNELS.email.label}
+              description={CHANNELS.email.description}
+              enabled={d.emailOn}
+              fields={{ intent: "channel", channel: "email" }}
+            />
+            <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
+            {d.kinds.length > 0 && (
+              <div className="grid gap-4 border-t pt-4">
+                <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>
+                {d.kinds.map((k) => (
+                  <SettingSwitch key={k.kind} id={`kind-${k.kind}`} label={k.label} description={k.description} enabled={k.enabled} fields={{ kind: k.kind }} />
+                ))}
+              </div>
+            )}
+          </Block>
 
-      <DeleteAccount deletion={d.deletion} />
+          <DeleteAccount deletion={d.deletion} />
+        </TabsContent>
+      </Tabs>
     </AppPage>
   );
 }
@@ -280,11 +330,11 @@ function DeleteAccount({ deletion }: { deletion: { effect: string } | { refused:
   const refused = "refused" in deletion ? deletion.refused : null;
   const error = fetcher.state === "idle" && fetcher.data && "deleteError" in fetcher.data ? fetcher.data.deleteError : null;
   return (
-    <section id="fiok-torlese" className="grid max-w-2xl scroll-mt-6 gap-3 border-t pt-6">
-      <h2 className="font-display text-lg font-extrabold">Fiók törlése</h2>
-      <p className="text-sm text-muted-foreground">
-        Ha már nem akarsz játszani, törölheted a fiókodat és az adataidat. A régi eredmények megmaradnak, de nem köthetők hozzád.
-      </p>
+    <Block
+      id="fiok-torlese"
+      title="Fiók törlése"
+      description="Ha már nem akarsz játszani, törölheted a fiókodat és az adataidat. A régi eredmények megmaradnak, de nem köthetők hozzád."
+    >
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button variant="destructive" className="justify-self-start" disabled={fetcher.state !== "idle"}>
@@ -311,6 +361,6 @@ function DeleteAccount({ deletion }: { deletion: { effect: string } | { refused:
           {error}
         </p>
       )}
-    </section>
+    </Block>
   );
 }

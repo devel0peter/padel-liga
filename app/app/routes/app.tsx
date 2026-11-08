@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, Handshake, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, Users, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -34,9 +34,10 @@ import { appNav, navLeagues, roleLabel, type LeagueRef, type NavIcon, type NavSe
 import { initials, parseCookies } from "~/lib/auth/rules";
 import { requireUser } from "~/lib/auth/session.server";
 import { leagueFromPath, switchLeaguePath } from "~/lib/leagues";
-import { listLeagues } from "~/lib/leagues.server";
+import { listLeagues, playerLeagueSlug } from "~/lib/leagues.server";
 import { unreadCount } from "~/lib/notifications.server";
 import { SITE_NAME } from "~/lib/site";
+import { cn } from "~/lib/utils";
 
 // The app shell: one sidebar layout for every page of a logged-in user. The
 // profile sits at the top; sections below it follow the user's roles.
@@ -61,8 +62,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     // the same pure function; the actor is the user's own data.
     actor,
     leagues: navLeagues(actor, actor.platformRole === "superadmin" ? await listLeagues() : []),
-    // The badge on Értesítések (and the phone header's bell, app-page.tsx).
+    // The badge on Értesítések, in the sidebar and the phone's bottom bar (D133).
     unread: await unreadCount(user.id),
+    // The league whose table "Tabella" opens (D133, D134).
+    tableHref: await playerLeagueSlug(user.id).then((slug) => (slug ? `/league/${slug}` : null)),
     // The sidebar remembers open/closed in a cookie; read it so the first
     // render matches.
     sidebarOpen: parseCookies(request.headers.get("Cookie")).get("sidebar_state") !== "false",
@@ -71,7 +74,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
-  pair: Handshake,
+  rankings: Medal,
   notifications: Bell,
   overview: LayoutDashboard,
   seasons: CalendarDays,
@@ -81,7 +84,6 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   disputes: Scale,
   substitutes: ArrowLeftRight,
   reminders: BellRing,
-  signups: Users,
   broadcasts: Mail,
   outbox: Send,
   clubs: MapPin,
@@ -210,10 +212,71 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
   ));
 }
 
-export default function AppShell({ loaderData }: Route.ComponentProps) {
-  const { actor, leagues, sidebarOpen, unread, ...profile } = loaderData;
+// Phones (D133, docs/player-ui.md N1): the player's own pages one tap away at
+// the bottom; the sidebar stays for the organizer's and the Admin's sections.
+function TabBar({ tableHref, unread, initials, imageUrl }: { tableHref: string | null; unread: number; initials: string; imageUrl: string | null }) {
   const { pathname } = useLocation();
-  const nav = appNav(actor, leagues, leagueFromPath(pathname));
+  const tabs = [
+    { to: "/home", label: "Kezdőlap", icon: House },
+    ...(tableHref ? [{ to: tableHref, label: "Tabella", icon: Trophy }] : []),
+    { to: "/notifications", label: "Értesítések", icon: Bell },
+  ];
+  const item = "relative grid min-w-0 flex-1 justify-items-center gap-0.5 px-1 pt-2 pb-1.5 text-[11px] font-medium no-underline";
+  return (
+    <nav
+      aria-label="Fő menü"
+      className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+    >
+      {tabs.map(({ to, label, icon: Icon }) => {
+        const active = isCurrent(pathname, to);
+        return (
+          <Link key={to} to={to} aria-current={active ? "page" : undefined} className={cn(item, active ? "text-nav-active" : "text-muted-foreground")}>
+            <Icon className="size-5" />
+            <span className="truncate">{label}</span>
+            {to === "/notifications" && unread > 0 && (
+              <span className="absolute top-1 left-1/2 ml-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-nav-active px-1 text-[10px] font-bold text-white">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+      <Link
+        to="/profile"
+        aria-current={isCurrent(pathname, "/profile") ? "page" : undefined}
+        className={cn(item, isCurrent(pathname, "/profile") ? "text-nav-active" : "text-muted-foreground")}
+      >
+        <Avatar className="size-5">
+          {imageUrl && <AvatarImage src={imageUrl} alt="" referrerPolicy="no-referrer" />}
+          <AvatarFallback className="bg-nav-active-bg text-[8px] font-bold text-nav-active">{initials}</AvatarFallback>
+        </Avatar>
+        <span className="truncate">Profil</span>
+      </Link>
+    </nav>
+  );
+}
+
+export default function AppShell({ loaderData }: Route.ComponentProps) {
+  const { actor, leagues, sidebarOpen, unread, tableHref, ...profile } = loaderData;
+  const { pathname } = useLocation();
+  const base = appNav(actor, leagues, leagueFromPath(pathname));
+  // The player's league table, after Kezdőlap (D133, D134): one tap away.
+  const nav = tableHref
+    ? base.map((section, i) =>
+        i === 0
+          ? {
+              ...section,
+              items: [
+                section.items[0]!,
+                { label: "Tabella", to: tableHref, icon: "leagues" as const, permission: section.items[0]!.permission },
+                // The Ranglista (D137), next to it.
+                { label: "Ranglista", to: `${tableHref}/rankings`, icon: "rankings" as const, permission: section.items[0]!.permission },
+                ...section.items.slice(1),
+              ],
+            }
+          : section,
+      )
+    : base;
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={sidebarOpen}>
@@ -265,9 +328,10 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <main>
+          <main className="pb-20 md:pb-0">
             <Outlet />
           </main>
+          <TabBar tableHref={tableHref} unread={unread} initials={profile.initials} imageUrl={profile.imageUrl} />
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>

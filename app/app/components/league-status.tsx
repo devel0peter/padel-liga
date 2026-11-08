@@ -28,15 +28,10 @@ export function LeagueStatus({ city, block }: { city: string; block: LandingBloc
           asChild
           className="h-auto rounded-full bg-ball px-6 py-3 text-base font-bold text-ball-foreground hover:bg-ball/85"
         >
-          <Link to="/register">{block.cta}</Link>
+          <Link to={block.registerPath ?? "/register"}>{block.cta}</Link>
         </Button>
         {block.ctaNote && <p className="text-sm text-muted-foreground">{block.ctaNote}</p>}
       </div>
-      {block.ladderPath && (
-        <Link to={block.ladderPath} className="justify-self-start font-bold underline">
-          Csoportok és tabella
-        </Link>
-      )}
     </section>
   );
 }

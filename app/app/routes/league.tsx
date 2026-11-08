@@ -1,159 +1,136 @@
 import type { Division } from "@padel-liga/rules";
+import { ListOrdered, Table2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/league";
-import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { signed } from "~/lib/format";
-import type { LadderBand, LadderGroup, LadderMatchView } from "~/lib/ladder";
+import { AppPage } from "~/components/app-page";
+import { FixtureList } from "~/components/fixture-list";
+import { HelpTip } from "~/components/help-tip";
+import { StandingsLegend, StandingsTable } from "~/components/standings-table";
+import { Badge } from "~/components/ui/badge";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { DIVISION_DOT } from "~/lib/division-colors";
+import type { LadderBand, LadderGroup } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
-import { finishedFirstLogin, getUser } from "~/lib/auth/session.server";
-import { ladderPage } from "~/lib/ladder.server";
+import { requireUser } from "~/lib/auth/session.server";
+import { ladderPage, pairIdsOf } from "~/lib/ladder.server";
 import { pairPath } from "~/lib/profiles";
-import { pageMeta } from "~/lib/site";
+import { SITE_NAME } from "~/lib/site";
+import { cn } from "~/lib/utils";
 
-// The public league page (#30, spec section 14): the phase's groups top-down
-// in division bands, each group's table and this week's matches. Names only:
-// no email or phone is selected anywhere on the way here, and no rating
-// (D112). For a logged-in member a pair's name in the table leads to its
-// profile (#36); a visitor sees plain names, since profiles are for members
-// only (D112).
+// The league page, the player's "Tabella" (#30, spec section 14): the phase's
+// groups top-down, each a card with its division and its table; the group's
+// matches beside its table when there is room, behind a "Mérkőzések" switch
+// when there isn't; every group open, in division bands on a faint colour of
+// their own (D143). For logged-in players only, inside the app
+// shell (D134): a visitor goes to the login page and comes back. Names only:
+// no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const page = await ladderPage(params.league ?? "");
+  const user = await requireUser(request);
+  const page = await ladderPage(params.league ?? "", new Date(), await pairIdsOf(user.id));
   if (!page) throw new Response("Nincs ilyen liga.", { status: 404 });
-  const user = await getUser(request);
-  return { ...page, member: !!user && finishedFirstLogin(user) };
+  return page;
 }
 
-export function meta({ loaderData, location }: Route.MetaArgs) {
-  const name = loaderData?.league.name ?? "Padelpárbaj liga";
-  return pageMeta({
-    title: `${name}: csoportok és tabella – Padelpárbaj`,
-    description: `${name}: a liga összes csoportja, a tabellák és a heti meccsek, divíziókra bontva.`,
-    path: location.pathname,
-  });
+// Not for search engines or link previews (D134): a title only.
+export function meta({ loaderData }: Route.MetaArgs) {
+  return [{ title: `Tabella: ${loaderData?.league.name ?? "liga"} – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
 }
-
-// Bands are colored by division: bronze, verdigris (copper's patina), violet.
-const BAND: Record<Division, { band: string; chip: string }> = {
-  bronz: { band: "border-amber-700 bg-amber-50 text-amber-950", chip: "bg-amber-700 text-white" },
-  rez: { band: "border-teal-700 bg-teal-50 text-teal-950", chip: "bg-teal-700 text-white" },
-  rookie: { band: "border-violet-700 bg-violet-50 text-violet-950", chip: "bg-violet-700 text-white" },
-};
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-function PairNames({ names }: { names: [string, string] }) {
-  return (
-    <span className="grid leading-snug">
-      <span>{names[0]}</span>
-      <span>{names[1]}</span>
-    </span>
-  );
-}
-
-function MatchLine({ match }: { match: LadderMatchView }) {
-  return (
-    <li className="grid gap-1 rounded-lg border bg-background px-3 py-2 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-center sm:gap-3">
-      <PairNames names={match.a} />
-      <span className="text-sm font-bold text-muted-foreground">vs</span>
-      <PairNames names={match.b} />
-      <span className="text-sm font-semibold sm:text-right">{match.result ?? match.when ?? "időpont még nincs"}</span>
-    </li>
-  );
-}
-
-function GroupCard({ group, week, weekRange, member }: { group: LadderGroup; week: number; weekRange: string; member: boolean }) {
-  return (
-    <section aria-label={`${group.number}. csoport`} className="grid gap-3 rounded-2xl border bg-background p-4 text-foreground sm:p-5">
-      <h3 className="font-display text-xl font-extrabold">{group.number}. csoport</h3>
-      <Table className="table-fixed">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-7 px-1">#</TableHead>
-            <TableHead className="px-1">Pár</TableHead>
-            <TableHead className="w-9 px-1 text-right" title="Lejátszott meccsek">
-              M
-            </TableHead>
-            <TableHead className="w-9 px-1 text-right" title="Pont">
-              P
-            </TableHead>
-            <TableHead className="w-11 px-1 text-right" title="Szettkülönbség">
-              Szett
-            </TableHead>
-            <TableHead className="w-12 px-1 text-right" title="Játékkülönbség">
-              Játék
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {group.rows.map((row) => (
-            <TableRow key={row.rank}>
-              <TableCell className="px-1 font-bold">{row.rank}.</TableCell>
-              <TableCell className="px-1 whitespace-normal">
-                {member ? (
-                  <Link to={pairPath(row.pairId)} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
-                    <PairNames names={row.names} />
-                  </Link>
-                ) : (
-                  <PairNames names={row.names} />
-                )}
-              </TableCell>
-              <TableCell className="px-1 text-right">{row.matches}</TableCell>
-              <TableCell className="px-1 text-right font-bold">{row.points}</TableCell>
-              <TableCell className="px-1 text-right">{signed(row.setDiff)}</TableCell>
-              <TableCell className="px-1 text-right">{signed(row.gameDiff)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {group.withdrawn.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
-        </p>
+// "Tabella | Meccsek" in the card's header, only on a card too narrow for the
+// two side by side (D143). Pressed state for a screen reader.
+function ViewSwitch({ view, onChange, count }: { view: "table" | "matches"; onChange: (v: "table" | "matches") => void; count: number }) {
+  const item = (v: "table" | "matches", icon: React.ReactNode, text: string) => (
+    <button
+      type="button"
+      aria-pressed={view === v}
+      onClick={() => onChange(v)}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&_svg]:size-3.5",
+        view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
       )}
+    >
+      {icon}
+      {text}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Nézet" className="inline-flex rounded-lg bg-muted p-0.5 @[46rem]/group:hidden">
+      {item("table", <Table2 aria-hidden />, "Tabella")}
+      {item("matches", <ListOrdered aria-hidden />, `Meccsek (${count})`)}
+    </div>
+  );
+}
 
-      <div className="grid gap-2">
-        <h4 className="font-bold">
-          {week}. hét meccsei <span className="font-normal text-muted-foreground">({weekRange})</span>
-        </h4>
-        {group.weekMatches.length > 0 ? (
-          <ul className="grid gap-2">
-            {group.weekMatches.map((m, i) => (
-              <MatchLine key={i} match={m} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground">Ezen a héten nincs meccs.</p>
-        )}
-      </div>
-
-      {group.results.length > 0 && (
-        <div className="grid gap-2">
-          <h4 className="font-bold">Lejátszott meccsek</h4>
-          <ul className="grid gap-2">
-            {group.results.map((m, i) => (
-              <MatchLine key={i} match={m} />
-            ))}
-          </ul>
+// One group: its table and, beside it, its matches by week when the card is
+// wide enough (a container query on the card, 46rem); on a narrower card one
+// of the two shows at a time, switched in the header (D143).
+function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
+  const [view, setView] = useState<"table" | "matches">("table");
+  const count = group.weeks.reduce((n, w) => n + w.matches.length, 0);
+  return (
+    <Card role="region" aria-label={`${group.number}. csoport`} className={cn("@container/group", group.mine && "ring-2 ring-nav-active/60")}>
+      <CardHeader>
+        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold whitespace-nowrap">{group.number}. csoport</CardTitle>
+        <CardDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
+          {label}
+          {/* On a phone the badge sits here; the header's right side has only the switch. */}
+          {group.mine && (
+            <Badge variant="secondary" className="@[30rem]/group:hidden">
+              A ti csoportotok
+            </Badge>
+          )}
+        </CardDescription>
+        {/* The badge and the switch side by side once the card has room (D143). */}
+        <CardAction className="flex items-center justify-end gap-2">
+          {group.mine && (
+            <Badge variant="secondary" className="hidden @[30rem]/group:inline-flex">
+              A ti csoportotok
+            </Badge>
+          )}
+          <ViewSwitch view={view} onChange={setView} count={count} />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 @[46rem]/group:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[46rem]/group:gap-6">
+          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[46rem]/group:grid")}>
+            <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
+            {group.withdrawn.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
+              </p>
+            )}
+          </div>
+          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[46rem]/group:grid")}>
+            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} compact />
+          </div>
         </div>
-      )}
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 
-function Band({ band, week, weekRange, member }: { band: LadderBand; week: number; weekRange: string; member: boolean }) {
-  const colors = BAND[band.division];
+// Faint division colours behind each band of the ladder (D143), the dots' hues.
+const BAND: Record<Division, string> = {
+  bronz: "bg-amber-50 ring-amber-200/70 dark:bg-amber-950/25 dark:ring-amber-900/50",
+  rez: "bg-teal-50 ring-teal-200/70 dark:bg-teal-950/25 dark:ring-teal-900/50",
+  rookie: "bg-violet-50 ring-violet-200/70 dark:bg-violet-950/25 dark:ring-violet-900/50",
+};
+
+// A division of the ladder: its name, then its groups top-down, on its colour.
+function Band({ band }: { band: LadderBand }) {
   return (
-    <section aria-label={band.label} className={`grid gap-4 rounded-3xl border-2 p-3 sm:p-5 ${colors.band}`}>
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h2 className={`font-display rounded-full px-4 py-1 text-lg font-extrabold ${colors.chip}`}>{band.label}</h2>
-        <a href="#hogyan-mukodik" className="text-sm font-bold underline">
-          Hogyan működik?
-        </a>
-      </header>
+    <section aria-label={band.label} className={cn("-mx-2 grid gap-4 rounded-2xl p-2 ring-1 sm:mx-0 sm:p-4", BAND[band.division])}>
+      <h2 className="flex items-center gap-2 px-1 font-display text-base font-bold">
+        <span aria-hidden className={`size-2.5 rounded-full ${DIVISION_DOT[band.division]}`} />
+        {band.label}
+      </h2>
       {band.groups.map((g) => (
-        <GroupCard key={g.number} group={g} week={week} weekRange={weekRange} member={member} />
+        <GroupCard key={g.number} group={g} division={band.division} label={band.label} />
       ))}
     </section>
   );
@@ -161,78 +138,66 @@ function Band({ band, week, weekRange, member }: { band: LadderBand; week: numbe
 
 const POINTS: [title: string, text: string][] = [
   ["Egyetlen létra", "Az összes csoport egy nagy létrát alkot: az 1. csoport a legerősebb, lefelé egyre könnyebbek."],
-  [
-    "A divíziók a létra harmadai",
-    "Felül a Bronz, középen a Réz, alul a Rookie divízió. Ez csak címke: a meccseidet, a feljutást és a kiesést nem érinti.",
-  ],
+  ["A divíziók a létra harmadai", "Felül a Bronz, középen a Réz, alul a Rookie divízió. Ez csak címke: a meccseidet, a feljutást és a kiesést nem érinti."],
   ["Egy fel, egy le", "A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül."],
 ];
 
+// "Hogyan működik a létra?" behind the "?" by the title (D138).
 function Explainer() {
   return (
-    <section id="hogyan-mukodik" aria-label="Hogyan működik?" className="grid scroll-mt-6 gap-4 rounded-2xl border-2 border-court p-5">
-      <h2 className="font-display text-2xl font-extrabold">Hogyan működik?</h2>
-      <ol className="grid list-decimal gap-3 pl-5">
+    <HelpTip label="Hogyan működik a létra?">
+      <p className="font-semibold">Hogyan működik a létra?</p>
+      <ol className="grid list-decimal gap-1.5 pl-5">
         {POINTS.map(([title, text]) => (
           <li key={title}>
             <strong>{title}.</strong> {text}
           </li>
         ))}
       </ol>
-      <p className="text-sm text-muted-foreground">
-        Részletesen a <Link to="/rules" className="underline">szabályzatban</Link>.
+      <p className="text-muted-foreground">
+        Részletesen a <Link to="/rules">szabályzatban</Link>.
       </p>
-    </section>
+    </HelpTip>
   );
 }
 
 export default function League({ loaderData: page }: Route.ComponentProps) {
-  return (
-    <>
-      <SiteHeader />
-      <main className="py-8">
-        <Wrap className="grid max-w-4xl gap-6">
-          <div className="grid gap-1">
-            <span className="text-sm font-extrabold tracking-wider text-court uppercase">{page.season}</span>
-            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] font-black">{page.league.name}</h1>
-          </div>
-
-          {page.kind === "waiting" ? (
-            <div className="grid gap-2 rounded-2xl border-2 border-court p-5">
-              <h2 className="font-display text-2xl font-bold">Még nincsenek kint a csoportok</h2>
-              <p className="text-lg">
-                {page.next
+  const where = [page.league.name, page.season].filter(Boolean).join(" · ");
+  if (page.kind === "waiting")
+    return (
+      <AppPage title="Tabella" description={where}>
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">Még nincsenek kint a csoportok</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              {page.starting ??
+                (page.next
                   ? `${capitalize(withArticle(page.next.round))} kör ${page.next.startsOn} indul. A csoportok az indulás előtt kerülnek ki ide.`
-                  : "A következő szezon időpontja hamarosan kiderül."}
-              </p>
-              <p>
-                <Link to="/" className="font-bold underline">
-                  Vissza a nyitólapra
-                </Link>
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="text-lg">
-                {page.started
-                  ? `${page.phase}. kör, ${page.week}. hét (${page.weekFrom} – ${page.weekTo}).`
-                  : `${page.phase}. kör, indul ${page.startsOn}. Itt az 1. hét meccsei látszanak (${page.weekFrom} – ${page.weekTo}).`}
-              </p>
-              {page.bands.map((band) => (
-                <Band
-                  key={band.division}
-                  band={band}
-                  week={page.week}
-                  weekRange={`${page.weekFrom} – ${page.weekTo}`}
-                  member={page.member}
-                />
-              ))}
-              <Explainer />
-            </>
-          )}
-        </Wrap>
-      </main>
-      <SiteFooter />
-    </>
+                  : "A következő szezon időpontja hamarosan kiderül.")}
+            </p>
+          </CardContent>
+        </Card>
+      </AppPage>
+    );
+  return (
+    <AppPage
+      title="Tabella"
+      help={<Explainer />}
+      description={
+        <>
+          {where} · {page.started ? `${page.phase}. kör, ${page.week}. hét (${page.weekFrom} – ${page.weekTo})` : `${page.phase}. kör, indul ${page.startsOn}`}
+        </>
+      }
+    >
+      <StandingsLegend />
+      {/* Down the ladder, band by band, every group open (D143). */}
+      <div className="grid gap-6">
+        {page.bands.map((band) => (
+          <Band key={band.division} band={band} />
+        ))}
+      </div>
+    </AppPage>
   );
 }

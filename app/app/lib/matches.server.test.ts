@@ -23,6 +23,9 @@ const { formatSlot } = await import("~/lib/matches");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
+const range = (day: string, from: number, to: number) => ({ start: at(day, from), end: at(day, to) });
 
 // The first season: phase 1 runs Mon 9 – Sun 29 Nov 2026 (Budapest, UTC+1).
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
@@ -83,7 +86,7 @@ const matchOf = (a: number, b: number): number =>
 const inbox = () => all("select n.kind, n.url, u.id as user from notifications n join users u on u.id = n.user_id order by n.id");
 const events = (matchId: number) => all("select kind, pair_id, user_id, slots, slot, club_id from match_events where match_id = ? order by id", matchId);
 
-const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19, 30), at("2026-11-14", 10)];
+const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
 describe("currentGroups (#25)", () => {
   beforeEach(freshDb);
@@ -112,15 +115,43 @@ describe("currentGroups (#25)", () => {
     expect(g!.matches.map((m) => m.week)).toEqual([2, 3]);
   });
 
-  it("shows the opponents' phone numbers, never an email address", async () => {
+  it("shows the opponents' phone numbers and email addresses, no one else's (D135)", async () => {
     const [g] = await M.currentGroups("p1a", NOW);
     expect(g!.matches[0]!.contacts).toEqual([
-      { name: "Játékos 3A", phone: "+36 30 300 0001" },
-      { name: "Játékos 3B", phone: "+36 30 300 0002" },
+      { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+      { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
     ]);
-    expect(JSON.stringify(g)).not.toContain("@");
-    // The player's own partner's phone isn't there either.
-    expect(JSON.stringify(g)).not.toContain("+36 30 100");
+    // Only the opponents' addresses and, for Írj mindenkinek, the partner's
+    // (D147): never the player's own or another group's.
+    const emails = JSON.stringify(g).match(/[\w.+-]+@[\w.-]+/g) ?? [];
+    expect(new Set(emails)).toEqual(new Set(["p1b@x.hu", ...g!.matches.flatMap((m) => m.contacts.map((c) => c.email))]));
+    expect(emails).not.toContain("p1a@x.hu");
+    expect(JSON.stringify(g)).not.toContain("+36 30 100 0001");
+  });
+
+  it("Írj mindenkinek: the partner and both opponents, never the player; none once final (D147)", async () => {
+    const [g] = await M.currentGroups("p1a", NOW);
+    expect(g!.matches[0]!.message).toEqual({
+      to: [
+        { name: "Játékos 1B", phone: "+36 30 100 0002", email: "p1b@x.hu" },
+        { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+        { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+      ],
+      us: ["Játékos 1A", "Játékos 1B"],
+      them: ["Játékos 3A", "Játékos 3B"],
+    });
+    // The player first in their own pair's names, whichever side they are.
+    const [b] = await M.currentGroups("p1b", NOW);
+    expect(b!.matches[0]!.message).toMatchObject({ us: ["Játékos 1B", "Játékos 1A"] });
+    expect(b!.matches[0]!.message!.to.map((r) => r.name)).toEqual(["Játékos 1A", "Játékos 3A", "Játékos 3B"]);
+    // A final result: nothing to write about any more.
+    h.raw.exec(
+      `insert into match_decisions (match_id, kind, user_id, outcome, reason, at) values (${matchOf(1, 3)}, 'organizer', 'o', '{"kind":"unplayed"}', 'teszt', ${sec("2026-11-10T09:00:00Z")})`,
+    );
+    const [after] = await M.currentGroups("p1a", NOW);
+    const done = after!.matches.find((m) => m.id === matchOf(1, 3))!;
+    expect(done.result.status).toBe("final");
+    expect(done.message).toBeNull();
   });
 
   it("is empty before the groups are published and after the phase deadline", async () => {
@@ -190,7 +221,7 @@ describe("currentGroups (#25)", () => {
 
   it("each status shows on the home view", async () => {
     const id = matchOf(1, 3);
-    await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW);
+    await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW);
     let [g] = await M.currentGroups("p1a", NOW);
     expect(g!.matches[0]!.state).toMatchObject({ status: "proposed", by: "a" });
     expect(g!.matches[0]!.side).toBe("a");
@@ -218,12 +249,40 @@ describe("matchPage (#25, #26)", () => {
     expect(page.contacts.map((c) => c.name)).toEqual(["Játékos 3A", "Játékos 3B"]);
     expect(page.clubs).toEqual([{ id: 1, name: "Ace Padel" }]);
     expect(page.actions).toMatchObject({ propose: true, recordAgreed: true });
-    expect(JSON.stringify(page)).not.toContain("@");
+    // The opponents' addresses (D135), and the partner's only for Írj mindenkinek (D147).
+    expect(page.contacts.map((c) => c.email)).toEqual(["p3a@x.hu", "p3b@x.hu"]);
+    expect(new Set(JSON.stringify(page).match(/[\w.+-]+@[\w.-]+/g))).toEqual(new Set(["p3a@x.hu", "p3b@x.hu", "p1b@x.hu"]));
+    expect(page.message).toEqual({
+      to: [
+        { name: "Játékos 1B", phone: "+36 30 100 0002", email: "p1b@x.hu" },
+        { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+        { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+      ],
+      us: ["Játékos 1A", "Játékos 1B"],
+      them: ["Játékos 3A", "Játékos 3B"],
+    });
+  });
+
+  it("Írj mindenkinek leaves out a deleted account and keeps one without a phone (D147)", async () => {
+    h.raw.exec(`update users set email = 'deleted-p3a@deleted.invalid', phone = null, name = 'Törölt játékos' where id = 'p3a'`);
+    h.raw.exec(`update users set phone = null where id = 'p1b'`);
+    const page = (await M.matchPage(matchOf(1, 3), "p1a", NOW))!;
+    expect(page.message!.to).toEqual([
+      { name: "Játékos 1B", phone: "", email: "p1b@x.hu" },
+      { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+    ]);
+  });
+
+  it("an anonymized opponent has no email address (D135)", async () => {
+    h.raw.exec(`update users set email = 'deleted-p3a@deleted.invalid' where id = 'p3a'`);
+    const page = (await M.matchPage(matchOf(1, 3), "p1a", NOW))!;
+    expect(page.contacts.map((c) => c.email)).toEqual([null, "p3b@x.hu"]);
   });
 
   it("after the deadline: no phones and no actions", async () => {
     const page = (await M.matchPage(matchOf(1, 3), "p1a", new Date(DEADLINE.getTime() + 60_000)))!;
     expect(page.contacts).toEqual([]);
+    expect(page.message).toBeNull();
     expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false });
   });
 });
@@ -233,29 +292,100 @@ describe("matchStep (#26)", () => {
 
   it("a proposal breaking a slot rule is refused with its Hungarian message, nothing written", async () => {
     const id = matchOf(1, 3);
-    const result = await M.matchStep("p1a", id, { kind: "propose", slots: [at("2026-11-11", 18), at("2026-11-12", 6)], clubId: null }, NOW);
+    const ranges = [range("2026-11-11", 18, 18), range("2026-11-11", 6, 9), { start: at("2026-11-11", 20, 30), end: at("2026-11-11", 22) }];
+    const result = await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error).toContain("Legalább 3 különböző időpontot ajánlj.");
-    expect(result.error).toContain("Az időpont 7:00 és 22:00 között kezdődjön.");
-    expect(result.error).toContain("Az időpont legalább 48 órával későbbi legyen, mint most.");
+    expect(result.error).toContain("Legalább 2 különböző napot adj meg.");
+    expect(result.error).toContain("Minden időszakba férjen bele egy 60 perces meccs.");
+    expect(result.error).toContain("Az időszak 7:00 és 23:00 közé essen, egy napon belül.");
+    expect(result.error).toContain("Csak egész órát adhatsz meg.");
     expect(result.slotErrors).toContainEqual({ code: "outside_window", slot: 1 });
     expect(events(id)).toEqual([]);
     expect(h.mails).toEqual([]);
   });
 
+  it("no lead time: ranges from the next hour pass (D144)", async () => {
+    const id = matchOf(1, 3);
+    // NOW is Tuesday 10 Nov 11:00.
+    const ranges = [range("2026-11-10", 12, 14), range("2026-11-11", 7, 8)];
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW)).toMatchObject({ ok: true });
+  });
+
+  it("ranges: stored as [start, end] with same-day touching ones joined; any whole hour inside can be accepted (D144)", async () => {
+    const id = matchOf(1, 3);
+    const ranges = [range("2026-11-12", 16, 18), range("2026-11-14", 10, 12), range("2026-11-12", 14, 16)];
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW)).toEqual({ ok: true, notice: "Elküldtük a másik párnak, mikor értek rá." });
+    const secs = (d: Date) => d.getTime() / 1000;
+    expect(JSON.parse(events(id)[0].slots)).toEqual([
+      [secs(at("2026-11-12", 14)), secs(at("2026-11-12", 18))],
+      [secs(at("2026-11-14", 10)), secs(at("2026-11-14", 12))],
+    ]);
+    // In the app: on how many days (no names).
+    const body = all("select body from notifications where kind = 'match_proposal' limit 1")[0].body;
+    expect(body).toContain("(2 nap)");
+    // "az 1. heti", not "a 1. heti".
+    expect(body).toContain("mikor érnek rá az 1. heti meccsetekre");
+    expect(h.mails[0].input.ranges).toEqual([range("2026-11-12", 14, 18), range("2026-11-14", 10, 12)]);
+    const page = (await M.matchPage(id, "p3a", NOW))!;
+    expect(page.actions.accept).toEqual([range("2026-11-12", 14, 18), range("2026-11-14", 10, 12)]);
+    expect(page.log[0]!.text).toBe("Időpontokat ajánlott: nov. 12., csütörtök 14:00–18:00; nov. 14., szombat 10:00–12:00");
+
+    // Off the hour, too late to finish in the range, or not in it: refused.
+    expect(await M.matchStep("p3a", id, { kind: "accept", slot: at("2026-11-12", 15, 30) }, NOW)).toMatchObject({ ok: false, error: "Csak egész órát adhatsz meg." });
+    for (const slot of [at("2026-11-12", 18), at("2026-11-13", 10)])
+      expect(await M.matchStep("p3a", id, { kind: "accept", slot }, NOW)).toMatchObject({
+        ok: false,
+        error: "Ez az időpont már nem választható. Frissítsd az oldalt.",
+      });
+    // The range's end minus 60 minutes is the last start.
+    expect(await M.matchStep("p3a", id, { kind: "accept", slot: at("2026-11-12", 17) }, NOW)).toEqual({ ok: true, notice: "Lefixáltátok a meccset." });
+    expect(all("select scheduled_at from matches where id = ?", id)).toEqual([{ scheduled_at: secs(at("2026-11-12", 17)) }]);
+  });
+
+  it("a started range: only the hours left can be accepted", async () => {
+    const id = matchOf(1, 3);
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges: [range("2026-11-12", 14, 18), range("2026-11-14", 10, 12)], clubId: null }, NOW)).toMatchObject({
+      ok: true,
+    });
+    const during = at("2026-11-12", 15, 20);
+    expect((await M.matchPage(id, "p3a", during))!.actions.accept[0]).toEqual(range("2026-11-12", 16, 18));
+    expect(await M.matchStep("p3a", id, { kind: "accept", slot: at("2026-11-12", 15) }, during)).toMatchObject({ ok: false, error: "Ez az időpont már elmúlt." });
+    expect(await M.matchStep("p3a", id, { kind: "accept", slot: at("2026-11-12", 16) }, during)).toMatchObject({ ok: true });
+  });
+
+  it("a proposal stored before D144 (bare starts, one off the hour) still shows and can be accepted", async () => {
+    const id = matchOf(1, 3);
+    const legacy = [at("2026-11-12", 18), at("2026-11-13", 19, 30)].map((d) => d.getTime() / 1000);
+    h.raw.exec(`insert into match_events (match_id, pair_id, user_id, kind, slots, at) values (${id}, 1, 'p1a', 'proposal', '${JSON.stringify(legacy)}', ${NOW.getTime() / 1000 - 3600})`);
+    h.raw.exec(`update matches set revision = revision + 1 where id = ${id}`);
+    const page = (await M.matchPage(id, "p3a", NOW))!;
+    expect(page.actions.accept).toEqual(hour([at("2026-11-12", 18), at("2026-11-13", 19, 30)]));
+    expect(page.log[0]!.text).toBe("Időpontokat ajánlott: nov. 12., csütörtök 18:00; nov. 13., péntek 19:30");
+    expect(await M.matchStep("p3a", id, { kind: "accept", slot: at("2026-11-13", 19, 30) }, NOW)).toEqual({ ok: true, notice: "Lefixáltátok a meccset." });
+  });
+
+  it("an agreed time must be on the hour (D144)", async () => {
+    const id = matchOf(1, 3);
+    expect(await M.matchStep("p1a", id, { kind: "agreed", slot: at("2026-11-12", 18, 30), clubId: null }, NOW)).toMatchObject({
+      ok: false,
+      error: "Csak egész órát adhatsz meg.",
+    });
+    expect(await M.matchStep("p1a", id, { kind: "agreed", slot: at("2026-11-12", 23), clubId: null }, NOW)).toMatchObject({ ok: true });
+  });
+
   it("propose → counter-propose → accept by the proposer's partner: scheduled for both pairs, every step logged", async () => {
     const id = matchOf(1, 3);
-    expect(await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: 1 }, NOW)).toEqual({
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: 1 }, NOW)).toEqual({
       ok: true,
-      notice: "Elküldtük az időpontokat a másik párnak.",
+      notice: "Elküldtük a másik párnak, mikor értek rá.",
     });
     // Instant to the other pair: email and the app.
     expect(h.mails.map((m) => [m.kind, m.toEmail])).toEqual([
       ["match_proposal", "p3a@x.hu"],
       ["match_proposal", "p3b@x.hu"],
     ]);
-    expect(h.mails[0].input).toMatchObject({ to: "Játékos 3A", opponents: "Játékos 1A és Játékos 1B", matchId: id, week: 1, counter: false, venue: "Ace Padel", slots: SLOTS });
+    expect(h.mails[0].input).toMatchObject({ to: "Játékos 3A", opponents: "Játékos 1A és Játékos 1B", matchId: id, week: 1, counter: false, venue: "Ace Padel", ranges: hour(SLOTS) });
     expect(inbox()).toEqual([
       { kind: "match_proposal", url: `/matches/${id}`, user: "p3a" },
       { kind: "match_proposal", url: `/matches/${id}`, user: "p3b" },
@@ -263,7 +393,7 @@ describe("matchStep (#26)", () => {
 
     const counter = [at("2026-11-17", 18), at("2026-11-18", 18), at("2026-11-19", 18)];
     h.mails = [];
-    expect((await M.matchStep("p3b", id, { kind: "propose", slots: counter, clubId: null }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p3b", id, { kind: "propose", ranges: hour(counter), clubId: null }, NOW)).ok).toBe(true);
     expect(h.mails.map((m) => [m.kind, m.toEmail, m.input.counter])).toEqual([
       ["match_proposal", "p1a@x.hu", true],
       ["match_proposal", "p1b@x.hu", true],
@@ -288,7 +418,7 @@ describe("matchStep (#26)", () => {
       ["counter_proposal", 3, "p3b"],
       ["accepted", 1, "p1b"],
     ]);
-    expect(JSON.parse(events(id)[0].slots)).toEqual(SLOTS.map((s) => sec(s.toISOString())));
+    expect(JSON.parse(events(id)[0].slots)).toEqual(SLOTS.map((s) => [sec(s.toISOString()), sec(s.toISOString()) + 3600]));
 
     // Both pairs see it scheduled; nothing more to do here.
     for (const u of ["p1a", "p3a"]) {
@@ -301,7 +431,7 @@ describe("matchStep (#26)", () => {
         ["Elfogadta", "Játékos 1B"],
       ]);
     }
-    const closed = await M.matchStep("p3a", id, { kind: "propose", slots: counter, clubId: null }, NOW);
+    const closed = await M.matchStep("p3a", id, { kind: "propose", ranges: hour(counter), clubId: null }, NOW);
     expect(closed).toEqual({ ok: false, error: "A meccs időpontja már le van fixálva." });
   });
 
@@ -312,9 +442,9 @@ describe("matchStep (#26)", () => {
     const proposalsTo = (user: string) => inbox().filter((n: any) => n.kind === "match_proposal" && n.user === user).length;
 
     // Two proposals from pair 2 on Tuesday: pair 4 gets one email each, and both in the app.
-    expect((await M.matchStep("p2a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p2a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW)).ok).toBe(true);
     const second = [at("2026-11-12", 19), at("2026-11-13", 20), at("2026-11-14", 11)];
-    expect((await M.matchStep("p2b", id, { kind: "propose", slots: second, clubId: null }, later(2))).ok).toBe(true);
+    expect((await M.matchStep("p2b", id, { kind: "propose", ranges: hour(second), clubId: null }, later(2))).ok).toBe(true);
     expect(mailsTo()).toEqual([
       ["match_proposal", "p4a@x.hu"],
       ["match_proposal", "p4b@x.hu"],
@@ -324,7 +454,7 @@ describe("matchStep (#26)", () => {
     // Pair 4 answers the same day: pair 2 hasn't had an email from it yet, so it gets one.
     h.mails = [];
     const counter = [at("2026-11-17", 18), at("2026-11-18", 18), at("2026-11-19", 18)];
-    expect((await M.matchStep("p4a", id, { kind: "propose", slots: counter, clubId: null }, later(3))).ok).toBe(true);
+    expect((await M.matchStep("p4a", id, { kind: "propose", ranges: hour(counter), clubId: null }, later(3))).ok).toBe(true);
     expect(mailsTo()).toEqual([
       ["match_proposal", "p2a@x.hu"],
       ["match_proposal", "p2b@x.hu"],
@@ -337,19 +467,19 @@ describe("matchStep (#26)", () => {
 
     // Wednesday: a new proposal from pair 2 is emailed again, with its own (newest) slots.
     const wednesday = [at("2026-11-13", 18), at("2026-11-14", 10), at("2026-11-15", 10)];
-    expect((await M.matchStep("p2b", id, { kind: "propose", slots: wednesday, clubId: null }, at("2026-11-11", 9))).ok).toBe(true);
+    expect((await M.matchStep("p2b", id, { kind: "propose", ranges: hour(wednesday), clubId: null }, at("2026-11-11", 9))).ok).toBe(true);
     expect(mailsTo()).toEqual([
       ["match_proposal", "p4a@x.hu"],
       ["match_proposal", "p4b@x.hu"],
     ]);
-    expect(h.mails[0].input.slots).toEqual(wednesday);
+    expect(h.mails[0].input.ranges).toEqual(hour(wednesday));
 
     // Every step is in the log.
     expect(events(id).map((e: any) => e.kind)).toEqual(["proposal", "proposal", "counter_proposal", "agreed_time", "proposal"]);
 
     // Another match isn't held back: pair 2's own week-2 match the same Wednesday.
     h.mails = [];
-    expect((await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", slots: wednesday, clubId: null }, at("2026-11-11", 10))).ok).toBe(true);
+    expect((await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", ranges: hour(wednesday), clubId: null }, at("2026-11-11", 10))).ok).toBe(true);
     expect(mailsTo()).toEqual([
       ["match_proposal", "p3a@x.hu"],
       ["match_proposal", "p3b@x.hu"],
@@ -360,7 +490,7 @@ describe("matchStep (#26)", () => {
     const id = matchOf(2, 4);
     const late = at("2026-11-10", 23);
     const now = at("2026-11-10", 22);
-    expect(await M.matchStep("p4a", id, { kind: "agreed", slot: late, clubId: 1 }, now)).toEqual({ ok: true, notice: "Rögzítettük. A másik pár megerősíti." });
+    expect(await M.matchStep("p4a", id, { kind: "agreed", slot: late, clubId: 1 }, now)).toEqual({ ok: true, notice: "Rögzítettük. Fix lesz nov. 10., kedd 23:00-kor, ha a másik pár nem jelez." });
     expect(h.mails.map((m) => [m.kind, m.toEmail])).toEqual([
       ["match_agreed_time", "p2a@x.hu"],
       ["match_agreed_time", "p2b@x.hu"],
@@ -418,8 +548,8 @@ describe("matchStep (#26)", () => {
   it("nobody outside the two pairs can act on the match", async () => {
     const id = matchOf(1, 3);
     for (const u of ["p2a", "p5a", "x", "o"])
-      expect(await M.matchStep(u, id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).toEqual({ ok: false, error: M.NOT_FOUND });
-    await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW);
+      expect(await M.matchStep(u, id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW)).toEqual({ ok: false, error: M.NOT_FOUND });
+    await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW);
     expect(await M.matchStep("p2a", id, { kind: "accept", slot: SLOTS[0]! }, NOW)).toEqual({ ok: false, error: M.NOT_FOUND });
     expect(events(id)).toHaveLength(1);
   });
@@ -427,7 +557,7 @@ describe("matchStep (#26)", () => {
   it("a venue must be an active club of the league's city", async () => {
     const id = matchOf(1, 3);
     for (const clubId of [2, 3, 99])
-      expect(await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId }, NOW)).toEqual({
+      expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId }, NOW)).toEqual({
         ok: false,
         error: "Válassz a listából helyszínt, vagy hagyd üresen.",
       });
@@ -445,7 +575,7 @@ describe("matchStep (#26)", () => {
 
   it("two answers at the same moment: only one wins", async () => {
     const id = matchOf(1, 3);
-    await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW);
+    await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW);
     const results = await Promise.all([
       M.matchStep("p3a", id, { kind: "accept", slot: SLOTS[0]! }, NOW),
       M.matchStep("p3b", id, { kind: "accept", slot: SLOTS[2]! }, NOW),
@@ -463,7 +593,7 @@ describe("venue and cancellation (#27)", () => {
   // Pair 1 (a) proposes, pair 3 (b) accepts Thu 12 Nov 18:00.
   async function booked(): Promise<number> {
     const id = matchOf(1, 3);
-    await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: null }, NOW);
+    await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW);
     expect(await M.matchStep("p3a", id, { kind: "accept", slot: SLOTS[0]! }, NOW)).toMatchObject({ ok: true });
     h.raw.exec("delete from notifications");
     h.mails = [];
@@ -570,10 +700,10 @@ describe("venue and cancellation (#27)", () => {
 describe("matchCalendarEvent (#192)", () => {
   beforeEach(freshDb);
   const player = { userId: "p1b", manages: () => false };
-  const LATER = [at("2026-11-17", 18), at("2026-11-18", 19, 30), at("2026-11-19", 10)];
+  const LATER = [at("2026-11-17", 18), at("2026-11-18", 19), at("2026-11-19", 10)];
 
   async function fix(id: number) {
-    expect((await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: 1 }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: 1 }, NOW)).ok).toBe(true);
     expect((await M.matchStep("p3b", id, { kind: "accept", slot: SLOTS[1]! }, NOW)).ok).toBe(true);
   }
 
@@ -609,8 +739,8 @@ describe("matchCalendarEvent (#192)", () => {
       expect(text).not.toContain("+36");
       expect(text).not.toMatch(/3630/);
     }
-    expect(ics).toContain("DTSTART:20261113T183000Z");
-    expect(ics).toContain("DTEND:20261113T193000Z");
+    expect(ics).toContain("DTSTART:20261113T180000Z");
+    expect(ics).toContain("DTEND:20261113T190000Z");
     expect(ics).toContain(`UID:match-${id}@padelparbaj.hu`);
   });
 
@@ -635,10 +765,10 @@ describe("matchCalendarEvent (#192)", () => {
     expect((await M.matchStep("p1a", id, { kind: "cancel" }, NOW)).ok).toBe(true);
     const cancelled = (await M.matchCalendarEvent(id, player))!;
     expect(toIcs(cancelled)).toContain("STATUS:CANCELLED");
-    expect(toIcs(cancelled)).toContain("DTSTART:20261113T183000Z");
+    expect(toIcs(cancelled)).toContain("DTSTART:20261113T180000Z");
     expect(cancelled.sequence).toBeGreaterThan(first.sequence);
 
-    expect((await M.matchStep("p1a", id, { kind: "propose", slots: LATER, clubId: null }, NOW)).ok).toBe(true);
+    expect((await M.matchStep("p1a", id, { kind: "propose", ranges: hour(LATER), clubId: null }, NOW)).ok).toBe(true);
     expect((await M.matchStep("p3b", id, { kind: "accept", slot: LATER[0]! }, NOW)).ok).toBe(true);
     const again = (await M.matchCalendarEvent(id, player))!;
     expect(toIcs(again)).toContain("STATUS:CONFIRMED");
@@ -666,5 +796,129 @@ describe("matchCalendarEvent (#192)", () => {
     const page = (await M.matchPage(id, "p1a", NOW))!;
     expect(page.result.status).toBe("final");
     expect(page.calendar).toBeNull();
+  });
+});
+
+describe("SMS/e-mail tap and the agreed time fixed by itself (D148)", () => {
+  beforeEach(freshDb);
+  const F = () => import("~/lib/agreed-auto-fix.server");
+  const contacted = (id: number) => all("select pair_id, user_id, note, at from match_events where match_id = ? and kind = 'contacted' order by id", id);
+
+  it("a tap is logged once per pair per Budapest day, with its channel; the log line says the SMS or mail app was opened", async () => {
+    const id = matchOf(1, 3);
+    expect(await M.recordContact("p1a", id, "sms", NOW)).toBe(true);
+    // The partner's tap that day, and a second one of the same player: nothing new.
+    expect(await M.recordContact("p1b", id, "email", at("2026-11-10", 23, 30))).toBe(false);
+    expect(await M.recordContact("p1a", id, "sms", at("2026-11-10", 12))).toBe(false);
+    // The other pair has its own; the next day is a new one.
+    expect(await M.recordContact("p3a", id, "email", NOW)).toBe(true);
+    expect(await M.recordContact("p1b", id, "email", at("2026-11-11", 0, 5))).toBe(true);
+    expect(contacted(id).map((e: any) => [e.pair_id, e.user_id, e.note])).toEqual([
+      [1, "p1a", "sms"],
+      [3, "p3a", "email"],
+      [1, "p1b", "email"],
+    ]);
+    // No state change, no revision bump, nobody told.
+    expect(all("select status, revision from matches where id = ?", id)).toEqual([{ status: "open", revision: 0 }]);
+    expect(inbox()).toEqual([]);
+    const page = (await M.matchPage(id, "p3b", at("2026-11-11", 1)))!;
+    expect(page.state).toEqual({ status: "to_schedule" });
+    expect(page.log.map((l) => [l.who, l.ours, l.text])).toEqual([
+      ["Játékos 1A", false, "SMS-t indított a többieknek"],
+      ["Játékos 3A", true, "E-mailt indított a többieknek"],
+      ["Játékos 1B", false, "E-mailt indított a többieknek"],
+    ]);
+  });
+
+  it("only one of the four players, only while the match can be scheduled", async () => {
+    const id = matchOf(1, 3);
+    for (const u of ["p2a", "x", "o"]) expect(await M.recordContact(u, id, "sms", NOW)).toBe(false);
+    expect(await M.recordContact("p1a", id, "sms", new Date(DEADLINE.getTime() + 1000))).toBe(false);
+    // A recorded result: scheduling is over.
+    h.raw
+      .prepare("insert into match_events (match_id, pair_id, user_id, kind, score, at) values (?, 1, 'p1a', 'result_recorded', ?, ?)")
+      .run(id, JSON.stringify({ sets: [[4, 1], [4, 2]] }), sec("2026-11-10T08:00:00Z"));
+    expect(await M.recordContact("p3a", id, "sms", NOW)).toBe(false);
+    // A withdrawn pair's match doesn't count (#34).
+    const other = matchOf(2, 4);
+    h.raw.exec("update group_pairs set withdrawn_at = 1 where pair_id = 4");
+    expect(await M.recordContact("p2a", other, "sms", NOW)).toBe(false);
+    expect(all("select count(*) as n from match_events where kind = 'contacted'")).toEqual([{ n: 0 }]);
+  });
+
+  it("an unanswered agreed time: the cron fixes it after 24 hours, logs it as the system's, mirrors the match and tells both pairs", async () => {
+    const id = matchOf(2, 4);
+    // Recorded Tue 11:00 for Thu 18:00: fixed by itself Wed 11:00.
+    expect((await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: 1 }, NOW)).ok).toBe(true);
+    const { autoFixAgreedTimes } = await F();
+    expect(await autoFixAgreedTimes(at("2026-11-11", 10, 59))).toEqual({ fixed: 0, left: false });
+    h.raw.exec("delete from notifications");
+    expect(await autoFixAgreedTimes(at("2026-11-11", 11, 10))).toEqual({ fixed: 1, left: false });
+    expect(all("select status, scheduled_at, club_id, revision from matches where id = ?", id)).toEqual([
+      { status: "scheduled", scheduled_at: sec(at("2026-11-12", 18).toISOString()), club_id: 1, revision: 2 },
+    ]);
+    // The line is at the moment it became fixed, with the pair that didn't answer and no player.
+    expect(all("select kind, pair_id, user_id, at from match_events where match_id = ? order by id", id).at(-1)).toEqual({
+      kind: "agreed_auto_fixed",
+      pair_id: 4,
+      user_id: null,
+      at: sec(at("2026-11-11", 11).toISOString()),
+    });
+    expect(inbox().map((n: any) => [n.kind, n.user])).toEqual([
+      ["match_scheduled", "p2a"],
+      ["match_scheduled", "p2b"],
+      ["match_scheduled", "p4a"],
+      ["match_scheduled", "p4b"],
+    ]);
+    expect(all("select action, actor_id, target from audit_log where action = 'match.agreed_auto_fix'")).toEqual([
+      { action: "match.agreed_auto_fix", actor_id: null, target: `match:${id}` },
+    ]);
+    const page = (await M.matchPage(id, "p4a", at("2026-11-11", 12)))!;
+    expect(page.state).toMatchObject({ status: "scheduled", slot: at("2026-11-12", 18) });
+    expect(page.log.at(-1)).toMatchObject({ who: "Padelpárbaj", by: "auto", ours: false, text: "Magától fix lett (nov. 12., csütörtök 18:00): a másik pár 24 órán belül nem jelzett." });
+    // Too late to decline; the next run has nothing to do.
+    expect(await M.matchStep("p4a", id, { kind: "decline" }, at("2026-11-11", 12))).toEqual({ ok: false, error: "A meccs időpontja már le van fixálva." });
+    expect(await autoFixAgreedTimes(at("2026-11-11", 12))).toEqual({ fixed: 0, left: false });
+  });
+
+  it("declined in time, it is never fixed; a start sooner than 24 hours fixes it at the start", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: null }, NOW);
+    expect((await M.matchStep("p4a", id, { kind: "decline" }, at("2026-11-11", 10))).ok).toBe(true);
+    const { autoFixAgreedTimes } = await F();
+    expect((await autoFixAgreedTimes(at("2026-11-12", 9))).fixed).toBe(0);
+
+    const soon = matchOf(1, 3);
+    await M.matchStep("p1a", soon, { kind: "agreed", slot: at("2026-11-10", 18), clubId: null }, NOW);
+    expect((await autoFixAgreedTimes(at("2026-11-10", 17, 50))).fixed).toBe(0);
+    expect((await autoFixAgreedTimes(at("2026-11-10", 18))).fixed).toBe(1);
+    const page = (await M.matchPage(soon, "p1a", at("2026-11-10", 19)))!;
+    expect(page.log.at(-1)!.text).toBe("Magától fix lett (nov. 10., kedd 18:00): a másik pár a kezdésig nem jelzett.");
+  });
+
+  it("a step after the moment, before the cron, writes the line first, so the log stays in order", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-14", 18), clubId: null }, NOW);
+    // Wed 12:00, an hour after it became fixed: pair 4 records the venue.
+    expect((await M.matchStep("p4a", id, { kind: "venue", clubId: 1, court: "" }, at("2026-11-11", 12))).ok).toBe(true);
+    expect(events(id).map((e: any) => [e.kind, e.user_id])).toEqual([
+      ["agreed_time", "p2a"],
+      ["agreed_auto_fixed", null],
+      ["venue", "p4a"],
+    ]);
+    expect(all("select status, club_id from matches where id = ?", id)).toEqual([{ status: "scheduled", club_id: 1 }]);
+    const { autoFixAgreedTimes } = await F();
+    expect((await autoFixAgreedTimes(at("2026-11-11", 13))).fixed).toBe(0);
+  });
+
+  it("the cron keeps room for the steps after it", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: null }, NOW);
+    const { RunBudget } = await import("~/lib/run-usage");
+    const { autoFixAgreedTimes } = await F();
+    // Only the candidates' lookup fits: the match waits for the next run.
+    const run = new RunBudget({ queries: 1, calls: 0 });
+    expect(await autoFixAgreedTimes(at("2026-11-11", 12), { run, keep: { queries: 0, calls: 0 } })).toEqual({ fixed: 0, left: true });
+    expect(all("select status from matches where id = ?", id)).toEqual([{ status: "open" }]);
   });
 });

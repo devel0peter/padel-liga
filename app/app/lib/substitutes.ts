@@ -3,6 +3,15 @@
 // substitutes.server.ts.
 import type { SubstituteRefusal, SubstituteStatus } from "@padel-liga/rules";
 
+// D145: no substitutes in the first season (Peter, 2026-11-08). The feature
+// stays in the code but is hidden: no "Helyettes kell?" on the match page, no
+// "Helyettesek" in the organizer's sidebar, no notification switch for it, and
+// the request and withdraw steps refuse. The organizer's page stays reachable
+// by URL. Tests that drive the feature mock `substitutesEnabled`.
+export const SUBSTITUTES_ENABLED = false;
+export const substitutesEnabled = (): boolean => SUBSTITUTES_ENABLED;
+export const SUBSTITUTES_OFF = "Ebben a szezonban még nincs helyettes.";
+
 // The organizer's optional reason for a rejection or a revocation.
 export const SUBSTITUTE_REASON_MAX = 300;
 

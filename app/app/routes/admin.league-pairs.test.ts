@@ -46,6 +46,8 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
     h.mails = [];
     h.raw.exec("insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr'), (2, 'deb', 'deb', 'Padelpárbaj Debrecen')");
     for (const id of ["a", "b"]) h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, id);
+    // Győr's players (D128).
+    h.raw.exec("insert into league_members (league_id, user_id, source) values (1, 'a', 'chosen'), (1, 'b', 'chosen')");
   });
 
   it("refuses a Játékos and another league's Szervező with 403, page and action alike", async () => {

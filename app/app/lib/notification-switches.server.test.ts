@@ -43,7 +43,6 @@ const E = await import("~/lib/season-entries.server");
 const N = await import("~/lib/notifications.server");
 const O = await import("~/lib/email/outbox.server");
 const L = await import("~/lib/auth/login-code.server");
-const SOLO = await import("~/lib/solo-pairing.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const DURING_REGISTRATION = new Date("2026-11-03T12:00:00Z");
@@ -104,7 +103,7 @@ describe("notification switches (#115)", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
     expect(all("select to_email from email_messages")).toEqual([{ to_email: "b@x.hu" }]);
     for (const id of ["a", "b"])
-      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Beneveztetek", url: "/pair" }]);
+      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Beneveztetek", url: "/profile#parod" }]);
     // Push is a separate switch.
     expect(h.pushed.sort()).toEqual([endpoint("a"), endpoint("b")]);
   });
@@ -159,23 +158,9 @@ describe("notification switches (#115)", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
   });
 
-  // Peter, 2026-10-29: only login codes and signup confirmations ignore the
-  // switch; addresses without an account are unaffected.
-  it("a pair intro skips the email of an account with email off, but is on its Értesítések", async () => {
-    await N.setChannelEnabled("a", "email", false);
-    const solo = (email: string) =>
-      h.raw
-        .prepare("insert into interest_signups (mode, name1, email1, city, level, consent_at) values ('solo', 'X', ?, 'gyor', 'kezdo', 1) returning id")
-        .get(email).id as number;
-    // Anna has an account (email off); z@x.hu has none.
-    expect(await SOLO.pairSolos("o", 1, solo("a@x.hu"), solo("z@x.hu"), "gyor", "Győr")).toBeNull();
-    expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "pair_intro", to_email: "z@x.hu" }]);
-    expect(inbox("a")).toEqual([{ kind: "pair_intro", title: "Párt találtunk neked", url: "/pair" }]);
-    expect(all("select count(*) n from notifications")[0].n).toBe(1);
-    expect(h.pushed).toEqual([endpoint("a")]);
-  });
-
-  it("broadcasts and partner notices skip an account with email off; signup confirmations don't", async () => {
+  // Peter, 2026-10-29: only login codes ignore the switch (signup
+  // confirmations went with the interest list, #334).
+  it("broadcasts skip an account with email off", async () => {
     await N.setChannelEnabled("a", "email", false);
     await O.createBroadcast({
       subject: "Hír",
@@ -191,21 +176,6 @@ describe("notification switches (#115)", () => {
     await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["z@x.hu"]);
     expect(await O.emailSwitchedOff()).toEqual(new Set(["a@x.hu"]));
-
-    h.sent = [];
-    // Anna signs up and names Béla as partner: her confirmation goes out.
-    await O.deliver(
-      await O.queueSignupEmails({ mode: "pair", name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "gyor", level: "halado" } as any),
-    );
-    // Béla's partner notice goes out too (email on); with email off it wouldn't.
-    expect(h.sent.map((m) => m.to).sort()).toEqual(["a@x.hu", "b@x.hu"]);
-    await N.setChannelEnabled("b", "email", false);
-    h.raw.exec("delete from email_messages");
-    h.sent = [];
-    await O.deliver(
-      await O.queueSignupEmails({ mode: "pair", name1: "Anna", email1: "a@x.hu", name2: "Béla", email2: "b@x.hu", city: "gyor", level: "halado" } as any),
-    );
-    expect(all("select kind, to_email from email_messages")).toEqual([{ kind: "signup_confirmation", to_email: "a@x.hu" }]);
   });
 
   it("a fan-out to many players takes a few D1 queries, not a few per player", async () => {
@@ -248,20 +218,20 @@ describe("notification switches (#115)", () => {
   it("a Szervező's per-kind switch keeps working next to the push switch", async () => {
     h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`);
     h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, 'o', 'k', 'k')").run(endpoint("o"));
-    const signup = { city: "gyor", cityOther: null, mode: "pair", level: "halado" } as any;
+    const dispute = () => N.notifyResultDisputed({ matchId: 1, leagueId: 1, leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 1, disputedBy: "a" });
 
-    await N.notifyNewSignup(signup);
-    expect(inbox("o")).toEqual([expect.objectContaining({ kind: "new_signup" })]);
+    await dispute();
+    expect(inbox("o")).toEqual([expect.objectContaining({ kind: "result_disputed" })]);
     expect(h.pushed).toEqual([endpoint("o")]);
 
     await N.setChannelEnabled("o", "push", false);
-    await N.notifyNewSignup(signup);
+    await dispute();
     expect(inbox("o")).toHaveLength(2);
     expect(h.pushed).toEqual([endpoint("o")]);
 
     await N.setChannelEnabled("o", "push", true);
-    await N.setKindEnabled("o", "new_signup", false);
-    await N.notifyNewSignup(signup);
+    await N.setKindEnabled("o", "result_disputed", false);
+    await dispute();
     expect(inbox("o")).toHaveLength(2);
     expect(h.pushed).toEqual([endpoint("o")]);
   });

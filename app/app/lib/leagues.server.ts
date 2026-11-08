@@ -1,7 +1,8 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { accountInvites, leagueAdminInvites, leagueAdmins, leagues, users } from "~/db/schema";
+import { accountInvites, leagueAdminInvites, leagueAdmins, leagues, pairs, users } from "~/db/schema";
+import { playerLeagues } from "~/lib/league-members.server";
 
 import { auditEntry, auditIfChanged } from "./audit.server";
 import type { LeagueRef } from "./auth/permissions";
@@ -14,12 +15,37 @@ export async function listLeagues(): Promise<LeagueRef[]> {
     .orderBy(asc(leagues.name));
 }
 
+/**
+ * The league whose table a player's "Tabella" opens (D133, D134): the league
+ * of their active pair, else the first of the leagues they belong to (D128);
+ * null when they belong to none.
+ */
+export async function playerLeagueSlug(userId: string): Promise<string | null> {
+  const [own] = await db
+    .select({ slug: leagues.slug })
+    .from(pairs)
+    .innerJoin(leagues, eq(leagues.id, pairs.leagueId))
+    .where(and(eq(pairs.status, "active"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))))
+    .orderBy(asc(pairs.id))
+    .limit(1);
+  if (own) return own.slug;
+  return (await playerLeagues(userId))[0]?.slug ?? null;
+}
+
 export async function getLeague(slug: string): Promise<LeagueRef | undefined> {
   const [row] = await db
     .select({ id: leagues.id, slug: leagues.slug, city: leagues.city, name: leagues.name })
     .from(leagues)
     .where(eq(leagues.slug, slug));
   return row;
+}
+
+// The league's minimum entries for its first season to start (D124), for
+// these leagues.
+export async function minEntriesByLeague(leagueIds: number[]): Promise<Map<number, number>> {
+  if (leagueIds.length === 0) return new Map();
+  const rows = await db.select({ id: leagues.id, min: leagues.minEntries }).from(leagues).where(inArray(leagues.id, leagueIds));
+  return new Map(rows.map((r) => [r.id, r.min]));
 }
 
 export async function leagueSlugTaken(slug: string): Promise<boolean> {

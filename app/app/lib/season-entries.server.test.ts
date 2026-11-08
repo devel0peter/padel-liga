@@ -83,8 +83,8 @@ describe("season entries on real SQLite", () => {
     expect(h.mails[0]).toMatchObject({ league: "Padelpárbaj Győr", season: "2026/27 tél", joins: { phase: 1, startsAt: at(PHASES[0]) } });
     // And both see it on Értesítések (#115).
     expect(all("select user_id, kind, title, url from notifications order by user_id")).toEqual([
-      { user_id: "a", kind: "season_entry_decision", title: "Beneveztetek", url: "/pair" },
-      { user_id: "b", kind: "season_entry_decision", title: "Beneveztetek", url: "/pair" },
+      { user_id: "a", kind: "season_entry_decision", title: "Beneveztetek", url: "/profile#parod" },
+      { user_id: "b", kind: "season_entry_decision", title: "Beneveztetek", url: "/profile#parod" },
     ]);
     // It counts for the group draft straight away.
     expect(await E.listSeasonEntries(1)).toHaveLength(1);
@@ -269,7 +269,7 @@ describe("#154: the organizer enters a pair or takes it out, from Párok", () =>
       target: `season_entry:${entry().id}`,
       detail: "pair:1",
     });
-    // The players see it on Párom too.
+    // The players see it in Párod too.
     const season = (await S.getSeason(1))!;
     expect((await E.entryViews(user("a"), [season], DURING_REGISTRATION)).get(1)).toMatchObject({ kind: "status", status: "approved" });
   });

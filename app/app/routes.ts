@@ -5,7 +5,6 @@ export default [
   index("routes/home.tsx"),
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
-  route("league/:league", "routes/league.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
@@ -19,14 +18,19 @@ export default [
   route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
   route("health", "routes/health.ts"),
+  // The old Párom address: leads to Profil's Párod section (D141).
+  route("pair", "routes/pair.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
     route("home", "routes/app.home.tsx"),
-    route("pair", "routes/pair.tsx"),
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("matches/:id", "routes/match.tsx"),
+    // The league page ("Tabella"): for logged-in players only (D134).
+    route("league/:league", "routes/league.tsx"),
+    // The Ranglista: players and pairs by Élő-pont (D137).
+    route("league/:league/rankings", "routes/rankings.tsx"),
     // Pair and player profiles: for logged-in members only (D112).
     route("players/:id", "routes/player-profile.tsx"),
     route("pairs/:id", "routes/pair-profile.tsx"),
@@ -60,6 +64,8 @@ export default [
   route("admin/poster", "routes/admin.poster.tsx"),
   route("admin/export.csv", "routes/admin.export.ts"),
   route("matches/:id/calendar.ics", "routes/match-calendar.ts"),
+  // A tap on Írj mindenkinek's SMS or e-mail button (D148).
+  route("matches/:id/contact", "routes/match-contact.ts"),
 
   // Hungarian paths from before 2026-10-04, still in sent emails and shared
   // links. Unsubscribe links are POSTed by mail clients (RFC 8058), which

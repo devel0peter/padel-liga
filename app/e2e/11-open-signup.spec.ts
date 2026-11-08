@@ -1,7 +1,9 @@
-// Walkthrough step 15: anyone can create an account (#113). An address with
-// no invite and no signup logs in, finishes the first-login page and sees on
-// Párom their own pair link, and that the organizer pairs those with nobody. Runs last: the new player has no pair,
-// so the earlier steps' lists stay as they were.
+// Walkthrough step 15: anyone can create an account (#113). An address that
+// logs in on /login, not through a league's register button, finishes the
+// first-login page and belongs to no league yet: Kezdőlap asks which league
+// they play in (#331). After "Csatlakozom" Párod shows their own pair link,
+// and that the organizer pairs those with nobody. Runs last: the new player
+// has no pair, so the earlier steps' lists stay as they were.
 import { expect, test } from "@playwright/test";
 
 import { content, d1, d1Insert, emailsSince, logIn, logOffset, save, visit } from "./support";
@@ -19,9 +21,8 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await logIn(page, NEW_PLAYER.email);
   await expect(page).toHaveURL(/\/welcome/);
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
-  // No signup: no partner named, nothing prefilled (#130).
+  // Nothing prefilled.
   await expect(content(page)).not.toContainText("A párod:");
-  await expect(content(page)).not.toContainText("A jelentkezésedből");
   await expect(page.getByLabel("Neved")).toHaveValue("");
   await page.getByLabel("Neved").fill(NEW_PLAYER.name);
   await expect(page.getByLabel("Szinted")).toContainText("Válassz…");
@@ -37,9 +38,29 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(page).toHaveURL(/\/home$/);
   await save(context, NEW_PLAYER.email);
 
-  // Straight after the first-login page: the own pair link (2026-10-31).
+  // In no league yet (D128): one card to choose, no season and no pair link.
+  // Only Mintaváros has a season open; Példaváros has none, so it isn't offered.
+  const choose = content(page).locator("[data-slot=card]", { hasText: "Melyik ligában játszol?" });
+  await expect(choose).toContainText("Mintaváros");
+  await expect(choose).toContainText("Padelpárbaj Mintaváros");
+  await expect(choose).not.toContainText("Példaváros");
+  await expect(content(page)).not.toContainText("Hívd meg a párodat");
+  await expect(content(page)).not.toContainText("Teszt szezon");
+  await visit(page, "/profile");
+  await expect(content(page)).toContainText("Még nem csatlakoztál egyik ligához sem.");
+  await visit(page, "/home");
+  await content(page).getByRole("button", { name: "Csatlakozom" }).click();
+  await expect(content(page)).not.toContainText("Melyik ligában játszol?");
+  expect(d1(`select l.slug, m.source from league_members m join leagues l on l.id = m.league_id join users u on u.id = m.user_id
+    where u.email = '${NEW_PLAYER.email}'`)).toEqual([{ slug: "minta", source: "chosen" }]);
+  expect(d1("select a.action from audit_log a join users u on u.id = a.actor_id where u.email = '" + NEW_PLAYER.email + "' and a.action = 'league.join'")).toEqual([
+    { action: "league.join" },
+  ]);
+
+  // Now the season and the own pair link (2026-10-31).
+  await expect(content(page)).toContainText("Teszt szezon");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await expect(content(page)).toContainText("a szervező keres neked párt.");
   // The contact address once, and no "if it changes" line without a pair (#124).

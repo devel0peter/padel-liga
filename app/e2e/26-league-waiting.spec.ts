@@ -1,13 +1,13 @@
-// The league page before any group is published (#181): a logged-out visitor
-// sees when the next round starts, no group, table or division band, and the
-// link back to the landing page. Its own data: a league in a city of its own,
+// The league page before any group is published (#181): a logged-in player
+// (players only since D134) sees when the next round starts, and no group,
+// table or division. Its own data: a league in a city of its own,
 // with a season and no group, removed again at the end. The walkthrough's
 // league (groups published since 06) is never touched.
 import { addDays, budapestDay, budapestTime, phaseCalendar } from "@padel-liga/rules";
 import { expect, test } from "@playwright/test";
 
 import { firstRoundStart } from "../app/lib/seed";
-import { content, d1Delete, d1Insert, visit } from "./support";
+import { PAIRS, as, content, d1Delete, d1Insert, visit } from "./support";
 
 const CITY = { slug: "e2e-varakozo", name: "Várakozóváros" };
 const LEAGUE = { slug: "e2e-varakozo", name: "Padelpárbaj Várakozóváros" };
@@ -46,11 +46,12 @@ test.beforeAll(() => {
 
 test.afterAll(removeOwnRows);
 
-test("a visitor sees when round 1 starts, and no group, table or band yet", async ({ browser }) => {
-  const page = await browser.newPage();
+test("a player sees when round 1 starts, and no group, table or division yet", async ({ browser }) => {
+  const { context, page } = await as(browser, PAIRS.p1[0]);
   await visit(page, `/league/${LEAGUE.slug}`);
   const main = content(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(LEAGUE.name);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tabella");
+  await expect(main).toContainText(LEAGUE.name);
   await expect(main).toContainText(SEASON);
 
   // The waiting message with round 1's date: "Az 1. kör november 23-án indul."
@@ -63,16 +64,13 @@ test("a visitor sees when round 1 starts, and no group, table or band yet", asyn
   // Nothing of a published phase: no group, table, division band or explainer.
   await expect(main.getByRole("region", { name: /csoport$/ })).toHaveCount(0);
   await expect(main.getByRole("table")).toHaveCount(0);
-  await expect(main.getByRole("region", { name: /divízió$/ })).toHaveCount(0);
-  await expect(main.getByRole("link", { name: "Hogyan működik?" })).toHaveCount(0);
+  await expect(main).not.toContainText("divízió");
+  await expect(main.getByRole("button", { name: "Hogyan működik a létra?" })).toHaveCount(0);
   await expect(main).not.toContainText(/\d+\. kör, (indul|\d+\. hét)/);
 
   // No email address or phone number.
   await expect(main).not.toContainText("@");
   await expect(main).not.toContainText(/\+36|\b06[ -]?\d{2}/);
 
-  // The way back to the landing page.
-  await main.getByRole("link", { name: "Vissza a nyitólapra" }).click();
-  await expect(page).toHaveURL((url) => url.pathname === "/");
-  await page.close();
+  await context.close();
 });

@@ -2,7 +2,10 @@ import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-// Phase 0 interest list from the landing page. Personal data: see spec section 17.
+// Phase 0 interest list from the landing page, retired (D123). Nothing writes
+// or reads it; the cron deletes every row once (#334, D132,
+// lib/interest-list-purge.server.ts). The table stays so the release is
+// additive; a later cleanup can drop it.
 export const interestSignups = sqliteTable("interest_signups", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   // City slug (tenant), see app/lib/cities.ts; "other" with cityOther set
@@ -73,6 +76,7 @@ export const emailMessages = sqliteTable(
         "match_tomorrow",
         "match_result",
         "strike_warning",
+        "season_start",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -273,6 +277,10 @@ export const leagues = sqliteTable("leagues", {
   // calibration switches (spec 10, #12): 2 pairs swap at a border of two
   // groups of 4. Default 1: the switch after phase 1 only.
   fastSwitches: integer("fast_switches").notNull().default(1),
+  // How many pair entries the league's first season needs to start by itself
+  // (D124, #335): three groups of four by default. Editable while that
+  // season waits; later seasons keep their own calendar.
+  minEntries: integer("min_entries").notNull().default(12),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -296,6 +304,15 @@ export const seasons = sqliteTable(
     firstPhaseStart: text("first_phase_start").notNull(),
     // JSON array of { start, end } days, both included.
     breaks: text("breaks", { mode: "json" }).$type<{ start: string; end: string }[]>().notNull().default(sql`'[]'`),
+    // A league's first season that starts once its entries reach the
+    // league's min_entries (D124, #335). While it waits (start_fixed_at
+    // null) it has no phases, first_phase_start is '' and
+    // registration_closes_at equals registration_opens_at: seasons.server.ts
+    // reads both as "not set". The entry that reaches the minimum sets all
+    // three and writes the phases in the same batch.
+    startsAtMinimum: integer("starts_at_minimum", { mode: "boolean" }).notNull().default(false),
+    // When the entries reached the minimum, which fixed the start.
+    startFixedAt: integer("start_fixed_at", { mode: "timestamp" }),
     updatedAt: integer("updated_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -430,6 +447,7 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "season_start",
         "strike",
         "substitute_requested",
         "substitute_approved",
@@ -495,11 +513,11 @@ export const notificationOptOuts = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
-// Two players who play a league together (spec section 4). Formed from the
-// interest signup (#89) or by a Szervező on the Párok page (#97); a player is
-// in at most one active pair per league. The inserts (signup-partners.server.ts,
-// pairs.server.ts) enforce it; the two unique indexes only catch the same
-// player twice in the same column.
+// Two players who play a league together (spec section 4). Formed by a pair
+// link, on Párkeresők or by a Szervező on the Párok page (#97; from the
+// interest signup, #89, until #333); a player is in at most one active pair
+// per league. The inserts (pairs.server.ts) enforce it; the two unique
+// indexes only catch the same player twice in the same column.
 // Dissolved pairs stay as history, so later matches keep their pair.
 export const pairs = sqliteTable(
   "pairs",
@@ -572,8 +590,8 @@ export const pairInvites = sqliteTable(
 );
 
 // A player's own link to invite a partner (decision log, 2026-10-31):
-// one per player and league, shown on /home and /pair while they have no
-// pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
+// one per player and league, shown on /home and in Profil's Párod while
+// they have no pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
 // partner, while both are without a pair in the league. The link carries the
 // token; it is stored as is because the player shows it again on every visit.
 export const pairLinks = sqliteTable(
@@ -594,11 +612,36 @@ export const pairLinks = sqliteTable(
   (t) => [uniqueIndex("pair_links_owner_idx").on(t.leagueId, t.ownerId)],
 );
 
+// A league's players (D128, #331, replacing D93): the leagues an account
+// joined. Being in a pair of the league counts too, with or without a row
+// (league-members.server.ts). `source` says how they joined: "register" (the
+// landing page's register button, written at login, before the first-login
+// page is done), "link" (accepted a pair link), "chosen" (the Kezdőlap card),
+// "pair" (a pair of the league was formed with them), "entry" and "carried"
+// (the release's backfill: an entry of the league, or a D93 player). A text
+// column without a CHECK: a new value needs no migration.
+export const leagueMembers = sqliteTable(
+  "league_members",
+  {
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["register", "link", "chosen", "pair", "entry", "carried"] }).notNull(),
+    joinedAt: integer("joined_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.userId] }), index("league_members_user_idx").on(t.userId)],
+);
+
 // "Párt keresek" (D59): a registered player without a pair says, per league,
 // whether the organizer should find them a partner; Párkeresők lists them.
-// No row: the default, which is on for someone whose solo signup is still
-// waiting and off for everyone else (partner-search.ts). A row stays when they
-// get a pair; it only counts while they have none.
+// No row: off (D128, #333; before, on for a waiting solo signup, whose
+// default the release stored as a row). A row stays when they get a pair; it
+// only counts while they have none.
 export const partnerSearches = sqliteTable(
   "partner_searches",
   {
@@ -656,8 +699,8 @@ export const seasonEntries = sqliteTable(
 
 // The automatic reminders already sent (#155, reminders.ts): one row per
 // reminder, so none goes out twice. `key` is "A:<email>", "B:<user id>",
-// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key holds
-// the address; deleting a signup deletes it (outbox.server.ts deleteMessagesTo).
+// "C:<user id>" or "D:<pair id>:<season id>". Personal data: an A key held
+// a list address; the interest list's deletion removed them (#334).
 export const stuckReminders = sqliteTable(
   "stuck_reminders",
   {
@@ -807,16 +850,35 @@ export const matchEvents = sqliteTable(
     matchId: integer("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
-    // The acting pair, one of the match's two.
+    // The acting pair, one of the match's two; for "agreed_auto_fixed" the
+    // pair that didn't answer.
     pairId: integer("pair_id")
       .notNull()
       .references(() => pairs.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind", {
-      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled", "result_recorded", "result_confirmed", "result_disputed"],
+      enum: [
+        "proposal",
+        "counter_proposal",
+        "accepted",
+        "agreed_time",
+        "agreed_confirmed",
+        "agreed_declined",
+        "venue",
+        "cancelled",
+        // D148: a tap on "SMS mindenkinek" / "E-mail mindenkinek", and the
+        // system's line for an agreed time fixed by itself (user_id null).
+        "contacted",
+        "agreed_auto_fixed",
+        "result_recorded",
+        "result_confirmed",
+        "result_disputed",
+      ],
     }).notNull(),
-    // A proposal's slots: JSON array of UTC instants in seconds.
-    slots: text("slots", { mode: "json" }).$type<number[]>(),
+    // A proposal's availability ranges (D144): JSON array of [start, end] in
+    // UTC seconds. Proposals before D144 stored bare starts (a number each),
+    // read as ranges one match long: always read with storedRanges().
+    slots: text("slots", { mode: "json" }).$type<(number | [number, number])[]>(),
     // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
     // The venue offered with a proposal or an agreed time (optional), or
@@ -827,7 +889,8 @@ export const matchEvents = sqliteTable(
     // A recorded result, or the disputing pair's version (#28); sides as
     // pair_a/pair_b.
     score: text("score", { mode: "json" }).$type<MatchScore>(),
-    // The disputing pair's note to the organizer (#28, optional).
+    // The disputing pair's note to the organizer (#28, optional); for
+    // "contacted" the channel tapped, "sms" or "email" (D148).
     note: text("note"),
     at: integer("at", { mode: "timestamp" })
       .notNull()

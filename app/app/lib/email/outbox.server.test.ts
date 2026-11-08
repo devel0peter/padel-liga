@@ -2,7 +2,6 @@
 // and for whom. The sender is stubbed; nothing leaves the process.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { InterestSignup } from "~/lib/interest";
 
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], gate: null as Promise<void> | null }));
 
@@ -185,20 +184,6 @@ describe("a deleted account's placeholder address", () => {
 
 // Every email goes out by itself (#112, replaces the held outbox of #88).
 describe("automatic outbox", () => {
-  const signup: InterestSignup = {
-    city: "gyor",
-    cityOther: null,
-    mode: "pair",
-    name1: "Nagy Anna",
-    email1: "anna@x.hu",
-    name2: "Kovács Béla",
-    email2: "bela@x.hu",
-    level: "kezdo",
-    note: null,
-    ref: null,
-    homeClub: null,
-    wantsToOrganize: false,
-  };
   const byKind = () =>
     Object.fromEntries(
       h.raw
@@ -227,21 +212,7 @@ describe("automatic outbox", () => {
   });
 
   it("sends every kind as soon as it is queued, with no further action", async () => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    h.raw
-      .prepare(
-        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', 'Zsófi', 'zsofi@x.hu', 'Ödön', 'odon@x.hu', 'kezdo', 1, 'gyor')",
-      )
-      .run();
     const league = "Padelpárbaj Győr";
-    await O.deliver(await O.queueSignupEmails(signup));
-    await O.deliver(
-      await O.queuePairIntros(
-        { name: "Cili", email: "cili@x.hu", level: "kezdo" },
-        { name: "Dani", email: "dani@x.hu", level: "kezdo" },
-        "Győr",
-      ),
-    );
     await O.queueSeasonEntered("bela@x.hu", {
       to: "Béla",
       partnerName: "Anna",
@@ -256,7 +227,6 @@ describe("automatic outbox", () => {
       recipients: [{ email: "anna@x.hu", name: "Anna" }],
       createdBy: "admin@x.hu", actorId: "admin",
     });
-    expect(await O.queueRegistrationInvites()).toBe(2);
     await settleBackground();
     await O.queueGroupsPublished([
       {
@@ -276,16 +246,12 @@ describe("automatic outbox", () => {
     await O.queueLoginCode("anna@x.hu", "123456");
 
     expect(byKind()).toEqual({
-      signup_confirmation: "sent",
-      partner_notice: "sent",
-      pair_intro: "sent",
       season_entry_decision: "sent",
       broadcast: "sent",
-      registration_invite: "sent",
       groups_published: "sent",
       login_code: "sent",
     });
-    expect(h.sent).toHaveLength(10);
+    expect(h.sent).toHaveLength(4);
     expect(h.sent.at(-1).subject).toMatch(/^123 456 a belépőkódod/);
   });
 
@@ -321,21 +287,6 @@ describe("automatic outbox", () => {
     h.raw.prepare("update email_messages set claimed_at = unixepoch() - 300").run();
     expect(await O.deliver(undefined, new Date(Date.now() + 6 * 60 * 1000))).toEqual({ sent: 0 });
     expect(h.raw.prepare("select status, last_error from email_messages").get()).toEqual({ status: "failed", last_error: O.INTERRUPTED });
-  });
-
-  it("registration invites go out right after the response, only the ones just queued", async () => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    h.raw
-      .prepare(
-        "insert into interest_signups (mode, name1, email1, name2, email2, level, consent_at, city) values ('pair', 'Zsófi', 'zsofi@x.hu', 'Ödön', 'odon@x.hu', 'kezdo', 1, 'gyor')",
-      )
-      .run();
-    // Something else waiting (over yesterday's limit) is left to the cron.
-    insert("broadcast", 1);
-    expect(await O.queueRegistrationInvites()).toBe(2);
-    await settleBackground();
-    expect(h.sent.map((m) => m.to).sort()).toEqual(["odon@x.hu", "zsofi@x.hu"]);
-    expect(count("kind = 'broadcast' and status = 'pending'")).toBe(1);
   });
 
   it("with the daily limit used up, a new email stays queued and goes out on the next run after the limit frees up", async () => {
@@ -411,13 +362,6 @@ describe("bulk mail after the response", () => {
   };
   const status = () =>
     h.raw.prepare("select status, count(*) as n from email_messages group by status order by status").all();
-  const inviteList = (n: number) => {
-    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
-    const st = h.raw.prepare(
-      "insert into interest_signups (mode, name1, email1, level, consent_at, city) values ('solo', ?, ?, 'kezdo', 1, 'gyor')",
-    );
-    for (let i = 0; i < n; i++) st.run(`P${i}`, `p${i}@x.hu`);
-  };
 
   beforeEach(async () => {
     await settleBackground();
@@ -425,19 +369,6 @@ describe("bulk mail after the response", () => {
     h.raw.exec(`insert into users (id, email, name) values ('admin', 'admin@x.hu', 'Admin')`);
     h.sent = [];
     h.gate = null;
-  });
-
-  it("the invite action answers without waiting for any send", async () => {
-    inviteList(3);
-    slowTransport();
-    // Resolves although the transport hasn't answered a single email.
-    expect(await O.queueRegistrationInvites()).toBe(3);
-    expect(h.sent).toEqual([]);
-    expect(backgroundPending()).toBe(1);
-    open();
-    await settleBackground();
-    expect(h.sent.map((m) => m.to).sort()).toEqual(["p0@x.hu", "p1@x.hu", "p2@x.hu"]);
-    expect(status()).toEqual([{ status: "sent", n: 3 }]);
   });
 
   it("a broadcast answers without waiting for any send", async () => {
@@ -451,10 +382,10 @@ describe("bulk mail after the response", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu"]);
   });
 
-  it("an overlapping cron run sends none of the queued invites twice", async () => {
-    inviteList(60);
+  it("an overlapping cron run sends none of a broadcast's emails twice", async () => {
     slowTransport();
-    expect(await O.queueRegistrationInvites()).toBe(60);
+    const recipients = Array.from({ length: 60 }, (_, i) => ({ email: `p${i}@x.hu`, name: `P${i}` }));
+    await O.createBroadcast({ subject: "Hír", body: "Szia {nev}!", audience: "mind", recipients, createdBy: "admin@x.hu", actorId: "admin" });
     // The cron starts while the background send waits on the transport.
     const cron = O.deliver();
     open();

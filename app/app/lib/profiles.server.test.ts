@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ raw: null as any }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { hasProfile, pairProfile, playerProfile, profilePairIds } = await import("~/lib/profiles.server");
+const { formerPairs, hasProfile, pairProfile, playerProfile, profilePairIds } = await import("~/lib/profiles.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
@@ -168,6 +168,21 @@ describe("once the league has started", () => {
     expect((await pairProfile(2, DURING))!.matches).toHaveLength(1);
   });
 
+  it("the summary (D136): seasons, rounds, matches, wins, losses, for the player and the pair", async () => {
+    match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    match(g1, 3, 1, 2, "final", JSON.stringify({ kind: "walkover", winner: "a" }));
+    // A pending result is not a match yet (D80).
+    match(g1, 2, 3, 3, "result_pending", played([[4, 0], [4, 0]]));
+    const summary = { seasons: 1, rounds: 1, matches: 2, wins: 1, losses: 1 };
+    expect((await playerProfile("ua", DURING))!.stats).toEqual(summary);
+    const p = (await pairProfile(1, DURING))!;
+    expect(p.stats).toEqual(summary);
+    // The pair's Élő-pont: its players' average, a whole number.
+    expect(Number.isInteger(p.elo)).toBe(true);
+    // Before the round starts nothing is counted and no rating shows.
+    expect((await pairProfile(1, BEFORE))!).toMatchObject({ elo: null, stats: { seasons: 0, rounds: 0, matches: 0 } });
+  });
+
   it("the group's place is the league page's table (final results only)", async () => {
     match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
     match(g1, 3, 2, 2, "final", played([[4, 2], [4, 2]]));
@@ -199,8 +214,8 @@ describe("once the league has started", () => {
     h.raw.prepare("update group_pairs set withdrawn_at = ?, withdrawal_reason = 'titkos ok' where pair_id = 2").run(sec("2026-11-15T10:00:00Z"));
     const two = await pairProfile(2, DURING);
     expect(two!.groups[0]).toMatchObject({ place: null, withdrawn: true });
-    expect(two!.matches[0]!.note).toBe("Visszalépés miatt nem számít a tabellába.");
-    expect((await pairProfile(1, DURING))!.matches[0]!.note).toBe("Visszalépés miatt nem számít a tabellába.");
+    expect(two!.matches[0]!.note).toBe("Visszalépés miatt nem számít bele a tabellába.");
+    expect((await pairProfile(1, DURING))!.matches[0]!.note).toBe("Visszalépés miatt nem számít bele a tabellába.");
     expect(JSON.stringify(two)).not.toContain("titkos ok");
   });
 
@@ -249,6 +264,93 @@ describe("once the league has started", () => {
   it("before the first rated match the rating is the level's starting value", async () => {
     const cili = await playerProfile("uc", DURING);
     expect(cili).toMatchObject({ started: true, elo: 1200, eloHistory: [], matches: [] });
+  });
+});
+
+describe("formerPairs: Korábbi párjaid on the own Profil (#347, D142)", () => {
+  const dissolve = (id: number, iso: string) =>
+    h.raw.prepare("update pairs set status = 'dissolved', dissolved_at = ?, dissolved_by = 'ua' where id = ?").run(sec(iso), id);
+  // What "Partner cseréje" stores (changePartner): the old pair dissolved, a
+  // new one, and the pair.change entry naming the old pair.
+  function changePartner(oldPair: number, newPair: number, keep: string, partner: string, leaving: string, iso: string) {
+    dissolve(oldPair, iso);
+    pair(newPair, keep, partner);
+    h.raw
+      .prepare("insert into audit_log (actor_id, action, target, detail, at, league_id) values ('ua', 'pair.change', ?, ?, ?, 1)")
+      .run(`pair:${newPair}`, `league:1; from pair:${oldPair}; user:${leaving} -> user:${partner}`, sec(iso));
+  }
+
+  it("a pair dissolved after playing: partner, pair page, league, rounds, Felbontva and the date", async () => {
+    group(2, 1, [1, 3]);
+    dissolve(1, "2026-12-21T10:00:00Z");
+    expect(await formerPairs("ua")).toEqual([
+      {
+        pairId: 1,
+        partner: { id: "ub", name: "Bea" },
+        link: "/pairs/1",
+        league: "Padelpárbaj Győr",
+        rounds: "2026/27 tél, 1–2. kör",
+        end: "Felbontva",
+        endedOn: "2026. 12. 21.",
+      },
+    ]);
+    // The same pair from the partner's side.
+    expect((await formerPairs("ub")).map((p) => p.partner.name)).toEqual(["Anna"]);
+  });
+
+  it("the date is the Budapest day", async () => {
+    dissolve(1, "2026-12-20T23:30:00Z");
+    expect((await formerPairs("ua"))[0]!.endedOn).toBe("2026. 12. 21.");
+  });
+
+  it("after a partner change the old pair is Partnercsere, and the new one is not listed", async () => {
+    user("ux", "Xénia");
+    changePartner(2, 5, "uc", "ux", "ud", "2026-12-21T10:00:00Z");
+    const cili = await formerPairs("uc");
+    expect(cili.map((p) => [p.pairId, p.partner.name, p.end])).toEqual([[2, "Dóra", "Partnercsere"]]);
+    expect((await formerPairs("ud")).map((p) => p.end)).toEqual(["Partnercsere"]);
+    expect(await formerPairs("ux")).toEqual([]);
+  });
+
+  it("another pair's change does not mark this one", async () => {
+    user("ux", "Xénia");
+    pair(12, "ux", "ue");
+    h.raw
+      .prepare("insert into audit_log (actor_id, action, target, detail, league_id) values ('ua', 'pair.change', 'pair:13', 'league:1; from pair:12; user:ue -> user:uf', 1)")
+      .run();
+    dissolve(1, "2026-12-21T10:00:00Z");
+    expect((await formerPairs("ua")).map((p) => p.end)).toEqual(["Felbontva"]);
+  });
+
+  it("only pairs that played in a published group, the newest ended first; active pairs are not listed", async () => {
+    user("ug", "Gréta");
+    user("uh", "Hanna");
+    dissolve(1, "2026-12-21T10:00:00Z");
+    // Pair 6 only ever in a draft; pair 7 played in phase 2 and ended later than pair 1.
+    pair(6, "ua", "ug");
+    group(1, 2, [6], false);
+    dissolve(6, "2026-12-22T10:00:00Z");
+    pair(7, "ua", "uh");
+    group(2, 1, [7]);
+    dissolve(7, "2027-01-10T10:00:00Z");
+    expect((await formerPairs("ua")).map((p) => p.pairId)).toEqual([7, 1]);
+    expect(await formerPairs("uc")).toEqual([]);
+  });
+
+  it("nothing from a league whose city is not listed, like the pair page", async () => {
+    dissolve(1, "2026-12-21T10:00:00Z");
+    h.raw.exec("update cities set listed = 0 where slug = 'gyor'");
+    expect(await formerPairs("ua")).toEqual([]);
+  });
+
+  it("a deleted former partner is Törölt játékos without a link; no email or phone anywhere", async () => {
+    dissolve(1, "2026-12-21T10:00:00Z");
+    h.raw.prepare("update users set name = 'Törölt játékos', email = 'x@deleted.invalid', phone = null, deleted_at = ? where id = 'ub'").run(sec("2026-12-22T10:00:00Z"));
+    const list = await formerPairs("ua");
+    expect(list).toMatchObject([{ partner: { id: null, name: "Törölt játékos" }, link: null }]);
+    user("ux", "Xénia");
+    changePartner(2, 5, "uc", "ux", "ud", "2026-12-21T10:00:00Z");
+    expect(JSON.stringify([list, await formerPairs("uc")])).not.toMatch(/titkos\.example|deleted\.invalid|@|\+36|30123|ub"/);
   });
 });
 

@@ -8,6 +8,7 @@ import { auditIfChanged } from "~/lib/audit.server";
 import type { User } from "./auth/session.server";
 import { activePairIdOf, activePairWith, insertPairIfFree, pairLeagues, type PairLeague } from "./pairs.server";
 import { checkPairLink, PAIR_LINK_REFUSALS } from "./pairs";
+import { pairMemberStatements, playerLeagues } from "./league-members.server";
 
 // The pair link (decision log, 2026-10-31): every player without a
 // pair in a league gets their own link to send to a partner. Whoever opens
@@ -30,10 +31,10 @@ export async function pairLinkFor(userId: string, leagueId: number): Promise<str
 
 export type PairLinkBox = { league: PairLeague; token: string };
 
-// The links /home and /pair show: one per league where the player has no
+// The links /home and Párod show: one per league of the player (D128) where they have no
 // active pair.
 export async function pairLinkBoxes(user: Pick<User, "id">, list?: PairLeague[]): Promise<PairLinkBox[]> {
-  const shown = list ?? (await pairLeagues());
+  const shown = list ?? (await playerLeagues(user.id));
   const out: PairLinkBox[] = [];
   for (const league of shown) {
     const [paired] = await db.select({ id: pairs.id }).from(pairs).where(activePairWith(league.id, [user.id])).limit(1);
@@ -99,6 +100,8 @@ export async function acceptPairLink(user: Pick<User, "id" | "consentAt">, token
       detail: `league:${link.leagueId}; link:${link.id}; user:${link.ownerId} + user:${user.id}`,
       leagueId: link.leagueId,
     }),
+    // Accepting a pair link joins its league (D128, #331).
+    ...pairMemberStatements(link.leagueId, link.ownerId, user.id, (id) => (id === user.id ? "link" : "pair")),
   ]);
   const [pair] = await db
     .select({ id: pairs.id })

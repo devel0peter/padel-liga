@@ -66,9 +66,9 @@ describe("code step hint (#123)", () => {
     h.env.GOOGLE_CLIENT_SECRET = "secret";
     const html = await render("login", await requestCode("anna@example.com"));
     expect(hint(html)).toBe(
-      "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, lépj be Google-lel, vagy írj nekünk: hello@padelparbaj.hu.",
+      "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, lépj be a Google-fiókoddal, vagy írj nekünk: hello@padelparbaj.hu.",
     );
-    expect(html).toContain('<a href="/auth/google?returnTo=%2Fhome" class="underline">lépj be Google-lel</a>');
+    expect(html).toContain('<a href="/auth/google?returnTo=%2Fhome" class="underline">lépj be a Google-fiókoddal</a>');
     expect(html).toContain('<a href="mailto:hello@padelparbaj.hu" class="underline">hello@padelparbaj.hu</a>');
   });
 
@@ -77,7 +77,7 @@ describe("code step hint (#123)", () => {
     h.env.GOOGLE_CLIENT_SECRET = "secret";
     const html = await render("register", await requestCode("anna@example.com"));
     expect(hint(html)).toBe(
-      "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, regisztrálj Google-lel, vagy írj nekünk: hello@padelparbaj.hu.",
+      "Nem jött meg? Nézd meg a spam mappát is, adj meg másik címet, regisztrálj a Google-fiókoddal, vagy írj nekünk: hello@padelparbaj.hu.",
     );
   });
 

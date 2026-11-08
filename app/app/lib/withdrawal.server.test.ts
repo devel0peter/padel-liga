@@ -32,6 +32,8 @@ const { IN_RUNNING_PHASE, NOT_IN_RUNNING_PHASE, TAKEN_OUT_TEXT } = await import(
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // Phases from Monday 9 Nov 2026 (Budapest, UTC+1).
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
@@ -197,8 +199,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     const without = never.bands[0]!.groups[0]!;
     expect(group.rows).toEqual(without.rows);
     expect(group.rows.map((r) => r.points)).toEqual([4, 4, 4]);
-    expect(group.results).toEqual(without.results);
-    expect(group.weekMatches).toEqual(without.weekMatches);
+    expect(group.weeks).toEqual(without.weeks);
     expect(group.withdrawn).toEqual([["Játékos G", "Játékos H"]]);
     expect(without.withdrawn).toEqual([]);
   });
@@ -229,7 +230,6 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
     expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
-    expect(mine!.offWeeks).toEqual([{ week: 2, opponents: "Játékos G – Játékos H" }]);
     const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
     freshDb({ withPair4: false });
     const [never] = await M.currentGroups("a", NOW);
@@ -247,12 +247,12 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
   it("match page and steps: off for both pairs, no scheduling or result step", async () => {
     await withdraw();
     const page = await M.matchPage(6, "c", NOW);
-    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.");
+    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
     expect(page?.actions.propose).toBe(false);
     expect(page?.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect((await M.matchPage(6, "g", NOW))?.voided).toMatch(/^Visszaléptetek/);
     expect((await M.matchPage(1, "a", NOW))?.voided).toBeNull();
-    expect(await M.matchStep("c", 6, { kind: "propose", slots: [at("2026-11-27T17:00:00Z")], clubId: null }, NOW)).toEqual({
+    expect(await M.matchStep("c", 6, { kind: "propose", ranges: hour([at("2026-11-27T17:00:00Z")]), clubId: null }, NOW)).toEqual({
       ok: false,
       error: M.VOIDED,
     });
@@ -272,11 +272,11 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     await withdraw();
     // A notice of another withdrawal with a reason, not about this pair, stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/profile#parod')")
       .run();
     // Another pair withdrawn with the same reason: its player's notice stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/profile#parod')")
       .run(`Más pár. Indok: ${REASON}`);
     expect(await A.deleteAccount("o", "g", NOW)).toEqual({ ok: true, mode: "anonymize" });
     expect(row("select withdrawn_at is not null as w, withdrawal_reason from group_pairs where pair_id = 4")).toEqual({
@@ -326,7 +326,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     ]);
   });
 
-  it("Párom: both players read that the organizer took them out, with no Nevezünk button", async () => {
+  it("Párod: both players read that the organizer took them out, with no Nevezünk button", async () => {
     await withdraw();
     const seasons = await S.listSeasons(1);
     for (const id of ["g", "h"]) {

@@ -1,4 +1,4 @@
-// The old Párom address (D140, #346): it leads to Profil's Párod section,
+// The old Párom address (D141, #346): it leads to Profil's Párod section,
 // with the query kept, so links in mail and notices sent before still work.
 import { describe, expect, it } from "vitest";
 

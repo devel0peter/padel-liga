@@ -40,7 +40,7 @@ test("37. no menu has Párom; Profil stays", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/home");
   const sidebar = page.locator("[data-sidebar=sidebar]");
-  await expect(sidebar.getByRole("link", { name: "Kezdőlap" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Kezdőlap", exact: true })).toBeVisible();
   await expect(sidebar.getByRole("link", { name: "Párom" })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   const bar = page.getByRole("navigation", { name: "Fő menü" });
@@ -56,7 +56,7 @@ test("37. a player in two leagues sees a card per league, each naming it", async
     const { context, page } = await as(browser, OUTSIDER.email);
     await visit(page, "/profile");
     const section = content(page).locator("#parod");
-    await expect(section.getByRole("heading", { name: "Párod" })).toBeVisible();
+    await expect(section.getByRole("heading", { name: "Párod", exact: true })).toBeVisible();
     for (const league of ["Padelpárbaj Mintaváros", "Padelpárbaj Példaváros"]) {
       const card = section.getByRole("region", { name: league });
       await expect(card.getByRole("heading", { name: league })).toBeVisible();

@@ -590,8 +590,8 @@ export const pairInvites = sqliteTable(
 );
 
 // A player's own link to invite a partner (decision log, 2026-10-31):
-// one per player and league, shown on /home and /pair while they have no
-// pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
+// one per player and league, shown on /home and in Profil's Párod while
+// they have no pair there. Whoever opens it, registers and taps "Elfogadom" becomes the
 // partner, while both are without a pair in the league. The link carries the
 // token; it is stored as is because the player shows it again on every visit.
 export const pairLinks = sqliteTable(

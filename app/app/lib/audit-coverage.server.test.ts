@@ -209,6 +209,14 @@ const STEPS: Step[] = [
     run: () =>
       OUTBOX.createBroadcast({ subject: "Hír", body: "Szia {név}!", audience: "Jelentkezők · „anna@x.hu”", recipients: [{ email: "p1a@x.hu", name: "Játékos 1a" }], createdBy: "adm@x.hu", actorId: ADMIN }),
   },
+  {
+    action: "outbox.retry",
+    actor: ADMIN,
+    run: async () => {
+      h.raw.prepare("insert into email_messages (kind, to_email, subject, text, status, last_error) values ('groups_published', 'p1a@x.hu', 's', 't', 'failed', ?)").run(OUTBOX.INTERRUPTED);
+      expect(await OUTBOX.retryFailed("groups_published", { id: ADMIN })).toBe(1);
+    },
+  },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },
   {
     action: "account.anonymize",
@@ -267,6 +275,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
   "admin.league-solos.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
+  "admin.outbox.tsx": ["outbox.retry"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],

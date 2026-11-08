@@ -90,6 +90,6 @@ test("9. Kimenő levelek logs the entry emails as sent, nothing waiting", async 
   const { context, page } = await as(browser, ADMIN.email);
   await visit(page, "/admin/outbox");
   const row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: "Nevezés", exact: true }) });
-  await expect(row.getByRole("cell")).toHaveText(["Nevezés", "0", "11", "0", "–"]);
+  await expect(row.getByRole("cell")).toHaveText(["Nevezés", "0", "11", "0", "–", ""]);
   await context.close();
 });

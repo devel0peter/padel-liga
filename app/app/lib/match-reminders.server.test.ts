@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 // No VAPID keys: notifications are stored, not pushed.
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -21,6 +22,7 @@ vi.mock("~/lib/email/send.server", () => ({
 vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor", name: "Győr" }] }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 const R = await import("~/lib/match-reminders.server");
@@ -67,6 +69,7 @@ async function freshDb() {
   });
   expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
   expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+  await settleBackground();
   h.raw.exec("delete from notifications");
   h.raw.exec("delete from email_messages");
   h.sent = [];

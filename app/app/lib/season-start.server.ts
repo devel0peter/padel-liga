@@ -84,12 +84,14 @@ export async function announceSeasonStart(seasonId: number, startsAt: Date): Pro
       .where(and(eq(seasonEntries.seasonId, seasonId), eq(seasonEntries.status, "approved"), isNull(users.deletedAt)));
     const input = { league: season.league, season: season.name, start: startsAt };
     await queueSeasonStart(players.map((p) => ({ toEmail: p.email, input: { ...input, to: p.name || "Játékos" } })));
-    // After the emails, so the pushes can't use up the request's
-    // subrequests before the relay connects (as groups.server.ts).
+    // The pushes wait for the cron (queuePush, D150, as groups.server.ts),
+    // so they leave the invocation's subrequests to the emails.
     const message = seasonStartMessage(input);
     await notifyPlayers(
       "season_start",
       players.map((p) => ({ userId: p.id, message })),
+      undefined,
+      true,
     );
   } catch (error) {
     logError("season start notice failed", { seasonId, error });

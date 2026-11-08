@@ -22,6 +22,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const { db } = await import("~/db/client.server");
 const { users } = await import("~/db/schema");
 const Seed = await import("./seed");
@@ -228,6 +229,8 @@ describe("the seed carries the walkthrough", () => {
     // The Szervező pairs them on Párok, as the walkthrough's pair links would.
     for (let i = 0; i < people.length; i += 2) expect(await P.createPair(organizer.id, league.id, `player-${i}`, `player-${i + 1}`)).toEqual({ ok: true });
     expect(rows("select count(*) as n from pairs where status = 'active'")[0].n).toBe(11);
+    // The emails go after the response (D150): let them finish first.
+    await settleBackground();
     h.raw.exec("delete from email_messages where kind = 'pair_created'");
 
     // Either player of each pair enters ("Nevezünk"): it counts at once, for round 1 (#153).
@@ -236,6 +239,7 @@ describe("the seed carries the walkthrough", () => {
       const user = (await db.select().from(users)).find((u) => u.id === pair.player_a)!;
       expect(await E.applyToSeason(user, season.id, NOW)).toMatchObject({ ok: true, joins: { phase: 1 } });
     }
+    await settleBackground();
     expect(count("season_entries")).toBe(11);
     expect(rows("select distinct status, joins_phase from season_entries")).toEqual([{ status: "approved", joins_phase: 1 }]);
     // Both players of every pair got the notice, with nothing else to do (#112).
@@ -250,7 +254,8 @@ describe("the seed carries the walkthrough", () => {
     expect(sizes.reduce((a, b) => a + b, 0)).toBe(11);
     expect(await G.publishGroups(season.id, organizer.id, NOW)).toEqual({ ok: true });
     expect(count("matches")).toBeGreaterThan(0);
-    // One email per player, sent right away (#112).
+    // One email per player, sent right after the response (#112, D150).
+    await settleBackground();
     expect(rows("select status, count(*) as n from email_messages where kind = 'groups_published' group by status")).toEqual([
       { status: "sent", n: 22 },
     ]);

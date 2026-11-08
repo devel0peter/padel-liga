@@ -3,7 +3,7 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { auditEntry } from "~/lib/audit.server";
+import { auditEntry, auditWhen } from "~/lib/audit.server";
 import { runAfterResponse } from "~/lib/background.server";
 import {
   broadcasts,
@@ -44,7 +44,9 @@ import {
 import { unsubscribeHeaders, unsubscribeToken, unsubscribeUrl } from "./unsubscribe";
 
 // The outbox: every email is first stored in email_messages, then delivered
-// by deliver(), right away and again by the cron (workers/app.ts).
+// by deliver(): after the response of the request that queued it (never
+// inside it, so a closed browser tab can't cut a send short, D150) and again
+// by the cron (workers/app.ts).
 // deliver() stays under the daily limit; whatever doesn't fit waits for the
 // next run. Nothing waits for an Admin (#112, replaces the held outbox of
 // #88); /admin/outbox only shows the log (outboxLog).
@@ -56,7 +58,11 @@ const MAX_ATTEMPTS = 5;
 const STALE_CLAIM_MS = 10 * 60 * 1000;
 export const INTERRUPTED = "interrupted while sending; not retried, so it can't go out twice";
 // Keeps one run well inside the Workers subrequest limit.
-const MAX_BATCHES_PER_RUN = 5;
+const MAX_BATCHES_PER_RUN = 10;
+// Emails claimed, sent and marked per batch (D150): if the Worker stops
+// mid-send, at most this many are left "sending" (unknown, never resent by
+// themselves); the rest are still pending and go with the next run.
+export const SEND_CHUNK = 10;
 // D1 allows 100 bound parameters per statement; a message row binds 7.
 const INSERT_CHUNK = 10;
 
@@ -153,7 +159,7 @@ export async function suppress(email: string, reason: "unsubscribed" | "bounced"
 }
 
 // An organizer put two registered players in a pair (#260): one email each,
-// sent right away as transactional mail. Unsubscribed or bounced addresses,
+// sent right after the response as transactional mail. Unsubscribed or bounced addresses,
 // and players who switched email off (#115), get nothing; the pair still
 // shows in the app.
 export async function queuePairCreated(
@@ -163,17 +169,18 @@ export async function queuePairCreated(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "pair_created", toEmail: m.toEmail, ...pairCreated(m.input) }));
-  await deliverNow(await enqueue(queued));
+  sendAfterResponse(await enqueue(queued));
 }
 
-// A login code goes out at once, ahead of broadcasts (transactional budget).
-// If the provider is down it stays queued like any email, but by the next
-// cron run the code has expired; the person just asks for a new one.
+// A login code goes out right after the response, ahead of broadcasts
+// (transactional budget). If the provider is down it stays queued like any
+// email, but by the next cron run the code has expired; the person just asks
+// for a new one.
 export async function queueLoginCode(email: string, code: string): Promise<void> {
   const ids = await enqueue([
     { kind: "login_code", toEmail: email, ...loginCode(code, CODE_TTL_MS / 60_000) },
   ]);
-  await deliver(ids);
+  sendAfterResponse(ids);
 }
 
 // A pair entered a season (#153): each player of the pair gets one. An unsubscribed or bounced address, or a player who switched
@@ -183,10 +190,10 @@ export async function queueSeasonEntered(
   input: Parameters<typeof seasonEntered>[0],
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  await deliverNow(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntered(input) }]));
+  sendAfterResponse(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntered(input) }]));
 }
 
-// The groups are published (#24, D22): one email per player, sent right away
+// The groups are published (#24, D22): one email per player, sent right after the response
 // as transactional mail (ahead of broadcasts); what doesn't fit the day's
 // limit goes with the next cron runs. Unsubscribed or bounced addresses, and
 // players who switched email off (#115), get nothing; the groups still show
@@ -198,11 +205,11 @@ export async function queueGroupsPublished(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, ...groupsPublished(m.input) }));
-  await deliverNow(await enqueue(queued));
+  sendAfterResponse(await enqueue(queued));
 }
 
 // A scheduling step the other pair must answer (#26, spec 13): a proposal or
-// an agreed time, sent at once to each of its players. Unsubscribed or
+// an agreed time, sent right after the response to each of its players. Unsubscribed or
 // bounced addresses, and players who switched email off (#115), get nothing;
 // the in-app list and push still have it.
 export async function queueMatchEmails(
@@ -222,14 +229,14 @@ export async function queueMatchEmails(
         ...(m.kind === "match_proposal" ? matchProposal(m.input) : m.kind === "match_result" ? matchResult(m.input) : matchAgreedTime(m.input)),
       }),
     );
-  await deliverNow(await enqueue(queued));
+  sendAfterResponse(await enqueue(queued));
 }
 
 // A player's 2nd strike (#294, spec 13): the warning, one email per strike
 // that brought the player to 2. Personal mail; unsubscribed or bounced
 // addresses, and players who switched email off (#115), get nothing (the
 // in-app notice and push still have it). From a request (a no-show, #33) it
-// goes at once; from the cron it waits for the run's delivery step.
+// goes right after the response; from the cron it waits for the run's delivery step.
 export async function queueStrikeWarnings(
   messages: { toEmail: string; input: Parameters<typeof strikeWarning>[0] }[],
   sendNow: boolean,
@@ -240,11 +247,11 @@ export async function queueStrikeWarnings(
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "strike_warning", toEmail: m.toEmail, ...strikeWarning(m.input) }));
   const ids = await enqueue(queued);
-  if (sendNow) await deliverNow(ids);
+  if (sendNow) sendAfterResponse(ids);
 }
 
 // A league's first season reached its minimum entries (D124, #335): one
-// email per entered player, sent at once. Unsubscribed or bounced addresses,
+// email per entered player, sent right after the response. Unsubscribed or bounced addresses,
 // and players who switched email off (#115), get nothing; the in-app notice
 // and push still have it.
 export async function queueSeasonStart(
@@ -255,7 +262,7 @@ export async function queueSeasonStart(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "season_start", toEmail: m.toEmail, ...seasonStart(m.input) }));
-  await deliverNow(await enqueue(queued));
+  sendAfterResponse(await enqueue(queued));
 }
 
 // The cron's match emails (#31): the daily digest and "holnap meccs", as
@@ -296,21 +303,17 @@ export async function reminderEmailInserts(batches: ReminderEmail[][]): Promise<
 }
 
 // SEND_NOW_MAX (budget.ts): one deliver() call, a handful of D1 queries and
-// one relay connection, well inside a Workers Free invocation; it also keeps
-// each statement under D1's 100 bound parameters.
+// a few relay connections (SEND_CHUNK each), well inside a Workers Free
+// invocation; it also keeps each statement under D1's 100 bound parameters.
 export { SEND_NOW_MAX };
 
 // Sends the first SEND_NOW_MAX of the emails just queued, within the daily
-// limit; the cron sends the rest. Personal emails: the request waits for it.
-async function deliverNow(ids: number[]): Promise<void> {
-  if (ids.length > 0) await deliver(ids.slice(0, SEND_NOW_MAX));
-}
-
-// Bulk mail (BULK_KINDS: broadcasts, registration invites, #140): the same
-// send, but after the response, so the Admin's click answers at once. The
-// claim in deliver() keeps an overlapping cron run from sending any twice.
-function deliverAfterResponse(ids: number[]): void {
-  if (ids.length > 0) runAfterResponse("bulk send", () => deliverNow(ids));
+// limit, after the response (D150): the request never waits for the relay,
+// so the browser leaving the page can't stop a send halfway. The claim in
+// deliver() keeps an overlapping cron run from sending any twice; whatever
+// this leaves (more than SEND_NOW_MAX, a failure) the cron sends.
+function sendAfterResponse(ids: number[]): void {
+  if (ids.length > 0) runAfterResponse("email send", () => deliver(ids.slice(0, SEND_NOW_MAX)));
 }
 
 export async function createBroadcast(input: {
@@ -357,7 +360,7 @@ export async function createBroadcast(input: {
       };
     }),
   );
-  deliverAfterResponse(await enqueue(messages));
+  sendAfterResponse(await enqueue(messages));
   return id;
 }
 
@@ -381,6 +384,31 @@ export async function stuckReminderInserts(
   for (let i = 0; i < queued.length; i += INSERT_CHUNK)
     statements.push(db.insert(emailMessages).values(queued.slice(i, i + INSERT_CHUNK).map(messageValues)));
   return statements;
+}
+
+// "Újraküldés" on /admin/outbox (D150): the Admin puts every failed email of
+// one kind back in the queue, also the ones a stopped send left unknown
+// (INTERRUPTED), after checking the Google email log; those may then arrive
+// twice, which the page says. Login codes are never resent (they expired),
+// nor emails whose text is gone. Returns how many went back in the queue.
+export async function retryFailed(kind: MessageKind, actor: { id: string }): Promise<number> {
+  if (kind === "login_code") return 0;
+  const [rows] = await db.batch([
+    db
+      .update(emailMessages)
+      .set({ status: "pending", attempts: 0, lastError: null, claimedAt: null })
+      .where(
+        and(
+          eq(emailMessages.kind, kind),
+          eq(emailMessages.status, "failed"),
+          or(isNotNull(emailMessages.text), isNotNull(emailMessages.html)),
+        ),
+      )
+      .returning({ id: emailMessages.id }),
+    auditWhen(sql`changes() > 0`, { actorId: actor.id, action: "outbox.retry", target: `kind:${kind}` }),
+  ]);
+  sendAfterResponse(rows.map((r) => r.id));
+  return rows.length;
 }
 
 // A one-off test of a draft, sent only to the admin. Not stored.
@@ -424,7 +452,7 @@ async function claim(limit: number, group: Group, runStart: Date, ids?: number[]
       ),
     )
     .orderBy(asc(emailMessages.id))
-    .limit(Math.min(limit, MAX_BATCH));
+    .limit(Math.min(limit, MAX_BATCH, SEND_CHUNK));
   // One UPDATE ... RETURNING, so two concurrent runs can't claim the same row.
   return db
     .update(emailMessages)

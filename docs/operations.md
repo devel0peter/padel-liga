@@ -15,6 +15,7 @@ How the live system is set up and how to restore it. The reasons behind each cho
 - Mail is sent from `hello@padelparbaj.hu` through the Google Workspace SMTP relay, with Resend (EU region) as the fallback (D114, D45, D46). All mail goes through the outbox in `app/app/lib/email/outbox.server.ts`.
 - DNS for mail lives in the Cloudflare zone: the Google Workspace verification TXT, MX, SPF and DKIM; for Resend the `resend._domainkey` TXT and the `send` and `rsend` CNAMEs (added by Resend's Cloudflare auto-configure).
 - DMARC: one record, `p=none` with a `rua` address; reports go to Cloudflare DMARC Management. Tighten to `quarantine` once the mail passes.
+- A request never sends mail itself: it stores it, and it goes out right after the response, the rest with the 10-minute cron, at most 10 per claim (D150). An email whose send was cut short is marked failed ("interrupted while sending") and never resent by itself. Check the Google Admin email log search (sender `hello@padelparbaj.hu`, subject) for what really left, then use "Újraküldés" on Kimenő levelek (`/admin/outbox`) for that kind.
 - Secrets: `RESEND_API_KEY` and `EMAIL_SECRET` (local: `app/.dev.vars`; without a key, dev logs emails to the console).
 
 ## Backups

@@ -507,9 +507,10 @@ export async function publishPhase(seasonId: number, number: number, actorId: st
     });
   });
   await queueGroupsPublished(messages);
-  // Then in the app (and by push) for every player, whatever their email
-  // switch says (#115). After the emails, so the pushes can't use up the
-  // request's subrequests before the relay connects.
+  // Then in the app for every player, whatever their email switch says
+  // (#115). The pushes wait for the cron (queuePush, D150): a whole league's
+  // pushes here would use up the invocation's subrequests that the emails,
+  // sent after the response, still need.
   await notifyPlayers(
     "groups_published",
     draft.flatMap((g) => {
@@ -522,6 +523,8 @@ export async function publishPhase(seasonId: number, number: number, actorId: st
       });
       return g.pairs.flatMap((pair) => pair.players.map((p) => ({ userId: p.id, message })));
     }),
+    undefined,
+    true,
   );
   return { ok: true };
 }

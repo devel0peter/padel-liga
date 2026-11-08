@@ -322,15 +322,16 @@ export function matchResult(input: MatchEmailInput & { score: string; autoAccept
 }
 
 // An agreed time waits for confirmation (#26, spec 6.3 and 13).
-export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email {
+// `fixesAt`: when it becomes fixed by itself unless they object (D148).
+export function matchAgreedTime(input: MatchEmailInput & { slot: Date; fixesAt: Date }): Email {
   const link = `${SITE_URL}/matches/${input.matchId}`;
   return buildPlain(
-    `Erősítsd meg a meccs időpontját – ${SITE_NAME}`,
+    `Megbeszélt időpont a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
       `${input.opponents} rögzítette a ${input.week}. heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
       input.venue ? `Helyszín: ${input.venue}` : null,
-      `Erősítsd meg, vagy jelezd, ha nem így beszéltétek:`,
+      `Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek. Ha nem így volt, addig jelezd itt:`,
       link,
       SIGNATURE,
     ].filter((p): p is string => p !== null),

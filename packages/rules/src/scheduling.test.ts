@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { budapestTime } from "./calendar";
 import type { SlotRange } from "./slots";
 import {
+  AGREED_FIX_MS,
   activeSides,
+  agreedFixAt,
+  contactDue,
   isValidActivity,
+  unloggedAutoFix,
   proposalKind,
   schedulingActions,
   schedulingState,
@@ -104,23 +108,49 @@ describe("schedulingState (spec 6, #26)", () => {
     });
   });
 
-  describe("agreed time (spec 6.3)", () => {
+  describe("agreed time (spec 6.3, D148)", () => {
+    // Recorded Tue 10 Nov 12:00 for Wed 11 Nov 20:00: the start is 32 hours
+    // away, so it becomes fixed by itself 24 hours later, Wed 12:00.
     const agreed: SchedulingEvent = { kind: "agreed_time", side: "a", at: now, slot: at("2026-11-11", 20), clubId: 3 };
+    const fixesAt = at("2026-11-11", 12);
+    const scheduled = { status: "scheduled", slot: at("2026-11-11", 20), clubId: 3 };
 
-    it("waits for the other pair", () => {
-      expect(schedulingState([agreed], now)).toEqual({ status: "agreed_time", by: "a", slot: at("2026-11-11", 20), clubId: 3, at: now });
+    it("waits for the other pair until it becomes fixed", () => {
+      expect(schedulingState([agreed], now)).toEqual({ status: "agreed_time", by: "a", slot: at("2026-11-11", 20), clubId: 3, at: now, fixesAt });
+      expect(schedulingState([agreed], new Date(fixesAt.getTime() - 1)).status).toBe("agreed_time");
     });
 
-    it("confirmed by the other pair: scheduled", () => {
-      expect(schedulingState([agreed, { kind: "agreed_confirmed", side: "b", at: now }], now)).toEqual({
-        status: "scheduled",
-        slot: at("2026-11-11", 20),
-        clubId: 3,
-      });
+    it("fixed at the earlier of 24 hours after recording and the start", () => {
+      expect(AGREED_FIX_MS).toBe(24 * 3600_000);
+      expect(agreedFixAt(at("2026-11-11", 20), now)).toEqual(fixesAt);
+      expect(agreedFixAt(at("2026-11-10", 18), now)).toEqual(at("2026-11-10", 18));
+      expect(agreedFixAt(at("2026-11-11", 12), now)).toEqual(at("2026-11-11", 12));
     });
 
-    it("declined by the other pair: back to scheduling", () => {
+    it("confirmed early by the other pair: scheduled at once", () => {
+      expect(schedulingState([agreed, { kind: "agreed_confirmed", side: "b", at: now }], now)).toEqual(scheduled);
+    });
+
+    it("unanswered: scheduled by itself 24 hours after it was recorded", () => {
+      expect(schedulingState([agreed], fixesAt)).toEqual(scheduled);
+      expect(schedulingState([agreed], at("2026-11-12", 9))).toEqual(scheduled);
+    });
+
+    it("unanswered, with the start sooner than 24 hours: scheduled at the start", () => {
+      const soon: SchedulingEvent = { ...agreed, slot: at("2026-11-10", 18) };
+      expect(schedulingState([soon], at("2026-11-10", 17)).status).toBe("agreed_time");
+      expect(schedulingState([soon], at("2026-11-10", 18))).toEqual({ ...scheduled, slot: at("2026-11-10", 18) });
+    });
+
+    it("declined before the moment: back to scheduling", () => {
       expect(schedulingState([agreed, { kind: "agreed_declined", side: "b", at: now }], now)).toEqual({ status: "to_schedule" });
+      const justBefore = new Date(fixesAt.getTime() - 1000);
+      expect(schedulingState([agreed, { kind: "agreed_declined", side: "b", at: justBefore }], at("2026-11-12", 9))).toEqual({ status: "to_schedule" });
+    });
+
+    it("declined at or after the moment: no effect, it stays fixed", () => {
+      for (const when of [fixesAt, at("2026-11-11", 15)])
+        expect(schedulingState([agreed, { kind: "agreed_declined", side: "b", at: when }], at("2026-11-11", 16))).toEqual(scheduled);
     });
 
     it("the recording pair can't confirm or decline its own", () => {
@@ -128,19 +158,66 @@ describe("schedulingState (spec 6, #26)", () => {
       expect(schedulingState([agreed, { kind: "agreed_declined", side: "a", at: now }], now).status).toBe("agreed_time");
     });
 
-    it("lapses unconfirmed when its start passes", () => {
-      expect(schedulingState([agreed], at("2026-11-11", 20))).toEqual({ status: "to_schedule" });
+    it("recording it again starts its 24 hours again", () => {
+      const again: SchedulingEvent = { ...agreed, at: at("2026-11-10", 20), slot: at("2026-11-12", 20) };
+      expect(schedulingState([agreed, again], fixesAt)).toMatchObject({ status: "agreed_time", fixesAt: at("2026-11-11", 20) });
     });
 
-    it("replaces an open proposal, and a proposal replaces it", () => {
+    it("replaces an open proposal, and a proposal before the moment replaces it", () => {
       expect(schedulingState([proposal("b"), agreed], now).status).toBe("agreed_time");
       expect(schedulingState([agreed, proposal("b", now)], now)).toMatchObject({ status: "proposed", by: "b" });
+      // After the moment the match is scheduled: a proposal changes nothing.
+      expect(schedulingState([agreed, proposal("b", fixesAt)], fixesAt)).toEqual(scheduled);
     });
 
     it("a confirmed time stays scheduled after it starts", () => {
       const log: SchedulingEvent[] = [agreed, { kind: "agreed_confirmed", side: "b", at: now }];
       expect(schedulingState(log, at("2026-11-12", 9)).status).toBe("scheduled");
     });
+
+    it("late cancellation counts from the fixed time", () => {
+      // Fixed by itself Wed 12:00; cancelled Wed 15:00, 5 hours before the 20:00 start: late.
+      const log: SchedulingEvent[] = [agreed, { kind: "cancelled", side: "b", at: at("2026-11-11", 15), slot: at("2026-11-11", 20) }];
+      expect(schedulingState(log, at("2026-11-11", 16))).toEqual({ status: "to_schedule", nextBy: "b" });
+      expect(lateCancellers(log, deadline)).toEqual(["b"]);
+      // 25 hours ahead of a later start, fixed by itself before: not late.
+      const far: SchedulingEvent = { ...agreed, slot: at("2026-11-13", 20) };
+      const early: SchedulingEvent[] = [far, { kind: "cancelled", side: "a", at: at("2026-11-12", 19), slot: at("2026-11-13", 20) }];
+      expect(schedulingState(early, at("2026-11-12", 19))).toEqual({ status: "to_schedule" });
+      expect(lateCancellers(early, deadline)).toEqual([]);
+    });
+
+    describe("unloggedAutoFix: the log line still to write (D148)", () => {
+      const line: SchedulingEvent = { kind: "agreed_auto_fixed", side: "b", at: fixesAt, slot: at("2026-11-11", 20) };
+
+      it("none while it waits, or once confirmed or declined", () => {
+        expect(unloggedAutoFix([agreed], now)).toBeNull();
+        expect(unloggedAutoFix([agreed, { kind: "agreed_confirmed", side: "b", at: now }], at("2026-11-12", 9))).toBeNull();
+        expect(unloggedAutoFix([agreed, { kind: "agreed_declined", side: "b", at: now }], at("2026-11-12", 9))).toBeNull();
+      });
+
+      it("the pair that didn't answer and the moment, once fixed by itself", () => {
+        expect(unloggedAutoFix([agreed], at("2026-11-12", 9))).toEqual({ side: "b", at: fixesAt, slot: at("2026-11-11", 20), clubId: 3 });
+      });
+
+      it("none once the line is in the log, which changes nothing else", () => {
+        expect(unloggedAutoFix([agreed, line], at("2026-11-12", 9))).toBeNull();
+        expect(schedulingState([agreed, line], at("2026-11-12", 9))).toEqual(scheduled);
+      });
+
+      it("kept after a venue, gone after a cancellation", () => {
+        const venue: SchedulingEvent = { kind: "venue", side: "a", at: at("2026-11-11", 13), clubId: 5 };
+        expect(unloggedAutoFix([agreed, venue], at("2026-11-11", 14))).toMatchObject({ side: "b" });
+        const cancel: SchedulingEvent = { kind: "cancelled", side: "a", at: at("2026-11-11", 13), slot: at("2026-11-11", 20) };
+        expect(unloggedAutoFix([agreed, cancel], at("2026-11-11", 14))).toBeNull();
+      });
+    });
+  });
+
+  it("a tap on the SMS or e-mail button changes no state (D148)", () => {
+    const contacted: SchedulingEvent = { kind: "contacted", side: "b", at: now };
+    expect(schedulingState([contacted], now)).toEqual({ status: "to_schedule" });
+    expect(schedulingState([proposal("a"), contacted], now)).toMatchObject({ status: "proposed", by: "a" });
   });
 
   it("no proposal or agreed time reopens a scheduled match (only cancelling does, #27)", () => {
@@ -212,7 +289,9 @@ describe("waitingFor", () => {
 });
 
 describe("valid activity (spec 8)", () => {
-  it("proposing, counter-proposing, recording and confirming an agreed time count; accepting and declining don't", () => {
+  it("proposing, counter-proposing, recording and confirming an agreed time, and the SMS/e-mail tap count; accepting, declining and a time fixed by itself don't", () => {
+    expect(isValidActivity("contacted")).toBe(true);
+    expect(isValidActivity("agreed_auto_fixed")).toBe(false);
     expect(isValidActivity("proposal")).toBe(true);
     expect(isValidActivity("counter_proposal")).toBe(true);
     expect(isValidActivity("agreed_time")).toBe(true);
@@ -230,6 +309,29 @@ describe("valid activity (spec 8)", () => {
     ];
     expect(activeSides(log, deadline)).toEqual(["a", "b"]);
     expect(activeSides([proposal("a", deadline)], deadline)).toEqual([]);
+  });
+
+  it("a pair that only tapped the SMS or e-mail button is active (D148)", () => {
+    expect(activeSides([{ kind: "contacted", side: "b", at: now }], deadline)).toEqual(["b"]);
+  });
+
+  it("the pair whose silence fixed an agreed time is not active through that line", () => {
+    const log: SchedulingEvent[] = [
+      { kind: "agreed_time", side: "a", at: now, slot: at("2026-11-11", 20) },
+      { kind: "agreed_auto_fixed", side: "b", at: at("2026-11-11", 12), slot: at("2026-11-11", 20) },
+    ];
+    expect(activeSides(log, deadline)).toEqual(["a"]);
+  });
+
+  it("one SMS/e-mail tap per pair per Budapest day goes into the log (D148)", () => {
+    const tap: SchedulingEvent = { kind: "contacted", side: "a", at: at("2026-11-10", 23, 30) };
+    expect(contactDue([], "a", now)).toBe(true);
+    expect(contactDue([tap], "a", at("2026-11-10", 23, 59))).toBe(false);
+    // The other pair has its own; the next Budapest day is a new one.
+    expect(contactDue([tap], "b", at("2026-11-10", 23, 45))).toBe(true);
+    expect(contactDue([tap], "a", at("2026-11-11", 0))).toBe(true);
+    // Another step that day isn't a tap.
+    expect(contactDue([proposal("a", at("2026-11-10", 9))], "a", now)).toBe(true);
   });
 
   it("a pair that only declined is not active", () => {

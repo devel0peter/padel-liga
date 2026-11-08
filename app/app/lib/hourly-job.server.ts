@@ -8,6 +8,7 @@ import { pushQueued } from "~/lib/notifications.server";
 import { PUSH_STATS_QUERIES, recordPushStats } from "~/lib/push-stats.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
 import { autoAcceptResults } from "~/lib/results.server";
+import { autoFixAgreedTimes } from "~/lib/agreed-auto-fix.server";
 import { draftRoundSwitches } from "~/lib/round-switch.server";
 import { RunBudget, type Usage } from "~/lib/run-usage";
 
@@ -17,7 +18,8 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // results waiting 48 hours are accepted (#28), from 06:00 the morning after a
 // phase's deadline its unplayed matches are resolved and the strikes given
 // (#11, #294, deadline.server.ts), and once they are settled the next phase's
-// groups drafted for the organizer (#35, round-switch.server.ts), the match reminders and the
+// groups drafted for the organizer (#35, round-switch.server.ts), agreed
+// times nobody answered fixed (D148, agreed-auto-fix.server.ts), the match reminders and the
 // daily digest when their hour comes (#31), the reminders for people stuck
 // before entering (#155), the one-time deletion of the interest list until it
 // is done (#334, interest-list-purge.server.ts; before the delivery, so none
@@ -84,6 +86,17 @@ export const CRON_STEPS: readonly CronStep[] = [
     // same room for the steps after it as the resolution does.
     name: "round switch draft",
     run: (now, run) => draftRoundSwitches(now, { run, keep: AFTER_DEADLINE }),
+  },
+  {
+    // After the resolution and the draft, so it never takes their room (the
+    // resolution reads the same state from the log either way); it writes
+    // the line and mirrors the match, keeping the match reminders' room.
+    name: "agreed time auto-fix",
+    run: async (now, run) => {
+      const { fixed, left } = await autoFixAgreedTimes(now, { run, keep: AFTER_MATCH });
+      if (left) return `fixed ${fixed} agreed times; more left for the next run`;
+      return fixed ? `fixed ${fixed} agreed times` : null;
+    },
   },
   {
     name: "match reminders",

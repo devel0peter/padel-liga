@@ -9,14 +9,12 @@ import { matchDecidedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
 import { pairName } from "./groups";
-import { eventText } from "./matches";
-import { CHANGED, clubNames, loadMatch, noWithdrawnPair, VOIDED } from "./matches.server";
+import { CHANGED, clubNames, eventWho, isSystemEvent, loadMatch, noWithdrawnPair, storedEventText, VOIDED } from "./matches.server";
 import { updateElo } from "./elo.server";
 import { resultOf, resultsOf } from "./result-log.server";
 import { guardedMatchId, lostRace } from "./results.server";
 import { finalLabel, neutralDecisionText, neutralOutcomeText, neutralScoreText, outcomeText, resultEventText } from "./results";
 import { logError } from "~/lib/log";
-import { storedRanges } from "~/lib/slot-ranges";
 
 // The organizer's side of results (#29): the league's disputes and matches,
 // one match with both pairs' versions and its log, and a decision or override
@@ -191,16 +189,9 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       key: `e${e.id}`,
       id: e.id,
       at: e.at,
-      who: e.userName || "Törölt játékos",
-      role: pairLabel(e.pairId),
-      text: eventText({
-        kind: e.kind,
-        at: e.at,
-        ranges: e.slots ? storedRanges(e.slots) : null,
-        slot: e.slot,
-        venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
-        court: e.court,
-      }),
+      who: eventWho(e),
+      role: isSystemEvent(e) ? "automatikus" : pairLabel(e.pairId),
+      text: storedEventText(e, venues),
     })),
     ...results.events.map((e) => ({
       key: `e${e.id}`,

@@ -257,19 +257,23 @@ export function matchProposalMessage(input: { matchId: number; week: number; cou
 }
 
 // To the other pair: an agreed time waits for confirmation (instant).
-export function matchAgreedTimeMessage(input: { matchId: number; slot: Date }): Message {
+// It becomes fixed by itself at `fixesAt` unless they say otherwise (D148).
+export function matchAgreedTimeMessage(input: { matchId: number; slot: Date; fixesAt: Date }): Message {
   return {
-    title: "Erősítsd meg az időpontot",
-    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.`,
+    title: "Megbeszélt időpont",
+    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek.`,
     url: matchUrl(input.matchId),
   };
 }
 
 // To the pair that proposed or recorded: the match is scheduled (digest item).
-export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean }): Message {
+// `auto`: to both pairs, the agreed time became fixed by itself (D148).
+export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean; auto?: boolean }): Message {
   return {
     title: "Lefixálva a meccsetek",
-    body: `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
+    body: input.auto
+      ? `Magától fix lett a megbeszélt időpont: ${formatDeadline(input.slot)}.`
+      : `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
     url: matchUrl(input.matchId),
   };
 }

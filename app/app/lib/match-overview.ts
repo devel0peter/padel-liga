@@ -7,7 +7,7 @@
 import { addDays, budapestTime, isValidActivity, other, type ResultState, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 
 import { weekDays } from "./groups";
-import { formatSlot, venueLine, type Tone } from "./matches";
+import { fixesAtText, formatSlot, venueLine, type Tone } from "./matches";
 import { finalLabel, neutralOutcomeText, neutralScoreText } from "./results";
 
 // Scheduling, then the result (#28): once a result is recorded, its status
@@ -18,7 +18,7 @@ export type OverviewStatus = SchedulingState["status"] | "result_pending" | "dis
 export const OVERVIEW_STATUSES: { value: OverviewStatus; label: string }[] = [
   { value: "to_schedule", label: "Egyeztetésre vár" },
   { value: "proposed", label: "Ajánlat, válaszra vár" },
-  { value: "agreed_time", label: "Megbeszélt időpont, megerősítésre vár" },
+  { value: "agreed_time", label: "Megbeszélt időpont, még nem fix" },
   { value: "scheduled", label: "Lefixálva" },
   { value: "result_pending", label: "Eredmény, megerősítésre vár" },
   { value: "disputed", label: "Vitatott eredmény" },
@@ -73,8 +73,9 @@ export function overviewStatus(state: SchedulingState, names: Record<Side, strin
     case "proposed":
       return { label: `Időpontokat ajánlottak, ${names[state.by === "a" ? "b" : "a"]} válaszára vár`, tone: "waiting" };
     case "agreed_time":
+      // Fixed by itself unless the other pair objects first (D148).
       return {
-        label: `Megbeszélt időpont (${formatSlot(state.slot)}), ${names[state.by === "a" ? "b" : "a"]} megerősítésére vár`,
+        label: `Megbeszélt időpont (${formatSlot(state.slot)}), fix lesz ${fixesAtText(state.fixesAt)}, ha ${names[state.by === "a" ? "b" : "a"]} nem jelez`,
         tone: "waiting",
       };
     case "scheduled":
@@ -110,8 +111,9 @@ export const STUCK_TEXT: Record<StuckReason, string> = {
 /**
  * Why the match is stuck at `now`, or null (#158): no valid activity (spec 8)
  * by either pair after the first 2 days of its scheduled week, or a proposal
- * or agreed time unanswered for 48 hours. That includes one that lapsed
- * unanswered (all its slots started, or the agreed time passed): the match
+ * or agreed time unanswered for 48 hours (an agreed time is fixed by itself
+ * within 24, D148). That includes a proposal that lapsed unanswered (all its
+ * slots started): the match
  * is back to scheduling, but the other pair still never answered, so it
  * stays stuck until someone steps again. A result (#28) decides alone: one
  * that counts is never stuck, an unconfirmed or disputed one always is.

@@ -50,6 +50,7 @@ export const AUDIT_ACTIONS = {
   // Matches
   "match.decide": "Meccs eldöntése",
   "result.auto_accept": "Eredmény automatikus elfogadása",
+  "match.agreed_auto_fix": "Megbeszélt időpont magától fix",
   "match.deadline": "Határidős döntés",
   "match.no_show_confirm": "Nem jöttek el: jóváhagyás",
   "match.no_show_reject": "Nem jöttek el: elutasítás",
@@ -78,7 +79,7 @@ export const SYSTEM_ACTOR = "Rendszer";
 
 // The actions written without an account: the cron and the command line.
 // Any other entry without an actor lost it when its account was deleted.
-export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "match.deadline", "interest_list.delete", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
+export const SYSTEM_ACTIONS: readonly string[] = ["result.auto_accept", "match.agreed_auto_fix", "match.deadline", "interest_list.delete", "superadmin.grant", "superadmin.revoke", "account_invite.create"];
 
 export function isSystemAction(code: string): boolean {
   return SYSTEM_ACTIONS.includes(code);

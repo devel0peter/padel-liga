@@ -62,7 +62,24 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
 
   it("recording or confirming an agreed time is valid activity", () => {
     const slot = at("2026-11-20", 18);
-    expect(resolveAtDeadline([{ kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot }], DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
+    // a declined it in time (not valid activity): b recorded, b is the active side.
+    const log: SchedulingEvent[] = [
+      { kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot },
+      { kind: "agreed_declined", side: "a", at: at("2026-11-10", 10) },
+    ];
+    expect(resolveAtDeadline(log, DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
+  });
+
+  it("an agreed time nobody answered became fixed by itself (D148): an agreed slot, both active, no strikes", () => {
+    const slot = at("2026-11-20", 18);
+    const log: SchedulingEvent[] = [{ kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot }];
+    expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
+  });
+
+  it("tapping the SMS or e-mail button is valid activity (D148)", () => {
+    const log: SchedulingEvent[] = [proposal("a"), { kind: "contacted", side: "b", at: at("2026-11-12", 9) }];
+    expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
+    expect(resolveAtDeadline([{ kind: "contacted", side: "b", at: at("2026-11-12", 9) }], DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
   });
 
   it("accepting or declining alone is not valid activity", () => {

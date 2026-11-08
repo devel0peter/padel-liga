@@ -204,10 +204,10 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, days: 2 }).title).toBe("Új időpontokat ajánlottak");
   });
 
-  it("an agreed time waiting for confirmation", () => {
-    expect(matchAgreedTimeMessage({ matchId: 7, slot })).toEqual({
-      title: "Erősítsd meg az időpontot",
-      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.",
+  it("an agreed time: when it becomes fixed by itself (D148)", () => {
+    expect(matchAgreedTimeMessage({ matchId: 7, slot, fixesAt: new Date(slot.getTime() - 6 * 3_600_000) })).toEqual({
+      title: "Megbeszélt időpont",
+      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Fix lesz nov. 17., kedd 12:00-kor, ha nem jelzitek, hogy nem így beszéltétek.",
       url: "/matches/7",
     });
   });
@@ -217,6 +217,7 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     expect(matchScheduledMessage({ matchId: 7, slot, confirmed: true }).body).toBe(
       "Az ellenfeletek megerősítette a megbeszélt időpontot: nov. 17., kedd 18:00.",
     );
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: false, auto: true }).body).toBe("Magától fix lett a megbeszélt időpont: nov. 17., kedd 18:00.");
   });
 
   it("declined", () => {

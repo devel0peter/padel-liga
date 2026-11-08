@@ -6,12 +6,11 @@ import { groups, matches, seasonPhases, seasons } from "~/db/schema";
 
 import { pairName } from "./groups";
 import { activityLine, overviewStatus, resultStatus, statusOf, stuckReason, type OverviewStatus, type StuckReason } from "./match-overview";
-import { eventText, type Tone } from "./matches";
-import { clubNames, eventsOf, groupCount, groupMembers, loadMatch, stateOf, toSchedulingEvent } from "./matches.server";
+import { type Tone } from "./matches";
+import { clubNames, eventWho, eventsOf, groupCount, groupMembers, isSystemEvent, loadMatch, stateOf, storedEventText, toSchedulingEvent } from "./matches.server";
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf, type MatchResults } from "./result-log.server";
 import { neutralDecisionText, resultEventText } from "./results";
-import { storedRanges } from "~/lib/slot-ranges";
 
 // The organizer's overview of the running phase's matches and one match's
 // log (#158, D76), for the league's Szervező and the Admin (the routes check
@@ -237,16 +236,9 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       ...ctx.events.map((e) => ({
         id: e.id,
         at: e.at,
-        who: e.userName || "Törölt játékos",
-        pair: pairOf(e.pairId),
-        text: eventText({
-          kind: e.kind,
-          at: e.at,
-          ranges: e.slots ? storedRanges(e.slots) : null,
-          slot: e.slot,
-          venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
-          court: e.court,
-        }),
+        who: eventWho(e),
+        pair: isSystemEvent(e) ? "automatikus" : pairOf(e.pairId),
+        text: storedEventText(e, venues),
       })),
       ...results.events.map((e) => ({
         id: e.id,

@@ -165,7 +165,7 @@ export function NextMatch({ group: g, multiLeague, origin }: { group: HomeGroup;
           {fixed && <p className="text-sm font-medium">{fixed}</p>}
         </div>
         <Contacts contacts={m.contacts} />
-        <GroupMessage message={m.message} week={m.week} url={`${origin}/matches/${m.id}`} />
+        <GroupMessage message={m.message} week={m.week} url={`${origin}/matches/${m.id}`} matchId={m.id} />
         <Button asChild size="sm" className="w-fit">
           <Link to={`/matches/${m.id}`} className="no-underline">
             A meccs oldala

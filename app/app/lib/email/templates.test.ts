@@ -241,11 +241,11 @@ describe("match scheduling emails (#26, spec 13)", () => {
     expect(email.text).toContain("Helyszín: Ace Padel");
   });
 
-  it("an agreed time waits for confirmation", () => {
-    const email = matchAgreedTime({ ...base, slot: slots[0]! });
-    expect(email.subject).toBe("Erősítsd meg a meccs időpontját – Padelpárbaj");
+  it("an agreed time: fixed by itself unless they object (D148)", () => {
+    const email = matchAgreedTime({ ...base, slot: slots[0]!, fixesAt: new Date(slots[0]!.getTime() - 6 * 3_600_000) });
+    expect(email.subject).toBe("Megbeszélt időpont a meccsetekre – Padelpárbaj");
     expect(email.text).toContain("Kiss Cecil és Tóth Dóra rögzítette a 2. heti meccsetek megbeszélt időpontját: nov. 17., kedd 18:00.");
-    expect(email.text).toContain("Erősítsd meg, vagy jelezd, ha nem így beszéltétek:");
+    expect(email.text).toContain("Fix lesz nov. 17., kedd 12:00-kor, ha nem jelzitek, hogy nem így beszéltétek. Ha nem így volt, addig jelezd itt:");
     expect(email.html).toContain('href="https://padelparbaj.hu/matches/42"');
   });
 

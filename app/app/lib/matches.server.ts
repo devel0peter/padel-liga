@@ -1,5 +1,7 @@
 import {
   acceptErrors,
+  agreedFixAt,
+  budapestTime,
   agreedTimeErrors,
   budapestDay,
   autoAcceptAt,
@@ -11,6 +13,9 @@ import {
   SCHEDULING_EVENT_KINDS,
   schedulingActions,
   schedulingState,
+  contactDue,
+  unloggedAutoFix,
+  type AutoFix,
   type SchedulingActions,
   type SchedulingEvent,
   type ResultState,
@@ -24,6 +29,7 @@ import { and, asc, count, eq, gte, inArray, isNotNull, isNull, or, sql } from "d
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
+import { rowSelect } from "~/db/insert-select";
 import { clubs, groupPairs, groups, leagues, matchEvents, matches, pairs, seasonPhases, seasons, users } from "~/db/schema";
 import { queueMatchEmails } from "~/lib/email/outbox.server";
 import { slotErrorText, storedRanges, toStoredRanges, type StoredSlots } from "~/lib/slot-ranges";
@@ -38,7 +44,7 @@ import {
 } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
 
-import { eventText, schedulingEmailDue } from "./matches";
+import { eventText, fixesAtText, schedulingEmailDue, type ContactChannel } from "./matches";
 import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } from "./calendar";
 import { SITE_URL } from "./site";
 import { pairName } from "./groups";
@@ -126,8 +132,28 @@ export type StoredEvent = {
   slot: Date | null;
   clubId: number | null;
   court: string | null;
+  // "contacted": the channel, "sms" or "email" (D148).
+  note: string | null;
   at: Date;
 };
+
+// A line the system wrote, not a player (D148: an agreed time fixed by itself).
+export const isSystemEvent = (e: Pick<StoredEvent, "kind">) => e.kind === "agreed_auto_fixed";
+
+// Who a log line names: the player, or the system for its own lines.
+export const eventWho = (e: Pick<StoredEvent, "kind" | "userName">) => (isSystemEvent(e) ? "Padelpárbaj" : e.userName || "Törölt játékos");
+
+// A scheduling step's log line (matches.ts eventText) with its venue's name.
+export const storedEventText = (e: StoredEvent, venues: ReadonlyMap<number, string>) =>
+  eventText({
+    kind: e.kind,
+    at: e.at,
+    ranges: e.slots ? storedRanges(e.slots) : null,
+    slot: e.slot,
+    venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
+    court: e.court,
+    note: e.note,
+  });
 
 export async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEvent[]>> {
   const out = new Map<number, StoredEvent[]>();
@@ -144,6 +170,7 @@ export async function eventsOf(matchIds: number[]): Promise<Map<number, StoredEv
       slot: matchEvents.slot,
       clubId: matchEvents.clubId,
       court: matchEvents.court,
+      note: matchEvents.note,
       at: matchEvents.at,
     })
     .from(matchEvents)
@@ -628,17 +655,10 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       key: `e${e.id}`,
       id: e.id,
       at: e.at,
-      who: e.userName || "Törölt játékos",
-      ours: e.pairId === ours.pairId,
-      by: "pair" as const,
-      text: eventText({
-        kind: e.kind,
-        at: e.at,
-        ranges: e.slots ? storedRanges(e.slots) : null,
-        slot: e.slot,
-        venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
-        court: e.court,
-      }),
+      who: eventWho(e),
+      ours: !isSystemEvent(e) && e.pairId === ours.pairId,
+      by: isSystemEvent(e) ? ("auto" as const) : ("pair" as const),
+      text: storedEventText(e, venues),
     })),
     ...results.events.map((e) => ({
       key: `e${e.id}`,
@@ -870,7 +890,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
       if (slotErrors.length > 0) return { ok: false, error: slotErrorText(slotErrors), slotErrors };
       if (!(await clubAllowed(input.clubId, ctx.city))) return { ok: false, error: BAD_CLUB };
       event = { kind: "agreed_time", slot: input.slot, clubId: input.clubId };
-      notice = "Rögzítettük. A másik pár megerősíti.";
+      notice = `Rögzítettük. Fix lesz ${fixesAtText(agreedFixAt(input.slot, now))}, ha a másik pár nem jelez.`;
       break;
     }
     case "confirm":
@@ -882,9 +902,14 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   }
 
   const pairId = side === "a" ? ctx.match.pairA : ctx.match.pairB;
+  const logged = ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA));
+  // An agreed time that became fixed by itself before the cron wrote its
+  // line (D148): this step writes it first, so the log tells it in order.
+  const fix = unloggedAutoFix(logged, now);
   const after = schedulingState(
     [
-      ...ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)),
+      ...logged,
+      ...(fix ? [autoFixEvent(fix)] : []),
       {
         kind: event.kind,
         side,
@@ -902,9 +927,10 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
   // is still at the revision checked above: otherwise match_id comes out
   // null, NOT NULL fails and nothing is written.
   try {
-    await db.batch([
+    const guarded = sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${revision})`;
+    const write = [
       db.insert(matchEvents).values({
-        matchId: sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${revision})`,
+        matchId: guarded,
         pairId,
         userId,
         kind: event.kind,
@@ -923,7 +949,8 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
           clubId: after.status === "scheduled" ? after.clubId : null,
         })
         .where(and(eq(matches.id, matchId), eq(matches.revision, revision))),
-    ]);
+    ] as const;
+    await (fix ? db.batch([db.insert(matchEvents).values(autoFixRow(ctx, fix, guarded)), ...write]) : db.batch(write));
   } catch (e) {
     if (/NOT NULL constraint failed: match_events\.match_id/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) return { ok: false, error: CHANGED };
     throw e;
@@ -931,6 +958,23 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
 
   await tellOtherPair(ctx, side, event, state, now);
   return { ok: true, notice };
+}
+
+// The log line of an agreed time fixed by itself (D148): the system's, so no
+// player; its pair is the one that didn't answer, its time the moment it
+// became fixed.
+export const autoFixEvent = (fix: AutoFix): SchedulingEvent => ({ kind: "agreed_auto_fixed", side: fix.side, at: fix.at, slot: fix.slot, clubId: fix.clubId });
+
+export function autoFixRow(m: { match: { pairA: number; pairB: number } }, fix: AutoFix, matchId: number | ReturnType<typeof sql<number>>) {
+  return {
+    matchId,
+    pairId: fix.side === "a" ? m.match.pairA : m.match.pairB,
+    userId: null,
+    kind: "agreed_auto_fixed" as const,
+    slot: fix.slot,
+    clubId: fix.clubId,
+    at: fix.at,
+  };
 }
 
 // The other pair learns about the step (spec 13): a proposal or an agreed
@@ -974,10 +1018,12 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
         await send("match_proposal", matchProposalMessage({ matchId, week: ctx.match.week, counter, days }));
         break;
       }
-      case "agreed_time":
-        await mail(theirs.players.map((p) => ({ kind: "match_agreed_time", toEmail: p.email, input: { ...base(p), slot: event.slot! } })));
-        await send("match_agreed_time", matchAgreedTimeMessage({ matchId, slot: event.slot! }));
+      case "agreed_time": {
+        const fixesAt = agreedFixAt(event.slot!, now);
+        await mail(theirs.players.map((p) => ({ kind: "match_agreed_time", toEmail: p.email, input: { ...base(p), slot: event.slot!, fixesAt } })));
+        await send("match_agreed_time", matchAgreedTimeMessage({ matchId, slot: event.slot!, fixesAt }));
         break;
+      }
       case "accepted":
         await send("match_scheduled", matchScheduledMessage({ matchId, slot: event.slot!, confirmed: false }));
         break;
@@ -995,4 +1041,54 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
     // The step is saved; a failed notice must not undo or hide it.
     logError("match notification failed", { matchId, error });
   }
+}
+
+// --- "SMS mindenkinek" / "E-mail mindenkinek" (D148) ----------------------------
+
+/**
+ * A player of either pair tapped the SMS or e-mail button: an attempt to
+ * schedule, valid activity at the deadline (spec 8). We only know the SMS
+ * or mail app opened, so that is what the log says. Logged while the match
+ * is open for scheduling (before the deadline, no result, not voided), at
+ * most once per pair per Budapest day; any other tap changes nothing. No
+ * revision bump (it changes no state, so it can't make a step fail) and no
+ * notification: the other three get the SMS or the email itself. Returns
+ * whether it was logged.
+ */
+export async function recordContact(userId: string, matchId: number, channel: ContactChannel, now = new Date()): Promise<boolean> {
+  const ctx = await loadMatch(matchId);
+  if (!ctx || ctx.voided) return false;
+  const side = sideOf(ctx, userId);
+  if (!side || now.getTime() >= ctx.match.deadline.getTime()) return false;
+  if ((await resultOf(ctx.match)).state.status !== "none") return false;
+  if (!contactDue(ctx.events.map((e) => toSchedulingEvent(e, ctx.match.pairA)), side, now)) return false;
+  const pairId = side === "a" ? ctx.match.pairA : ctx.match.pairB;
+  const dayStart = budapestTime(budapestDay(now), 0, 0);
+  // The once-a-day check again inside the insert, so two taps at the same
+  // moment (both partners) still leave one line.
+  const inserted = await db
+    .insert(matchEvents)
+    .select(
+      rowSelect(
+        matchEvents,
+        {
+          id: sql`null`,
+          matchId: sql`${matchId}`,
+          pairId: sql`${pairId}`,
+          userId: sql`${userId}`,
+          kind: sql`'contacted'`,
+          slots: sql`null`,
+          slot: sql`null`,
+          clubId: sql`null`,
+          court: sql`null`,
+          score: sql`null`,
+          note: sql`${channel}`,
+          at: sql`${Math.floor(now.getTime() / 1000)}`,
+        },
+        sql`where not exists (select 1 from ${matchEvents} where ${matchEvents.matchId} = ${matchId} and ${matchEvents.pairId} = ${pairId}
+          and ${matchEvents.kind} = 'contacted' and ${matchEvents.at} >= ${Math.floor(dayStart.getTime() / 1000)})`,
+      ),
+    )
+    .returning({ id: matchEvents.id });
+  return inserted.length > 0;
 }

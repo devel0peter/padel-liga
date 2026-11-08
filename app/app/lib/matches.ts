@@ -41,12 +41,15 @@ export function groupLine(number: number, groupCount: number): string {
   return `${DIVISION_NAMES[divisionOf(number, groupCount)]} divízió, ${number}. csoport`;
 }
 
-// How scheduling works, on the match page (#26 requirement 7).
+// How scheduling works, on the match page (#26 requirement 7, D148).
 export const SCHEDULING_GUIDE = [
-  "Adjátok meg, mikor értek rá, legalább 2 különböző napra: például szombat 14–18. Egész órák, 7:00 és 23:00 között; egy meccs 60 perc.",
-  "A másik pár ebből választ egy kezdést, vagy ő ajánl mást.",
-  "Ha már megbeszéltétek az időpontot (Messengeren, személyesen), rögzítsétek itt, és a másik pár megerősíti.",
+  "Beszéljétek meg SMS-ben vagy e-mailben: az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és az ellenfeleknek.",
+  "Ha megvan, rögzítsétek itt az időpontot. A másik pár 24 órán belül (vagy a kezdésig, ha az hamarabb van) jelezheti, ha nem így beszéltétek; ha nem jelez, az időpont fix.",
+  "Vagy adjátok meg, mikor értek rá, legalább 2 különböző napra (egész órák, 7:00 és 23:00 között; egy meccs 60 perc), és a másik pár ebből választ.",
 ];
+
+// "nov. 12., csütörtök 18:00-kor": when an unanswered agreed time becomes fixed (D148).
+export const fixesAtText = (fixesAt: Date) => `${formatSlot(fixesAt)}-kor`;
 
 export type Tone = "todo" | "waiting" | "done";
 
@@ -77,8 +80,8 @@ export function statusView(state: SchedulingState, me: Side, venue?: string | nu
         : { label: "Időpontokat ajánlottak, válaszolj", tone: "todo" };
     case "agreed_time":
       return state.by === me
-        ? { label: `Megbeszélt időpont (${formatSlot(state.slot)}), a másik pár megerősítésére vár`, tone: "waiting" }
-        : { label: `Megbeszélt időpont (${formatSlot(state.slot)}), erősítsd meg`, tone: "todo" };
+        ? { label: `Megbeszélt időpont (${formatSlot(state.slot)}), fix lesz ${fixesAtText(state.fixesAt)}, ha a másik pár nem jelez`, tone: "waiting" }
+        : { label: `Megbeszélt időpont (${formatSlot(state.slot)}), fix lesz ${fixesAtText(state.fixesAt)}, ha nem jelzitek, hogy nem így beszéltétek`, tone: "todo" };
     case "scheduled":
       const where = venueLine(venue, state.court);
       return { label: `Lefixálva: ${formatSlot(state.slot)}${where ? `, ${where}` : ""}`, tone: "done" };
@@ -95,14 +98,22 @@ export function todoFor(state: SchedulingState, me: Side, opponents: string): st
     case "proposed":
       return state.by === me ? null : `Válaszolj az időpont-ajánlatra (${opponents})`;
     case "agreed_time":
-      return state.by === me ? null : `Erősítsd meg a megbeszélt időpontot (${opponents})`;
+      // It becomes fixed by itself (D148): the Teendő says when.
+      return state.by === me ? null : `Nézd meg a megbeszélt időpontot (${opponents}): ${fixesAtText(state.fixesAt)} magától fix lesz`;
     case "scheduled":
       return null;
   }
 }
 
+// The channel of an "SMS mindenkinek" / "E-mail mindenkinek" tap (D148),
+// stored in match_events.note.
+export const CONTACT_CHANNELS = ["sms", "email"] as const;
+export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
+export const isContactChannel = (v: unknown): v is ContactChannel => CONTACT_CHANNELS.includes(v as ContactChannel);
+
 // A log line (#26 requirement 4): what happened, without who and when. A
-// cancellation says whether it was late (#27); `at` is when it happened.
+// cancellation says whether it was late (#27); `at` is when it happened. A
+// tap only says the SMS or mail app was opened: that is all we know (D148).
 export function eventText(e: {
   kind: SchedulingEventKind;
   at?: Date;
@@ -110,6 +121,8 @@ export function eventText(e: {
   slot?: Date | null;
   venue?: string | null;
   court?: string | null;
+  // "contacted": the channel.
+  note?: string | null;
 }): string {
   const venue = e.venue ? `, helyszín: ${e.venue}` : "";
   const slot = e.slot ? formatSlot(e.slot) : "";
@@ -132,6 +145,13 @@ export function eventText(e: {
       return e.slot && e.at && isLateCancel(e.slot, e.at)
         ? `Lemondta a meccset (${slot}). Késői lemondás: 24 órán belül volt.`
         : `Lemondta a meccset (${slot})`;
+    case "contacted":
+      return e.note === "email" ? "E-mailt indított a többieknek" : "SMS-t indított a többieknek";
+    case "agreed_auto_fixed":
+      // Fixed at the start: it was sooner than 24 hours after recording.
+      return e.slot && e.at && e.at.getTime() >= e.slot.getTime()
+        ? `Magától fix lett (${slot}): a másik pár a kezdésig nem jelzett.`
+        : `Magától fix lett (${slot}): a másik pár 24 órán belül nem jelzett.`;
   }
 }
 

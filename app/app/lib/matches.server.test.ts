@@ -487,7 +487,7 @@ describe("matchStep (#26)", () => {
     const id = matchOf(2, 4);
     const late = at("2026-11-10", 23);
     const now = at("2026-11-10", 22);
-    expect(await M.matchStep("p4a", id, { kind: "agreed", slot: late, clubId: 1 }, now)).toEqual({ ok: true, notice: "Rögzítettük. A másik pár megerősíti." });
+    expect(await M.matchStep("p4a", id, { kind: "agreed", slot: late, clubId: 1 }, now)).toEqual({ ok: true, notice: "Rögzítettük. Fix lesz nov. 10., kedd 23:00-kor, ha a másik pár nem jelez." });
     expect(h.mails.map((m) => [m.kind, m.toEmail])).toEqual([
       ["match_agreed_time", "p2a@x.hu"],
       ["match_agreed_time", "p2b@x.hu"],
@@ -793,5 +793,129 @@ describe("matchCalendarEvent (#192)", () => {
     const page = (await M.matchPage(id, "p1a", NOW))!;
     expect(page.result.status).toBe("final");
     expect(page.calendar).toBeNull();
+  });
+});
+
+describe("SMS/e-mail tap and the agreed time fixed by itself (D148)", () => {
+  beforeEach(freshDb);
+  const F = () => import("~/lib/agreed-auto-fix.server");
+  const contacted = (id: number) => all("select pair_id, user_id, note, at from match_events where match_id = ? and kind = 'contacted' order by id", id);
+
+  it("a tap is logged once per pair per Budapest day, with its channel; the log line says the SMS or mail app was opened", async () => {
+    const id = matchOf(1, 3);
+    expect(await M.recordContact("p1a", id, "sms", NOW)).toBe(true);
+    // The partner's tap that day, and a second one of the same player: nothing new.
+    expect(await M.recordContact("p1b", id, "email", at("2026-11-10", 23, 30))).toBe(false);
+    expect(await M.recordContact("p1a", id, "sms", at("2026-11-10", 12))).toBe(false);
+    // The other pair has its own; the next day is a new one.
+    expect(await M.recordContact("p3a", id, "email", NOW)).toBe(true);
+    expect(await M.recordContact("p1b", id, "email", at("2026-11-11", 0, 5))).toBe(true);
+    expect(contacted(id).map((e: any) => [e.pair_id, e.user_id, e.note])).toEqual([
+      [1, "p1a", "sms"],
+      [3, "p3a", "email"],
+      [1, "p1b", "email"],
+    ]);
+    // No state change, no revision bump, nobody told.
+    expect(all("select status, revision from matches where id = ?", id)).toEqual([{ status: "open", revision: 0 }]);
+    expect(inbox()).toEqual([]);
+    const page = (await M.matchPage(id, "p3b", at("2026-11-11", 1)))!;
+    expect(page.state).toEqual({ status: "to_schedule" });
+    expect(page.log.map((l) => [l.who, l.ours, l.text])).toEqual([
+      ["Játékos 1A", false, "SMS-t indított a többieknek"],
+      ["Játékos 3A", true, "E-mailt indított a többieknek"],
+      ["Játékos 1B", false, "E-mailt indított a többieknek"],
+    ]);
+  });
+
+  it("only one of the four players, only while the match can be scheduled", async () => {
+    const id = matchOf(1, 3);
+    for (const u of ["p2a", "x", "o"]) expect(await M.recordContact(u, id, "sms", NOW)).toBe(false);
+    expect(await M.recordContact("p1a", id, "sms", new Date(DEADLINE.getTime() + 1000))).toBe(false);
+    // A recorded result: scheduling is over.
+    h.raw
+      .prepare("insert into match_events (match_id, pair_id, user_id, kind, score, at) values (?, 1, 'p1a', 'result_recorded', ?, ?)")
+      .run(id, JSON.stringify({ sets: [[4, 1], [4, 2]] }), sec("2026-11-10T08:00:00Z"));
+    expect(await M.recordContact("p3a", id, "sms", NOW)).toBe(false);
+    // A withdrawn pair's match doesn't count (#34).
+    const other = matchOf(2, 4);
+    h.raw.exec("update group_pairs set withdrawn_at = 1 where pair_id = 4");
+    expect(await M.recordContact("p2a", other, "sms", NOW)).toBe(false);
+    expect(all("select count(*) as n from match_events where kind = 'contacted'")).toEqual([{ n: 0 }]);
+  });
+
+  it("an unanswered agreed time: the cron fixes it after 24 hours, logs it as the system's, mirrors the match and tells both pairs", async () => {
+    const id = matchOf(2, 4);
+    // Recorded Tue 11:00 for Thu 18:00: fixed by itself Wed 11:00.
+    expect((await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: 1 }, NOW)).ok).toBe(true);
+    const { autoFixAgreedTimes } = await F();
+    expect(await autoFixAgreedTimes(at("2026-11-11", 10, 59))).toEqual({ fixed: 0, left: false });
+    h.raw.exec("delete from notifications");
+    expect(await autoFixAgreedTimes(at("2026-11-11", 11, 10))).toEqual({ fixed: 1, left: false });
+    expect(all("select status, scheduled_at, club_id, revision from matches where id = ?", id)).toEqual([
+      { status: "scheduled", scheduled_at: sec(at("2026-11-12", 18).toISOString()), club_id: 1, revision: 2 },
+    ]);
+    // The line is at the moment it became fixed, with the pair that didn't answer and no player.
+    expect(all("select kind, pair_id, user_id, at from match_events where match_id = ? order by id", id).at(-1)).toEqual({
+      kind: "agreed_auto_fixed",
+      pair_id: 4,
+      user_id: null,
+      at: sec(at("2026-11-11", 11).toISOString()),
+    });
+    expect(inbox().map((n: any) => [n.kind, n.user])).toEqual([
+      ["match_scheduled", "p2a"],
+      ["match_scheduled", "p2b"],
+      ["match_scheduled", "p4a"],
+      ["match_scheduled", "p4b"],
+    ]);
+    expect(all("select action, actor_id, target from audit_log where action = 'match.agreed_auto_fix'")).toEqual([
+      { action: "match.agreed_auto_fix", actor_id: null, target: `match:${id}` },
+    ]);
+    const page = (await M.matchPage(id, "p4a", at("2026-11-11", 12)))!;
+    expect(page.state).toMatchObject({ status: "scheduled", slot: at("2026-11-12", 18) });
+    expect(page.log.at(-1)).toMatchObject({ who: "Padelpárbaj", by: "auto", ours: false, text: "Magától fix lett (nov. 12., csütörtök 18:00): a másik pár 24 órán belül nem jelzett." });
+    // Too late to decline; the next run has nothing to do.
+    expect(await M.matchStep("p4a", id, { kind: "decline" }, at("2026-11-11", 12))).toEqual({ ok: false, error: "A meccs időpontja már le van fixálva." });
+    expect(await autoFixAgreedTimes(at("2026-11-11", 12))).toEqual({ fixed: 0, left: false });
+  });
+
+  it("declined in time, it is never fixed; a start sooner than 24 hours fixes it at the start", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: null }, NOW);
+    expect((await M.matchStep("p4a", id, { kind: "decline" }, at("2026-11-11", 10))).ok).toBe(true);
+    const { autoFixAgreedTimes } = await F();
+    expect((await autoFixAgreedTimes(at("2026-11-12", 9))).fixed).toBe(0);
+
+    const soon = matchOf(1, 3);
+    await M.matchStep("p1a", soon, { kind: "agreed", slot: at("2026-11-10", 18), clubId: null }, NOW);
+    expect((await autoFixAgreedTimes(at("2026-11-10", 17, 50))).fixed).toBe(0);
+    expect((await autoFixAgreedTimes(at("2026-11-10", 18))).fixed).toBe(1);
+    const page = (await M.matchPage(soon, "p1a", at("2026-11-10", 19)))!;
+    expect(page.log.at(-1)!.text).toBe("Magától fix lett (nov. 10., kedd 18:00): a másik pár a kezdésig nem jelzett.");
+  });
+
+  it("a step after the moment, before the cron, writes the line first, so the log stays in order", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-14", 18), clubId: null }, NOW);
+    // Wed 12:00, an hour after it became fixed: pair 4 records the venue.
+    expect((await M.matchStep("p4a", id, { kind: "venue", clubId: 1, court: "" }, at("2026-11-11", 12))).ok).toBe(true);
+    expect(events(id).map((e: any) => [e.kind, e.user_id])).toEqual([
+      ["agreed_time", "p2a"],
+      ["agreed_auto_fixed", null],
+      ["venue", "p4a"],
+    ]);
+    expect(all("select status, club_id from matches where id = ?", id)).toEqual([{ status: "scheduled", club_id: 1 }]);
+    const { autoFixAgreedTimes } = await F();
+    expect((await autoFixAgreedTimes(at("2026-11-11", 13))).fixed).toBe(0);
+  });
+
+  it("the cron keeps room for the steps after it", async () => {
+    const id = matchOf(2, 4);
+    await M.matchStep("p2a", id, { kind: "agreed", slot: at("2026-11-12", 18), clubId: null }, NOW);
+    const { RunBudget } = await import("~/lib/run-usage");
+    const { autoFixAgreedTimes } = await F();
+    // Only the candidates' lookup fits: the match waits for the next run.
+    const run = new RunBudget({ queries: 1, calls: 0 });
+    expect(await autoFixAgreedTimes(at("2026-11-11", 12), { run, keep: { queries: 0, calls: 0 } })).toEqual({ fixed: 0, left: true });
+    expect(all("select status from matches where id = ?", id)).toEqual([{ status: "open" }]);
   });
 });

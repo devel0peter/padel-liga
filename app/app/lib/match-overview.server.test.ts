@@ -126,7 +126,7 @@ describe("runningPhases (#158)", () => {
     expect(byId.get(matchOf(1, 4))).toMatchObject({
       week: 2,
       status: "agreed_time",
-      label: "Megbeszélt időpont (nov. 17., kedd 19:00), Játékos 1A – Játékos 1B megerősítésére vár",
+      label: "Megbeszélt időpont (nov. 17., kedd 19:00), fix lesz nov. 12., csütörtök 10:00-kor, ha Játékos 1A – Játékos 1B nem jelez",
       lastActivity: hours(NOW, -1),
       stuck: null,
     });

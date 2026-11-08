@@ -1,19 +1,36 @@
 import { Copy, Mail, MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useRevalidator } from "react-router";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { groupMessage, smsPlatform, type SmsPlatform } from "~/lib/group-message";
+import type { ContactChannel } from "~/lib/matches";
 import type { GroupMessageData } from "~/lib/matches.server";
 
 // "Írj mindenkinek" (D147), under the opponents' contacts on the match page
 // and on Kezdőlap: the phone's SMS app or email app opens with the partner
 // and both opponents and a short text; the app itself sends nothing. `url`:
-// the match page, absolute.
+// the match page, absolute. A tap on the SMS or e-mail button also tells the
+// app in the background (D148, routes/match-contact.ts): it counts as trying
+// to schedule. The link opens the SMS or mail app as before; "Számok
+// másolása" doesn't count.
 
 export const COPIED = "Kimásoltuk.";
 
-export function GroupMessage({ message, week, url }: { message: GroupMessageData | null; week: number; url: string }) {
+// Fire and forget: the SMS or mail app opens whatever the answer. `keepalive`
+// lets it finish if the browser leaves the page.
+function logTap(matchId: number, channel: ContactChannel, done: () => void) {
+  const body = new FormData();
+  body.set("channel", channel);
+  fetch(`/matches/${matchId}/contact`, { method: "POST", body, keepalive: true, credentials: "same-origin" }).then(
+    (r) => r.ok && done(),
+    () => {},
+  );
+}
+
+export function GroupMessage({ message, week, url, matchId }: { message: GroupMessageData | null; week: number; url: string; matchId: number }) {
+  const revalidator = useRevalidator();
   // The SMS link's form depends on the phone; the server renders Android's.
   const [platform, setPlatform] = useState<SmsPlatform>("android");
   useEffect(() => setPlatform(smsPlatform(navigator.userAgent, navigator.maxTouchPoints)), []);
@@ -44,7 +61,7 @@ export function GroupMessage({ message, week, url }: { message: GroupMessageData
       <div className="grid gap-2 sm:flex sm:flex-wrap">
         {m.sms && (
           <Button asChild variant="outline" className={button}>
-            <a href={m.sms} className="no-underline">
+            <a href={m.sms} className="no-underline" onClick={() => logTap(matchId, "sms", revalidator.revalidate)}>
               <MessageSquare aria-hidden className="text-court" />
               SMS mindenkinek
             </a>
@@ -52,7 +69,7 @@ export function GroupMessage({ message, week, url }: { message: GroupMessageData
         )}
         {m.mailto && (
           <Button asChild variant="outline" className={button}>
-            <a href={m.mailto} className="no-underline">
+            <a href={m.mailto} className="no-underline" onClick={() => logTap(matchId, "email", revalidator.revalidate)}>
               <Mail aria-hidden className="text-court" />
               E-mail mindenkinek
             </a>

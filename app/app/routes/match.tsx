@@ -28,7 +28,7 @@ import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ConfirmResult, RecordResult, ResultStatus, ScoreBoard } from "~/components/match-result";
-import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, statusView } from "~/lib/matches";
+import { COURT_MAX, SCHEDULING_GUIDE, fixesAtText, formatSlot, groupLine, statusView } from "~/lib/matches";
 import { cn } from "~/lib/utils";
 import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
 import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
@@ -220,7 +220,7 @@ function Fold({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group max-w-2xl rounded-xl border bg-card" open={open || undefined}>
+    <details className="group max-w-2xl rounded-xl border bg-card" open={open || undefined} aria-label={title}>
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 py-2 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="grid">
@@ -295,9 +295,26 @@ function ProposeForm({ clubs, result, now, deadline }: { clubs: { id: number; na
   );
 }
 
-const AGREED_HELP = "Ha Messengeren vagy személyesen megegyeztetek, rögzítsd az időpontot. A másik pár megerősíti, és a meccs le van fixálva.";
+// D148: one step. The other pair may object for 24 hours (or until the
+// start, if sooner); otherwise the time is fixed by itself.
+const AGREED_HELP = "A másik pár 24 órán belül (vagy a kezdésig, ha az hamarabb van) jelezheti, ha nem így beszéltétek. Ha nem jelez, az időpont fix.";
+const AGREED_TITLE = "Megbeszéltétek? Rögzítsétek az időpontot";
+const PROPOSE_TITLE = "Vagy adjátok meg, mikor értek rá, és a másik pár választ";
+const TALK_LINE = "Beszéljétek meg SMS-ben vagy e-mailben, aztán rögzítsétek itt az időpontot.";
 
-function AgreedForm({ clubs, result, now, deadline }: { clubs: { id: number; name: string }[]; result?: ActionResult; now: Date; deadline: Date }) {
+function AgreedForm({
+  clubs,
+  result,
+  now,
+  deadline,
+  primary = false,
+}: {
+  clubs: { id: number; name: string }[];
+  result?: ActionResult;
+  now: Date;
+  deadline: Date;
+  primary?: boolean;
+}) {
   const busy = useNavigation().state !== "idle";
   const [error, setError] = useState<string | null>(null);
   return (
@@ -317,7 +334,7 @@ function AgreedForm({ clubs, result, now, deadline }: { clubs: { id: number; nam
       <ClientError message={error} />
       {!error && <Feedback result={result} intent="agreed" />}
       <div>
-        <Button type="submit" variant="outline" disabled={busy}>
+        <Button type="submit" variant={primary ? "default" : "outline"} disabled={busy}>
           Rögzítem az időpontot
         </Button>
       </div>
@@ -645,7 +662,7 @@ function whenLine(m: Route.ComponentProps["loaderData"]): string {
     case "scheduled":
       return formatSlot(m.state.slot);
     case "agreed_time":
-      return `${formatSlot(m.state.slot)} (megerősítésre vár)`;
+      return `${formatSlot(m.state.slot)} (még nem fix)`;
     case "proposed":
       return "Ajánlott időpontok várnak választásra";
     case "to_schedule":
@@ -680,7 +697,11 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const recordMain = r.status === "none" && m.resultActions.record && m.started;
   const recordFolded = m.resultActions.record && !recordMain && !confirmResult;
   const venueMain = m.state.status === "scheduled" && m.actions.venue && !m.started && m.state.clubId === null && m.clubs.length > 0;
-  const proposeMain = m.actions.propose && m.state.status === "to_schedule";
+  // No fixed time yet and nothing of theirs to answer (D148): first talk by
+  // SMS or e-mail, then record the time (open), the ranges folded below.
+  // With our own agreed time waiting, recording another one stays folded.
+  const talk = m.actions.propose && !!m.message && m.message.to.length > 0;
+  const agreedOpen = m.actions.recordAgreed && !theirs && m.state.status !== "agreed_time";
   const subs = m.substitutes;
   const substitutesShown = !!subs && (subs.approved.length > 0 || subs.ours.length > 0);
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
@@ -725,7 +746,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               <div className="grid gap-1.5">
                 <p className="text-sm font-medium">Az ellenfeleitek elérhetősége:</p>
                 <Contacts contacts={m.contacts} />
-                <GroupMessage message={m.message} week={m.week} url={m.url} />
+                {/* While scheduling, Írjatok egymásnak below has it. */}
+                {!talk && <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />}
               </div>
             )}
             {m.calendar && <CalendarRow calendar={m.calendar} />}
@@ -782,7 +804,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           {m.state.status === "agreed_time" && m.actions.confirm && (
             <Panel
               title="Megerősíted az időpontot?"
-              description={`Az ellenfeletek szerint így beszéltétek meg: ${formatSlot(m.state.slot)}${m.venue ? `, ${m.venue}` : ""}.`}
+              description={`Az ellenfeletek szerint így beszéltétek meg: ${formatSlot(m.state.slot)}${m.venue ? `, ${m.venue}` : ""}. Fix lesz ${fixesAtText(m.state.fixesAt)}, ha nem jelzitek, hogy nem így beszéltétek.`}
               tone="main"
             >
               <div className="flex flex-wrap gap-2">
@@ -805,7 +827,13 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           {ours && r.status === "none" && (
             <Panel
               title={m.state.status === "proposed" ? "Ekkor értek rá" : "Ezt rögzítettétek"}
-              description={m.state.status === "proposed" ? "A másik pár ebből választ egy kezdést, vagy ő ajánl mást." : "A másik pár megerősíti, vagy újra egyeztettek."}
+              description={
+                m.state.status === "proposed"
+                  ? "A másik pár ebből választ egy kezdést, vagy ő ajánl mást."
+                  : m.state.status === "agreed_time"
+                    ? `Fix lesz ${fixesAtText(m.state.fixesAt)}, ha a másik pár nem jelez.`
+                    : undefined
+              }
             >
               <ul className="flex flex-wrap gap-2 text-sm">
                 {m.state.status === "proposed"
@@ -819,13 +847,15 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Panel>
           )}
 
-          {proposeMain && (
-            <Panel
-              title={m.state.status === "to_schedule" && m.state.nextBy === m.side ? "Ajánljatok új ráérést" : "Ajánljatok ráérést"}
-              description={PROPOSE_RULES}
-              tone="main"
-            >
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
+          {talk && (
+            <Panel title="Írjatok egymásnak" description={TALK_LINE} tone={theirs ? undefined : "main"}>
+              <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />
+            </Panel>
+          )}
+
+          {agreedOpen && (
+            <Panel title={AGREED_TITLE} tone={talk ? undefined : "main"}>
+              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} primary />
             </Panel>
           )}
 
@@ -849,15 +879,19 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {/* --- Everything else, folded --------------------------------------- */}
 
-          {m.actions.propose && !proposeMain && (
-            <Fold title={theirs ? "Egyik sem jó? Adjátok meg, mikor értek rá" : "Új ráérést adnátok meg?"} hint={PROPOSE_RULES} open={failed("propose")}>
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
+          {m.actions.recordAgreed && !agreedOpen && (
+            <Fold title={AGREED_TITLE} hint="A másik pár 24 órán belül jelezheti, ha nem így volt." open={failed("agreed")}>
+              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 
-          {m.actions.recordAgreed && (
-            <Fold title="Máshol már megbeszéltétek?" hint="Rögzítsd az időpontot, a másik pár megerősíti." open={failed("agreed")}>
-              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
+          {m.actions.propose && (
+            <Fold
+              title={theirs && m.state.status === "proposed" ? "Egyik sem jó? Adjátok meg, mikor értek rá" : PROPOSE_TITLE}
+              hint={PROPOSE_RULES}
+              open={failed("propose")}
+            >
+              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 

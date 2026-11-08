@@ -32,10 +32,10 @@ describe("overviewStatus (#158 requirement 1)", () => {
     expect(overviewStatus({ ...state, by: "b" }, names).label).toBe("Időpontokat ajánlottak, Kiss Anna – Nagy Béla válaszára vár");
   });
 
-  it("an agreed time names its time and the pair that has to confirm", () => {
-    const state: SchedulingState = { status: "agreed_time", by: "b", slot, clubId: null, at: slot };
+  it("an agreed time names its time, the pair that may object and when it becomes fixed (D148)", () => {
+    const state: SchedulingState = { status: "agreed_time", by: "b", slot, clubId: null, at: slot, fixesAt: new Date(slot.getTime() - 6 * 3_600_000) };
     expect(overviewStatus(state, names)).toEqual({
-      label: "Megbeszélt időpont (nov. 12., csütörtök 18:00), Kiss Anna – Nagy Béla megerősítésére vár",
+      label: "Megbeszélt időpont (nov. 12., csütörtök 18:00), fix lesz nov. 12., csütörtök 12:00-kor, ha Kiss Anna – Nagy Béla nem jelez",
       tone: "waiting",
     });
   });
@@ -130,7 +130,7 @@ describe("stuckReason (#158 stuck match)", () => {
   });
 
   it("an agreed time unconfirmed for 48 hours", () => {
-    const state: SchedulingState = { status: "agreed_time", by: "b", slot: hours(monday, 72), clubId: null, at: monday };
+    const state: SchedulingState = { status: "agreed_time", by: "b", slot: hours(monday, 72), clubId: null, at: monday, fixesAt: hours(monday, 24) };
     const events = [ev("agreed_time", monday)];
     expect(stuckReason({ ...base, state, events, now: hours(monday, 47) })).toBeNull();
     expect(stuckReason({ ...base, state, events, now: hours(monday, 49) })).toBe("unanswered");

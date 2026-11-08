@@ -173,7 +173,7 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await propose.getByLabel("Eddig").click();
   await player.page.getByRole("option", { name: "19:00" }).click();
   await propose.getByRole("button", { name: "Hozzáadom" }).click();
-  const list = propose.getByRole("list", { name: "Ráérésetek" });
+  const list = propose.getByRole("list", { name: "Amikor ráértek" });
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(list).toContainText("14:00–19:00");
   await propose.getByRole("button", { name: "Elküldöm, mikor érünk rá" }).click();

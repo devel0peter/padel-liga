@@ -35,7 +35,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| F0 | On the Tabella the fixture list opens in a side panel from each group's card ("A csoport meccsei"), so the page under it doesn't move. Kezdőlap shows it under the group's table, to read only (no links). | Peter, 2026-11-07 (D136); 2026-11-08 (D138) |
+| F0 | On the Tabella the fixture list opens in a side panel from each group's card ("A csoport meccsei"), so the page under it doesn't move. Kezdőlap shows it under the group's table, the pair's own rows a link. | Peter, 2026-11-07 (D136); 2026-11-08 (D138, D140) |
 | F1 | Every match of the group, grouped by week (1.–3. hét with the dates), like a fixture list: pair A, the score or the time in the middle, pair B. | Peter, 2026-11-07; spec 5 |
 | F2 | A played match shows its sets and who won (the winner in bold). | Peter, 2026-11-07 |
 | F3 | A match without a final result shows its state: time and venue once fixed, "Egyeztetés alatt", "Eredmény megerősítésre vár" or "Vitatott eredmény". No match disappears from the list because of its state. | Peter, 2026-11-07; D80 |
@@ -47,8 +47,8 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | # | Requirement | Source |
 |---|---|---|
 | H1 | "Teendők" first, only when there is one: every step waiting on the player, each a link, with its deadline where there is one (auto-accept time, phase deadline). | D67, spec 13, D136 |
-| H2 | "Meccseitek": one compact list, a row per week (opponents, the state or the score), each row a link. The next match to play is open: time and venue once fixed, the opponents' phone and email. | D67, D136 |
-| H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), to read only. | D67, D85, D136, D138 |
+| H2 | "Következő meccsetek": only the next match to play (the first without a final result): opponents, state, time and venue once fixed, the opponents' phone and email, and the way to its page; gone once every match is final. | D67, D136, D140 |
+| H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), the pair's own rows a link. | D67, D85, D136, D138, D140 |
 | H4 | Where the pair stands on the ladder: "Réz divízió, 2. csoport · még 1 feljutás a divízió éléig, 3 kör van hátra". | spec 14 |
 | H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
 | H6 | The season card stays (entry button, strikes count) but small; its rounds are listed with their dates, the round being played highlighted. | D103a, #23, D136, D139 |

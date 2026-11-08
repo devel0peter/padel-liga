@@ -65,14 +65,15 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   }
 
   // A pair of the same group: on Kezdőlap the group's table leaves the
-  // withdrawn pair out and names it below; its week's match is off. The
+  // withdrawn pair out and names it below; its matches are gone. The
   // notice comes without the reason.
   const mate = await as(browser, others[0]![0]);
   await visit(mate.page, "/home");
   const card = content(mate.page);
   await expect(card).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
   await expect(card.getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
-  await expect(card.getByRole("listitem").filter({ hasText: "visszalépett a körből: ez a meccs elmarad" })).toHaveCount(1);
+  // The group's matches leave its matches out (D140: no Meccseitek row for the week off).
+  await expect(card.getByRole("group", { name: "A csoport meccsei" })).not.toContainText(x.name);
   await visit(mate.page, "/notifications");
   await expect(content(mate.page)).toContainText("Visszalépett egy pár a csoportodból");
   await expect(content(mate.page)).not.toContainText(REASON);

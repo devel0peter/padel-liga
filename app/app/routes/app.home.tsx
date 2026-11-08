@@ -2,7 +2,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
-import { GroupStanding, MyMatches, Todos, todos } from "~/components/my-group";
+import { GroupStanding, NextMatch, Todos, todos } from "~/components/my-group";
 import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
@@ -237,12 +237,12 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
     <AppPage title="Kezdőlap">
       {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {running && (
-        // Three separate cards (D136): what to do, our matches, our group.
+        // Separate cards (D136, D140): what to do, the next match, our group.
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <div className="grid gap-6">
             {open.length > 0 && <Todos items={open} />}
             {d.groups.map((g) => (
-              <MyMatches key={g.groupId} group={g} multiLeague={d.multiLeague} />
+              <NextMatch key={g.groupId} group={g} multiLeague={d.multiLeague} />
             ))}
           </div>
           <div className="grid gap-6">

@@ -1,10 +1,11 @@
-# Checks every ready PR (typecheck, tests, build, browser suite, commitlint) and push to main; on main, applies D1 migrations and deploys. Drafts skip the expensive jobs; docs-only PRs pass them without running their steps (D117, D125).
+# Checks every ready PR (typecheck, tests, build, commitlint) and push to main; on main, applies D1 migrations and deploys. The browser suite runs only on release PRs (into main) or a PR labelled `e2e` (D149). Drafts skip the expensive jobs; docs-only PRs pass them without running their steps (D117, D125).
 # Secrets (repo settings → Secrets → Actions): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
 name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled`: adding the `e2e` label starts the browser suite on a develop PR (D149).
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches: [main]
 
@@ -84,8 +85,10 @@ jobs:
 
   # The browser suite (#102): `npm run e2e` walks through milestone 1 in
   # Chromium on its own local D1 and a dev server without a Resend key, so
-  # it needs no secrets and sends no email. Runs next to `check` on every
-  # ready PR that changes code (D117).
+  # it needs no secrets and sends no email. Runs next to `check` on a ready
+  # release PR (into main) that changes code, or on any ready PR labelled
+  # `e2e` (D149). Otherwise the job still starts and passes without running
+  # its steps, so the required check reports under its real name (D125).
   e2e:
     name: ${{ github.event.pull_request.draft && 'e2e (draft)' || 'e2e' }}
     needs: changes
@@ -93,13 +96,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      RUN: ${{ needs.changes.outputs.code == 'true' }}
+      RUN: ${{ needs.changes.outputs.code == 'true' && (github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'e2e')) }}
     # Read-only token, no `secrets`: nothing of Cloudflare or Resend reaches this job.
     permissions:
       contents: read
     steps:
       - if: env.RUN != 'true'
-        run: echo "Documentation only, no browser suite (D117)."
+        run: echo "No browser suite here (D117, D149) - documentation only, or not a release PR. Add the e2e label to run it."
       - if: env.RUN == 'true'
         uses: actions/checkout@v5
       - if: env.RUN == 'true'

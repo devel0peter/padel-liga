@@ -153,7 +153,7 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await visit(player.page, `/matches/${first!.id}`);
   const main = content(player.page);
   await expect(main.getByRole("heading", { name: "Hogyan egyeztessetek?" })).toBeVisible();
-  await expect(main).toContainText("adjátok meg, mikor értek rá, legalább 2 különböző napra");
+  await expect(main).toContainText("adjátok meg, mikor értek rá, legalább 2 különböző napon");
   // No time yet (D148): first write to each other, then record the time (open);
   // the ranges are folded below.
   await expect(main.getByRole("region", { name: "Írjatok egymásnak" })).toContainText("Beszéljétek meg SMS-ben vagy e-mailben");
@@ -163,7 +163,7 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   const PROPOSE = "Vagy adjátok meg, mikor értek rá, és a másik pár választ";
   await main.getByText(PROPOSE).click();
   const propose = main.getByRole("group", { name: PROPOSE });
-  await expect(propose).toContainText("Adjatok meg ráérést legalább 2 különböző napra.");
+  await expect(propose).toContainText("Írjátok meg, mikor értek rá, legalább 2 különböző napon.");
   const days = propose.getByRole("radiogroup", { name: "Nap" });
   await days.getByRole("radio", { name: dayName(inDays(4)) }).click();
   await propose.getByRole("button", { name: "Délután 14–18" }).click();
@@ -302,7 +302,7 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   const main = content(player.page);
 
   // The venue: only the city's active clubs; both pairs see it.
-  await player.page.getByLabel("Helyszín").click();
+  await main.getByRole("region", { name: "Hol lesz a meccs?" }).getByLabel("Helyszín", { exact: true }).click();
   await player.page.getByRole("option", { name: "Minta Padel Aréna" }).click();
   // The folded result form has its own court field (D146): this one is the venue form's.
   await main.getByRole("region", { name: "Hol lesz a meccs?" }).getByLabel("Pálya (nem kötelező)").fill("2-es pálya");

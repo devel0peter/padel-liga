@@ -59,7 +59,7 @@ test("Fekete pontok: the organizer sees and cancels one with a reason; the playe
   const p = await as(browser, x);
   await visit(p.page, "/home");
   await expect(content(p.page)).toContainText("Fekete pontjaid ebben a szezonban: 1.");
-  await expect(content(p.page)).toContainText("A 3.-nál a párod és te a kör végén kikerültök a ligából.");
+  await expect(content(p.page)).toContainText("A harmadiknál a pároddal a kör végén kikerültök a ligából.");
   // Never public.
   await visit(p.page, "/league/minta");
   await expect(content(p.page)).not.toContainText("fekete pont");

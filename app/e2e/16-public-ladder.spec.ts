@@ -76,6 +76,10 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(tip).toContainText("A divíziók a létra harmadai");
   await expect(tip).toContainText("Egy fel, egy le");
   await expect(main.getByRole("heading", { level: 1, name: "Tabella", exact: true })).toBeVisible();
+  // Escape and a pointer elsewhere close it: on a phone it would cover the card's switch.
+  await page.keyboard.press("Escape");
+  await page.mouse.move(0, 0);
+  await expect(tip).toBeHidden();
 
   // On a phone the card shows one of the two; the header's switch flips to the matches and back (D143).
   await page.setViewportSize({ width: 390, height: 844 });

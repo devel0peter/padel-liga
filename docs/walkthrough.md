@@ -300,9 +300,10 @@ A player without a pair sends their own link; the partner registers and accepts 
 
 - Page: `/matches/<id>` (from "Egyeztetés és részletek"), then the same as an opponent
 - Accounts: the player of step 17, then one of the opponents
-- Do: pick a day chip, press "Délután 14–18", then add 16:00–19:00 with "Ettől"/"Eddig" and "Hozzáadom" (one range, 14:00–19:00), and press "Elküldöm a ráérésünket"; then pick another day, add 19:00–21:00 and send again.
+- Do: open "Vagy adjátok meg, mikor értek rá, és a másik pár választ", pick a day chip, press "Délután 14–18", then add 16:00–19:00 with "Ettől"/"Eddig" and "Hozzáadom" (one range, 14:00–19:00), and press "Elküldöm a ráérésünket"; then pick another day, add 19:00–21:00 and send again.
 - Expect:
-  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok ráérést" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D133).
+  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Írjatok egymásnak" ("SMS mindenkinek", "E-mail mindenkinek", "Számok másolása") and "Megbeszéltétek? Rögzítsétek az időpontot" open; "Vagy adjátok meg, mikor értek rá, és a másik pár választ", "Már lejátszottátok? Rögzítsd az eredményt" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below (D133, D148).
+  - Tapping "SMS mindenkinek" or "E-mail mindenkinek" opens the SMS or mail app and adds "SMS-t indított a többieknek" / "E-mailt indított a többieknek" to "Napló" (once a day per pair; "Számok másolása" adds nothing, D148).
   - The first try is refused before sending: "Adj meg ráérést legalább 2 különböző napra." (D144).
   - The second goes through: "Elküldtük a ráéréseteket a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár", and "Ekkor értek rá" lists both ranges. The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the ranges and the link.
   - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, "Választható kezdések" shows each whole hour a match fits in (14:00–18:00 and 19:00, 20:00); pick one and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
@@ -313,10 +314,11 @@ A player without a pair sends their own link; the partner registers and accepts 
 ### 19. A pair records an agreed time, the other confirms
 
 - Page: the player's other match, then the same as an opponent
-- Do: under "Máshol már megbeszéltétek?" pick tomorrow's day chip and the 22:00 hour chip and press "Rögzítem az időpontot"; as an opponent, press "Megerősítem" (or "Nem így beszéltük").
+- Do: under "Megbeszéltétek? Rögzítsétek az időpontot" (open) pick tomorrow's day chip and the 22:00 hour chip and press "Rögzítem az időpontot"; as an opponent, press "Megerősítem" (or "Nem így beszéltük").
 - Expect:
-  - Any future whole hour before the deadline is fine (no 48 hours, no minimum, D144); the chips offer 7:00–22:00. "Rögzítettük. A másik pár megerősíti."; the terminal prints "Erősítsd meg a meccs időpontját" to both opponents.
-  - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
+  - Any future whole hour before the deadline is fine (no 48 hours, no minimum, D144); the chips offer 7:00–22:00. "Rögzítettük. Fix lesz <time>-kor, ha a másik pár nem jelez." (24 hours later, or the start if that is sooner, D148); the terminal prints "Megbeszélt időpont a meccsetekre" to both opponents.
+  - As the opponent: "Megerősíted az időpontot?" says when it becomes fixed by itself; Kezdőlap's Teendő says so too.
+  - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification. Unanswered: fixed by itself at that moment (the cron writes "Magától fix lett…" into "Napló"; it doesn't run on its own in local dev, the unit tests cover it).
   - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
 
 ### 20. Admin filters the Felhasználók list (side path)
@@ -359,7 +361,7 @@ The ladder (decision log (`docs/decisions.md`), 2026-11-02, #30), for logged-in 
 - Page: `/admin/leagues/minta/matches` ("Meccsek" in the league section of the sidebar)
 - Account: the Szervező (or the Admin)
 - Expect:
-  - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match, named "<pair> a <pair> ellen" as on Viták (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), <pair> megerősítésére vár", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
+  - The season, the round and the deadline; a section per group ("Bronz divízió, 1. csoport"), the weeks inside it, and every match, named "<pair> a <pair> ellen" as on Viták (names only), the status ("Egyeztetésre vár", "Időpontokat ajánlottak, <pair> válaszára vár", "Megbeszélt időpont (<time>), fix lesz <time>-kor, ha <pair> nem jelez", "Lefixálva: <time>, <venue>"), "Utolsó lépés: <time>" (or "Még nincs lépés") and who has stepped ("Mindkét pár lépett", "Csak <pair> lépett", "Még egyik pár sem lépett").
   - "Elakadtak (<n>)" shows only the stuck matches, with a red badge saying why: nobody has stepped by Wednesday of the match's week, or a proposal or agreed time has waited 48 hours without an answer (also after it lapsed). Before round 1 starts, a fresh walkthrough has none. The group and status selects narrow the list and the count; "Szűrők törlése" clears them.
   - After steps 27 and 28, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.

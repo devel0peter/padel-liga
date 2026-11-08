@@ -5,7 +5,7 @@
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
 - Minden héten egy meccset játszotok a csoport egy másik párjával. Egy kör 3 hétig tart.
-- Az időpontot az oldalon egyeztetitek. A kör végéig minden meccset le kell játszani.
+- Az időpontot SMS-ben vagy e-mailben beszélitek meg, és rögzítitek az oldalon. A kör végéig minden meccset le kell játszani.
 - 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
 - A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a divíziók győztesei díjat kapnak.
@@ -54,11 +54,12 @@ A részleteket lent találod.
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
-- **Bármelyik pár ajánlhat időpontokat**, nem kell megvárni a másikat. Minél előbb ajánltok, annál könnyebb időpontot találni.
-- Az időpontot az oldalon egyeztetitek:
-  - Az egyik pár megadja, **mikor ér rá**: ráérési sávokat (például „szombat 14–18”) legalább **2 különböző napra**. Egész órákat adtok meg, egy meccs **60 perc**: minden sávba férjen bele legalább egy meccs. A meccs 7:00 és 22:00 között kezdődhet, és a sávok a kör határideje előtt legyenek.
+- **Bármelyik pár kezdeményezhet**, nem kell megvárni a másikat. Minél előbb szóltok, annál könnyebb időpontot találni.
+- **Beszéljétek meg SMS-ben vagy e-mailben.** A meccs oldalán az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és a két ellenfélnek.
+- **Rögzítsétek az időpontot az oldalon** (egész órát), és ha tudjátok, a helyszínt is. A másik pár **24 órán belül** jelezheti, ha nem így beszéltétek (ha a meccs ennél hamarabb kezdődik, a kezdésig). Ha nem jelez, az időpont fix. Megerősíteni hamarabb is lehet.
+- **Vagy adjátok meg, mikor értek rá**, és a másik pár választ:
+  - ráérési sávokat (például „szombat 14–18”) adtok meg legalább **2 különböző napra**. Egész órákat adtok meg, egy meccs **60 perc**: minden sávba férjen bele legalább egy meccs. A meccs 7:00 és 22:00 között kezdődhet, és a sávok a kör határideje előtt legyenek.
   - A másik pár ebből választ egy kezdést (egész órát), vagy ugyanilyen feltételekkel ő adja meg, mikor ér rá. Elutasítani csak új ajánlattal lehet.
-- **Ha már megbeszéltétek** (Messengeren, személyesen), az időpontot (egész órát) közvetlenül is rögzíthetitek az oldalon, ráérés megadása nélkül. A másik pár megerősíti, és a meccs le van fixálva. Ez is egyeztetésnek számít.
 - **Lemondás:** a megbeszélt időpontot bármelyik pár lemondhatja az oldalon, ilyenkor újra egyeztettek.
   - Ha 24 órán belül mondjátok le, nektek kell új időpontokat ajánlanotok. Ha a meccs a határidőig nem jön létre, úgy számít, mintha ti nem próbáltatok volna egyeztetni (lásd 5. pont).
 - A pályát az foglalja le, akit megbeszéltek, és rögzíti az oldalon, hol foglalt.
@@ -83,6 +84,8 @@ A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az Élő-pontok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
 - **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:4, 0:4 eredménnyel.
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
+
+**Egyeztetésnek számít**, ha a meccs oldalán megnyomod az „SMS mindenkinek” vagy az „E-mail mindenkinek” gombot, ha időpontokat ajánlotok, vagy ha rögzítitek vagy megerősítitek a megbeszélt időpontot. Ha az időpont fix lett (megerősítve vagy magától), mindkét pár próbált egyeztetni.
 
 Minden egyeztetési lépést naplózunk, ez alapján dönt a rendszer.
 

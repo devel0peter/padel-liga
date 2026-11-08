@@ -22,7 +22,7 @@ describe("statusView (#25 requirement 2)", () => {
 
   it("a proposal waits for you or for them", () => {
     const state: SchedulingState = { status: "proposed", by: "a", ranges, clubId: null, at: slot };
-    expect(statusView(state, "a")).toEqual({ label: "Ajánlottatok időpontokat, a másik pár válaszára vár", tone: "waiting" });
+    expect(statusView(state, "a")).toEqual({ label: "Ajánlottatok időpontokat, várjuk a másik pár válaszát", tone: "waiting" });
     expect(statusView(state, "b")).toEqual({ label: "Időpontokat ajánlottak, válaszolj", tone: "todo" });
   });
 
@@ -103,7 +103,7 @@ describe("SCHEDULING_GUIDE (#26 requirement 7)", () => {
     expect(SCHEDULING_GUIDE.length).toBeLessThanOrEqual(3);
     const text = SCHEDULING_GUIDE.join(" ");
     expect(text).toContain("SMS-ben vagy e-mailben");
-    expect(text).toContain("legalább 2 különböző napra");
+    expect(text).toContain("legalább 2 különböző napon");
     expect(text).toContain("60 perc");
     expect(text).not.toContain("48 órával");
     expect(text).toContain("nem így beszéltétek");

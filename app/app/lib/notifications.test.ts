@@ -198,7 +198,7 @@ describe("match scheduling notifications (#26, spec 13)", () => {
   it("a proposal or counter-proposal links to the match, without names", () => {
     expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, days: 3 })).toEqual({
       title: "Időpontokat ajánlottak",
-      body: "Az ellenfeletek 3 napra adta meg, mikor ér rá a 2. heti meccsetekre. Válassz egy kezdést, vagy ajánlj mást.",
+      body: "Az ellenfeleitek megírták, mikor érnek rá a 2. heti meccsetekre (3 nap). Válasszatok egy időpontot, vagy ajánljatok mást.",
       url: "/matches/7",
     });
     expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, days: 2 }).title).toBe("Új időpontokat ajánlottak");
@@ -362,7 +362,7 @@ describe("no-show notices (#33, D108)", () => {
     const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true });
     const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false });
     expect(won).toMatchObject({ title: "Jóváhagyta a szervező: nem jöttek el", url: "/matches/7" });
-    expect(won.body).toContain("4-0 4-0");
+    expect(won.body).toContain("4:0, 4:0");
     expect(lost.body).toContain("fekete pontot");
     expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true }).title).toBe("A szervező elutasította a bejelentésed");
     expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");

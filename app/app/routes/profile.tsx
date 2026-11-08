@@ -273,7 +273,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
                 {d.email}
                 <p className="text-sm text-muted-foreground">Az aktuális ellenfeleid is látják, hogy egyeztetni tudjatok. Nyilvános oldalon sosem jelenik meg.</p>
               </Row>
-              <Row label="Belépés">{d.google ? "Google-lel vagy e-mailes kóddal" : "E-mailes kóddal"}</Row>
+              <Row label="Belépés">{d.google ? "Google-fiókkal vagy e-mailben kapott kóddal" : "E-mailben kapott kóddal"}</Row>
               {d.leagues.length > 0 && <Row label="Szervező itt">{d.leagues.join(", ")}</Row>}
             </dl>
             <div className="grid gap-2 border-t pt-4">

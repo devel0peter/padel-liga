@@ -73,7 +73,7 @@ export default function Privacy() {
                 játékos nem látja, a profilodban módosíthatod),
               </li>
               <li>
-                ha Google-lel lépsz be, a Google-fiókod azonosítója (ebből
+                ha Google-fiókkal lépsz be, a Google-fiókod azonosítója (ebből
                 tudjuk, hogy te vagy) és a profilképed,
               </li>
               <li>a fiók létrehozásának, a hozzájárulásodnak és az utolsó belépésednek az időpontja,</li>
@@ -283,7 +283,7 @@ export default function Privacy() {
 
           <Section title="Belépés és süti">
             <p>
-              Jelszót nem kérünk és nem tárolunk. Belépni Google-lel vagy egy
+              Jelszót nem kérünk és nem tárolunk. Belépni Google-fiókkal vagy egy
               e-mailben küldött, 10 percig érvényes kóddal lehet.
             </p>
             <p>
@@ -292,7 +292,7 @@ export default function Privacy() {
               követ, és nem ad ki rólad semmit. Kilépéskor töröljük.
             </p>
             <p>
-              Ha Google-lel lépsz be, a Google átadja nekünk a neved, az
+              Ha Google-fiókkal lépsz be, a Google átadja nekünk a neved, az
               e-mail-címed, a fiókod azonosítóját és a profilképed címét. A
               profilképet csak a fiókodban mutatjuk, és a Google szerveréről
               töltődik be. A leveleinket is a Google küldi ki (lásd lent).

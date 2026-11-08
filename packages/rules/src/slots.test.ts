@@ -326,16 +326,16 @@ describe("slotErrorMessage (#8 requirement 6)", () => {
     const all: SlotErrorCode[] = ["invalid", "too_few_days", "too_short", "not_whole_hour", "outside_window", "in_past", "after_deadline", "not_offered"];
     const messages = all.map((c) => slotErrorMessage(c));
     expect(new Set(messages).size).toBe(all.length);
-    expect(slotErrorMessage("too_few_days")).toBe("Adj meg ráérést legalább 2 különböző napra.");
-    expect(slotErrorMessage("too_short")).toBe("Egy ráérésbe férjen bele egy 60 perces meccs.");
+    expect(slotErrorMessage("too_few_days")).toBe("Legalább 2 különböző napot adj meg.");
+    expect(slotErrorMessage("too_short")).toBe("Minden időszakba férjen bele egy 60 perces meccs.");
     expect(slotErrorMessage("not_whole_hour")).toBe("Csak egész órát adhatsz meg.");
-    expect(slotErrorMessage("outside_window")).toBe("A ráérés 7:00 és 23:00 közé essen, egy napon belül.");
+    expect(slotErrorMessage("outside_window")).toBe("Az időszak 7:00 és 23:00 közé essen, egy napon belül.");
     expect(slotErrorMessage("after_deadline")).toBe("Az időpont a kör határideje előtt legyen.");
   });
 
   it("follows the rules it is given", () => {
-    expect(slotErrorMessage("outside_window", { ...SLOT_RULES, earliest: 8 * 60 + 30 })).toBe("A ráérés 8:30 és 23:00 közé essen, egy napon belül.");
-    expect(slotErrorMessage("too_short", { ...SLOT_RULES, matchMinutes: 90 })).toBe("Egy ráérésbe férjen bele egy 90 perces meccs.");
+    expect(slotErrorMessage("outside_window", { ...SLOT_RULES, earliest: 8 * 60 + 30 })).toBe("Az időszak 8:30 és 23:00 közé essen, egy napon belül.");
+    expect(slotErrorMessage("too_short", { ...SLOT_RULES, matchMinutes: 90 })).toBe("Minden időszakba férjen bele egy 90 perces meccs.");
   });
 });
 

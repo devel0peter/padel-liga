@@ -228,7 +228,7 @@ describe("match scheduling emails (#26, spec 13)", () => {
     expect(email.text).toContain(
       "Kiss Cecil és Tóth Dóra időpontokat ajánlott a 2. heti meccsetekre. Ekkor érnek rá:\nnov. 17., kedd 18:00–21:00\nnov. 18., szerda 09:30\nnov. 19., csütörtök 18:00",
     );
-    expect(email.text).toContain("Válassz ebből egy kezdést, vagy ajánlj mást (határidő: nov. 29., vasárnap 23:59):");
+    expect(email.text).toContain("Válassz ezek közül egy időpontot, vagy ajánlj mást (határidő: nov. 29., vasárnap 23:59):");
     expect(email.html).toContain('href="https://padelparbaj.hu/matches/42"');
     expect(email.text).not.toContain("Helyszín");
     expect(email.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");

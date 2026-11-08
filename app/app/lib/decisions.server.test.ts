@@ -243,10 +243,10 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
       ["organizer", "o", "Mégis elmaradt."],
     ]);
     const page = (await D.decisionPage(1, id))!;
-    expect(page.label).toBe("Döntés: Elmaradt: nem számít a tabellába");
+    expect(page.label).toBe("Döntés: Elmaradt: nem számít bele a tabellába");
     expect(page.log.slice(-2).map((l) => [l.who, l.role, l.text])).toEqual([
       ["Org", "szervező", `Döntés: Játék nélküli győzelem: Játékos ${b}A – Játékos ${b}B (4:0, 4:0). Indoklás: Nem jelent meg az 1. pár.`],
-      ["Org", "szervező", "Döntés: Elmaradt: nem számít a tabellába. Indoklás: Mégis elmaradt."],
+      ["Org", "szervező", "Döntés: Elmaradt: nem számít bele a tabellába. Indoklás: Mégis elmaradt."],
     ]);
 
     // A match nobody touched: both inactive.

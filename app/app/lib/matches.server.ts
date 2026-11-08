@@ -616,8 +616,8 @@ const withdrawnOf = (ctx: MatchContext): PairPlayers => (ctx.pairs.a.withdrawn ?
 // On the match page of a withdrawn pair's match (#34).
 export function voidedText(withdrawn: PairPlayers, ourPairId: number): string {
   return withdrawn.pairId === ourPairId
-    ? "Visszaléptetek a körből: ez a meccs elmarad, és nem számít a tabellában."
-    : `${pairName(withdrawn.players)} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.`;
+    ? "Visszaléptetek a körből: ez a meccs elmarad, és nem számít bele a tabellába."
+    : `${pairName(withdrawn.players)} visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.`;
 }
 
 // The same as a condition on `matches`, for queries that read matches alone.
@@ -874,7 +874,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
       if (!(await clubAllowed(input.clubId, ctx.city))) return { ok: false, error: BAD_CLUB };
       // Same-day ranges that overlap or touch are stored as one (D144).
       event = { kind: proposalKind(state, side), ranges: mergeRanges(input.ranges), clubId: input.clubId };
-      notice = "Elküldtük a ráéréseteket a másik párnak.";
+      notice = "Elküldtük a másik párnak, mikor értek rá.";
       break;
     }
     case "accept": {

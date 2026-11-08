@@ -78,7 +78,7 @@ export function outcomeText(outcome: MatchOutcome, side: Side): string {
     case "both-inactive":
       return MATCH_LOST_BOTH_TEXT;
     case "unplayed":
-      return "Elmaradt: nem számít a tabellába";
+      return "Elmaradt: nem számít bele a tabellába";
   }
 }
 
@@ -92,7 +92,7 @@ export function neutralOutcomeText(outcome: MatchOutcome, names: { a: string; b:
     case "both-inactive":
       return MATCH_LOST_BOTH_TEXT;
     case "unplayed":
-      return "Elmaradt: nem számít a tabellába";
+      return "Elmaradt: nem számít bele a tabellába";
   }
 }
 

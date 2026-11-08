@@ -48,13 +48,13 @@ export function slotErrorMessage(code: SlotErrorCode, rules: SlotRules = SLOT_RU
     case "invalid":
       return "Hibás időpont. Válassz napot és órát.";
     case "too_few_days":
-      return `Adj meg ráérést legalább ${rules.minDays} különböző napra.`;
+      return `Legalább ${rules.minDays} különböző napot adj meg.`;
     case "too_short":
-      return `Egy ráérésbe férjen bele egy ${rules.matchMinutes} perces meccs.`;
+      return `Minden időszakba férjen bele egy ${rules.matchMinutes} perces meccs.`;
     case "not_whole_hour":
       return "Csak egész órát adhatsz meg.";
     case "outside_window":
-      return `A ráérés ${clock(rules.earliest)} és ${clock(rules.latest + rules.matchMinutes)} közé essen, egy napon belül.`;
+      return `Az időszak ${clock(rules.earliest)} és ${clock(rules.latest + rules.matchMinutes)} közé essen, egy napon belül.`;
     case "in_past":
       return "Ez az időpont már elmúlt.";
     case "after_deadline":

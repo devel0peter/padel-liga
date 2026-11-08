@@ -26,17 +26,17 @@ export type AuthMode = "login" | "register";
 const WORDS = {
   login: {
     title: "Belépés",
-    intro: "Nincs jelszó: lépj be Google-lel, vagy kérj egy belépőkódot",
-    google: "Belépés Google-lel",
-    googleHint: "lépj be Google-lel",
+    intro: "Nincs jelszó: lépj be a Google-fiókoddal, vagy kérj egy belépőkódot",
+    google: "Belépés Google-fiókkal",
+    googleHint: "lépj be a Google-fiókoddal",
     verify: "Belépek",
     other: { text: "Még nincs fiókod?", link: "Regisztráció", to: "/register" },
   },
   register: {
     title: "Regisztráció",
-    intro: "Nincs jelszó: regisztrálj Google-lel, vagy kérj egy kódot",
-    google: "Regisztráció Google-lel",
-    googleHint: "regisztrálj Google-lel",
+    intro: "Nincs jelszó: regisztrálj a Google-fiókoddal, vagy kérj egy kódot",
+    google: "Regisztráció Google-fiókkal",
+    googleHint: "regisztrálj a Google-fiókoddal",
     verify: "Tovább",
     other: { text: "Már van fiókod?", link: "Belépés", to: "/login" },
   },

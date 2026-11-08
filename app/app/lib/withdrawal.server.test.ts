@@ -247,7 +247,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
   it("match page and steps: off for both pairs, no scheduling or result step", async () => {
     await withdraw();
     const page = await M.matchPage(6, "c", NOW);
-    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.");
+    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
     expect(page?.actions.propose).toBe(false);
     expect(page?.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect((await M.matchPage(6, "g", NOW))?.voided).toMatch(/^Visszaléptetek/);

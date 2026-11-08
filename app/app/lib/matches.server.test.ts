@@ -296,9 +296,9 @@ describe("matchStep (#26)", () => {
     const result = await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error).toContain("Adj meg ráérést legalább 2 különböző napra.");
-    expect(result.error).toContain("Egy ráérésbe férjen bele egy 60 perces meccs.");
-    expect(result.error).toContain("A ráérés 7:00 és 23:00 közé essen, egy napon belül.");
+    expect(result.error).toContain("Legalább 2 különböző napot adj meg.");
+    expect(result.error).toContain("Minden időszakba férjen bele egy 60 perces meccs.");
+    expect(result.error).toContain("Az időszak 7:00 és 23:00 közé essen, egy napon belül.");
     expect(result.error).toContain("Csak egész órát adhatsz meg.");
     expect(result.slotErrors).toContainEqual({ code: "outside_window", slot: 1 });
     expect(events(id)).toEqual([]);
@@ -315,14 +315,17 @@ describe("matchStep (#26)", () => {
   it("ranges: stored as [start, end] with same-day touching ones joined; any whole hour inside can be accepted (D144)", async () => {
     const id = matchOf(1, 3);
     const ranges = [range("2026-11-12", 16, 18), range("2026-11-14", 10, 12), range("2026-11-12", 14, 16)];
-    expect(await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW)).toEqual({ ok: true, notice: "Elküldtük a ráéréseteket a másik párnak." });
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges, clubId: null }, NOW)).toEqual({ ok: true, notice: "Elküldtük a másik párnak, mikor értek rá." });
     const secs = (d: Date) => d.getTime() / 1000;
     expect(JSON.parse(events(id)[0].slots)).toEqual([
       [secs(at("2026-11-12", 14)), secs(at("2026-11-12", 18))],
       [secs(at("2026-11-14", 10)), secs(at("2026-11-14", 12))],
     ]);
     // In the app: on how many days (no names).
-    expect(all("select body from notifications where kind = 'match_proposal' limit 1")[0].body).toContain("2 napra");
+    const body = all("select body from notifications where kind = 'match_proposal' limit 1")[0].body;
+    expect(body).toContain("(2 nap)");
+    // "az 1. heti", not "a 1. heti".
+    expect(body).toContain("mikor érnek rá az 1. heti meccsetekre");
     expect(h.mails[0].input.ranges).toEqual([range("2026-11-12", 14, 18), range("2026-11-14", 10, 12)]);
     const page = (await M.matchPage(id, "p3a", NOW))!;
     expect(page.actions.accept).toEqual([range("2026-11-12", 14, 18), range("2026-11-14", 10, 12)]);
@@ -375,7 +378,7 @@ describe("matchStep (#26)", () => {
     const id = matchOf(1, 3);
     expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: 1 }, NOW)).toEqual({
       ok: true,
-      notice: "Elküldtük a ráéréseteket a másik párnak.",
+      notice: "Elküldtük a másik párnak, mikor értek rá.",
     });
     // Instant to the other pair: email and the app.
     expect(h.mails.map((m) => [m.kind, m.toEmail])).toEqual([

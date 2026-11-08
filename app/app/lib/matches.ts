@@ -45,7 +45,7 @@ export function groupLine(number: number, groupCount: number): string {
 export const SCHEDULING_GUIDE = [
   "Beszéljétek meg SMS-ben vagy e-mailben: az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és az ellenfeleknek.",
   "Ha megvan, rögzítsétek itt az időpontot. A másik pár 24 órán belül (vagy a kezdésig, ha az hamarabb van) jelezheti, ha nem így beszéltétek; ha nem jelez, az időpont fix.",
-  "Vagy adjátok meg, mikor értek rá, legalább 2 különböző napra (egész órák, 7:00 és 23:00 között; egy meccs 60 perc), és a másik pár ebből választ.",
+  "Vagy adjátok meg, mikor értek rá, legalább 2 különböző napon (egész órák, 7:00 és 23:00 között; egy meccs 60 perc), és a másik pár ebből választ.",
 ];
 
 // "nov. 12., csütörtök 18:00-kor": when an unanswered agreed time becomes fixed (D148).
@@ -76,7 +76,7 @@ export function statusView(state: SchedulingState, me: Side, venue?: string | nu
       return { label: "Egyeztetésre vár", tone: "todo" };
     case "proposed":
       return state.by === me
-        ? { label: "Ajánlottatok időpontokat, a másik pár válaszára vár", tone: "waiting" }
+        ? { label: "Ajánlottatok időpontokat, várjuk a másik pár válaszát", tone: "waiting" }
         : { label: "Időpontokat ajánlottak, válaszolj", tone: "todo" };
     case "agreed_time":
       return state.by === me

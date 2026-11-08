@@ -176,8 +176,8 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   const list = propose.getByRole("list", { name: "Ráérésetek" });
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await expect(list).toContainText("14:00–19:00");
-  await propose.getByRole("button", { name: "Elküldöm a ráérésünket" }).click();
-  await expect(propose.getByRole("alert")).toContainText("Adj meg ráérést legalább 2 különböző napra.");
+  await propose.getByRole("button", { name: "Elküldöm, mikor érünk rá" }).click();
+  await expect(propose.getByRole("alert")).toContainText("Legalább 2 különböző napot adj meg.");
 
   // A second day, its own range: sent.
   const offset = logOffset();
@@ -188,9 +188,9 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await player.page.getByRole("option", { name: "21:00" }).click();
   await propose.getByRole("button", { name: "Hozzáadom" }).click();
   await expect(list.getByRole("listitem")).toHaveCount(2);
-  await propose.getByRole("button", { name: "Elküldöm a ráérésünket" }).click();
-  await expect(main.getByRole("status").filter({ hasText: "Elküldtük a ráéréseteket a másik párnak." })).toBeVisible();
-  await expect(status(player.page)).toContainText("Ajánlottatok időpontokat, a másik pár válaszára vár");
+  await propose.getByRole("button", { name: "Elküldöm, mikor érünk rá" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Elküldtük a másik párnak, mikor értek rá." })).toBeVisible();
+  await expect(status(player.page)).toContainText("Ajánlottatok időpontokat, várjuk a másik pár válaszát");
   await expect(main.getByRole("heading", { name: "Ekkor értek rá" })).toBeVisible();
   await expect(main.getByRole("region", { name: "Ekkor értek rá" })).toContainText("14:00–19:00");
 
@@ -207,7 +207,7 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await expect(other.page).toHaveURL(new RegExp(`/matches/${first!.id}$`));
   await other.page.waitForLoadState("networkidle");
   // Every whole hour a match fits in: 14:00–19:00 and 19:00–21:00 give 5 and 2; they pick 20:00.
-  const starts = content(other.page).getByRole("radiogroup", { name: "Választható kezdések" });
+  const starts = content(other.page).getByRole("radiogroup", { name: "Választható időpontok" });
   await expect(starts.getByRole("radio")).toHaveCount(5 + 2);
   await starts.getByRole("radio", { name: `${dayName(inDays(5))} 20:00` }).click();
   await other.page.getByRole("button", { name: "Elfogadom" }).click();

@@ -90,14 +90,14 @@ describe("score and outcome texts (#28, #29)", () => {
     expect(outcomeText({ kind: "walkover", winner: "a" }, "a")).toBe("Játék nélküli győzelem nektek (4:0, 4:0)");
     expect(outcomeText({ kind: "walkover", winner: "a" }, "b")).toBe("Játék nélküli vereség (0:4, 0:4)");
     expect(outcomeText({ kind: "both-inactive" }, "a")).toBe("Mindkét pár vereséget kap (0:4, 0:4)");
-    expect(outcomeText({ kind: "unplayed" }, "b")).toBe("Elmaradt: nem számít a tabellába");
+    expect(outcomeText({ kind: "unplayed" }, "b")).toBe("Elmaradt: nem számít bele a tabellába");
   });
 
   it("for the organizer, with the pairs' names", () => {
     const names = { a: "Anna – Béla", b: "Cili – Dani" };
     expect(neutralOutcomeText({ kind: "played", score: SPLIT }, names)).toBe("4:1, 2:4, szuper tie-break 10:8 (nyert: Anna – Béla)");
     expect(neutralOutcomeText({ kind: "walkover", winner: "b" }, names)).toBe("Játék nélküli győzelem: Cili – Dani (4:0, 4:0)");
-    expect(neutralOutcomeText({ kind: "unplayed" }, names)).toBe("Elmaradt: nem számít a tabellába");
+    expect(neutralOutcomeText({ kind: "unplayed" }, names)).toBe("Elmaradt: nem számít bele a tabellába");
     expect(neutralOutcomeText({ kind: "both-inactive" }, names)).toBe(MATCH_LOST_BOTH_TEXT);
   });
 });
@@ -154,7 +154,7 @@ describe("status, Teendő and log lines (#28)", () => {
       "48 óra után magától elfogadtuk az eredményt",
     );
     expect(decisionText({ kind: "organizer", outcome: { kind: "unplayed" }, reason: "Eső" }, "a")).toBe(
-      "A szervező döntött: Elmaradt: nem számít a tabellába. Indoklás: Eső",
+      "A szervező döntött: Elmaradt: nem számít bele a tabellába. Indoklás: Eső",
     );
   });
 });

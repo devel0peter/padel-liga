@@ -6,6 +6,9 @@ import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
+
+// "Az 1." / "A 2.": the article and number, starting a sentence.
+const capitalArticle = (n: number) => withArticle(n).replace(/^a/, "A");
 import { PAIR_SECTION_PATH } from "./pairs";
 import { WAITING_START } from "./season-entries";
 import { substitutesEnabled } from "./substitutes";
@@ -251,7 +254,7 @@ const matchUrl = (matchId: number) => `/matches/${matchId}`;
 export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; days: number }): Message {
   return {
     title: input.counter ? "Új időpontokat ajánlottak" : "Időpontokat ajánlottak",
-    body: `Az ellenfeletek ${input.days} napra adta meg, mikor ér rá a ${input.week}. heti meccsetekre. Válassz egy kezdést, vagy ajánlj mást.`,
+    body: `Az ellenfeleitek megírták, mikor érnek rá ${withArticle(input.week)} heti meccsetekre (${input.days} nap). Válasszatok egy időpontot, vagy ajánljatok mást.`,
     url: matchUrl(input.matchId),
   };
 }
@@ -342,7 +345,7 @@ export function disputeRecipients(organizerIds: readonly string[], adminIds: rea
 export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Vitatott eredmény · ${input.leagueName}`,
-    body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
+    body: `${capitalArticle(input.week)} heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -354,7 +357,7 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
 export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Helyettes kérés · ${input.leagueName}`,
-    body: `Egy pár helyettest kér a ${input.week}. heti meccsére. A jóváhagyás rád vár.`,
+    body: `Egy pár helyettest kér ${withArticle(input.week)} heti meccsére. A jóváhagyás rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/substitutes`,
   };
 }
@@ -403,7 +406,7 @@ export function substituteRevokedMessage(input: SubstituteNotice & { ours: boole
 export function noShowReportedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Nem jöttek el · ${input.leagueName}`,
-    body: `Egy pár jelezte, hogy az ellenfele nem jött el a ${input.week}. heti meccsre. A döntés rád vár.`,
+    body: `Egy pár jelezte, hogy az ellenfele nem jött el ${withArticle(input.week)} heti meccsre. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -414,10 +417,10 @@ export function noShowDecidedMessage(input: { matchId: number; confirmed: boolea
   const url = matchUrl(input.matchId);
   if (input.confirmed)
     return input.reported
-      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4-0 4-0-val megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.", url }
       : {
           title: "A szervező szerint nem jöttetek el",
-          body: "A meccs 0-4 0-4-es vereség nektek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          body: "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
           url,
         };
   return input.reported

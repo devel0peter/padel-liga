@@ -155,7 +155,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     input = { kind: "agreed", slot: parseStartField(String(form.get("slot") ?? "")), clubId: club };
   } else if (intent === "accept") {
     const at = Number(form.get("slot"));
-    if (!Number.isFinite(at)) return fail("Válassz egy kezdést.");
+    if (!Number.isFinite(at)) return fail("Válassz egy időpontot.");
     input = { kind: "accept", slot: new Date(at) };
   } else if (intent === "confirm" || intent === "decline" || intent === "cancel") {
     input = { kind: intent };
@@ -255,7 +255,7 @@ function ClubSelect({ clubs, id }: { clubs: { id: number; name: string }[]; id: 
   );
 }
 
-const PROPOSE_RULES = "Adjatok meg ráérést legalább 2 különböző napra. A másik pár ebből választ egy órát.";
+const PROPOSE_RULES = "Írjátok meg, mikor értek rá, legalább 2 különböző napon. A másik pár ebből választ egy időpontot.";
 
 // A step's own error before sending (D144): the rules engine's messages, the
 // same the server would answer with.
@@ -288,7 +288,7 @@ function ProposeForm({ clubs, result, now, deadline }: { clubs: { id: number; na
       {!error && <Feedback result={result} intent="propose" />}
       <div>
         <Button type="submit" disabled={busy}>
-          Elküldöm a ráérésünket
+          Elküldöm, mikor érünk rá
         </Button>
       </div>
     </Form>
@@ -420,8 +420,8 @@ function VenueForm({
 // that means before asking.
 function cancelConsequence(late: boolean): string {
   return late
-    ? "24 órán belül vagytok a kezdéshez képest, ez késői lemondás: utána nektek kell új időpontokat ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeletek nyer 4-0 4-0-val."
-    : "Utána újra egyeztettek. 24 órán belül a kezdéshez képest a lemondás már késői: akkor nektek kell új időpontokat ajánlani.";
+    ? "Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek 4:0, 4:0-ra."
+    : "Utána újra egyeztettek. Ha a kezdés előtti 24 órában mondjátok le, az késői lemondás: akkor nektek kell új időpontot ajánlani.";
 }
 
 function CancelButton({ late }: { late: boolean }) {
@@ -559,7 +559,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
     <>
       {s.canReport && (
         <p className="text-sm text-muted-foreground">
-          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4-0 4-0-val nyertek, és ők fekete pontot kapnak.
+          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4:0, 4:0-ra nyertek, és ők fekete pontot kapnak.
         </p>
       )}
       {s.open && (
@@ -587,8 +587,8 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
               <span className="break-words">
                 {d.confirmed
                   ? d.ours
-                    ? "A szervező jóváhagyta a bejelentéseteket: 4-0 4-0 nektek."
-                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0-4 0-4, és fekete pontot kaptatok."
+                    ? "A szervező jóváhagyta a bejelentéseteket: 4:0, 4:0 nektek."
+                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0:4, 0:4, és fekete pontot kaptatok."
                   : d.ours
                     ? "A szervező elutasította a bejelentéseteket."
                     : "A szervező elutasította az ellenfeleitek bejelentését."}{" "}
@@ -610,7 +610,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Biztosan nem jöttek el?</AlertDialogTitle>
               <AlertDialogDescription>
-                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4-0 4-0-val nyertek, az ellenfeletek fekete pontot kap. Amíg nem döntött, visszavonhatod.
+                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4:0, 4:0-ra nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -664,7 +664,7 @@ function whenLine(m: Route.ComponentProps["loaderData"]): string {
     case "agreed_time":
       return `${formatSlot(m.state.slot)} (még nem fix)`;
     case "proposed":
-      return "Ajánlott időpontok várnak választásra";
+      return "Válasszatok az ajánlott időpontokból";
     case "to_schedule":
       return m.result.status === "none" ? "Még nincs időpont" : "Nincs rögzített időpont";
   }
@@ -785,7 +785,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {m.state.status === "proposed" && theirs && m.actions.accept.length > 0 && (
             <Panel
-              title="Válassz egy kezdést"
+              title="Válasszatok időpontot"
               description={`Ekkor érnek rá. Egy meccs 60 perc.${m.venue ? ` Helyszín: ${m.venue}.` : ""}`}
               tone="main"
             >
@@ -829,7 +829,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               title={m.state.status === "proposed" ? "Ekkor értek rá" : "Ezt rögzítettétek"}
               description={
                 m.state.status === "proposed"
-                  ? "A másik pár ebből választ egy kezdést, vagy ő ajánl mást."
+                  ? "A másik pár ebből választ egy időpontot, vagy mást ajánl."
                   : m.state.status === "agreed_time"
                     ? `Fix lesz ${fixesAtText(m.state.fixesAt)}, ha a másik pár nem jelez.`
                     : undefined
@@ -903,7 +903,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {recordFolded && (
             <Fold
-              title={r.status === "recorded" ? "Elírtátok? Javítsd ki" : "Már lejátszottátok? Rögzítsd az eredményt"}
+              title={r.status === "recorded" ? "Elírtátok? Javítsátok ki" : "Már lejátszottátok? Írjátok be az eredményt"}
               hint={r.status === "recorded" ? "A 48 óra újraindul." : "Ha a meccs megvolt, itt írjátok be."}
               open={failed("result-record")}
             >
@@ -914,7 +914,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           )}
 
           {m.state.status === "scheduled" && m.actions.cancel && (
-            <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: 24 órán belül vagytok." : "Lemondhatjátok, utána újra egyeztettek."}>
+            <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: már 24 órán belül van a kezdés." : "Lemondhatjátok, utána újra egyeztettek."}>
               <CancelButton late={m.cancelLate} />
             </Fold>
           )}

@@ -327,7 +327,7 @@ export async function decideNoShow(
     logError("no-show strike notice failed", { matchId: ctx.match.id, error });
   }
   await tellPairs(ctx, row.pairId, true);
-  return { ok: true, notice: "Jóváhagytad: 4-0 4-0 a bejelentő párnak, a másik pár fekete pontot kapott. Mindkét pár értesítést kap." };
+  return { ok: true, notice: "Jóváhagytad: 4:0, 4:0 a bejelentő párnak, a másik pár fekete pontot kapott. Mindkét pár értesítést kap." };
 }
 
 // spec 13, D108: both pairs, each from its own side. In the app and by push only.

@@ -58,10 +58,10 @@ A részleteket lent találod.
 - **Beszéljétek meg SMS-ben vagy e-mailben.** A meccs oldalán az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és a két ellenfélnek.
 - **Rögzítsétek az időpontot az oldalon** (egész órát), és ha tudjátok, a helyszínt is. A másik pár **24 órán belül** jelezheti, ha nem így beszéltétek (ha a meccs ennél hamarabb kezdődik, a kezdésig). Ha nem jelez, az időpont fix. Megerősíteni hamarabb is lehet.
 - **Vagy adjátok meg, mikor értek rá**, és a másik pár választ:
-  - ráérési sávokat (például „szombat 14–18”) adtok meg legalább **2 különböző napra**. Egész órákat adtok meg, egy meccs **60 perc**: minden sávba férjen bele legalább egy meccs. A meccs 7:00 és 22:00 között kezdődhet, és a sávok a kör határideje előtt legyenek.
-  - A másik pár ebből választ egy kezdést (egész órát), vagy ugyanilyen feltételekkel ő adja meg, mikor ér rá. Elutasítani csak új ajánlattal lehet.
+  - Írjátok meg, mikor értek rá (például „szombat 14–18”), legalább **2 különböző napon**. Egész órákkal számolunk, egy meccs **60 perc**, így minden időszakba férjen bele legalább egy meccs. A meccs 7:00 és 22:00 között kezdődhet, a kör határideje előtt.
+  - A másik pár ebből választ egy kezdési időpontot (egész órát), vagy ő írja meg, mikor ér rá. Elutasítani csak új ajánlattal lehet.
 - **Lemondás:** a megbeszélt időpontot bármelyik pár lemondhatja az oldalon, ilyenkor újra egyeztettek.
-  - Ha 24 órán belül mondjátok le, nektek kell új időpontokat ajánlanotok. Ha a meccs a határidőig nem jön létre, úgy számít, mintha ti nem próbáltatok volna egyeztetni (lásd 5. pont).
+  - Ha a kezdés előtti 24 órában mondjátok le, nektek kell új időpontot ajánlanotok. Ha a meccs a határidőig nem jön létre, úgy számít, mintha ti nem próbáltatok volna egyeztetni (lásd 5. pont).
 - A pályát az foglalja le, akit megbeszéltek, és rögzíti az oldalon, hol foglalt.
 - A városotok bármelyik padelpályáján játszhattok.
 - A pályadíjat a négy játékos egyenlő arányban állja.

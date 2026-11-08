@@ -43,7 +43,7 @@ const result = (page: Page) => content(page).getByRole("region", { name: "Eredm�
 
 // Recording is folded until the fixed time has started (D133): open it if it is.
 async function openRecord(page: Page) {
-  const fold = content(page).getByText("Már lejátszottátok? Rögzítsd az eredményt");
+  const fold = content(page).getByText("Már lejátszottátok? Írjátok be az eredményt");
   if (await fold.isVisible()) await fold.click();
   await expect(content(page).getByRole("button", { name: "Rögzítem az eredményt" })).toBeVisible();
 }

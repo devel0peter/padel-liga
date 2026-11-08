@@ -136,7 +136,7 @@ export function RangePicker({ now, deadline }: { now: Date; deadline: Date }) {
       </div>
 
       {picked && (
-        <div className="grid gap-3 rounded-lg border bg-muted/40 p-3" role="group" aria-label={`Ráérés: ${formatDay(picked.day)}`}>
+        <div className="grid gap-3 rounded-lg border bg-muted/40 p-3" role="group" aria-label={`Időszak: ${formatDay(picked.day)}`}>
           <p className="text-sm font-medium">{formatDay(picked.day)}</p>
           <div className="flex flex-wrap gap-2">
             {presetRanges(picked).map((p) => (
@@ -200,11 +200,11 @@ export function RangePicker({ now, deadline }: { now: Date; deadline: Date }) {
       )}
 
       <div className="grid gap-2">
-        <p className="text-sm font-medium">Ráérésetek</p>
+        <p className="text-sm font-medium">Amikor ráértek</p>
         {ranges.length === 0 ? (
           <p className="text-sm text-muted-foreground">Még nincs. Válassz napot, és add meg, mettől meddig értek rá.</p>
         ) : (
-          <ul className="grid gap-2" aria-label="Ráérésetek">
+          <ul className="grid gap-2" aria-label="Amikor ráértek">
             {ranges.map((r) => (
               <li key={r.start.getTime()} className="flex min-h-11 items-center justify-between gap-2 rounded-lg border bg-background py-1 pr-1 pl-3 text-sm">
                 <span className="min-w-0 font-medium break-words">{formatRange(r)}</span>
@@ -241,7 +241,7 @@ export function StartPicker({ ranges }: { ranges: SlotRange[] }) {
     (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(r);
   }
   return (
-    <RadioGroupPrimitive.Root name="slot" required aria-label="Választható kezdések" className="grid gap-4">
+    <RadioGroupPrimitive.Root name="slot" required aria-label="Választható időpontok" className="grid gap-4">
       {[...byDay].map(([day, rs]) => (
         <div key={day} className="grid gap-2">
           <p className="text-sm font-medium">{formatWeekdayDate(rs[0]!.start)}</p>

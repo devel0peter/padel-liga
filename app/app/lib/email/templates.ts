@@ -223,7 +223,7 @@ export function seasonStart(input: { to: string; league: string; season: string;
       `Szia ${input.to}!`,
       `Összegyűlt elég nevezés, így eldőlt, mikor indul a szezon (${input.season}, ${input.league}).`,
       `Az 1. kör kezdete: ${day}. A csoportbeosztást legkésőbb aznap reggel megkapjátok e-mailben és az oldalon.`,
-      `A kezdést a Kezdőlapon is látod:`,
+      `Az időpontot a Kezdőlapon is látod:`,
       home,
       SIGNATURE,
     ],
@@ -290,9 +290,9 @@ export function matchProposal(input: MatchEmailInput & { counter: boolean; range
     `${input.counter ? "Új időpontokat" : "Időpontokat"} ajánlottak a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre. Ekkor érnek rá:\n${input.ranges.map((r) => formatRange(r)).join("\n")}`,
+      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott ${withArticle(input.week)} heti meccsetekre. Ekkor érnek rá:\n${input.ranges.map((r) => formatRange(r)).join("\n")}`,
       input.venue ? `Helyszín: ${input.venue}` : null,
-      `Válassz ebből egy kezdést, vagy ajánlj mást (határidő: ${formatDeadline(input.deadline)}):`,
+      `Válassz ezek közül egy időpontot, vagy ajánlj mást (határidő: ${formatDeadline(input.deadline)}):`,
       link,
       SIGNATURE,
     ].filter((p): p is string => p !== null),
@@ -310,7 +310,7 @@ export function matchResult(input: MatchEmailInput & { score: string; autoAccept
     `Erősítsd meg a meccs eredményét – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} rögzítette a ${input.week}. heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
+      `${input.opponents} rögzítette ${withArticle(input.week)} heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
       `Erősítsd meg, vagy jelezd, ha nem így volt:`,
       link,
       `Ha ${formatDeadline(input.autoAcceptAt)}-ig nem válaszoltok, magától elfogadjuk.`,
@@ -329,7 +329,7 @@ export function matchAgreedTime(input: MatchEmailInput & { slot: Date; fixesAt: 
     `Megbeszélt időpont a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} rögzítette a ${input.week}. heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
+      `${input.opponents} rögzítette ${withArticle(input.week)} heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
       input.venue ? `Helyszín: ${input.venue}` : null,
       `Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek. Ha nem így volt, addig jelezd itt:`,
       link,

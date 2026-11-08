@@ -140,8 +140,8 @@ function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
     <p role="status" className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
       <span className="font-semibold">Fekete pontjaid ebben a szezonban: {count}.</span>{" "}
       {leaving
-        ? "A párod és te a kör végén kikerültök a ligából; a következő szezonban újra nevezhettek."
-        : "A 3.-nál a párod és te a kör végén kikerültök a ligából."}{" "}
+        ? "A pároddal a kör végén kikerültök a ligából; a következő szezonban újra nevezhettek."
+        : "A harmadiknál a pároddal a kör végén kikerültök a ligából."}{" "}
       Ha betegség vagy pályalemondás miatt kaptad, szólj a szervezőnek.{" "}
       <Link to="/rules#section-5" className="underline">
         Szabályzat

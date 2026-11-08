@@ -54,6 +54,11 @@ test("17. Kezdőlap shows the group, the division line, the matches by week with
   // No other address: not Anna's, not her partner's.
   await expect(main.locator('a[href^="mailto:"]')).toHaveCount(2);
   await expect(main).not.toContainText(anna.email);
+  // Under the group's table: every match of the group by week, to read only (D138).
+  const fixtures = main.getByRole("group", { name: "A csoport meccsei" });
+  await expect(fixtures).toBeVisible();
+  await expect(fixtures.getByRole("region", { name: "1. hét" })).toBeVisible();
+  await expect(fixtures.locator("a")).toHaveCount(0);
   await context.close();
 });
 

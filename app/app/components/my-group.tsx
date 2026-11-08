@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { autoAcceptAt } from "@padel-liga/rules";
 
+import { FixtureList } from "~/components/fixture-list";
 import { StandingsTable } from "~/components/standings-table";
 import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -16,7 +17,8 @@ import { cn } from "~/lib/utils";
 
 // Kezdőlap once the groups are out (#25, D133, D136): three separate cards,
 // Teendők (only when there is one), Meccseitek (a row per week, the next match
-// open) and the group's table. The group's fixture list is on the Tabella.
+// open) and the group: its table and, under it, every match of the group with
+// its result, to read only (D138).
 
 const TONE: Record<Tone, string> = {
   todo: "bg-nav-active-bg text-nav-active",
@@ -208,8 +210,13 @@ export function MyMatches({ group: g, multiLeague }: { group: HomeGroup; multiLe
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-// The group (docs/player-ui.md H3): its table and where the pair stands on the
-// ladder; every group and the matches are on the Tabella.
+// The fixture list without the links into the pair's own matches.
+const readOnly = (weeks: HomeGroup["fixtures"]): HomeGroup["fixtures"] =>
+  weeks.map((w) => ({ ...w, matches: w.matches.map((m) => ({ ...m, href: null })) }));
+
+// The group (docs/player-ui.md H3): its table, where the pair stands on the
+// ladder and the group's matches with their results (D138). Read only: no
+// links into the matches here, Meccseitek has the pair's own.
 export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
   const title = groupLine(g.number, g.groupCount);
   return (
@@ -232,6 +239,8 @@ export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; mul
       <CardContent className="grid gap-2">
         <StandingsTable rows={g.pairs} ranked={g.ranked} linkFor={pairPath} />
         {g.withdrawn.length > 0 && <p className="text-sm text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>}
+        <h3 className="mt-2 font-semibold">A csoport meccsei</h3>
+        <FixtureList weeks={readOnly(g.fixtures)} label="A csoport meccsei" />
       </CardContent>
     </Card>
   );

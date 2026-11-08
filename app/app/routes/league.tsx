@@ -5,12 +5,13 @@ import { Link } from "react-router";
 import type { Route } from "./+types/league";
 import { AppPage } from "~/components/app-page";
 import { FixtureList } from "~/components/fixture-list";
+import { HelpTip } from "~/components/help-tip";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "~/components/ui/accordion";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "~/components/ui/sheet";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { DIVISION_DOT } from "~/lib/division-colors";
 import type { LadderGroup } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { requireUser } from "~/lib/auth/session.server";
@@ -35,13 +36,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
   return [{ title: `Tabella: ${loaderData?.league.name ?? "liga"} – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
 }
 
-// One quiet mark per division (bronze, verdigris, violet): a dot by its name.
-const DOT: Record<Division, string> = {
-  bronz: "bg-amber-700",
-  rez: "bg-teal-700",
-  rookie: "bg-violet-700",
-};
-
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
@@ -51,7 +45,7 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
       <CardHeader>
         <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
         <CardDescription className="flex items-center gap-1.5">
-          <span aria-hidden className={`size-2 rounded-full ${DOT[division]}`} />
+          <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
           {label}
         </CardDescription>
         {group.mine && (
@@ -95,25 +89,22 @@ const POINTS: [title: string, text: string][] = [
   ["Egy fel, egy le", "A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül."],
 ];
 
+// "Hogyan működik a létra?" behind the "?" by the title (D138).
 function Explainer() {
   return (
-    <Accordion type="single" collapsible className="max-w-3xl rounded-xl px-4 ring-1 ring-foreground/10">
-      <AccordionItem value="how">
-        <AccordionTrigger className="font-semibold">Hogyan működik a létra?</AccordionTrigger>
-        <AccordionContent className="grid gap-3">
-          <ol className="grid list-decimal gap-2 pl-5">
-            {POINTS.map(([title, text]) => (
-              <li key={title}>
-                <strong>{title}.</strong> {text}
-              </li>
-            ))}
-          </ol>
-          <p className="text-muted-foreground">
-            Részletesen a <Link to="/rules">szabályzatban</Link>.
-          </p>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <HelpTip label="Hogyan működik a létra?">
+      <p className="font-semibold">Hogyan működik a létra?</p>
+      <ol className="grid list-decimal gap-1.5 pl-5">
+        {POINTS.map(([title, text]) => (
+          <li key={title}>
+            <strong>{title}.</strong> {text}
+          </li>
+        ))}
+      </ol>
+      <p className="text-muted-foreground">
+        Részletesen a <Link to="/rules">szabályzatban</Link>.
+      </p>
+    </HelpTip>
   );
 }
 
@@ -140,6 +131,7 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
   return (
     <AppPage
       title="Tabella"
+      help={<Explainer />}
       actions={
         // The Ranglista (D137): one tap from the Tabella, also on a phone.
         <Button asChild variant="outline" size="sm">
@@ -162,7 +154,6 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
         )}
       </div>
       <StandingsLegend />
-      <Explainer />
     </AppPage>
   );
 }

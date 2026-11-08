@@ -68,11 +68,15 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(panel).toHaveCount(0);
   await expect(main).toContainText("1. kör, indul");
 
-  // The explainer: three points, folded at the bottom.
+  // The explainer: three points in a tooltip behind the "?" by the title (D138).
+  const tip = main.getByRole("tooltip");
+  await expect(tip).toBeHidden();
   await main.getByRole("button", { name: "Hogyan működik a létra?" }).click();
-  await expect(main).toContainText("Egyetlen létra");
-  await expect(main).toContainText("A divíziók a létra harmadai");
-  await expect(main).toContainText("Egy fel, egy le");
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("Egyetlen létra");
+  await expect(tip).toContainText("A divíziók a létra harmadai");
+  await expect(tip).toContainText("Egy fel, egy le");
+  await expect(main.getByRole("heading", { level: 1, name: "Tabella", exact: true })).toBeVisible();
 
   // Not for search engines or link previews.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);

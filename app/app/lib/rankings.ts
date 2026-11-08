@@ -2,6 +2,8 @@
 // loader hands in what is stored. Equal shown Élő-pont shares a place and is
 // listed by name until the tiebreak rules exist (#345).
 
+import type { Division } from "@padel-liga/rules";
+
 export type RankInput = {
   key: string;
   name: string;
@@ -13,6 +15,8 @@ export type RankInput = {
   mine: boolean;
   /** Rated matches, for players; null for pairs. */
   matches: number | null;
+  /** The division the pair (a player's: their pair's) plays in on the Tabella now; null when none (D138). */
+  division: Division | null;
 };
 
 export type RankRow = Omit<RankInput, "rating"> & {

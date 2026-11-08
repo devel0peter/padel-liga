@@ -12,9 +12,12 @@ export function AppPage({
   description,
   actions,
   back,
+  help,
   children,
 }: {
   title: React.ReactNode;
+  // A HelpTip next to the title (D138), outside the <h1> so its name stays the title.
+  help?: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   // A parent page, shown above the title (e.g. Körlevelek above Új körlevél).
@@ -37,7 +40,14 @@ export function AppPage({
               {back.label}
             </Link>
           )}
-          <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+          {help ? (
+            <div className="relative flex items-center gap-2">
+              <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+              {help}
+            </div>
+          ) : (
+            <h1 className="font-display text-2xl font-extrabold">{title}</h1>
+          )}
           {description && <div className="max-w-3xl text-sm text-muted-foreground">{description}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

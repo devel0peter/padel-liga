@@ -2,7 +2,7 @@
 // without a pair asks the organizer for a partner, per league. Pure; the D1
 // side is partner-search.server.ts.
 
-// The switch on Párom, while the player has no pair in the league.
+// The switch on Párod, while the player has no pair in the league.
 export const PARTNER_SEARCH_TITLE = "Párt keresel?";
 export const PARTNER_SEARCH_LABEL = "Párt keresek";
 export const PARTNER_SEARCH_ON = "A szervező látja, hogy párt keresel, és párba tesz valakivel. A párod neve itt jelenik meg.";

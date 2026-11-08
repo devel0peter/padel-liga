@@ -12,7 +12,7 @@ test("1. the Admin lands on Kezdőlap with the season card and both sidebar sect
   await expect(card).toContainText("Nevezés:");
   await expect(card).toContainText("Szezon vége:");
   await expect(card).toContainText("Nevezni párban lehet, és még nincs párod.");
-  await expect(card.getByRole("link", { name: "Párom" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Párod a Profilban" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nevezünk" })).toHaveCount(0);
 
   const sidebar = page.locator("[data-sidebar=sidebar]");

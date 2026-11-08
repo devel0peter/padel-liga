@@ -112,7 +112,7 @@ describe("seasonEntered (#153)", () => {
     expect(email.text).toContain("Szia Nagy Anna!");
     expect(email.text).toContain("Beneveztetek Kovács Béla pároddal (2026/27 tél, Padelpárbaj Győr).");
     expect(email.text).toContain("Az 1. körtől játszotok (kezdés: nov. 9.).");
-    expect(email.html).toContain('href="https://padelparbaj.hu/pair"');
+    expect(email.html).toContain('href="https://padelparbaj.hu/profile#parod"');
     expect(email.text).not.toMatch(/jóváhagy|szervező/i);
   });
 
@@ -304,13 +304,13 @@ describe("pairCreated (#260, D121)", () => {
     league: "Padelpárbaj Győr",
   };
 
-  it("names the partner and the league, and links Párom", () => {
+  it("names the partner and the league, and links Párod on Profil (D141)", () => {
     const e = pairCreated(input);
     expect(e.subject).toBe("Van párod – Padelpárbaj");
     expect(e.text).toContain("Szia Nagy Anna!");
     expect(e.text).toContain("A szervező párba tett: a párod Kovács Béla (Padelpárbaj Győr).");
-    expect(e.text).toContain("https://padelparbaj.hu/pair");
-    expect(e.html).toContain('href="https://padelparbaj.hu/pair"');
+    expect(e.text).toContain("https://padelparbaj.hu/profile#parod");
+    expect(e.html).toContain('href="https://padelparbaj.hu/profile#parod"');
   });
 
   it("gives the partner's email and phone, so the two can reach each other (D121)", () => {

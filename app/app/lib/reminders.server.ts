@@ -115,7 +115,7 @@ const RECORD_CHUNK = 15;
 const PERSON_CHUNK = 30;
 
 // C needs the player's own pair link: made now for whoever has none yet
-// (as Párom would on their next visit).
+// (as Párod would on their next visit).
 async function pairLinksFor(owners: { userId: string; leagueId: number }[]): Promise<Map<string, string>> {
   if (owners.length > 0) {
     const inserts: BatchItem<"sqlite">[] = [];

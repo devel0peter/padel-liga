@@ -47,7 +47,7 @@ test("5. a player registers through the league's register button", async ({ brow
   await expect(content(page)).not.toContainText("Melyik ligában játszol?");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await expect(content(page)).toContainText("Teszt szezon");
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page).getByLabel("A meghívó linked")).toBeVisible();
   await context.close();
 });
@@ -55,7 +55,7 @@ test("5. a player registers through the league's register button", async ({ brow
 test("6. the partner accepts the pair link, and the pair is there", async ({ browser }) => {
   await pairUp(browser, [anna, bence]);
   const second = await as(browser, bence);
-  await visit(second.page, "/pair");
+  await visit(second.page, "/profile");
   await expect(content(second.page)).toContainText("A párod");
   await expect(content(second.page)).toContainText(anna.name);
   // The partner's address and phone, to reach each other (D121).
@@ -68,7 +68,7 @@ test("6. the partner accepts the pair link, and the pair is there", async ({ bro
   await second.context.close();
 
   const first = await as(browser, anna);
-  await visit(first.page, "/pair");
+  await visit(first.page, "/profile");
   await expect(content(first.page)).toContainText(bence.name);
   await first.context.close();
 });
@@ -84,7 +84,7 @@ test("6. the other pairs register and pair up; the Szervező pairs two who look 
   await seekPartner(browser, miklos);
   await pairSeekers(browser, PAIRS.solo);
   const { context, page } = await as(browser, dora);
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page)).toContainText(miklos.name);
   await expect(page.getByRole("button", { name: "Nevezünk" })).toBeVisible();
   await context.close();

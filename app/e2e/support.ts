@@ -158,20 +158,20 @@ export async function completeWelcome(page: Page, player: Player): Promise<void>
 // the interest list (#333).
 export async function pairUp(browser: Browser, [a, b]: [Player, Player]): Promise<void> {
   const owner = await as(browser, a);
-  await visit(owner.page, "/pair");
+  await visit(owner.page, "/profile");
   const url = await content(owner.page).getByLabel("A meghívó linked").inputValue();
   await owner.context.close();
   const partner = await as(browser, b);
   await visit(partner.page, new URL(url).pathname);
   await partner.page.getByRole("button", { name: "Elfogadom" }).click();
-  await expect(partner.page).toHaveURL(/\/pair\?joined=1$/);
+  await expect(partner.page).toHaveURL(/\/profile\?joined=1#parod$/);
   await partner.context.close();
 }
 
-// A registered player switches "Párt keresek" on, on Párom.
+// A registered player switches "Párt keresek" on, in Profil's Párod section.
 export async function seekPartner(browser: Browser, who: Player): Promise<void> {
   const { context, page } = await as(browser, who);
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   const toggle = content(page).getByRole("switch", { name: "Párt keresek" });
   await expect(toggle).not.toBeChecked();
   await toggle.click();

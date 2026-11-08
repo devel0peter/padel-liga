@@ -1,5 +1,5 @@
-import { addDays, budapestDay, type Day } from "@padel-liga/rules";
-import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { addDays, budapestDay, divisionOf, type Day, type Division } from "@padel-liga/rules";
+import { and, asc, count, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -10,11 +10,11 @@ import { buildLadder, countedOutcome, isValidOutcome, phaseWeek, type LadderBand
 import { getLeague, minEntriesByLeague } from "./leagues.server";
 import { logWarn } from "./log";
 import { averageElo } from "./season-entries";
-import { currentSeason, isWaiting, waitingText } from "./seasons";
+import { currentSeason, isWaiting, waitingText, type Season } from "./seasons";
 import { listSeasons } from "./seasons.server";
 
-// What the public league page needs (#30). Only names leave this module: the
-// queries below select no email, phone or user id.
+// What the league page needs (#30; members only since D134). Only names leave
+// this module: the queries below select no email, phone or user id.
 
 export type LadderPage = {
   league: { name: string; city: string };
@@ -117,13 +117,15 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
         a: m.a,
         b: m.b,
         week: m.week,
+        status: m.status,
         scheduledAt: m.scheduledAt,
         outcome: skipped.has(m.id) ? null : countedOutcome(m),
       })),
   }));
 }
 
-export async function ladderPage(slug: string, now = new Date()): Promise<LadderPage | null> {
+/** `mine`: the viewer's pairs, marked on the page (D136). */
+export async function ladderPage(slug: string, now = new Date(), mine: ReadonlySet<number> = new Set()): Promise<LadderPage | null> {
   const league = await getLeague(slug);
   if (!league) return null;
   // Like the landing page, only leagues of listed cities are public.
@@ -145,15 +147,7 @@ export async function ladderPage(slug: string, now = new Date()): Promise<Ladder
     return { ...head, kind: "waiting", next: null, starting: waitingText(entered?.n ?? 0, minimums.get(league.id) ?? 0) };
   }
 
-  const published = await db
-    .selectDistinct({ phase: groups.phase })
-    .from(groups)
-    .where(and(eq(groups.seasonId, season.id), isNotNull(groups.publishedAt)))
-    .orderBy(asc(groups.phase));
-  const open = new Set(published.map((p) => p.phase));
-  const phases = season.phases.filter((p) => open.has(p.number));
-  // The latest published phase that has started, else the first one coming.
-  const shown = [...phases].reverse().find((p) => p.startsAt <= now) ?? phases[0];
+  const shown = await shownPhase(season, now);
   if (!shown) {
     const next = season.phases.find((p) => p.startsAt > now) ?? season.phases[0];
     return { ...head, kind: "waiting", next: next ? { round: next.number, startsOn: formatOnDate(next.startsAt) } : null };
@@ -170,6 +164,55 @@ export async function ladderPage(slug: string, now = new Date()): Promise<Ladder
     startsOn: formatOnDate(shown.startsAt),
     weekFrom: formatShortDay(addDays(start, (week - 1) * 7)),
     weekTo: formatShortDay(addDays(start, (week - 1) * 7 + 6)),
-    bands: buildLadder(await phaseInput(season.id, shown.number), week),
+    bands: buildLadder(await phaseInput(season.id, shown.number), started && now <= shown.deadline ? week : null, shown.startsAt, mine),
   };
+}
+
+// The phase the league page shows: the latest published one that has
+// started, else the first one coming. Undefined before any group is out.
+async function shownPhase(season: Season, now: Date): Promise<Season["phases"][number] | undefined> {
+  const published = await db
+    .selectDistinct({ phase: groups.phase })
+    .from(groups)
+    .where(and(eq(groups.seasonId, season.id), isNotNull(groups.publishedAt)))
+    .orderBy(asc(groups.phase));
+  const open = new Set(published.map((p) => p.phase));
+  const phases = season.phases.filter((p) => open.has(p.number));
+  return [...phases].reverse().find((p) => p.startsAt <= now) ?? phases[0];
+}
+
+/**
+ * Each pair's division in the phase the league page shows (D138), for the
+ * Ranglista's colours: the same groups and bands as the Tabella. A pair
+ * withdrawn from its group, or in none, has no entry.
+ */
+export async function pairDivisions(leagueId: number, now = new Date()): Promise<Map<number, Division>> {
+  const season = currentSeason(await listSeasons(leagueId), now);
+  if (!season || isWaiting(season)) return new Map();
+  const shown = await shownPhase(season, now);
+  if (!shown) return new Map();
+  const where = and(eq(groups.seasonId, season.id), eq(groups.phase, shown.number), isNotNull(groups.publishedAt));
+  const [list, members] = await Promise.all([
+    db.select({ id: groups.id, number: groups.number }).from(groups).where(where),
+    db
+      .select({ groupId: groupPairs.groupId, pairId: groupPairs.pairId, withdrawnAt: groupPairs.withdrawnAt })
+      .from(groupPairs)
+      .where(inArray(groupPairs.groupId, db.select({ id: groups.id }).from(groups).where(where))),
+  ]);
+  const numberOf = new Map(list.map((g) => [g.id, g.number]));
+  const out = new Map<number, Division>();
+  for (const m of members) {
+    const number = numberOf.get(m.groupId);
+    if (number !== undefined && m.withdrawnAt === null) out.set(m.pairId, divisionOf(number, list.length));
+  }
+  return out;
+}
+
+/** Every pair the account is or was in: what the league page marks as theirs (D136). */
+export async function pairIdsOf(userId: string): Promise<Set<number>> {
+  const rows = await db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  return new Set(rows.map((r) => r.id));
 }

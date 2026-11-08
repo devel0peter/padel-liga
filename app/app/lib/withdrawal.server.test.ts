@@ -197,8 +197,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     const without = never.bands[0]!.groups[0]!;
     expect(group.rows).toEqual(without.rows);
     expect(group.rows.map((r) => r.points)).toEqual([4, 4, 4]);
-    expect(group.results).toEqual(without.results);
-    expect(group.weekMatches).toEqual(without.weekMatches);
+    expect(group.weeks).toEqual(without.weeks);
     expect(group.withdrawn).toEqual([["Játékos G", "Játékos H"]]);
     expect(without.withdrawn).toEqual([]);
   });
@@ -229,7 +228,6 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
     expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
-    expect(mine!.offWeeks).toEqual([{ week: 2, opponents: "Játékos G – Játékos H" }]);
     const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
     freshDb({ withPair4: false });
     const [never] = await M.currentGroups("a", NOW);
@@ -272,11 +270,11 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     await withdraw();
     // A notice of another withdrawal with a reason, not about this pair, stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/profile#parod')")
       .run();
     // Another pair withdrawn with the same reason: its player's notice stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/profile#parod')")
       .run(`Más pár. Indok: ${REASON}`);
     expect(await A.deleteAccount("o", "g", NOW)).toEqual({ ok: true, mode: "anonymize" });
     expect(row("select withdrawn_at is not null as w, withdrawal_reason from group_pairs where pair_id = 4")).toEqual({
@@ -326,7 +324,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     ]);
   });
 
-  it("Párom: both players read that the organizer took them out, with no Nevezünk button", async () => {
+  it("Párod: both players read that the organizer took them out, with no Nevezünk button", async () => {
     await withdraw();
     const seasons = await S.listSeasons(1);
     for (const id of ["g", "h"]) {

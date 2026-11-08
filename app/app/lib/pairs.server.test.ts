@@ -61,7 +61,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(await P.pairLeagues()).toEqual([{ id: 1, name: "Padelpárbaj Győr" }]);
   });
 
-  it("creates a manual pair, audited, and both players see it on /pair", async () => {
+  it("creates a manual pair, audited, and both players see it in Párod", async () => {
     expect(await P.createPair("o", 1, "a", "b")).toEqual({ ok: true });
     expect(one("select league_id, player_a, player_b, source, status from pairs")).toEqual({
       league_id: 1,
@@ -77,7 +77,7 @@ describe("pairs.server on real SQLite (#97)", () => {
     expect(oa.pair).toEqual({ id, partnerName: "Anna", partnerEmail: "a@x.hu", partnerPhone: "" });
   });
 
-  it("shows the partner's phone on /pair, formatted (D121)", async () => {
+  it("shows the partner's phone in Párod, formatted (D121)", async () => {
     h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
     await P.createPair("o", 1, "a", "b");
     const [ob] = await P.pairOverview({ id: "b" } as any, [{ id: 1, name: "Padelpárbaj Győr" }]);
@@ -90,8 +90,8 @@ describe("pairs.server on real SQLite (#97)", () => {
     h.raw.exec(`update users set phone = '+36301234567' where id = 'a'`);
     await P.createPair("o", 1, "a", "b");
     expect(inbox()).toEqual([
-      { user_id: "a", kind: "pair_intro", url: "/pair" },
-      { user_id: "b", kind: "pair_intro", url: "/pair" },
+      { user_id: "a", kind: "pair_intro", url: "/profile#parod" },
+      { user_id: "b", kind: "pair_intro", url: "/profile#parod" },
     ]);
     expect(pairMails()).toEqual([
       {

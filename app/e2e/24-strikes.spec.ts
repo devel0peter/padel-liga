@@ -2,7 +2,7 @@
 // cron, so the suite writes two players' strikes straight into its D1. The
 // Szervező sees the counts and the season's list on "Párok" and cancels one
 // with a required reason; the player sees their own count on Kezdőlap; the
-// public league page never shows any.
+// league page (players only, D134) never shows any.
 import { expect, test } from "@playwright/test";
 
 import { ORGANIZER, PAIRS, as, content, d1, d1Insert, visit } from "./support";

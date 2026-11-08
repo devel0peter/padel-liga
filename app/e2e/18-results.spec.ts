@@ -41,11 +41,19 @@ function versus(matchId: number): string {
 const status = (page: Page) => page.getByRole("region", { name: "Állapot" });
 const result = (page: Page) => content(page).getByRole("region", { name: "Eredmény" });
 
+// Recording is folded until the fixed time has started (D133): open it if it is.
+async function openRecord(page: Page) {
+  const fold = content(page).getByText("Már lejátszottátok? Rögzítsd az eredményt");
+  if (await fold.isVisible()) await fold.click();
+  await expect(content(page).getByRole("button", { name: "Rögzítem az eredményt" })).toBeVisible();
+}
+
 async function fillScore(page: Page, rows: [string, string][]) {
   const labels = ["1. szett", "2. szett", "Szuper tie-break (csak 1:1-nél)"];
+  const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
   for (const [i, [us, them]] of rows.entries()) {
-    await result(page).getByLabel(`${labels[i]}, Ti`).fill(us);
-    await result(page).getByLabel(`${labels[i]}, Ők`).fill(them);
+    await form.getByLabel(`${labels[i]}, Ti`).fill(us);
+    await form.getByLabel(`${labels[i]}, Ők`).fill(them);
   }
 }
 
@@ -53,14 +61,14 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const [first] = annasMatches();
   const [opponent] = first!.opponents;
   const player = await as(browser, anna);
-  // Before any result the group card on Kezdőlap lists the pairs, no table (#201, #220).
+  // Before any result the group card on Kezdőlap has the table without places (#201, #220, D133).
   await visit(player.page, "/home");
-  const pairList = content(player.page).getByRole("list", { name: "Párok" });
-  await expect(pairList.getByRole("listitem").filter({ hasText: "(ti)" })).toContainText(anna.name);
-  await expect(content(player.page).getByRole("table", { name: "Tabella" })).toHaveCount(0);
+  const table = content(player.page).getByRole("table", { name: "Tabella" });
+  await expect(table.getByRole("row").filter({ hasText: "(ti)" })).toContainText(anna.name);
+  await expect(content(player.page)).toContainText("Még nincs végleges eredmény: a sorrend a kiemelés.");
 
   await visit(player.page, `/matches/${first!.id}`);
-  await expect(result(player.page).getByText("Eredmény rögzítése")).toBeVisible();
+  await openRecord(player.page);
 
   // 4:3 doesn't end a set: the engine's Hungarian message.
   await fillScore(player.page, [
@@ -68,7 +76,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
     ["4", "1"],
   ]);
   await player.page.getByRole("button", { name: "Rögzítem az eredményt" }).click();
-  await expect(result(player.page).getByRole("alert")).toContainText("1. szett: 4:3 nem lehet.");
+  await expect(content(player.page).getByRole("alert")).toContainText("1. szett: 4:3 nem lehet.");
 
   const offset = logOffset();
   await fillScore(player.page, [
@@ -104,13 +112,15 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   // Played for anna's side too, on Kezdőlap.
   const partner = await as(browser, PAIRS.p1[1]);
   await visit(partner.page, "/home");
-  await expect(content(partner.page).getByRole("list", { name: "Meccseitek" })).toContainText("Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
-  // The card now shows the table (#201, #220): their row has the match and the
-  // win's 3 points. Columns: #, Pár, M, P, Szett, Játék.
-  await expect(content(partner.page).getByRole("list", { name: "Párok" })).toHaveCount(0);
+  // The group's matches show the score from pair A's side (D140).
+  await expect(content(partner.page).getByRole("group", { name: "A csoport meccsei" }).getByLabel(/^Eredmény: /)).toHaveCount(1);
+  // The table is ranked now (#201, #220): their row has the match, the win and
+  // its 3 points. Columns: #, Pár, M, Gy, V, Szett, Játék, P (D133).
+  await expect(content(partner.page)).not.toContainText("Még nincs végleges eredmény");
   const ours = content(partner.page).getByRole("table", { name: "Tabella" }).getByRole("row").filter({ hasText: "(ti)" });
   await expect(ours.getByRole("cell").nth(2)).toHaveText("1");
-  await expect(ours.getByRole("cell").nth(3)).toHaveText("3");
+  await expect(ours.getByRole("cell").nth(3)).toHaveText("1");
+  await expect(ours.getByRole("cell").nth(7)).toHaveText("3");
   await partner.context.close();
   await player.context.close();
 });
@@ -121,6 +131,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   // Anna records a 2:0 win on her other match (scheduled in step 19).
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${second!.id}`);
+  await openRecord(player.page);
   await fillScore(player.page, [
     ["4", "2"],
     ["5", "3"],
@@ -131,7 +142,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   // The other pair disputes it with its own version and a note.
   const other = await as(browser, opponent!);
   await visit(other.page, `/matches/${second!.id}`);
-  await expect(result(other.page).getByText("Nem így volt?")).toBeVisible();
+  await result(other.page).getByText("Nem így volt?").click();
   const dispute = result(other.page).locator("form").filter({ has: other.page.getByRole("button", { name: "Vitatom az eredményt" }) });
   await dispute.getByLabel("1. szett, Ti").fill("4");
   await dispute.getByLabel("1. szett, Ők").fill("2");

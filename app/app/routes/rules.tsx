@@ -20,7 +20,7 @@ const components: Components = {
   h1: ({ children }) => (
     <h1 className="font-display text-[clamp(2rem,5vw,3rem)] font-black">{children}</h1>
   ),
-  // "8. Egyéni értékszám" gets id="section-8", the target of the table of contents.
+  // "8. Egyéni Élő-pont" gets id="section-8", the target of the table of contents.
   h2: ({ children }) => {
     const number = /^(\d+)\./.exec(String(children))?.[1];
     return (

@@ -103,7 +103,7 @@ describe("notification switches (#115)", () => {
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
     expect(all("select to_email from email_messages")).toEqual([{ to_email: "b@x.hu" }]);
     for (const id of ["a", "b"])
-      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Beneveztetek", url: "/pair" }]);
+      expect(inbox(id)).toEqual([{ kind: "season_entry_decision", title: "Beneveztetek", url: "/profile#parod" }]);
     // Push is a separate switch.
     expect(h.pushed.sort()).toEqual([endpoint("a"), endpoint("b")]);
   });

@@ -5,6 +5,7 @@ import { AuthPage } from "~/components/auth";
 import { Button } from "~/components/ui/button";
 import { getUser, requireUser } from "~/lib/auth/session.server";
 import { acceptPairLink, pairLinkPath, pairLinkView } from "~/lib/pair-links.server";
+import { PAIR_SECTION_PATH, pairSectionUrl } from "~/lib/pairs";
 import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 
 // A player's pair link (2026-10-31), opened by the partner they sent it to.
@@ -30,7 +31,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireUser(request);
   const result = await acceptPairLink(user, params.token);
-  if (result.ok) return redirect("/pair?joined=1");
+  if (result.ok) return redirect(pairSectionUrl("?joined=1"));
   return { error: result.error };
 }
 
@@ -62,8 +63,8 @@ export default function PairJoin({ loaderData: d, actionData }: Route.ComponentP
           <p role="alert" className="font-semibold text-destructive">
             {error}
           </p>
-          <Link to="/pair" className="underline">
-            Párom
+          <Link to={PAIR_SECTION_PATH} className="underline">
+            Párod a Profilban
           </Link>
         </div>
       ) : (

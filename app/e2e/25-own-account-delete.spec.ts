@@ -24,7 +24,7 @@ test("Fiók törlése: a player without history deletes their own account", asyn
   const other = await two.newPage();
   await logIn(other, TEST.email);
 
-  await visit(page, "/profile");
+  await visit(page, "/profile?tab=settings");
   await content(page).getByRole("button", { name: "Fiók törlése" }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("Törlöd a fiókodat?");
@@ -54,7 +54,7 @@ test("Fiók törlése: refused while the pair plays, and for the Admin", async (
   const anna = PAIRS.p1[0];
   // Anna's pair is in a published group of a phase that hasn't ended (step 11).
   const player = await as(browser, anna);
-  await visit(player.page, "/profile");
+  await visit(player.page, "/profile?tab=settings");
   await content(player.page).getByRole("button", { name: "Fiók törlése" }).click();
   const dialog = player.page.getByRole("alertdialog");
   await expect(dialog).toContainText("Most nem törölheted: a párod kihirdetett csoportban játszik");
@@ -63,7 +63,7 @@ test("Fiók törlése: refused while the pair plays, and for the Admin", async (
   await player.context.close();
 
   const admin = await as(browser, ADMIN.email);
-  await visit(admin.page, "/profile");
+  await visit(admin.page, "/profile?tab=settings");
   await content(admin.page).getByRole("button", { name: "Fiók törlése" }).click();
   await expect(admin.page.getByRole("alertdialog")).toContainText("Adminként a saját fiókodat nem törölheted.");
   await admin.context.close();

@@ -1,5 +1,7 @@
 import { Link } from "react-router";
 
+import { CardContent, CardHeader, CardTitle, Card as UiCard } from "~/components/ui/card";
+
 import { pairPath, playerPath, type ProfileMatchView, type ProfilePair, type ProfilePerson } from "~/lib/profiles";
 
 // Shared pieces of the pair and player profiles (#36; members only, D112),
@@ -25,12 +27,15 @@ export function PairLink({ pair }: { pair: ProfilePair }) {
   );
 }
 
+// One block of a profile: the app's card with a heading (D136).
 export function Card({ title, children, label }: { title: string; children: React.ReactNode; label?: string }) {
   return (
-    <section aria-label={label ?? title} className="grid gap-3 rounded-2xl border bg-background p-4 text-foreground sm:p-5">
-      <h2 className="font-display text-xl font-extrabold">{title}</h2>
-      {children}
-    </section>
+    <UiCard role="region" aria-label={label ?? title}>
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3">{children}</CardContent>
+    </UiCard>
   );
 }
 
@@ -57,7 +62,7 @@ export function MatchList({ matches, empty }: { matches: ProfileMatchView[]; emp
             </span>
             {m.elo && (
               <span className="text-sm" data-testid="elo-change">
-                Értékszám: <strong>{m.elo.delta}</strong> → {m.elo.after}
+                Élő-pont: <strong>{m.elo.delta}</strong> → {m.elo.after}
               </span>
             )}
           </div>
@@ -68,7 +73,7 @@ export function MatchList({ matches, empty }: { matches: ProfileMatchView[]; emp
 }
 
 // The rating after each rated match as a small line chart, oldest left. A
-// list says the same in text (the match list's "Értékszám" lines).
+// list says the same in text (the match list's "Élő-pont" lines).
 export function EloChart({ points }: { points: number[] }) {
   if (points.length < 2) return null;
   const width = 320;
@@ -86,7 +91,7 @@ export function EloChart({ points }: { points: number[] }) {
         viewBox={`0 0 ${width} ${height}`}
         className="h-24 w-full max-w-md text-court"
         role="img"
-        aria-label={`Értékszám a meccsek után: ${points.join(", ")}`}
+        aria-label={`Élő-pont a meccsek után: ${points.join(", ")}`}
       >
         <polyline points={line} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((v, i) => (

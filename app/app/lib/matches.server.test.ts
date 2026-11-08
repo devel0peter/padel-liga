@@ -112,13 +112,17 @@ describe("currentGroups (#25)", () => {
     expect(g!.matches.map((m) => m.week)).toEqual([2, 3]);
   });
 
-  it("shows the opponents' phone numbers, never an email address", async () => {
+  it("shows the opponents' phone numbers and email addresses, no one else's (D135)", async () => {
     const [g] = await M.currentGroups("p1a", NOW);
     expect(g!.matches[0]!.contacts).toEqual([
-      { name: "Játékos 3A", phone: "+36 30 300 0001" },
-      { name: "Játékos 3B", phone: "+36 30 300 0002" },
+      { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+      { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
     ]);
-    expect(JSON.stringify(g)).not.toContain("@");
+    // Only the opponents' addresses: not the player's own, the partner's or another group's.
+    const emails = JSON.stringify(g).match(/[\w.+-]+@[\w.-]+/g) ?? [];
+    expect(new Set(emails)).toEqual(new Set(g!.matches.flatMap((m) => m.contacts.map((c) => c.email))));
+    expect(emails).not.toContain("p1a@x.hu");
+    expect(emails).not.toContain("p1b@x.hu");
     // The player's own partner's phone isn't there either.
     expect(JSON.stringify(g)).not.toContain("+36 30 100");
   });
@@ -218,7 +222,15 @@ describe("matchPage (#25, #26)", () => {
     expect(page.contacts.map((c) => c.name)).toEqual(["Játékos 3A", "Játékos 3B"]);
     expect(page.clubs).toEqual([{ id: 1, name: "Ace Padel" }]);
     expect(page.actions).toMatchObject({ propose: true, recordAgreed: true });
-    expect(JSON.stringify(page)).not.toContain("@");
+    // The opponents' addresses only (D135).
+    expect(page.contacts.map((c) => c.email)).toEqual(["p3a@x.hu", "p3b@x.hu"]);
+    expect(JSON.stringify(page).match(/[\w.+-]+@[\w.-]+/g)).toEqual(["p3a@x.hu", "p3b@x.hu"]);
+  });
+
+  it("an anonymized opponent has no email address (D135)", async () => {
+    h.raw.exec(`update users set email = 'deleted-p3a@deleted.invalid' where id = 'p3a'`);
+    const page = (await M.matchPage(matchOf(1, 3), "p1a", NOW))!;
+    expect(page.contacts.map((c) => c.email)).toEqual([null, "p3b@x.hu"]);
   });
 
   it("after the deadline: no phones and no actions", async () => {

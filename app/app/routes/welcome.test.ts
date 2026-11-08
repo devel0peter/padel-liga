@@ -112,16 +112,16 @@ describe("Férfi or Nő (#133)", () => {
   it("asks an existing account once, then sends it on where it was going", async () => {
     h.raw.prepare("insert into users (id, email, name, level, phone, consent_at) values ('old', 'old@x.hu', 'Régi Ödön', 'halado', '+36301234567', 1)").run();
     const cookie = (await createSession("old")).split(";")[0]!;
-    const pair = new Request("http://localhost/pair", { headers: { Cookie: cookie } });
-    expect(await redirectOf(requireUser(pair))).toBe("/welcome?returnTo=%2Fpair");
-    const page = await R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fpair", { headers: { Cookie: cookie } })));
-    expect(page).toEqual({ onlySex: true, returnTo: "/pair" });
-    expect(await R.action(args(post(cookie, { sex: "x", returnTo: "/pair" })))).toEqual({ errors: { sex: "Válaszd ki: férfi vagy nő." } });
-    expect(await redirectOf(R.action(args(post(cookie, { sex: "male", returnTo: "/pair" }))))).toBe("/pair");
+    const pair = new Request("http://localhost/profile", { headers: { Cookie: cookie } });
+    expect(await redirectOf(requireUser(pair))).toBe("/welcome?returnTo=%2Fprofile");
+    const page = await R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fprofile", { headers: { Cookie: cookie } })));
+    expect(page).toEqual({ onlySex: true, returnTo: "/profile" });
+    expect(await R.action(args(post(cookie, { sex: "x", returnTo: "/profile" })))).toEqual({ errors: { sex: "Válaszd ki: férfi vagy nő." } });
+    expect(await redirectOf(R.action(args(post(cookie, { sex: "male", returnTo: "/profile" }))))).toBe("/profile");
     expect(row("old")).toEqual({ sex: "male", done: 1 });
     // Asked once: from now on it goes straight through.
-    expect((await requireUser(new Request("http://localhost/pair", { headers: { Cookie: cookie } }))).sex).toBe("male");
-    expect(await redirectOf(R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fpair", { headers: { Cookie: cookie } }))))).toBe("/pair");
+    expect((await requireUser(new Request("http://localhost/profile", { headers: { Cookie: cookie } }))).sex).toBe("male");
+    expect(await redirectOf(R.loader(args(new Request("http://localhost/welcome?returnTo=%2Fprofile", { headers: { Cookie: cookie } }))))).toBe("/profile");
   });
 
   it("Profil saves a change, and only Férfi or Nő", async () => {

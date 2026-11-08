@@ -1,13 +1,15 @@
 import type { Route } from "./+types/pair-profile";
 import { AppPage } from "~/components/app-page";
 import { Card, MatchList, PersonLink } from "~/components/profile-parts";
+import { ProfileSummary } from "~/components/player-profile-view";
 import { requireUser } from "~/lib/auth/session.server";
 import { pairName } from "~/lib/profiles";
 import { pairProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
-// A pair's profile (#36, spec sections 14, 17): its two players, its group
-// in every phase and its final results. For logged-in members only (D112):
+// A pair's profile (#36, spec sections 14, 17): its two players, the summary
+// (D136: the pair's Élő-pont, seasons, rounds, matches, wins, losses), its
+// group in every phase and its final results. For logged-in members only (D112):
 // a visitor goes to the login page and comes back. Names only: no email or
 // phone is selected on the way here.
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -26,7 +28,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export default function PairProfile({ loaderData: d }: Route.ComponentProps) {
   return (
     <AppPage
-      back={{ to: `/league/${d.league.slug}`, label: d.league.name }}
+      back={{ to: `/league/${d.league.slug}`, label: "Tabella" }}
       title={
         <span className="grid leading-tight">
           <PersonLink person={d.pair.players[0]} />
@@ -35,6 +37,7 @@ export default function PairProfile({ loaderData: d }: Route.ComponentProps) {
       }
     >
       <div className="grid max-w-4xl gap-6">
+        <ProfileSummary elo={d.elo} stats={d.stats} started={d.started} eloTestId={d.elo != null ? "pair-elo" : undefined} />
         <Card title="Csoportok">
           <ul className="grid gap-2">
             {d.groups.map((g) => (

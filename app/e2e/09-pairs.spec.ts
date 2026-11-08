@@ -90,9 +90,9 @@ test("14. create, dissolve and change pairs; a published pair is locked", async 
   await expect(locked).toContainText(/Nevezés \(.+\): Nevezett/);
   await expect(content(page)).not.toContainText("@example.test");
 
-  // The players see the entry on Párom and both changes on Értesítések.
+  // The players see the entry in Párod and both changes on Értesítések.
   const player = await as(browser, torok);
-  await visit(player.page, "/pair");
+  await visit(player.page, "/profile");
   await expect(content(player.page)).toContainText(boglarka.name);
   await expect(content(player.page)).toContainText("Beneveztetek: a 2. körtől játszotok.");
   // A paired player still reads that they can write to us if the pair should change (#124).

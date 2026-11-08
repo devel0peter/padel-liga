@@ -1,4 +1,4 @@
-// The profile level and the értékszám (#135). Pure.
+// The profile level and the Élő-pont (#135). Pure.
 //
 // The level is the player's own guess and only sets the starting rating
 // (szabályzat section 8). Once they took part in a season the league's
@@ -7,10 +7,10 @@
 import { currentElo } from "@padel-liga/rules";
 
 export const LEVEL_LOCKED_NOTE =
-  "A szinted lezárult: mostantól a liga eredményei döntik el, hol tartasz. Ezt az értékszámod mutatja.";
+  "A szinted lezárult: mostantól a liga eredményei döntik el, hol tartasz. Ezt az Élő-pontod mutatja.";
 export const LEVEL_LOCKED_ERROR = "A szintedet már nem módosíthatod: a liga eredményei döntik el.";
 
-// The értékszám to show, rounded: the rating from the player's played
+// The Élő-pont to show, rounded: the rating from the player's played
 // matches (#13), before the first one the starting value of the level. Null
 // without either.
 export function ratingFor(level: string | null | undefined, elo: number | null = null): number | null {

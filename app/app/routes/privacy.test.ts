@@ -43,7 +43,7 @@ describe("privacy page (#334)", () => {
   });
 
   it("says who sees the phone number and the email address as spec 17 does (D121, D126)", () => {
-    expect(text).toContain("A párod látja az e-mail-címedet és a telefonszámodat a Párom oldalon");
+    expect(text).toContain("A párod látja az e-mail-címedet és a telefonszámodat a Profil oldalon");
     expect(text).toContain("szintjét és telefonszámát látja, az e-mail-címeteket nem");
     expect(text).not.toContain("a párod csak a neved látja");
     expect(text).not.toContain("az e-mail-címe és a telefonszáma nélkül");

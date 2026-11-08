@@ -1,17 +1,24 @@
-import { ChevronRight, Phone } from "lucide-react";
+import { ChevronRight, Mail, Phone } from "lucide-react";
 import { Link } from "react-router";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { formatDeadline, signed } from "~/lib/format";
+import { autoAcceptAt } from "@padel-liga/rules";
+
+import { FixtureList } from "~/components/fixture-list";
+import { StandingsTable } from "~/components/standings-table";
+import { Button } from "~/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
-import { groupLine, statusView, telHref, todoFor, type Tone } from "~/lib/matches";
-import type { HomeGroup, Opponent } from "~/lib/matches.server";
+import { formatSlot, groupLine, statusView, telHref, todoFor, venueLine, type Tone } from "~/lib/matches";
+import type { HomeGroup, HomeMatch } from "~/lib/matches.server";
+import { pairPath } from "~/lib/profiles";
 import { resultStatusView, resultTodo } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
-// Kezdőlap once the groups are out (#25): the Teendők, then the player's
-// group and matches by week. Mobile first: nothing scrolls sideways at 390 px.
+// Kezdőlap once the groups are out (#25, D133, D136, D140): Teendők (only
+// when there is one), Következő meccsetek (the next match with the opponents'
+// contacts, only while there is one) and the group: its table and, under it,
+// every match of the group with its result, the pair's own rows a link.
 
 const TONE: Record<Tone, string> = {
   todo: "bg-nav-active-bg text-nav-active",
@@ -20,26 +27,43 @@ const TONE: Record<Tone, string> = {
 };
 
 export function StatusPill({ label, tone }: { label: string; tone: Tone }) {
-  return <span className={cn("inline-block rounded-md px-2 py-0.5 text-xs font-semibold", TONE[tone])}>{label}</span>;
+  return <span className={cn("inline-block rounded-md px-2 py-1 text-xs font-semibold", TONE[tone])}>{label}</span>;
 }
 
-// The other pair's phone numbers, tap to call (#25 requirement 4). Never an
-// email address.
-export function Contacts({ contacts }: { contacts: Opponent[] }) {
+// The state as one line of text: the colour says whose move it is.
+const LINE: Record<Tone, string> = {
+  todo: "font-semibold text-nav-active",
+  waiting: "text-muted-foreground",
+  done: "text-muted-foreground",
+};
+
+export type Contact = { name: string; phone: string; email?: string | null };
+
+// The other pair's players while the match is to be played (D135): tap to
+// call, tap to write. Big enough for a thumb (40 px rows).
+export function Contacts({ contacts, className }: { contacts: Contact[]; className?: string }) {
   if (contacts.length === 0) return null;
+  const link = "inline-flex min-h-10 min-w-0 items-center gap-1.5 no-underline hover:underline";
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+    <ul className={cn("grid gap-2", className)} aria-label="Az ellenfelek elérhetősége">
       {contacts.map((c) => (
-        <li key={c.name} className="min-w-0">
+        <li key={c.name} className="flex min-w-0 flex-wrap items-center gap-x-4 rounded-lg border bg-background px-3 py-1 text-sm">
+          <span className="w-full pt-1 font-semibold break-words sm:w-auto sm:pt-0">{c.name}</span>
           {c.phone ? (
-            <a href={telHref(c.phone)} className="inline-flex items-center gap-1 underline">
-              <Phone className="size-3.5 shrink-0" />
-              <span className="break-words">
-                {c.name}: {c.phone}
-              </span>
+            <a href={telHref(c.phone)} className={link}>
+              <Phone aria-hidden className="size-4 shrink-0 text-court" />
+              <span className="sr-only">Hívás: </span>
+              {c.phone}
             </a>
           ) : (
-            <span className="text-muted-foreground">{c.name}: nincs telefonszám</span>
+            <span className="inline-flex min-h-10 items-center text-muted-foreground">Nincs telefonszám</span>
+          )}
+          {c.email && (
+            <a href={`mailto:${c.email}`} className={link}>
+              <Mail aria-hidden className="size-4 shrink-0 text-court" />
+              <span className="sr-only">E-mail: </span>
+              <span className="min-w-0 [overflow-wrap:anywhere]">{c.email}</span>
+            </a>
           )}
         </li>
       ))}
@@ -47,146 +71,134 @@ export function Contacts({ contacts }: { contacts: Opponent[] }) {
   );
 }
 
-export type Todo = { matchId: number; text: string };
+export type Todo = { matchId: number; text: string; due: string | null };
 
 export function todos(groups: readonly HomeGroup[]): Todo[] {
   return groups.flatMap((g) =>
     g.matches.flatMap((m) => {
       // Once a result exists, only its confirmation can be a Teendő (#28).
-      const text = m.result.status === "none" ? todoFor(m.state, m.side, m.opponents) : resultTodo(m.result, m.side, m.opponents);
-      return text ? [{ matchId: m.id, text }] : [];
+      if (m.result.status !== "none") {
+        const text = resultTodo(m.result, m.side, m.opponents);
+        const auto = autoAcceptAt(m.result);
+        return text ? [{ matchId: m.id, text, due: auto ? `${formatDeadline(auto)} után magától elfogadjuk` : null }] : [];
+      }
+      const text = todoFor(m.state, m.side, m.opponents);
+      return text ? [{ matchId: m.id, text, due: `határidő: ${formatDeadline(g.deadline)}` }] : [];
     }),
   );
 }
 
-// Teendők (#25 requirement 3, spec 13): every open item, each a link to it.
+// Teendők (spec 13, docs/player-ui.md H1): every open item, each a link to it,
+// with its deadline. The page leaves it out when there is none.
 export function Todos({ items }: { items: Todo[] }) {
   return (
-    <section aria-labelledby="teendok" className="grid max-w-2xl gap-2 rounded-lg border border-nav-active bg-nav-active-bg p-4 sm:p-6">
-      <h2 id="teendok" className="font-display text-lg font-bold">
-        Teendők
-      </h2>
-      {items.length === 0 ? (
-        <p className="text-muted-foreground">Most nincs teendőd.</p>
-      ) : (
-        <ul className="grid gap-1">
+    <Card role="region" aria-labelledby="teendok" className="ring-nav-active/40">
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2} id="teendok" className="font-display text-lg font-bold">
+          Teendők
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid divide-y">
           {items.map((t) => (
             <li key={`${t.matchId}:${t.text}`}>
-              <Link to={`/matches/${t.matchId}`} className="inline-flex items-start gap-1 font-medium underline">
-                <ChevronRight className="mt-0.5 size-4 shrink-0" />
-                {t.text}
+              <Link to={`/matches/${t.matchId}`} className="flex min-h-12 items-center gap-2 py-2 no-underline hover:text-nav-active">
+                <span className="grid min-w-0 flex-1">
+                  <span className="font-semibold break-words">{t.text}</span>
+                  {t.due && <span className="text-xs text-muted-foreground">{t.due}</span>}
+                </span>
+                <ChevronRight aria-hidden className="size-4 shrink-0 text-nav-active" />
               </Link>
             </li>
           ))}
         </ul>
-      )}
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 
-// The group's standing (#201): the public league page's table (rank, matches,
-// points, set and game difference), from final results only. Before any
-// result there is no ranking to show, so the pairs are listed without numbers.
-function GroupTable({ pairs }: { pairs: HomeGroup["pairs"] }) {
-  if (pairs.every((p) => p.matches === 0)) {
-    return (
-      <ul className="grid gap-1" aria-label="Párok">
-        {pairs.map((p) => (
-          <li key={p.pairId} className={cn("break-words", p.mine && "font-semibold")}>
-            {p.name}
-            {p.mine && " (ti)"}
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  return (
-    <Table className="table-fixed" aria-label="Tabella">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-7 px-1">#</TableHead>
-          <TableHead className="px-1">Pár</TableHead>
-          <TableHead className="w-9 px-1 text-right" title="Lejátszott meccsek">
-            M
-          </TableHead>
-          <TableHead className="w-9 px-1 text-right" title="Pont">
-            P
-          </TableHead>
-          <TableHead className="w-11 px-1 text-right" title="Szettkülönbség">
-            Szett
-          </TableHead>
-          <TableHead className="w-12 px-1 text-right" title="Játékkülönbség">
-            Játék
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {pairs.map((p) => (
-          <TableRow key={p.pairId} className={cn(p.mine && "font-semibold")}>
-            <TableCell className="px-1 font-bold">{p.rank}.</TableCell>
-            <TableCell className="px-1 break-words whitespace-normal">
-              {p.name}
-              {p.mine && " (ti)"}
-            </TableCell>
-            <TableCell className="px-1 text-right">{p.matches}</TableCell>
-            <TableCell className="px-1 text-right font-bold">{p.points}</TableCell>
-            <TableCell className="px-1 text-right">{signed(p.setDiff)}</TableCell>
-            <TableCell className="px-1 text-right">{signed(p.gameDiff)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+// The match to look at now: the first one whose result isn't final yet.
+const nextMatch = (g: HomeGroup) => [...g.matches].sort((x, y) => x.week - y.week).find((m) => m.result.status !== "final") ?? null;
+
+function statusOf(m: HomeMatch) {
+  return resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue);
 }
 
-export function MyGroup({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
-  const weeks = [1, 2, 3].map((week) => ({
-    week,
-    match: g.matches.find((m) => m.week === week) ?? null,
-    off: g.offWeeks.find((o) => o.week === week) ?? null,
-  }));
+// When and where, once a time is fixed or agreed.
+function whenWhere(m: HomeMatch): string | null {
+  if (m.result.status !== "none") return null;
+  if (m.state.status === "scheduled") return [formatSlot(m.state.slot), venueLine(m.venue, m.state.court)].filter(Boolean).join(" · ");
+  return null;
+}
+
+// Következő meccsetek (docs/player-ui.md H2, D140): the first match whose
+// result isn't final yet: opponents, its state, when and where once fixed,
+// the opponents' contacts and the way in. Nothing once every match is final;
+// the group's fixture list under the table has them all.
+export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
+  const m = nextMatch(g);
+  if (!m) return null;
+  const status = statusOf(m);
+  const fixed = whenWhere(m);
+  const current = g.fixtures.find((w) => w.current)?.week === m.week;
   return (
-    <Card className="max-w-2xl" aria-label={groupLine(g.number, g.groupCount)}>
+    <Card role="region" aria-labelledby={`kovetkezo-${g.groupId}`}>
       <CardHeader>
-        <CardTitle className="font-display text-lg">{groupLine(g.number, g.groupCount)}</CardTitle>
+        <CardTitle role="heading" aria-level={2} id={`kovetkezo-${g.groupId}`} className="font-display text-lg font-bold">
+          Következő meccsetek{multiLeague ? ` · ${g.league}` : ""}
+        </CardTitle>
         <CardDescription>
-          {multiLeague ? `${g.league}, ` : ""}
-          {g.season}, {g.phase}. kör · határidő: {formatDeadline(g.deadline)}
+          {m.week}. hét · {weekRange(g.phaseStartsAt, m.week)}
+          {current && <span className="font-semibold text-court"> · ez a hét</span>}
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm">
-        <GroupTable pairs={g.pairs} />
-        {g.withdrawn.length > 0 && (
-          <p className="text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>
-        )}
-        <ul className="grid gap-3" aria-label="Meccseitek">
-          {weeks.map(({ week, match: m, off }) => (
-            <li key={week} className="grid gap-1.5 rounded-md border p-3">
-              <p className="text-xs font-semibold text-muted-foreground">
-                {week}. hét · {weekRange(g.phaseStartsAt, week)}
-              </p>
-              {m ? (
-                <>
-                  <p className="font-medium break-words">{m.opponents} ellen</p>
-                  <div>
-                    <StatusPill {...(resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue))} />
-                  </div>
-                  <Contacts contacts={m.contacts} />
-                  <Link to={`/matches/${m.id}`} className="inline-flex w-fit items-center gap-1 font-semibold underline">
-                    Egyeztetés és részletek
-                    <ChevronRight className="size-4" />
-                  </Link>
-                </>
-              ) : off ? (
-                <p className="text-muted-foreground">
-                  {off.opponents} visszalépett a körből: ez a meccs elmarad, és nem számít a tabellában.
-                </p>
-              ) : (
-                <p className="text-muted-foreground">Pihenőhét: ezen a héten nem játszotok.</p>
-              )}
-            </li>
-          ))}
-        </ul>
+      <CardContent className="grid gap-3">
+        <div className="grid gap-0.5">
+          <p className="font-semibold break-words">{m.opponents} ellen</p>
+          <p className={cn("text-sm", LINE[status.tone])}>{status.label}</p>
+          {fixed && <p className="text-sm font-medium">{fixed}</p>}
+        </div>
+        <Contacts contacts={m.contacts} />
+        <Button asChild size="sm" className="w-fit">
+          <Link to={`/matches/${m.id}`} className="no-underline">
+            A meccs oldala
+            <ChevronRight aria-hidden />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+// The group (docs/player-ui.md H3): its table, where the pair stands on the
+// ladder and the group's matches with their results (D138); the pair's own
+// rows are marked and open their match page (D140).
+export function GroupStanding({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
+  const title = groupLine(g.number, g.groupCount);
+  return (
+    <Card role="region" aria-label={title}>
+      <CardHeader>
+        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
+        <CardDescription>
+          {multiLeague ? `${g.league}, ` : ""}
+          {g.season}, {g.phase}. kör. {capitalize(g.standing)}.
+        </CardDescription>
+        <CardAction>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/league/${g.leagueSlug}`} className="no-underline">
+              Tabella
+              <ChevronRight aria-hidden />
+            </Link>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        <StandingsTable rows={g.pairs} ranked={g.ranked} linkFor={pairPath} />
+        {g.withdrawn.length > 0 && <p className="text-sm text-muted-foreground">Visszalépett: {g.withdrawn.join(", ")}. A meccseik nem számítanak.</p>}
+        <h3 className="mt-2 font-semibold">A csoport meccsei</h3>
+        <FixtureList weeks={g.fixtures} label="A csoport meccsei" />
       </CardContent>
     </Card>
   );

@@ -3,6 +3,9 @@
 // that nothing but names leaves the module (#30).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { FixtureMatch } from "~/lib/fixtures";
+import type { LadderGroup } from "~/lib/ladder";
+
 const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
@@ -66,6 +69,15 @@ const at = (iso: string) => new Date(iso);
 
 beforeEach(freshDb);
 
+// A fixture-list match's score as one line ("4:1, 2:4, szuper tie-break 10:7"), or its note.
+const scoreOf = (m: FixtureMatch) =>
+  m.sets
+    ? [m.sets.map(([a, b]) => `${a}:${b}`).join(", "), m.superTieBreak && `szuper tie-break ${m.superTieBreak.join(":")}`].filter(Boolean).join(", ")
+    : m.note;
+const allMatches = (g: LadderGroup) => g.weeks.flatMap((w) => w.matches);
+const scores = (g: LadderGroup) => allMatches(g).map(scoreOf).filter(Boolean).sort();
+const between = (g: LadderGroup, a: number, b: number) => allMatches(g).find((m) => m.a.names[0] === `Játékos ${a}A` && m.b.names[0] === `Játékos ${b}A`)!;
+
 describe("ladderPage", () => {
   it("is null for a league that doesn't exist", async () => {
     expect(await ladderPage("nincs", at("2026-11-10T10:00:00Z"))).toBeNull();
@@ -99,24 +111,22 @@ describe("ladderPage", () => {
     const weekOf = async (now: string) => {
       const page = await ladderPage("gyor", at(now));
       if (page?.kind !== "ladder") throw new Error("no ladder");
-      return { week: page.week, started: page.started, matches: page.bands[0]!.groups[0]!.weekMatches.length, range: [page.weekFrom, page.weekTo] };
+      const current = page.bands[0]!.groups[0]!.weeks.find((w) => w.current)?.week ?? null;
+      return { week: page.week, started: page.started, current, range: [page.weekFrom, page.weekTo] };
     };
-    expect(await weekOf("2026-11-07T10:00:00Z")).toEqual({ week: 1, started: false, matches: 1, range: ["nov. 9.", "nov. 15."] });
-    expect(await weekOf("2026-11-17T10:00:00Z")).toEqual({ week: 2, started: true, matches: 1, range: ["nov. 16.", "nov. 22."] });
+    expect(await weekOf("2026-11-07T10:00:00Z")).toEqual({ week: 1, started: false, current: null, range: ["nov. 9.", "nov. 15."] });
+    expect(await weekOf("2026-11-17T10:00:00Z")).toEqual({ week: 2, started: true, current: 2, range: ["nov. 16.", "nov. 22."] });
   });
 
   it("shows a scheduled match's time in Budapest time, and 'no time yet' for the others", async () => {
     publish(1, 1);
     // Week 1 is pair 1011 vs 1012: agreed for Tue 10 Nov 2026, 18:30 Budapest (17:30 UTC).
-    h.raw
-      .prepare("update matches set status = 'scheduled', scheduled_at = ? where pair_a = 1011 and pair_b = 1012")
-      .run(sec("2026-11-10T17:30:00Z"));
+    h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where pair_a = 1011 and pair_b = 1012").run(sec("2026-11-10T17:30:00Z"));
     const page = await ladderPage("gyor", at("2026-11-07T10:00:00Z"));
     if (page?.kind !== "ladder") throw new Error("no ladder");
-    expect(page.bands[0]!.groups[0]!.weekMatches.map((m) => m.when)).toEqual(["nov. 10., kedd 18:30"]);
-    const week2 = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
-    if (week2?.kind !== "ladder") throw new Error("no ladder");
-    expect(week2.bands[0]!.groups[0]!.weekMatches.map((m) => m.when)).toEqual([null]);
+    const [w1, w2] = page.bands[0]!.groups[0]!.weeks;
+    expect(w1!.matches.map((m) => [m.state, m.when])).toEqual([["scheduled", "nov. 10., kedd 18:30"]]);
+    expect(w2!.matches.map((m) => [m.state, m.when])).toEqual([["open", null]]);
   });
 
   it("shows the table in table order (Elo, then seed), with names, before any result", async () => {
@@ -148,15 +158,17 @@ describe("ladderPage", () => {
       }
       h.raw.prepare("insert into pairs (id, league_id, player_a, player_b) values (1014, 1, 'u1014a', 'u1014b')").run();
       h.raw.prepare("insert into group_pairs (group_id, pair_id, seed) values (?, 1014, 4)").run(groupId);
-      for (const [a, week] of [[1011, 3], [1012, 2], [1013, 1]] as const)
+      for (const [a, week] of [
+        [1011, 3],
+        [1012, 2],
+        [1013, 1],
+      ] as const)
         h.raw
           .prepare("insert into matches (group_id, pair_a, pair_b, week, deadline) values (?, ?, 1014, ?, ?)")
           .run(groupId, a, week, sec(STARTS[0]!) + 21 * 86400 - 60);
     }
     const setMatch = (a: number, b: number, status: string, outcome: Outcome | null) =>
-      h.raw
-        .prepare("update matches set status = ?, outcome = ? where pair_a = ? and pair_b = ?")
-        .run(status, outcome ? JSON.stringify(outcome) : null, a, b);
+      h.raw.prepare("update matches set status = ?, outcome = ? where pair_a = ? and pair_b = ?").run(status, outcome ? JSON.stringify(outcome) : null, a, b);
     const tableOf = async () => {
       const page = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
       if (page?.kind !== "ladder") throw new Error("no ladder");
@@ -167,9 +179,25 @@ describe("ladderPage", () => {
     function playSeason() {
       fourPairGroup();
       // Confirmed: 1011 beats 1012.
-      setMatch(1011, 1012, "final", played([[4, 1], [4, 2]]));
+      setMatch(
+        1011,
+        1012,
+        "final",
+        played([
+          [4, 1],
+          [4, 2],
+        ]),
+      );
       // Auto-accepted (a ruling with no user): 1013 beats 1011.
-      setMatch(1011, 1013, "final", played([[1, 4], [2, 4]]));
+      setMatch(
+        1011,
+        1013,
+        "final",
+        played([
+          [1, 4],
+          [2, 4],
+        ]),
+      );
       // Organizer walkover: 1012 wins 4-0 4-0 over 1013.
       setMatch(1012, 1013, "final", { kind: "walkover", winner: "a" });
       // A result that waits for the other pair, and a disputed one.
@@ -190,12 +218,30 @@ describe("ladderPage", () => {
 
     it("a waiting or disputed result stays out whatever outcome is stored on the match", async () => {
       playSeason();
-      setMatch(1012, 1014, "result_pending", played([[4, 0], [4, 0]]));
-      setMatch(1011, 1014, "disputed", played([[4, 0], [4, 0]]));
+      setMatch(
+        1012,
+        1014,
+        "result_pending",
+        played([
+          [4, 0],
+          [4, 0],
+        ]),
+      );
+      setMatch(
+        1011,
+        1014,
+        "disputed",
+        played([
+          [4, 0],
+          [4, 0],
+        ]),
+      );
       const { rows, group } = await tableOf();
       expect(rows["1014"]).toEqual([0, 0]);
       expect(rows["1011"]).toEqual([4, 2]);
-      expect(group.results.map((m) => m.result)).toEqual(["4:1, 4:2", "kontumác"]); // week 2 is shown above, not listed again
+      // Both stay in the fixture list, without a score.
+      expect(between(group, 1012, 1014)).toMatchObject({ state: "pending", sets: null, winner: null });
+      expect(between(group, 1011, 1014)).toMatchObject({ state: "disputed", sets: null, winner: null });
     });
 
     it("a disputed result counts as soon as the organizer decides it", async () => {
@@ -212,8 +258,8 @@ describe("ladderPage", () => {
       const { rows, group } = await tableOf();
       expect(rows).toEqual({ "1011": [4, 3], "1012": [4, 2], "1013": [3, 2], "1014": [0, 1] });
       // The unplayed match has no score to show; both-inactive says so.
-      expect(group.results.map((m) => m.result)).toContain("Mindkét pár vereséget kap (0:4, 0:4)");
-      expect(group.results).toHaveLength(3);
+      expect(between(group, 1011, 1014)).toMatchObject({ sets: null, note: "Mindkét pár vereséget kap (0:4, 0:4)" });
+      expect(between(group, 1012, 1014)).toMatchObject({ sets: null, winner: null, note: "Elmaradt, nem számít" });
     });
 
     it("skips a match whose stored outcome is invalid, logs one warning and still renders (D115)", async () => {
@@ -221,14 +267,23 @@ describe("ladderPage", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         // A score no write would accept (sets go to 4) and a kind the app doesn't know.
-        setMatch(1012, 1014, "final", played([[6, 1], [6, 2]]));
+        setMatch(
+          1012,
+          1014,
+          "final",
+          played([
+            [6, 1],
+            [6, 2],
+          ]),
+        );
         setMatch(1011, 1014, "final", { kind: "forfeit" });
         const { rows, group } = await tableOf();
         // Neither counts: the table is the one without them.
         expect(rows).toEqual({ "1011": [4, 2], "1012": [4, 2], "1013": [3, 2], "1014": [0, 0] });
-        // Week 2's 1012-1014 is shown without a result; the results list skips week 3's 1011-1014.
-        expect(group.weekMatches.map((m) => m.result)).toEqual(["1:4, 2:4", null]);
-        expect(group.results.map((m) => m.result)).toEqual(["4:1, 4:2", "kontumác"]);
+        // Both are listed without a result, like matches not played yet.
+        expect(between(group, 1012, 1014)).toMatchObject({ state: "open", sets: null, note: null });
+        expect(between(group, 1011, 1014)).toMatchObject({ state: "open", sets: null, note: null });
+        expect(scores(group)).toEqual(["1:4, 2:4", "4:1, 4:2", "Játék nélküli győzelem (4:0, 4:0)"]);
         expect(warn).toHaveBeenCalledTimes(1);
         const line = warn.mock.calls[0]![0] as Record<string, unknown>;
         const ids = h.raw.prepare("select id from matches where pair_b = 1014 and pair_a in (1011, 1012) order by id").all();
@@ -245,8 +300,8 @@ describe("ladderPage", () => {
       const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z")); // week 1
       if (page?.kind !== "ladder") throw new Error("no ladder");
       const group = page.bands[0]!.groups[0]!;
-      expect(group.weekMatches.map((m) => m.result)).toEqual(["4:1, 4:2", null]);
-      expect(group.results.map((m) => m.result)).toEqual(["1:4, 2:4", "kontumác"]); // the week-1 result is under the week, not listed twice (#202)
+      // Every result once, under its own week (#202).
+      expect(scores(group)).toEqual(["1:4, 2:4", "4:1, 4:2", "Játék nélküli győzelem (4:0, 4:0)"]);
     });
   });
 
@@ -268,7 +323,20 @@ describe("ladderPage", () => {
     h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where week = 1").run(sec("2026-11-10T17:30:00Z"));
     // A page with scores (#190): group 1's week-1 and week-2 matches are final.
     const final = h.raw.prepare("update matches set status = 'final', outcome = ? where pair_a = ? and pair_b = ?");
-    final.run(JSON.stringify({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [10, 7] } }), 1011, 1012);
+    final.run(
+      JSON.stringify({
+        kind: "played",
+        score: {
+          sets: [
+            [4, 1],
+            [2, 4],
+          ],
+          superTieBreak: [10, 7],
+        },
+      }),
+      1011,
+      1012,
+    );
     final.run(JSON.stringify({ kind: "walkover", winner: "b" }), 1011, 1013);
     const page = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
     const group = page?.kind === "ladder" ? page.bands[0]!.groups[0]! : null;
@@ -277,7 +345,7 @@ describe("ladderPage", () => {
       ["Játékos 1011A", 3, -1, -6],
       ["Játékos 1012A", 1, -1, -2],
     ]);
-    expect([...group!.weekMatches, ...group!.results].map((m) => m.result)).toEqual(["kontumác", "4:1, 2:4, szuper tie-break 10:7"]);
+    expect(scores(group!)).toEqual(["4:1, 2:4, szuper tie-break 10:7", "Játék nélküli győzelem (4:0, 4:0)"]);
     const text = JSON.stringify(page);
     expect(text).not.toMatch(/titkos\.example|@|\+36|30123|"u1\d+/);
     expect(text).toContain("Játékos 1011A");

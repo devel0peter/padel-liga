@@ -12,7 +12,7 @@ import { createPair, type PairLeague } from "./pairs.server";
 import { LEVELS } from "./interest";
 import { formatPhone } from "./phone";
 
-// "Párt keresek" in D1 (D59). Párom sets it per league; Párkeresők lists the
+// "Párt keresek" in D1 (D59). Párod sets it per league; Párkeresők lists the
 // league's registered players (D128) who look for a partner and have none in
 // it. Off until the player switches it on (#333). Names, levels and, for the
 // league's Szervező and the Admin, phone numbers (D126); never an email
@@ -21,7 +21,7 @@ import { formatPhone } from "./phone";
 const LEVEL_ORDER: string[] = Object.keys(LEVELS);
 const levelRank = (level: string) => (LEVEL_ORDER.includes(level) ? LEVEL_ORDER.indexOf(level) : LEVEL_ORDER.length);
 
-// Párom: per league where the player has no pair, whether the switch is on.
+// Párod: per league where the player has no pair, whether the switch is on.
 export async function partnerSearchState(user: Pick<User, "id">, list: PairLeague[]): Promise<Map<number, boolean>> {
   if (list.length === 0) return new Map();
   const stored = await db

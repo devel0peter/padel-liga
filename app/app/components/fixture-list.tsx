@@ -57,47 +57,60 @@ function Middle({ m }: { m: FixtureMatch }) {
   }
   // A final outcome without a score: a dash here, its note under the row.
   if (m.state === "final") return <span className="font-bold text-muted-foreground">–</span>;
+  // No time yet: a dash; the state is said under the row (D143), or only to a
+  // screen reader while the pairs are still scheduling.
   if (m.state === "scheduled" && m.when) {
     const [day, time] = splitWhen(m.when);
     return (
-      <span className="grid justify-items-center text-xs leading-tight">
+      <span className="grid justify-items-center text-center text-[11px] leading-tight">
         <span className="text-muted-foreground">{day}</span>
         <span className="text-sm font-bold">{time}</span>
       </span>
     );
   }
   return (
-    <span
-      className={cn(
-        "max-w-[4.5rem] rounded-md px-1 py-0.5 text-center text-[10px] leading-tight font-semibold sm:max-w-none sm:px-1.5 sm:text-[11px]",
-        m.state === "disputed" ? "bg-amber-100 text-amber-900" : "bg-muted text-muted-foreground",
-      )}
-    >
-      {STATE_LABEL[m.state as keyof typeof STATE_LABEL]}
+    <span className="font-bold text-muted-foreground">
+      <span aria-hidden>–</span>
+      {m.state === "open" && <span className="sr-only">{STATE_LABEL.open}</span>}
     </span>
   );
+}
+
+// What isn't a score or a time, under the row: waiting for confirmation, or
+// disputed (amber), or a final outcome's note (walkover, both lose).
+function Caption({ m }: { m: FixtureMatch }) {
+  if (m.state === "final") return !m.sets && m.note ? <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span> : null;
+  if (m.state === "pending" || m.state === "disputed")
+    return (
+      <span className={cn("col-span-3 text-center text-[11px] font-semibold", m.state === "disputed" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+        {STATE_LABEL[m.state]}
+      </span>
+    );
+  return null;
 }
 
 function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   const body = (
     <>
       <Side side={m.a} won={m.winner === "a"} align="right" compact={compact} />
-      <span className="grid min-w-[3.75rem] place-items-center sm:min-w-[4.5rem]">
+      <span className="grid place-items-center">
         <Middle m={m} />
       </span>
       <Side side={m.b} won={m.winner === "b"} align="left" compact={compact} />
-      {/* Under the names, so a long note never squeezes them (D133). */}
-      {m.state === "final" && !m.sets && m.note && <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span>}
+      {/* Under the names, so a long note never squeezes them (D133), nor moves the middle (D143). */}
+      <Caption m={m} />
     </>
   );
+  // A fixed middle and the same padding on both sides (room for the arrow of
+  // a linked row on each), so the score sits exactly in the middle of every row (D143).
   const grid = cn(
-    "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 border bg-background px-2",
-    compact ? "rounded-md py-1 sm:gap-2" : "rounded-lg py-2 sm:gap-3 sm:px-3",
+    "relative grid items-center gap-x-1.5 gap-y-0.5 border bg-background px-6",
+    compact ? "grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] rounded-md py-1 sm:gap-x-2" : "grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1fr)] rounded-lg py-2 sm:gap-x-3",
   );
   return (
     <li>
       {m.href ? (
-        <Link to={m.href} className={cn(grid, "relative border-nav-active/40 bg-nav-active-bg/40 pr-6 no-underline hover:bg-nav-active-bg sm:pr-7")}>
+        <Link to={m.href} className={cn(grid, "border-nav-active/40 bg-nav-active-bg/40 no-underline hover:bg-nav-active-bg")}>
           {body}
           <ChevronRight aria-hidden className="absolute top-1/2 right-1 size-4 -translate-y-1/2 text-nav-active" />
           <span className="sr-only">: a meccs oldala</span>

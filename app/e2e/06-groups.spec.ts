@@ -90,6 +90,6 @@ test("12. Kimenő levelek logs the group emails as sent, nothing waiting", async
   const { context, page } = await as(browser, ADMIN.email);
   await visit(page, "/admin/outbox");
   const row = page.getByRole("row").filter({ hasText: "Kihirdetett csoportok" });
-  await expect(row.getByRole("cell")).toHaveText(["Kihirdetett csoportok", "0", "12", "0", "–"]);
+  await expect(row.getByRole("cell")).toHaveText(["Kihirdetett csoportok", "0", "12", "0", "–", ""]);
   await context.close();
 });

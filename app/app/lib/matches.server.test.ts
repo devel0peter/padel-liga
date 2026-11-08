@@ -121,13 +121,37 @@ describe("currentGroups (#25)", () => {
       { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
       { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
     ]);
-    // Only the opponents' addresses: not the player's own, the partner's or another group's.
+    // Only the opponents' addresses and, for Írj mindenkinek, the partner's
+    // (D147): never the player's own or another group's.
     const emails = JSON.stringify(g).match(/[\w.+-]+@[\w.-]+/g) ?? [];
-    expect(new Set(emails)).toEqual(new Set(g!.matches.flatMap((m) => m.contacts.map((c) => c.email))));
+    expect(new Set(emails)).toEqual(new Set(["p1b@x.hu", ...g!.matches.flatMap((m) => m.contacts.map((c) => c.email))]));
     expect(emails).not.toContain("p1a@x.hu");
-    expect(emails).not.toContain("p1b@x.hu");
-    // The player's own partner's phone isn't there either.
-    expect(JSON.stringify(g)).not.toContain("+36 30 100");
+    expect(JSON.stringify(g)).not.toContain("+36 30 100 0001");
+  });
+
+  it("Írj mindenkinek: the partner and both opponents, never the player; none once final (D147)", async () => {
+    const [g] = await M.currentGroups("p1a", NOW);
+    expect(g!.matches[0]!.message).toEqual({
+      to: [
+        { name: "Játékos 1B", phone: "+36 30 100 0002", email: "p1b@x.hu" },
+        { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+        { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+      ],
+      us: ["Játékos 1A", "Játékos 1B"],
+      them: ["Játékos 3A", "Játékos 3B"],
+    });
+    // The player first in their own pair's names, whichever side they are.
+    const [b] = await M.currentGroups("p1b", NOW);
+    expect(b!.matches[0]!.message).toMatchObject({ us: ["Játékos 1B", "Játékos 1A"] });
+    expect(b!.matches[0]!.message!.to.map((r) => r.name)).toEqual(["Játékos 1A", "Játékos 3A", "Játékos 3B"]);
+    // A final result: nothing to write about any more.
+    h.raw.exec(
+      `insert into match_decisions (match_id, kind, user_id, outcome, reason, at) values (${matchOf(1, 3)}, 'organizer', 'o', '{"kind":"unplayed"}', 'teszt', ${sec("2026-11-10T09:00:00Z")})`,
+    );
+    const [after] = await M.currentGroups("p1a", NOW);
+    const done = after!.matches.find((m) => m.id === matchOf(1, 3))!;
+    expect(done.result.status).toBe("final");
+    expect(done.message).toBeNull();
   });
 
   it("is empty before the groups are published and after the phase deadline", async () => {
@@ -225,9 +249,28 @@ describe("matchPage (#25, #26)", () => {
     expect(page.contacts.map((c) => c.name)).toEqual(["Játékos 3A", "Játékos 3B"]);
     expect(page.clubs).toEqual([{ id: 1, name: "Ace Padel" }]);
     expect(page.actions).toMatchObject({ propose: true, recordAgreed: true });
-    // The opponents' addresses only (D135).
+    // The opponents' addresses (D135), and the partner's only for Írj mindenkinek (D147).
     expect(page.contacts.map((c) => c.email)).toEqual(["p3a@x.hu", "p3b@x.hu"]);
-    expect(JSON.stringify(page).match(/[\w.+-]+@[\w.-]+/g)).toEqual(["p3a@x.hu", "p3b@x.hu"]);
+    expect(new Set(JSON.stringify(page).match(/[\w.+-]+@[\w.-]+/g))).toEqual(new Set(["p3a@x.hu", "p3b@x.hu", "p1b@x.hu"]));
+    expect(page.message).toEqual({
+      to: [
+        { name: "Játékos 1B", phone: "+36 30 100 0002", email: "p1b@x.hu" },
+        { name: "Játékos 3A", phone: "+36 30 300 0001", email: "p3a@x.hu" },
+        { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+      ],
+      us: ["Játékos 1A", "Játékos 1B"],
+      them: ["Játékos 3A", "Játékos 3B"],
+    });
+  });
+
+  it("Írj mindenkinek leaves out a deleted account and keeps one without a phone (D147)", async () => {
+    h.raw.exec(`update users set email = 'deleted-p3a@deleted.invalid', phone = null, name = 'Törölt játékos' where id = 'p3a'`);
+    h.raw.exec(`update users set phone = null where id = 'p1b'`);
+    const page = (await M.matchPage(matchOf(1, 3), "p1a", NOW))!;
+    expect(page.message!.to).toEqual([
+      { name: "Játékos 1B", phone: "", email: "p1b@x.hu" },
+      { name: "Játékos 3B", phone: "+36 30 300 0002", email: "p3b@x.hu" },
+    ]);
   });
 
   it("an anonymized opponent has no email address (D135)", async () => {
@@ -239,6 +282,7 @@ describe("matchPage (#25, #26)", () => {
   it("after the deadline: no phones and no actions", async () => {
     const page = (await M.matchPage(matchOf(1, 3), "p1a", new Date(DEADLINE.getTime() + 60_000)))!;
     expect(page.contacts).toEqual([]);
+    expect(page.message).toBeNull();
     expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false });
   });
 });

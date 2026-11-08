@@ -120,6 +120,9 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const log = content(other.page).getByRole("region", { name: "Napló" });
   await expect(log).toContainText("Rögzítette az eredményt: 1:4, 4:2, szuper tie-break 8:10");
   await expect(log).toContainText("Megerősítette az eredményt");
+  // Final: no contacts and no Írj mindenkinek any more (D135, D147).
+  await expect(content(other.page).getByRole("group", { name: "Írj mindenkinek" })).toHaveCount(0);
+  await expect(content(other.page).locator('a[href^="sms:"], a[href^="tel:"]')).toHaveCount(0);
   await other.context.close();
 
   // Played for anna's side too, on Kezdőlap.

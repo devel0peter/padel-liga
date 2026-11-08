@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { autoAcceptAt } from "@padel-liga/rules";
 
 import { FixtureList } from "~/components/fixture-list";
+import { GroupMessage } from "~/components/group-message";
 import { StandingsTable } from "~/components/standings-table";
 import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -137,9 +138,10 @@ function whenWhere(m: HomeMatch): string | null {
 
 // Következő meccsetek (docs/player-ui.md H2, D140): the first match whose
 // result isn't final yet: opponents, its state, when and where once fixed,
-// the opponents' contacts and the way in. Nothing once every match is final;
+// the opponents' contacts, Írj mindenkinek (D147) and the way in. Nothing once every match is final;
 // the group's fixture list under the table has them all.
-export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
+// `origin`: the site's, for the match link in the Írj mindenkinek text (D147).
+export function NextMatch({ group: g, multiLeague, origin }: { group: HomeGroup; multiLeague: boolean; origin: string }) {
   const m = nextMatch(g);
   if (!m) return null;
   const status = statusOf(m);
@@ -163,6 +165,7 @@ export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLe
           {fixed && <p className="text-sm font-medium">{fixed}</p>}
         </div>
         <Contacts contacts={m.contacts} />
+        <GroupMessage message={m.message} week={m.week} url={`${origin}/matches/${m.id}`} />
         <Button asChild size="sm" className="w-fit">
           <Link to={`/matches/${m.id}`} className="no-underline">
             A meccs oldala

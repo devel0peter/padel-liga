@@ -5,6 +5,7 @@ import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
 import { AppPage } from "~/components/app-page";
+import { GroupMessage } from "~/components/group-message";
 import { Contacts, StatusPill } from "~/components/my-group";
 import { DayHourPicker, RangePicker, StartPicker } from "~/components/slot-picker";
 import {
@@ -67,7 +68,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // A fixed time that has started: recording the result becomes the main step (D133).
   const started = page.state.status === "scheduled" && page.state.slot.getTime() <= now.getTime();
   // `now`: the time pickers draw their days and hours from the server's clock.
-  return { ...page, substitutes, noShow, started, now };
+  // `url`: this page, absolute, for the Írj mindenkinek text (D147).
+  return { ...page, substitutes, noShow, started, now, url: `${new URL(request.url).origin}/matches/${page.id}` };
 }
 
 const NONE = "none";
@@ -723,6 +725,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               <div className="grid gap-1.5">
                 <p className="text-sm font-medium">Az ellenfeleitek elérhetősége:</p>
                 <Contacts contacts={m.contacts} />
+                <GroupMessage message={m.message} week={m.week} url={m.url} />
               </div>
             )}
             {m.calendar && <CalendarRow calendar={m.calendar} />}

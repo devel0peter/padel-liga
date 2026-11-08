@@ -11,7 +11,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | C1 | Everything on screen is Hungarian, informal ("tegező") and short. Dates as "nov. 10., kedd 19:00", 24-hour time, Budapest time, decimal comma. | CLAUDE.md, spec 16 |
 | C2 | Mobile first: most visits come from a phone link. At 390 px nothing scrolls sideways and nothing is cut off; tap targets are at least 40 px high. | spec 16, #146, `27-table-fit` |
 | C3 | Desktop uses the width: no single narrow column with an empty right half. | Peter, 2026-11-07 |
-| C4 | Phone numbers and email addresses: only the current phase's opponents, while the match is still to be played (tap to call, `mailto:`), and the active partner (Profil's Párod section, D141). Never on a public page. | spec 3, D67, D121, D135 |
+| C4 | Phone numbers and email addresses: only the current phase's opponents, while the match is still to be played (tap to call, `mailto:`), and the active partner (Profil's Párod section, D141; with the opponents in the match's "Írj mindenkinek" links, D147). Never on a public page. | spec 3, D67, D121, D135, D147 |
 | C5 | Group tables count final results only (confirmed, auto-accepted, organizer or deadline decision). A result waiting for confirmation or disputed never counts. One table computation (`groupTable`) for every page. | D80, D85 |
 | C6 | Results read the same everywhere: pair A first, "4:2, 2:4, szuper tie-break 10:7"; both lose as "Mindkét pár vereséget kap (0:4, 0:4)". | D85 |
 | C7 | Nothing about the league is public: tables, results and profiles are for logged-in players only (the league page sits in the app shell). The league page shows names, tables and results only; no rating on it. Public stay the landing page, rules, privacy, login and register. | spec 14, D112, D134 |
@@ -47,7 +47,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | # | Requirement | Source |
 |---|---|---|
 | H1 | "Teendők" first, only when there is one: every step waiting on the player, each a link, with its deadline where there is one (auto-accept time, phase deadline). | D67, spec 13, D136 |
-| H2 | "Következő meccsetek": only the next match to play (the first without a final result): opponents, state, time and venue once fixed, the opponents' phone and email, and the way to its page; gone once every match is final. | D67, D136, D140 |
+| H2 | "Következő meccsetek": only the next match to play (the first without a final result): opponents, state, time and venue once fixed, the opponents' phone and email, "Írj mindenkinek" (SMS, e-mail, copy the numbers: partner and opponents), and the way to its page; gone once every match is final. | D67, D136, D140, D147 |
 | H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), the pair's own rows a link. | D67, D85, D136, D138, D140 |
 | H4 | Where the pair stands on the ladder: "Réz divízió, 2. csoport · még 1 feljutás a divízió éléig, 3 kör van hátra". | spec 14 |
 | H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
@@ -58,7 +58,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| M1 | A summary at the top: the state in words, when and where, the score once there is one (per set, winner marked), our pair and theirs, the opponents' call buttons, the calendar buttons once fixed. | D68, D106; Peter, 2026-11-07 |
+| M1 | A summary at the top: the state in words, when and where, the score once there is one (per set, winner marked), our pair and theirs, the opponents' call buttons with "Írj mindenkinek" under them (one SMS or email to the partner and both opponents, or their numbers copied; the app sends nothing; not once the result is final), the calendar buttons once fixed. | D68, D106, D147; Peter, 2026-11-07 |
 | M2 | One main action at a time, chosen by the state; everything else folded behind a one-line opener. | Peter, 2026-11-07 |
 | M3 | To schedule: the proposal form ("Ajánljatok ráérést") is the main action: day chips from today to the deadline, then quick ranges ("Délelőtt 8–12", "Délután 14–18", "Este 18–22", cut to the hours left) or Ettől/Eddig whole hours and "Hozzáadom"; the added ranges listed with a remove button; the rules' own messages before sending. "Máshol már megbeszéltétek?" (agreed time: day chips and hour chips 7:00–22:00) folded; the short guide folded. No native date or time field. | D68, D144 |
 | M4 | Their proposal open: their open ranges by day, each with its whole-hour starts as chips ("Választható kezdések"), and "Elfogadom"; a counter-proposal and an agreed time folded ("Egyik sem jó?"). | D68, D144 |

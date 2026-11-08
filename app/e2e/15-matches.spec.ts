@@ -4,9 +4,9 @@
 // booked match gets its venue and is cancelled, once in time and once late;
 // the cron gives the morning reminders and "holnap meccs" in the app (their emails are off, #191).
 import { addDays, budapestClock, budapestDay, budapestTime } from "@padel-liga/rules";
-import { expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
+import { PAIRS, as, content, d1, d1Update, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
 
 // A Budapest day `days` from today.
 const inDays = (days: number) => addDays(budapestDay(new Date()), days);
@@ -65,11 +65,75 @@ test("17. Kezdőlap shows the group, the division line, the next match with phon
   await expect(card.getByRole("link", { name: "A meccs oldala" })).toHaveAttribute("href", `/matches/${next!.id}`);
   await expect(card.locator('a[href^="tel:"]')).toHaveCount(2);
   for (const o of next!.opponents) await expect(card.locator(`a[href="mailto:${o.email}"]`)).toHaveCount(1);
-  // No other address: not Anna's, not her partner's.
-  await expect(main.locator('a[href^="mailto:"]')).toHaveCount(2);
+  // No other address shown: not Anna's, not her partner's; besides the two,
+  // only the one Írj mindenkinek link (test 17a).
+  await expect(main.getByRole("list", { name: "Az ellenfelek elérhetősége" }).locator('a[href^="mailto:"]')).toHaveCount(2);
+  await expect(main.locator('a[href^="mailto:"]')).toHaveCount(3);
   await expect(main).not.toContainText(anna.email);
+  await expect(main).not.toContainText(PAIRS.p1[1].email);
   await expect(fixtures.getByRole("region", { name: "1. hét" })).toBeVisible();
   await context.close();
+});
+
+test("17a. Írj mindenkinek on Kezdőlap and the match page: one SMS and one email to the partner and both opponents, never the player (D147)", async ({ browser }) => {
+  const [next] = annasMatches().sort((x, y) => x.week - y.week);
+  const partner = PAIRS.p1[1];
+  const others = [partner, ...next!.opponents];
+  const four = [anna, ...others];
+  // Every player has the same number from the welcome page: four different
+  // ones here, so Anna's own can be told apart. Put back at the end.
+  const before = d1(`select email, phone from users where email in (${four.map((p) => `'${p.email}'`).join(", ")})`) as { email: string; phone: string | null }[];
+  const number = (i: number) => `+3630111000${i}`;
+  four.forEach((p, i) => d1Update(`update users set phone = '${number(i)}' where email = '${p.email}'`));
+  try {
+    const { context, page } = await as(browser, anna);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    for (const path of ["/home", `/matches/${next!.id}`]) {
+      await visit(page, path);
+      const box = content(page).getByRole("group", { name: "Írj mindenkinek" });
+      await expect(box).toContainText("a párodnak és az ellenfeleknek");
+      // Android's form on a desktop browser: sms:<numbers>?body=…
+      const sms = (await box.getByRole("link", { name: "SMS mindenkinek" }).getAttribute("href"))!;
+      expect(sms).toMatch(/^sms:\+36[\d,+]+\?body=/);
+      expect(sms.slice(4, sms.indexOf("?")).split(",").sort()).toEqual([number(1), number(2), number(3)]);
+      expect(sms).not.toContain(number(0));
+      const body = decodeURIComponent(sms.split("body=")[1]!);
+      expect(body).toContain(`${next!.week}. heti meccsünkről írok`);
+      expect(body).toContain("rögzítsük az appban is:");
+      expect(body).toMatch(new RegExp(`https?://[^/]+/matches/${next!.id}$`));
+      // One email to the same three, with the subject.
+      const mailto = (await box.getByRole("link", { name: "E-mail mindenkinek" }).getAttribute("href"))!;
+      expect(mailto.slice(7, mailto.indexOf("?")).split(",").sort()).toEqual(others.map((p) => p.email).sort());
+      expect(mailto).not.toContain(anna.email);
+      expect(decodeURIComponent(mailto)).toContain(`subject=Padelpárbaj: ${next!.week}. heti meccs`);
+      // The three numbers as shown, to the clipboard.
+      await box.getByRole("button", { name: "Számok másolása" }).click();
+      await expect(box.getByRole("status")).toHaveText("Kimásoltuk.");
+      const copied = (await page.evaluate("navigator.clipboard.readText()")) as string;
+      expect(copied.split(", ").sort()).toEqual(["+36 30 111 0001", "+36 30 111 0002", "+36 30 111 0003"]);
+      await expect(box).not.toContainText("Nincs telefonszáma");
+    }
+
+    // An iPhone gets iOS's form after hydration: sms:/open?addresses=…&body=…
+    const iphone = await browser.newContext({ storageState: await context.storageState(), userAgent: devices["iPhone 15"].userAgent });
+    const ios = await iphone.newPage();
+    await visit(ios, `/matches/${next!.id}`);
+    const href = content(ios).getByRole("group", { name: "Írj mindenkinek" }).getByRole("link", { name: "SMS mindenkinek" });
+    await expect(href).toHaveAttribute("href", /^sms:\/open\?addresses=\+36[\d,+]+&body=/);
+    await iphone.close();
+
+    // A partner without a number: left out of the SMS, named under the buttons.
+    d1Update(`update users set phone = null where email = '${partner.email}'`);
+    await visit(page, `/matches/${next!.id}`);
+    const box = content(page).getByRole("group", { name: "Írj mindenkinek" });
+    const sms = (await box.getByRole("link", { name: "SMS mindenkinek" }).getAttribute("href"))!;
+    expect(sms.slice(4, sms.indexOf("?")).split(",").sort()).toEqual([number(2), number(3)]);
+    await expect(box).toContainText(`Nincs telefonszáma: ${partner.name}`);
+    expect(await box.getByRole("link", { name: "E-mail mindenkinek" }).getAttribute("href")).toContain(partner.email);
+    await context.close();
+  } finally {
+    for (const p of before) d1Update(`update users set phone = ${p.phone === null ? "null" : `'${p.phone}'`} where email = '${p.email}'`);
+  }
 });
 
 test("18. propose → accept: a refused proposal, the email to the other pair, scheduled for both", async ({ browser }) => {

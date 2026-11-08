@@ -54,8 +54,9 @@ import { logError } from "~/lib/log";
 
 // A player's group and matches (#25) and scheduling them (#26) in D1. The
 // rules are in packages/rules (slots.ts, scheduling.ts); the texts in
-// matches.ts. Phone numbers leave this module only for the current phase's
-// opponents (spec 3), email addresses never (they go to the outbox).
+// matches.ts. Phone numbers and email addresses leave this module only for
+// the current phase's opponents (spec 3, D135) and, for "Írj mindenkinek",
+// the partner (D147); otherwise addresses go only to the outbox.
 
 export type Person = { id: string; name: string; email: string; phone: string | null };
 // `elo`: the pair's rating, the last tiebreak of the table (D20).
@@ -193,12 +194,30 @@ const contactOf = (p: Person): Opponent => ({
   email: isAnonymizedEmail(p.email) ? null : p.email,
 });
 
+// "Írj mindenkinek" (D147): the match's other three players, the partner
+// (whose contact Párod shows anyway, D121) and the two opponents, never the
+// viewer; a deleted account is left out. With both pairs' names, the
+// viewer's pair and the viewer first, for the text. Only where the
+// opponents' contacts show, and not once the result is final.
+export type GroupMessageData = { to: Opponent[]; us: string[]; them: string[] };
+
+function groupMessageOf(ours: readonly Person[], theirs: readonly Person[], userId: string): GroupMessageData {
+  const partner = ours.filter((p) => p.id !== userId);
+  return {
+    to: [...partner, ...theirs].filter((p) => !isAnonymizedEmail(p.email)).map(contactOf),
+    us: [...ours.filter((p) => p.id === userId), ...partner].map((p) => p.name),
+    them: theirs.map((p) => p.name),
+  };
+}
+
 export type HomeMatch = {
   id: number;
   week: number;
   // The other pair: names, phones and email addresses (only the current phase is listed here).
   opponents: string;
   contacts: Opponent[];
+  // Írj mindenkinek (D147); null once the result is final.
+  message: GroupMessageData | null;
   side: Side;
   state: SchedulingState;
   venue: string | null;
@@ -350,15 +369,18 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
           const side: Side = m.pairA === g.pairId ? "a" : "b";
           const them = other(m);
           const state = states.get(m.id)!;
+          const result = results.get(m.id)?.state ?? { status: "none" as const };
+          const us = byId.get(g.pairId);
           return {
             id: m.id,
             week: m.week,
             opponents: them ? pairName(them.players) : "",
             contacts: (them?.players ?? []).map(contactOf),
+            message: them && us && result.status !== "final" ? groupMessageOf(us.players, them.players, userId) : null,
             side,
             state,
             venue: venueOf(m),
-            result: results.get(m.id)?.state ?? { status: "none" },
+            result,
           };
         }),
       };
@@ -525,6 +547,8 @@ export type MatchPage = {
   opponents: string;
   // Only while the phase runs (spec 3); empty afterwards.
   contacts: Opponent[];
+  // Írj mindenkinek (D147): while `contacts` shows and the result isn't final.
+  message: GroupMessageData | null;
   state: SchedulingState;
   venue: string | null;
   // The summary's "Helyszín": the fixed time's venue and court, else the club
@@ -584,6 +608,8 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
   const state = stateOf(ctx, now);
   const running = ctx.match.deadline.getTime() >= now.getTime();
   const [ours, theirs] = side === "a" ? [ctx.pairs.a, ctx.pairs.b] : [ctx.pairs.b, ctx.pairs.a];
+  // A withdrawn pair's match (#34): the two are no opponents any more.
+  const reachable = running && !ctx.voided;
   const cityClubs = await db
     .select({ id: clubs.id, name: clubs.name })
     .from(clubs)
@@ -649,8 +675,8 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     side,
     us: pairName(ours.players),
     opponents: pairName(theirs.players),
-    // A withdrawn pair's match (#34): the two are no opponents any more.
-    contacts: running && !ctx.voided ? theirs.players.map(contactOf) : [],
+    contacts: reachable ? theirs.players.map(contactOf) : [],
+    message: reachable && result.status !== "final" ? groupMessageOf(ours.players, theirs.players, userId) : null,
     state,
     venue,
     where:

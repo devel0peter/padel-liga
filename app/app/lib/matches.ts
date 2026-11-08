@@ -135,7 +135,10 @@ export function eventText(e: {
   }
 }
 
+// "+36 30 123 4567" -> "+36301234567"
+export const dialable = (phone: string): string => phone.replace(/[^\d+]/g, "");
+
 // "+36 30 123 4567" -> "tel:+36301234567"
 export function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+  return `tel:${dialable(phone)}`;
 }

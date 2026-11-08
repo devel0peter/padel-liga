@@ -95,6 +95,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const groups = await currentGroups(user.id, now);
   return {
     groups,
+    // For the match links in the Írj mindenkinek text (D147).
+    origin: new URL(request.url).origin,
     // "Melyik ligában játszol?" (#331): empty once they belong to a league.
     choices: choices.map((c) => ({ id: c.id, city: c.cityName, name: c.name })),
     // The register button's league, rather than "which one".
@@ -253,7 +255,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
             ))}
             {open.length > 0 && <Todos items={open} />}
             {d.groups.map((g) => (
-              <NextMatch key={g.groupId} group={g} multiLeague={d.multiLeague} />
+              <NextMatch key={g.groupId} group={g} multiLeague={d.multiLeague} origin={d.origin} />
             ))}
           </div>
           <div className="grid gap-6">

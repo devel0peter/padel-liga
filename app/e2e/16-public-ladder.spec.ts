@@ -33,7 +33,8 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   const first = main.getByRole("region", { name: "1. csoport" });
   await expect(first).toContainText("Bronz divízió");
   await expect(main.getByRole("region", { name: "2. csoport" })).toContainText("Réz divízió");
-  await expect(main).not.toContainText("Rookie divízió");
+  // No group card is Rookie (the explainer tooltip names it, so look at the cards).
+  await expect(main.getByRole("region", { name: /^\d+\. csoport$/ }).filter({ hasText: "Rookie divízió" })).toHaveCount(0);
   // Anna's group and pair are marked.
   await expect(first).toContainText("A ti csoportotok");
   await expect(first.getByRole("row").filter({ hasText: anna.name })).toContainText("(ti)");

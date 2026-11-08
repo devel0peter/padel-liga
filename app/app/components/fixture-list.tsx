@@ -147,24 +147,31 @@ function IconLegend({ weeks }: { weeks: FixtureWeek[] }) {
   );
 }
 
-// The Tabella's group cards (D143): the week as a narrow column beside its
-// matches instead of a line above them, and who rests on hover and for a
-// screen reader, so the list is about as tall as the table.
+// The Tabella's group cards (D143): each week is a thin centred divider
+// ("1. hét · okt. 26. – nov. 1.") above its matches instead of a heading line,
+// and who rests shows on hover and to a screen reader, so the list is about
+// as tall as the table.
 function CompactList({ weeks, label }: { weeks: FixtureWeek[]; label: string }) {
   return (
-    <div className="grid gap-1.5" role="group" aria-label={label}>
+    <div className="grid gap-2" role="group" aria-label={label}>
       {weeks.map((w) => {
         const rest = w.resting ? `pihen: ${w.resting[0]} – ${w.resting[1]}` : null;
         return (
-          <section key={w.week} aria-label={`${w.week}. hét`} className="grid grid-cols-[2.75rem_minmax(0,1fr)] items-start gap-1.5">
-            <div title={[w.range, rest].filter(Boolean).join(" · ")} className={cn("grid pt-1 text-[11px] leading-tight", w.current ? "text-court" : "text-muted-foreground")}>
-              <span className={cn("font-bold", w.current ? "text-court" : "text-foreground")}>{w.week}. hét</span>
-              <span>{w.range.split(" – ")[0]}</span>
-              {w.current && <span className="font-semibold">ez a hét</span>}
-              {rest && <span className="sr-only">{rest}</span>}
+          <section key={w.week} aria-label={`${w.week}. hét`} className="grid gap-1">
+            <div
+              title={rest ?? undefined}
+              className={cn("flex items-center gap-2 text-[11px] leading-none", w.current ? "text-court" : "text-muted-foreground")}
+            >
+              <span aria-hidden className="h-px flex-1 bg-border" />
+              <span className="whitespace-nowrap">
+                <span className={cn("font-bold", !w.current && "text-foreground")}>{w.week}. hét</span> · {w.range}
+                {w.current && <span className="font-semibold"> · ez a hét</span>}
+                {rest && <span className="sr-only"> · {rest}</span>}
+              </span>
+              <span aria-hidden className="h-px flex-1 bg-border" />
             </div>
             {w.matches.length === 0 ? (
-              <p className="pt-1 text-xs text-muted-foreground">Ezen a héten nincs meccs.</p>
+              <p className="text-center text-xs text-muted-foreground">Ezen a héten nincs meccs.</p>
             ) : (
               <ul className="grid gap-1">
                 {w.matches.map((m, i) => (

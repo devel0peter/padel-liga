@@ -17,7 +17,7 @@ import {
 } from "@padel-liga/rules";
 
 import { resetStatements, SEED_EMAIL_DOMAIN } from "./seed";
-import { runningStart, SEASON_GROUPS, seasonPairs, seasonPlan, seasonSeedSql, seasonStatements } from "./seed-season";
+import { runningStart, SEASON_GROUPS, seasonElo, seasonPairs, seasonPlan, seasonSeedSql, seasonStatements } from "./seed-season";
 
 // Saturday 2026-11-07 and every other weekday of that week, at two times of day.
 const NOWS = [0, 1, 2, 3, 4, 5, 6].flatMap((d) =>
@@ -100,6 +100,26 @@ describe("seasonPlan", () => {
   it("records only valid scores", () => {
     for (const m of seasonPlan(NOW).matches)
       for (const e of m.events) if (e.score) expect(validateScore(e.score).ok, `${m.a}-${m.b} ${e.kind}`).toBe(true);
+  });
+});
+
+describe("seasonElo: the seed's Élő-pont, as updateElo would leave it", () => {
+  it("rates every final played match, two changes a side, and moves the winners up", () => {
+    const plan = seasonPlan(NOW);
+    const finals = plan.matches.filter((m) => m.status === "final").length;
+    const { changes, players } = seasonElo(plan);
+    expect(finals).toBeGreaterThan(0);
+    expect(changes).toHaveLength(finals * 4);
+    for (const c of changes) expect(c.after - c.before).toBeCloseTo(c.delta, 9);
+    expect(changes.some((c) => c.delta > 0) && changes.some((c) => c.delta < 0)).toBe(true);
+    expect(players.size).toBeGreaterThan(0);
+  });
+
+  it("writes the changes and the ratings", () => {
+    const statements = seasonStatements(NOW);
+    const { changes, players } = seasonElo(seasonPlan(NOW));
+    expect(statements.filter((s) => s.startsWith("insert into elo_changes"))).toHaveLength(changes.length);
+    expect(statements.filter((s) => s.startsWith("update users set elo ="))).toHaveLength(players.size);
   });
 });
 

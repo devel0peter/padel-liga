@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Hourglass, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
 import type { FixtureMatch, FixtureSide, FixtureWeek } from "~/lib/fixtures";
@@ -38,7 +38,7 @@ function splitWhen(when: string): [string, string] {
   return i > 0 ? [when.slice(0, i), when.slice(i + 1)] : [when, ""];
 }
 
-function Middle({ m }: { m: FixtureMatch }) {
+function Middle({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   if (m.state === "final" && m.sets) {
     return (
       <span className="grid justify-items-center font-bold tabular-nums" aria-label={`Eredmény: ${m.sets.map(([a, b]) => `${a}:${b}`).join(", ")}`}>
@@ -60,7 +60,9 @@ function Middle({ m }: { m: FixtureMatch }) {
   // No time yet: a dash; the state is said under the row (D143), or only to a
   // screen reader while the pairs are still scheduling.
   if (m.state === "scheduled" && m.when) {
-    const [day, time] = splitWhen(m.when);
+    const [when, time] = splitWhen(m.when);
+    // Compact: "nov. 9." without the weekday, so the middle stays narrow.
+    const day = compact ? when.split(",")[0] : when;
     return (
       <span className="grid justify-items-center text-center text-[11px] leading-tight">
         <span className="text-muted-foreground">{day}</span>
@@ -68,25 +70,28 @@ function Middle({ m }: { m: FixtureMatch }) {
       </span>
     );
   }
+  // Waiting for confirmation or disputed: an icon in the middle, its words on
+  // hover and for a screen reader, so the row keeps one line (D143).
+  if (m.state === "pending" || m.state === "disputed") {
+    const Icon = m.state === "pending" ? Hourglass : TriangleAlert;
+    return (
+      <span title={STATE_LABEL[m.state]} className={cn("grid place-items-center", m.state === "disputed" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+        <Icon aria-hidden className="size-4" />
+        <span className="sr-only">{STATE_LABEL[m.state]}</span>
+      </span>
+    );
+  }
   return (
     <span className="font-bold text-muted-foreground">
       <span aria-hidden>–</span>
-      {m.state === "open" && <span className="sr-only">{STATE_LABEL.open}</span>}
+      <span className="sr-only">{STATE_LABEL.open}</span>
     </span>
   );
 }
 
-// What isn't a score or a time, under the row: waiting for confirmation, or
-// disputed (amber), or a final outcome's note (walkover, both lose).
+// A final outcome without a score (walkover, both lose) says so under the row.
 function Caption({ m }: { m: FixtureMatch }) {
-  if (m.state === "final") return !m.sets && m.note ? <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span> : null;
-  if (m.state === "pending" || m.state === "disputed")
-    return (
-      <span className={cn("col-span-3 text-center text-[11px] font-semibold", m.state === "disputed" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
-        {STATE_LABEL[m.state]}
-      </span>
-    );
-  return null;
+  return m.state === "final" && !m.sets && m.note ? <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span> : null;
 }
 
 function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
@@ -94,7 +99,7 @@ function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
     <>
       <Side side={m.a} won={m.winner === "a"} align="right" compact={compact} />
       <span className="grid place-items-center">
-        <Middle m={m} />
+        <Middle m={m} compact={compact} />
       </span>
       <Side side={m.b} won={m.winner === "b"} align="left" compact={compact} />
       {/* Under the names, so a long note never squeezes them (D133), nor moves the middle (D143). */}
@@ -104,8 +109,8 @@ function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   // A fixed middle and the same padding on both sides (room for the arrow of
   // a linked row on each), so the score sits exactly in the middle of every row (D143).
   const grid = cn(
-    "relative grid items-center gap-x-1.5 gap-y-0.5 border bg-background px-6",
-    compact ? "grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] rounded-md py-1 sm:gap-x-2" : "grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1fr)] rounded-lg py-2 sm:gap-x-3",
+    "relative grid items-center gap-x-1.5 gap-y-0.5 border bg-background",
+    compact ? "grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] rounded-md px-5 py-1 sm:gap-x-2" : "grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1fr)] rounded-lg px-6 py-2 sm:gap-x-3",
   );
   return (
     <li>
@@ -122,38 +127,87 @@ function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   );
 }
 
-// `compact` (the Tabella's group cards, D143): tighter weeks and rows, and who
-// rests goes on the week's own line, so the list is about as tall as the table.
-export function FixtureList({ weeks, label = "Meccsek", compact = false }: { weeks: FixtureWeek[]; label?: string; compact?: boolean }) {
+// What the icons in the middle mean, once under a list that has any.
+function IconLegend({ weeks }: { weeks: FixtureWeek[] }) {
+  const states = new Set(weeks.flatMap((w) => w.matches.map((m) => m.state)));
+  if (!states.has("pending") && !states.has("disputed")) return null;
   return (
-    <div className={cn("grid", compact ? "gap-2.5" : "gap-4")} role="group" aria-label={label}>
+    <p aria-hidden className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      {states.has("pending") && (
+        <span className="inline-flex items-center gap-1">
+          <Hourglass className="size-3" /> {STATE_LABEL.pending}
+        </span>
+      )}
+      {states.has("disputed") && (
+        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
+          <TriangleAlert className="size-3" /> {STATE_LABEL.disputed}
+        </span>
+      )}
+    </p>
+  );
+}
+
+// The Tabella's group cards (D143): the week as a narrow column beside its
+// matches instead of a line above them, and who rests on hover and for a
+// screen reader, so the list is about as tall as the table.
+function CompactList({ weeks, label }: { weeks: FixtureWeek[]; label: string }) {
+  return (
+    <div className="grid gap-1.5" role="group" aria-label={label}>
+      {weeks.map((w) => {
+        const rest = w.resting ? `pihen: ${w.resting[0]} – ${w.resting[1]}` : null;
+        return (
+          <section key={w.week} aria-label={`${w.week}. hét`} className="grid grid-cols-[2.75rem_minmax(0,1fr)] items-start gap-1.5">
+            <div title={[w.range, rest].filter(Boolean).join(" · ")} className={cn("grid pt-1 text-[11px] leading-tight", w.current ? "text-court" : "text-muted-foreground")}>
+              <span className={cn("font-bold", w.current ? "text-court" : "text-foreground")}>{w.week}. hét</span>
+              <span>{w.range.split(" – ")[0]}</span>
+              {w.current && <span className="font-semibold">ez a hét</span>}
+              {rest && <span className="sr-only">{rest}</span>}
+            </div>
+            {w.matches.length === 0 ? (
+              <p className="pt-1 text-xs text-muted-foreground">Ezen a héten nincs meccs.</p>
+            ) : (
+              <ul className="grid gap-1">
+                {w.matches.map((m, i) => (
+                  <Row key={i} m={m} compact />
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+      <IconLegend weeks={weeks} />
+    </div>
+  );
+}
+
+// `compact`: the Tabella's group cards (CompactList).
+export function FixtureList({ weeks, label = "Meccsek", compact = false }: { weeks: FixtureWeek[]; label?: string; compact?: boolean }) {
+  if (compact) return <CompactList weeks={weeks} label={label} />;
+  return (
+    <div className="grid gap-4" role="group" aria-label={label}>
       {weeks.map((w) => (
-        <section key={w.week} aria-label={`${w.week}. hét`} className={cn("grid", compact ? "gap-1" : "gap-2")}>
-          <h4 className={cn("flex flex-wrap items-baseline gap-x-2 font-bold", compact ? "text-xs" : "text-sm")}>
+        <section key={w.week} aria-label={`${w.week}. hét`} className="grid gap-2">
+          <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-bold">
             {w.week}. hét <span className="font-normal text-muted-foreground">{w.range}</span>
             {w.current && <span className="rounded-full bg-court px-2 py-px text-[10px] font-bold tracking-wide text-white uppercase">ez a hét</span>}
-            {compact && w.resting && (
-              <span className="text-[11px] font-normal text-muted-foreground">
-                · pihen: {w.resting[0]} – {w.resting[1]}
-              </span>
-            )}
           </h4>
           {w.matches.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ezen a héten nincs meccs.</p>
           ) : (
-            <ul className={cn("grid", compact ? "gap-1" : "gap-1.5")}>
+            <ul className="grid gap-1.5">
               {w.matches.map((m, i) => (
-                <Row key={i} m={m} compact={compact} />
+                <Row key={i} m={m} compact={false} />
               ))}
             </ul>
           )}
-          {!compact && w.resting && (
+          {w.resting && (
             <p className="text-xs text-muted-foreground">
               Pihen: {w.resting[0]} – {w.resting[1]}
             </p>
           )}
         </section>
       ))}
+      <IconLegend weeks={weeks} />
     </div>
   );
 }

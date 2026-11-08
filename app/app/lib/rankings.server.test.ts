@@ -69,23 +69,6 @@ describe("rankingsPage (D137)", () => {
     ]);
   });
 
-  it("colours each row by its pair's division on the Tabella; a withdrawn pair and its players have none (D138)", async () => {
-    // Three groups: 1 Bronz, 2 Réz, 3 Rookie.
-    user("ue", "Edit");
-    user("uf", "Feri");
-    user("ug", "Gabi");
-    user("uh", "Hanna");
-    pair(3, "ue", "uf");
-    pair(4, "ug", "uh");
-    group(2, [3]);
-    group(3, [4]);
-    h.raw.exec(`update group_pairs set withdrawn_at = ${sec("2026-11-15T10:00:00Z")} where pair_id = 2`);
-    const page = (await rankingsPage("gyor", "ub", DURING))!;
-    const division = (rows: { name: string; division: string | null }[]) => Object.fromEntries(rows.map((r) => [r.name, r.division]));
-    expect(division(page.pairs)).toEqual({ "Anna – Bea": "bronz", "Cili – Dóra": null, "Edit – Feri": "rez", "Gabi – Hanna": "rookie" });
-    expect(division(page.players)).toMatchObject({ Anna: "bronz", Bea: "bronz", Cili: null, Edit: "rez", Gabi: "rookie" });
-  });
-
   it("counts each player's rated matches", async () => {
     h.raw.prepare("insert into matches (id, group_id, pair_a, pair_b, week, deadline, status) values (1, 1, 1, 2, 1, ?, 'final')").run(sec("2026-11-29T22:59:00Z"));
     h.raw

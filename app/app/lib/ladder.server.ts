@@ -1,4 +1,4 @@
-import { addDays, budapestDay, divisionOf, type Day, type Division } from "@padel-liga/rules";
+import { addDays, budapestDay, type Day } from "@padel-liga/rules";
 import { and, asc, count, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
@@ -179,33 +179,6 @@ async function shownPhase(season: Season, now: Date): Promise<Season["phases"][n
   const open = new Set(published.map((p) => p.phase));
   const phases = season.phases.filter((p) => open.has(p.number));
   return [...phases].reverse().find((p) => p.startsAt <= now) ?? phases[0];
-}
-
-/**
- * Each pair's division in the phase the league page shows (D138), for the
- * Ranglista's colours: the same groups and bands as the Tabella. A pair
- * withdrawn from its group, or in none, has no entry.
- */
-export async function pairDivisions(leagueId: number, now = new Date()): Promise<Map<number, Division>> {
-  const season = currentSeason(await listSeasons(leagueId), now);
-  if (!season || isWaiting(season)) return new Map();
-  const shown = await shownPhase(season, now);
-  if (!shown) return new Map();
-  const where = and(eq(groups.seasonId, season.id), eq(groups.phase, shown.number), isNotNull(groups.publishedAt));
-  const [list, members] = await Promise.all([
-    db.select({ id: groups.id, number: groups.number }).from(groups).where(where),
-    db
-      .select({ groupId: groupPairs.groupId, pairId: groupPairs.pairId, withdrawnAt: groupPairs.withdrawnAt })
-      .from(groupPairs)
-      .where(inArray(groupPairs.groupId, db.select({ id: groups.id }).from(groups).where(where))),
-  ]);
-  const numberOf = new Map(list.map((g) => [g.id, g.number]));
-  const out = new Map<number, Division>();
-  for (const m of members) {
-    const number = numberOf.get(m.groupId);
-    if (number !== undefined && m.withdrawnAt === null) out.set(m.pairId, divisionOf(number, list.length));
-  }
-  return out;
 }
 
 /** Every pair the account is or was in: what the league page marks as theirs (D136). */

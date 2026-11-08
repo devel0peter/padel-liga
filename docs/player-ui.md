@@ -26,7 +26,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | T1 | Columns: place, pair, played (M), wins (Gy), losses (V), sets won:lost (Szett), games won:lost (Játék), points (P). Ratios, not only differences, so a player can check the tiebreak by eye. Under 640 px Játék is left out, so the names keep room (T6); the league page on a wider screen has it. | Peter, 2026-11-07; spec 9 |
 | T2 | The places that move at the end of the round are marked: 1st moves up (not in group 1), last moves down (not in the last group; in a group of 3 the 3rd). A legend says what the marks mean. | spec 10; Peter, 2026-11-07 |
 | T3 | Before any final result the order is only the seeding: no place numbers and no up/down marks, so nobody reads the seed as a ranking. | D85 |
-| T4 | The player's own pair is highlighted ("ti"), on Kezdőlap and on the Tabella, where their group is marked too. | D67, D136 |
+| T4 | The player's own pair is in bold, with no "ti" label and no row colour (the word stays for screen readers), on Kezdőlap, the Tabella, where their group is marked too, and the Ranglista ("te"/"ti" likewise). | D67, D136, D143 |
 | T5 | Column headings are explained (title and a legend line), since M, Gy, V, P are abbreviations. | Peter, 2026-11-07 |
 | T6 | At 390 px the table fits without sideways scroll; pair names wrap onto a second line rather than squeezing the numbers. | C2 |
 | T7 | A pair withdrawn mid-phase is out of the table, listed under it as "Visszalépett". | spec 9, #34 |
@@ -51,7 +51,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), the pair's own rows a link. | D67, D85, D136, D138, D140 |
 | H4 | Where the pair stands on the ladder: "Réz divízió, 2. csoport · még 1 feljutás a divízió éléig, 3 kör van hátra". | spec 14 |
 | H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
-| H6 | The season card stays (entry button, strikes count) but small; its rounds are listed with their dates, the round being played highlighted. | D103a, #23, D136, D139 |
+| H6 | The season card opens the left column as the season's summary: under its title the round being played and its deadline; its rounds listed with their dates, the round being played highlighted; entry button and strikes count. | D103a, #23, D136, D139, D143 |
 | H7 | Before the groups are out: pair link, "Párt keresek", entry, as today. | D55, D59, #23 |
 
 ## 5. Match page
@@ -86,9 +86,9 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| L1 | The league page ("Tabella", in the app shell, D134) uses the same table (section 2) and fixture list (section 3) per group, in the division bands. | spec 14, D85 |
+| L1 | The league page ("Tabella", in the app shell, D134) uses the same table (section 2) and fixture list (section 3) per group. The groups sit one under the other in a list that scrolls on its own while the page keeps the screen's height; the group in the middle is full size, those above and below shrink and fade with their distance; on load the viewer's group is in the middle. | spec 14, D85, D143 |
 | L2 | At 390 px pair names don't break into four lines; at desktop width the table doesn't spread its numbers across the page. | Peter, 2026-11-07 |
-| L3 | A Ranglista: players and pairs by Élő-pont in two tabs, the viewer marked, each name linking its profile; one tap from the Tabella and in the sidebar. Ties share a place until #345. Each row shows its pair's division in the Tabella's colours, with a legend. | Peter, 2026-11-07 (D137); 2026-11-08 (D138) |
+| L3 | A Ranglista: players and pairs by Élő-pont in two tabs, the viewer marked, each name linking its profile; one tap from the Tabella and in the sidebar. Ties share a place until #345. No division marks: a higher Élő-pont can sit in a lower division. | Peter, 2026-11-07 (D137); 2026-11-08 (D143) |
 | L4 | "Hogyan működik a létra?" is behind a "?" next to the Tabella's title, in a tooltip (hover, tap or focus). | Peter, 2026-11-08 (D138) |
 | N1 | On a phone the player's own sections are one tap away (bottom bar: Kezdőlap, Tabella, Értesítések with the unread count, Profil; the pair is a section of Profil since D141); the sidebar stays for the organizer and admin sections. | Peter, 2026-11-07; spec 16 |
 

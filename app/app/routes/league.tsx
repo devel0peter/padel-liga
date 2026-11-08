@@ -6,6 +6,7 @@ import type { Route } from "./+types/league";
 import { AppPage } from "~/components/app-page";
 import { FixtureList } from "~/components/fixture-list";
 import { HelpTip } from "~/components/help-tip";
+import { LadderScroller } from "~/components/ladder-scroller";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -21,7 +22,9 @@ import { SITE_NAME } from "~/lib/site";
 
 // The league page, the player's "Tabella" (#30, spec section 14): the phase's
 // groups top-down, each a card with its division and its table; the group's
-// matches open in a side panel (D136). For logged-in players only, inside the app
+// matches open in a side panel (D136). The groups sit one under the other in
+// a list that scrolls on its own, the one in the middle full size, the
+// viewer's group there on load (D143). For logged-in players only, inside the app
 // shell (D134): a visitor goes to the login page and comes back. Names only:
 // no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -109,6 +112,8 @@ function Explainer() {
 }
 
 export default function League({ loaderData: page }: Route.ComponentProps) {
+  const groups = page.kind === "ladder" ? page.bands.flatMap((band) => band.groups.map((g) => ({ g, band }))) : [];
+  const focus = Math.max(0, groups.findIndex(({ g }) => g.mine));
   const where = [page.league.name, page.season].filter(Boolean).join(" · ");
   if (page.kind === "waiting")
     return (
@@ -147,13 +152,13 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
         </>
       }
     >
-      {/* One grid down the ladder (D136): 1, 2 / 3, 4 …; each card names its division. */}
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
-        {page.bands.flatMap((band) =>
-          band.groups.map((g) => <GroupCard key={g.number} group={g} division={band.division} label={band.label} />),
-        )}
-      </div>
       <StandingsLegend />
+      {/* Down the ladder, one group under the other (D143); each card names its division. */}
+      <LadderScroller
+        label="Csoportok"
+        focus={focus}
+        items={groups.map(({ g, band }) => ({ key: g.number, node: <GroupCard group={g} division={band.division} label={band.label} /> }))}
+      />
     </AppPage>
   );
 }

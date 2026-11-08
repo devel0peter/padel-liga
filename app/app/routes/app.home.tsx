@@ -30,6 +30,7 @@ import { partnerSearchState } from "~/lib/partner-search.server";
 import { homeSeasons, isWaiting, waitingText } from "~/lib/seasons";
 import { applyToSeason, entryCounts, entryViews } from "~/lib/season-entries.server";
 import { listSeasons } from "~/lib/seasons.server";
+import { withArticle } from "~/lib/groups";
 import { SITE_NAME } from "~/lib/site";
 import { myStrikes } from "~/lib/strikes.server";
 
@@ -208,13 +209,19 @@ function SeasonDates({ s }: { s: SeasonView }) {
 }
 
 // A season: its dates with the round being played marked, entry and
-// strikes; once it runs (`running`) a smaller card (docs/player-ui.md H6, D139).
+// strikes. Once it runs (`running`) it opens Kezdőlap as the season's summary
+// (docs/player-ui.md H6, D139, D143): the round being played and its deadline
+// under the title.
 function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolean; actionData: Route.ComponentProps["actionData"] }) {
+  const now = s.phases.find((p) => p.number === s.current);
   return (
     <Card size={running ? "sm" : "default"} className={running ? undefined : "max-w-2xl"}>
       <CardHeader>
         <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{s.name}</CardTitle>
-        <CardDescription>{s.league}</CardDescription>
+        <CardDescription>
+          {s.league}
+          {now && ` · most ${withArticle(now.number)} kör megy, határidő: ${formatDeadline(new Date(now.deadline))}`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm">
         <SeasonDates s={s} />
@@ -237,9 +244,13 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
     <AppPage title="Kezdőlap">
       {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {running && (
-        // Separate cards (D136, D140): what to do, the next match, our group.
+        // Separate cards (D136, D140, D143): the season's summary, what to do,
+        // the next match; our group on the right.
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <div className="grid gap-6">
+            {d.seasons.map((s) => (
+              <SeasonCard key={s.id} s={s} running actionData={actionData} />
+            ))}
             {open.length > 0 && <Todos items={open} />}
             {d.groups.map((g) => (
               <NextMatch key={g.groupId} group={g} multiLeague={d.multiLeague} />
@@ -248,9 +259,6 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           <div className="grid gap-6">
             {d.groups.map((g) => (
               <GroupStanding key={g.groupId} group={g} multiLeague={d.multiLeague} />
-            ))}
-            {d.seasons.map((s) => (
-              <SeasonCard key={s.id} s={s} running actionData={actionData} />
             ))}
           </div>
         </div>

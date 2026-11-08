@@ -108,7 +108,7 @@ export function StandingsTable({
           {rows.map((r) => {
             const href = linkFor?.(r.pairId) ?? null;
             return (
-              <TableRow key={r.pairId} className={cn(r.zone && ZONE_ROW[r.zone], r.mine && "bg-nav-active-bg/60 font-semibold hover:bg-nav-active-bg/80")}>
+              <TableRow key={r.pairId} className={cn(r.zone && ZONE_ROW[r.zone], r.mine && "font-bold")}>
                 <TableCell className="px-1">
                   <span className="flex items-center gap-0.5 font-bold">
                     {ranked ? `${r.rank}.` : "–"}
@@ -123,7 +123,8 @@ export function StandingsTable({
                   ) : (
                     <Names names={r.names} />
                   )}
-                  {r.mine && <span className="text-xs font-semibold text-nav-active"> (ti)</span>}
+                  {/* The own pair is bold (D143); the word is for screen readers only. */}
+                  {r.mine && <span className="sr-only"> (ti)</span>}
                 </TableCell>
                 <TableCell className={num}>{r.matches}</TableCell>
                 <TableCell className={num}>{r.wins}</TableCell>

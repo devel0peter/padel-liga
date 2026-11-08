@@ -11,9 +11,13 @@ import {
   addDays,
   budapestDay,
   budapestTime,
+  currentElo,
   groupRounds,
   isMonday,
   phaseCalendar,
+  ratedWinner,
+  replayElo,
+  type RatedMatch,
   type MatchOutcome,
   type MatchScore,
   type Side,
@@ -324,7 +328,36 @@ export function seasonStatements(now: Date): string[] {
         `club_id = ${CLUB(m.club)}, outcome = ${m.outcome ? json(m.outcome) : "NULL"} where id = ${MATCH(m.a, m.b)}`,
     );
   }
+
+  // The Élő-pont as updateElo (elo.server.ts) leaves it after these results:
+  // the final played matches replayed in the order they were confirmed, then
+  // users.elo and elo_changes. Without it the Ranglista and the profiles show
+  // the starting values and no rated match.
+  const { changes, players: rated } = seasonElo(plan);
+  for (const c of changes) {
+    const m = plan.matches[c.matchId]!;
+    out.push(
+      `insert into elo_changes (match_id, user_id, rating_before, rating_after, delta, k, at) values (` +
+        `${MATCH(m.a, m.b)}, ${q(c.playerId)}, ${c.before}, ${c.after}, ${c.delta}, ${c.k}, ${secs(confirmedAt(m))})`,
+    );
+  }
+  for (const [id, state] of rated) out.push(`update users set elo = ${state.rating} where id = ${q(id)}`);
   return out;
+}
+
+const confirmedAt = (m: SeedMatch): Date => m.events.find((e) => e.kind === "result_confirmed")!.at;
+
+/** The seed's Élő-pont replay; a change's `matchId` is the index into `plan.matches`. */
+export function seasonElo(plan: SeasonPlan): ReturnType<typeof replayElo> {
+  const ids = (i: number): [string, string] => [seasonUserId(plan.pairs[i]!.a), seasonUserId(plan.pairs[i]!.b)];
+  const level = new Map(plan.pairs.flatMap((p) => [[seasonUserId(p.a), p.level] as const, [seasonUserId(p.b), p.level] as const]));
+  const list = plan.matches
+    .flatMap((m, i): { match: RatedMatch; at: number }[] => {
+      const winner = m.status === "final" ? ratedWinner(m.outcome ?? null) : null;
+      return winner ? [{ match: { id: i, a: ids(m.a), b: ids(m.b), winner }, at: confirmedAt(m).getTime() }] : [];
+    })
+    .sort((x, y) => x.at - y.at || x.match.id - y.match.id);
+  return replayElo((id) => currentElo(null, level.get(id) ?? null)!, list.map((r) => r.match));
 }
 
 // The walkthrough seed (reset included), then the running phase on top.

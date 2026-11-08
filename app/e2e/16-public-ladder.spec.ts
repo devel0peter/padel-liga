@@ -79,6 +79,11 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(tip).toContainText("Egy fel, egy le");
   await expect(main.getByRole("heading", { level: 1, name: "Tabella", exact: true })).toBeVisible();
 
+  // One group open at a time, Anna's on load (D143): opening group 2 folds hers into a row.
+  await main.getByRole("button", { name: "2. csoport megnyitása" }).click();
+  await expect(main.getByRole("region", { name: "2. csoport" }).getByRole("row")).toHaveCount(4);
+  await expect(main.getByRole("button", { name: "1. csoport megnyitása" })).toBeVisible();
+
   // Not for search engines or link previews.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   await expect(page.locator('meta[property="og:title"]')).toHaveCount(0);

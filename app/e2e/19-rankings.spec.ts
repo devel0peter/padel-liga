@@ -31,9 +31,9 @@ test("33a. once round 1 has started: every placed player and pair by Élő-pont,
   d1Update(`update season_phases set starts_at = ${Math.floor(Date.now() / 1000) - 86_400} where ${ROUND_1}`);
   try {
     const { context, page } = await as(browser, anna);
-    // From the Tabella's header, as on a phone.
-    await visit(page, "/league/minta");
-    await content(page).getByRole("link", { name: "Ranglista" }).click();
+    // From the sidebar (the Tabella has no button to it, D143).
+    await visit(page, "/home");
+    await page.getByRole("link", { name: "Ranglista", exact: true }).locator("visible=true").first().click();
     await expect(page).toHaveURL(/\/league\/minta\/rankings$/);
     const main = content(page);
 

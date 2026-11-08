@@ -89,13 +89,17 @@ export function todos(groups: readonly HomeGroup[]): Todo[] {
 }
 
 // Teendők (spec 13, docs/player-ui.md H1): every open item, each a link to it,
-// with its deadline. The page leaves it out when there is none.
+// with its deadline. The page leaves it out when there is none. A light tint,
+// a stronger edge and the count set it apart from the other cards (D143).
 export function Todos({ items }: { items: Todo[] }) {
   return (
-    <Card role="region" aria-labelledby="teendok" className="ring-nav-active/40">
+    <Card role="region" aria-labelledby="teendok" className="bg-nav-active-bg/40 ring-2 ring-nav-active/50">
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} id="teendok" className="font-display text-lg font-bold">
+        <CardTitle role="heading" aria-level={2} id="teendok" className="flex items-center gap-2 font-display text-lg font-bold">
           Teendők
+          <span className="rounded-full bg-nav-active px-2 py-px text-xs font-bold text-white tabular-nums dark:text-background">
+            {items.length}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>

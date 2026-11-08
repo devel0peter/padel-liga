@@ -15,6 +15,10 @@ test("29. the group table counts the confirmed win and the organizer's decision"
     .getByRole("region", { name: /^\d+\. csoport$/ })
     .filter({ hasText: anna.name });
   await expect(group).toHaveCount(1);
+  // One group is open at a time, the viewer's (D143): open Anna's if it isn't.
+  const opener = group.getByRole("button", { name: /csoport megnyitása$/ });
+  if (await opener.count()) await opener.click();
+  await expect(group.locator("tbody tr")).toHaveCount(3);
 
   // Column order: #, Pár, M, Gy, V, Szett, Játék, P (D133). Read the M and P cells of the body rows.
   const column = (nth: number) =>

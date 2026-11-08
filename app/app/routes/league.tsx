@@ -1,12 +1,12 @@
 import type { Division } from "@padel-liga/rules";
-import { ListOrdered, Medal } from "lucide-react";
+import { ChevronRight, ListOrdered } from "lucide-react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/league";
 import { AppPage } from "~/components/app-page";
 import { FixtureList } from "~/components/fixture-list";
 import { HelpTip } from "~/components/help-tip";
-import { LadderScroller } from "~/components/ladder-scroller";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -22,9 +22,9 @@ import { SITE_NAME } from "~/lib/site";
 
 // The league page, the player's "Tabella" (#30, spec section 14): the phase's
 // groups top-down, each a card with its division and its table; the group's
-// matches open in a side panel (D136). The groups sit one under the other in
-// a list that scrolls on its own, the one in the middle full size, the
-// viewer's group there on load (D143). For logged-in players only, inside the app
+// matches open in a side panel (D136). Down the ladder one group is open as a
+// full card, the viewer's on load; the others are compact rows above and
+// below it (number, division, pairs), and a tap on one opens it (D143). For logged-in players only, inside the app
 // shell (D134): a visitor goes to the login page and comes back. Names only:
 // no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -86,6 +86,62 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
   );
 }
 
+// A group that isn't open: one row with its number, division and pairs; a tap
+// opens it. It keeps the region and the division, so the ladder still reads
+// top-down.
+function GroupRow({ group, division, label, onOpen }: { group: LadderGroup; division: Division; label: string; onOpen: () => void }) {
+  return (
+    <section aria-label={`${group.number}. csoport`}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${group.number}. csoport megnyitása`}
+        className="flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        <span className="grid min-w-0 flex-1 gap-0.5">
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-display font-bold">{group.number}. csoport</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
+              {label}
+            </span>
+            {group.mine && <span className="text-xs font-semibold text-nav-active">a ti csoportotok</span>}
+          </span>
+          <span className="truncate text-xs text-muted-foreground">{group.rows.map((r) => r.names.join(" – ")).join(" · ")}</span>
+        </span>
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+    </section>
+  );
+}
+
+// The ladder (D143): the open group as a full card, the rest as rows in their
+// place. Opening another one brings its card into view.
+function Ladder({ groups, initial }: { groups: { g: LadderGroup; division: Division; label: string }[]; initial: number }) {
+  const [open, setOpen] = useState(initial);
+  const card = useRef<HTMLDivElement>(null);
+  const show = (i: number) => {
+    setOpen(i);
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      card.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    });
+  };
+  return (
+    <div className="grid max-w-3xl gap-2">
+      {groups.map(({ g, division, label }, i) =>
+        i === open ? (
+          <div key={g.number} ref={card} className="scroll-mt-4 py-2">
+            <GroupCard group={g} division={division} label={label} />
+          </div>
+        ) : (
+          <GroupRow key={g.number} group={g} division={division} label={label} onOpen={() => show(i)} />
+        ),
+      )}
+    </div>
+  );
+}
+
 const POINTS: [title: string, text: string][] = [
   ["Egyetlen létra", "Az összes csoport egy nagy létrát alkot: az 1. csoport a legerősebb, lefelé egyre könnyebbek."],
   ["A divíziók a létra harmadai", "Felül a Bronz, középen a Réz, alul a Rookie divízió. Ez csak címke: a meccseidet, a feljutást és a kiesést nem érinti."],
@@ -112,7 +168,7 @@ function Explainer() {
 }
 
 export default function League({ loaderData: page }: Route.ComponentProps) {
-  const groups = page.kind === "ladder" ? page.bands.flatMap((band) => band.groups.map((g) => ({ g, band }))) : [];
+  const groups = page.kind === "ladder" ? page.bands.flatMap((band) => band.groups.map((g) => ({ g, division: band.division, label: band.label }))) : [];
   const focus = Math.max(0, groups.findIndex(({ g }) => g.mine));
   const where = [page.league.name, page.season].filter(Boolean).join(" · ");
   if (page.kind === "waiting")
@@ -137,15 +193,6 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
     <AppPage
       title="Tabella"
       help={<Explainer />}
-      actions={
-        // The Ranglista (D137): one tap from the Tabella, also on a phone.
-        <Button asChild variant="outline" size="sm">
-          <Link to="rankings" relative="path" className="no-underline">
-            <Medal aria-hidden />
-            Ranglista
-          </Link>
-        </Button>
-      }
       description={
         <>
           {where} · {page.started ? `${page.phase}. kör, ${page.week}. hét (${page.weekFrom} – ${page.weekTo})` : `${page.phase}. kör, indul ${page.startsOn}`}
@@ -153,12 +200,8 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
       }
     >
       <StandingsLegend />
-      {/* Down the ladder, one group under the other (D143); each card names its division. */}
-      <LadderScroller
-        label="Csoportok"
-        focus={focus}
-        items={groups.map(({ g, band }) => ({ key: g.number, node: <GroupCard group={g} division={band.division} label={band.label} /> }))}
-      />
+      {/* Down the ladder, one group open, the viewer's on load (D143). */}
+      <Ladder groups={groups} initial={focus} />
     </AppPage>
   );
 }

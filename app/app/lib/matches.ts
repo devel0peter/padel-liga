@@ -6,16 +6,16 @@
 import {
   DIVISION_NAMES,
   budapestDay,
-  budapestTime,
   divisionOf,
-  isDay,
   isLateCancel,
   type SchedulingEventKind,
   type SchedulingState,
   type Side,
+  type SlotRange,
 } from "@padel-liga/rules";
 
 import { formatDeadline } from "./format";
+import { formatRange } from "./slot-ranges";
 
 // "nov. 12., csütörtök 18:00": a slot or an agreed time.
 export const formatSlot = formatDeadline;
@@ -43,9 +43,9 @@ export function groupLine(number: number, groupCount: number): string {
 
 // How scheduling works, on the match page (#26 requirement 7).
 export const SCHEDULING_GUIDE = [
-  "Ajánljatok legalább 3 időpontot, legalább 2 különböző napra, 7:00 és 22:00 közé, legalább 48 órával előre.",
+  "Adjátok meg, mikor értek rá, legalább 2 különböző napra: például szombat 14–18. Egész órák, 7:00 és 23:00 között; egy meccs 60 perc.",
+  "A másik pár ebből választ egy kezdést, vagy ő ajánl mást.",
   "Ha már megbeszéltétek az időpontot (Messengeren, személyesen), rögzítsétek itt, és a másik pár megerősíti.",
-  "A másik pár itt választ egyet az időpontjaitok közül, vagy újakat ajánl.",
 ];
 
 export type Tone = "todo" | "waiting" | "done";
@@ -106,7 +106,7 @@ export function todoFor(state: SchedulingState, me: Side, opponents: string): st
 export function eventText(e: {
   kind: SchedulingEventKind;
   at?: Date;
-  slots?: readonly Date[] | null;
+  ranges?: readonly SlotRange[] | null;
   slot?: Date | null;
   venue?: string | null;
   court?: string | null;
@@ -115,9 +115,9 @@ export function eventText(e: {
   const slot = e.slot ? formatSlot(e.slot) : "";
   switch (e.kind) {
     case "proposal":
-      return `Időpontokat ajánlott: ${(e.slots ?? []).map(formatSlot).join("; ")}${venue}`;
+      return `Időpontokat ajánlott: ${(e.ranges ?? []).map((r) => formatRange(r)).join("; ")}${venue}`;
     case "counter_proposal":
-      return `Új időpontokat ajánlott: ${(e.slots ?? []).map(formatSlot).join("; ")}${venue}`;
+      return `Új időpontokat ajánlott: ${(e.ranges ?? []).map((r) => formatRange(r)).join("; ")}${venue}`;
     case "accepted":
       return `Elfogadta: ${slot}`;
     case "agreed_time":
@@ -133,31 +133,6 @@ export function eventText(e: {
         ? `Lemondta a meccset (${slot}). Késői lemondás: 24 órán belül volt.`
         : `Lemondta a meccset (${slot})`;
   }
-}
-
-const SLOT_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/;
-
-/**
- * A datetime-local field ("2026-11-12T18:00") read as Budapest time, whatever
- * the browser's own time zone. Null for anything else; "" for an empty field.
- */
-export function parseSlot(value: string): Date | null | "" {
-  const v = value.trim();
-  if (v === "") return "";
-  const m = SLOT_RE.exec(v);
-  if (!m || !isDay(m[1]!)) return null;
-  const [h, min] = [Number(m[2]), Number(m[3])];
-  if (h > 23 || min > 59) return null;
-  return budapestTime(m[1]!, h, min);
-}
-
-// The proposal form's slots: empty rows are skipped, unreadable ones stay as
-// an invalid date so the slot rules report them.
-export function parseSlots(values: readonly string[]): Date[] {
-  return values.flatMap((v) => {
-    const d = parseSlot(v);
-    return d === "" ? [] : [d ?? new Date(Number.NaN)];
-  });
 }
 
 // "+36 30 123 4567" -> "tel:+36301234567"

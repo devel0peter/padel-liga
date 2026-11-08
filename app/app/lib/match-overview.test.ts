@@ -27,7 +27,7 @@ describe("overviewStatus (#158 requirement 1)", () => {
   });
 
   it("a proposal names the pair whose answer it waits for", () => {
-    const state: SchedulingState = { status: "proposed", by: "a", slots: [slot], clubId: null, at: slot };
+    const state: SchedulingState = { status: "proposed", by: "a", ranges: [{ start: slot, end: new Date(slot.getTime() + 3_600_000) }], clubId: null, at: slot };
     expect(overviewStatus(state, names).label).toBe("Időpontokat ajánlottak, Tóth Cili – Szabó Dani válaszára vár");
     expect(overviewStatus({ ...state, by: "b" }, names).label).toBe("Időpontokat ajánlottak, Kiss Anna – Nagy Béla válaszára vár");
   });
@@ -123,7 +123,7 @@ describe("stuckReason (#158 stuck match)", () => {
   });
 
   it("a proposal unanswered for 48 hours", () => {
-    const state: SchedulingState = { status: "proposed", by: "a", slots: [hours(monday, 100)], clubId: null, at: monday };
+    const state: SchedulingState = { status: "proposed", by: "a", ranges: [{ start: hours(monday, 100), end: hours(monday, 101) }], clubId: null, at: monday };
     const events = [ev("proposal", monday)];
     expect(stuckReason({ ...base, state, events, now: hours(monday, 47.99) })).toBeNull();
     expect(stuckReason({ ...base, state, events, now: hours(monday, 48) })).toBe("unanswered");
@@ -158,7 +158,7 @@ describe("stuckReason (#158 stuck match)", () => {
 
   it("a fresh proposal isn't stuck, even late in the week", () => {
     const at = hours(wednesday, 30);
-    const state: SchedulingState = { status: "proposed", by: "a", slots: [hours(at, 60)], clubId: null, at };
+    const state: SchedulingState = { status: "proposed", by: "a", ranges: [{ start: hours(at, 60), end: hours(at, 61) }], clubId: null, at };
     expect(stuckReason({ ...base, state, events: [ev("proposal", at)], now: hours(at, 1) })).toBeNull();
   });
 

@@ -23,6 +23,8 @@ const M = await import("~/lib/matches.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // The first season: phase 1 runs Mon 9 – Sun 29 Nov 2026 (Budapest, UTC+1).
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
@@ -84,7 +86,7 @@ const inbox = () => all("select n.kind, n.url, u.id as user from notifications n
 const events = (matchId: number) => all("select kind, pair_id, user_id, slots, slot, club_id from match_events where match_id = ? order by id", matchId);
 
 const R = await import("~/lib/results.server");
-const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19, 30), at("2026-11-14", 10)];
+const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
 const WIN: [number, number][] = [
   [4, 1],
@@ -168,7 +170,7 @@ describe("recording a result (#28)", () => {
     await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
     const page = (await M.matchPage(id, opp, PLAYED))!;
     expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false });
-    expect(await M.matchStep(opp, id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).toEqual({
+    expect(await M.matchStep(opp, id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW)).toEqual({
       ok: false,
       error: "A meccs eredménye már rögzítve van, itt már nem lehet egyeztetni.",
     });

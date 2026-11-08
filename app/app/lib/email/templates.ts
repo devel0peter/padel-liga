@@ -1,7 +1,10 @@
 // Email content. Pure (no I/O) so it can be unit tested and previewed in the
 // browser. Every email has an HTML and a plain-text version.
 
+import type { SlotRange } from "@padel-liga/rules";
+
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "../format";
+import { formatRange } from "../slot-ranges";
 import { withArticle } from "../groups";
 import { PAIR_SECTION_PATH } from "../pairs";
 import { SITE_NAME, SITE_URL } from "../site";
@@ -279,17 +282,17 @@ type MatchEmailInput = {
 const matchFooter = () =>
   footer(`Azért kaptad ezt a levelet, mert a pároddal játszol a ${SITE_URL.replace("https://", "")} ligájában. Az értesítéseket a profilodban állíthatod be.`);
 
-// A proposal or counter-proposal arrived (#26, spec 13): the slots and a
-// one-tap link to answer. Names stay plain text.
-export function matchProposal(input: MatchEmailInput & { counter: boolean; slots: Date[] }): Email {
+// A proposal or counter-proposal arrived (#26, spec 13): the ranges (D144)
+// and a one-tap link to answer. Names stay plain text.
+export function matchProposal(input: MatchEmailInput & { counter: boolean; ranges: SlotRange[] }): Email {
   const link = `${SITE_URL}/matches/${input.matchId}`;
   return buildPlain(
     `${input.counter ? "Új időpontokat" : "Időpontokat"} ajánlottak a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre:\n${input.slots.map((s) => formatDeadline(s)).join("\n")}`,
+      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre. Ekkor érnek rá:\n${input.ranges.map((r) => formatRange(r)).join("\n")}`,
       input.venue ? `Helyszín: ${input.venue}` : null,
-      `Válassz egyet, vagy ajánlj másikat (határidő: ${formatDeadline(input.deadline)}):`,
+      `Válassz ebből egy kezdést, vagy ajánlj mást (határidő: ${formatDeadline(input.deadline)}):`,
       link,
       SIGNATURE,
     ].filter((p): p is string => p !== null),

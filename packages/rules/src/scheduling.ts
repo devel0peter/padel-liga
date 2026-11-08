@@ -8,11 +8,12 @@
 
 // The match's two pairs, as in results.ts: "a" is pair_a, "b" pair_b.
 import type { Side } from "./results";
+import { fitsRange, openRanges, type SlotRange } from "./slots";
 
 export const SCHEDULING_EVENT_KINDS = [
-  "proposal", // at least 3 slots by the slot rules
+  "proposal", // availability ranges by the slot rules (D144)
   "counter_proposal", // the same, while the other pair's proposal or agreed time was open
-  "accepted", // one slot of the other pair's proposal
+  "accepted", // one start inside the other pair's ranges
   "agreed_time", // one slot agreed elsewhere (spec 6.3)
   "agreed_confirmed", // the other pair confirmed it
   "agreed_declined", // the other pair declined it: back to scheduling
@@ -26,7 +27,7 @@ export type SchedulingEvent = {
   kind: SchedulingEventKind;
   side: Side;
   at: Date;
-  slots?: readonly Date[] | null; // proposal, counter_proposal
+  ranges?: readonly SlotRange[] | null; // proposal, counter_proposal
   slot?: Date | null; // accepted, agreed_time; cancelled: the slot given up
   clubId?: number | null; // the venue offered with a proposal or agreed time, or recorded (venue)
   court?: string | null; // venue: the court, free text (optional)
@@ -36,8 +37,8 @@ export type SchedulingState =
   // `nextBy`: after a late cancellation, the cancelling pair must make the
   // next proposal (spec 6.6).
   | { status: "to_schedule"; nextBy?: Side }
-  // `slots`: the ones that haven't started yet.
-  | { status: "proposed"; by: Side; slots: Date[]; clubId: number | null; at: Date }
+  // `ranges`: the parts that can still be picked (openRanges).
+  | { status: "proposed"; by: Side; ranges: SlotRange[]; clubId: number | null; at: Date }
   | { status: "agreed_time"; by: Side; slot: Date; clubId: number | null; at: Date }
   | { status: "scheduled"; slot: Date; clubId: number | null; court?: string | null };
 
@@ -53,7 +54,7 @@ export const other = (side: Side): Side => (side === "a" ? "b" : "a");
 
 /**
  * The match's scheduling state at `now`, from its log in order. A proposal
- * whose slots have all started lapses, and so does an unconfirmed agreed time
+ * with no start left after `now` in any of its ranges lapses, and so does an unconfirmed agreed time
  * once its start passes (spec 6.3): the match is back to scheduling. A step
  * that doesn't fit the state (accepting your own proposal, confirming without
  * an agreed time) changes nothing.
@@ -65,10 +66,10 @@ export function schedulingState(events: readonly SchedulingEvent[], now: Date): 
       case "proposal":
       case "counter_proposal":
         if (state.status === "scheduled") break;
-        state = { status: "proposed", by: e.side, slots: [...(e.slots ?? [])], clubId: e.clubId ?? null, at: e.at };
+        state = { status: "proposed", by: e.side, ranges: [...(e.ranges ?? [])], clubId: e.clubId ?? null, at: e.at };
         break;
       case "accepted":
-        if (state.status === "proposed" && state.by !== e.side && e.slot && state.slots.some((s) => s.getTime() === e.slot!.getTime()))
+        if (state.status === "proposed" && state.by !== e.side && e.slot && state.ranges.some((r) => fitsRange(e.slot!, r)))
           state = { status: "scheduled", slot: e.slot, clubId: state.clubId };
         break;
       case "agreed_time":
@@ -91,8 +92,8 @@ export function schedulingState(events: readonly SchedulingEvent[], now: Date): 
     }
   }
   if (state.status === "proposed") {
-    const open = state.slots.filter((s) => s.getTime() > now.getTime());
-    return open.length > 0 ? { ...state, slots: open } : { status: "to_schedule" };
+    const open = openRanges(state.ranges, now);
+    return open.length > 0 ? { ...state, ranges: open } : { status: "to_schedule" };
   }
   if (state.status === "agreed_time" && state.slot.getTime() <= now.getTime()) return { status: "to_schedule" };
   return state;
@@ -101,7 +102,7 @@ export function schedulingState(events: readonly SchedulingEvent[], now: Date): 
 export type SchedulingActions = {
   propose: boolean; // a proposal, or a counter-proposal (proposalKind)
   recordAgreed: boolean;
-  accept: Date[]; // the other pair's open slots
+  accept: SlotRange[]; // the other pair's open ranges: one start inside one of them
   confirm: boolean; // the other pair's agreed time
   decline: boolean;
   venue: boolean; // record or change where the court is booked (#27)
@@ -126,7 +127,7 @@ export function schedulingActions(state: SchedulingState, side: Side, now: Date,
   return {
     propose: true,
     recordAgreed: true,
-    accept: theirs && state.status === "proposed" ? state.slots : [],
+    accept: theirs && state.status === "proposed" ? state.ranges : [],
     confirm: theirs && state.status === "agreed_time",
     decline: theirs && state.status === "agreed_time",
     venue: false,

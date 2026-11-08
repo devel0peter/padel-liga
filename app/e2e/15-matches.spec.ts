@@ -8,8 +8,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { PAIRS, as, content, d1, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
 
-// A datetime-local value `days` from today at hh:mm, Budapest time.
-const slot = (days: number, time: string) => `${addDays(budapestDay(new Date()), days)}T${time}`;
+// A Budapest day `days` from today.
+const inDays = (days: number) => addDays(budapestDay(new Date()), days);
+// How the time pickers name a day (D144): "nov. 14., szombat".
+const dayName = (day: string) =>
+  new Intl.DateTimeFormat("hu-HU", { timeZone: "UTC", month: "short", day: "numeric", weekday: "long" }).format(new Date(`${day}T00:00:00Z`));
+const hh = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
 const anna = PAIRS.p1[0];
 
@@ -29,6 +33,14 @@ function annasMatches(): { id: number; week: number; opponents: Player[] }[] {
 }
 
 const status = (page: Page) => page.getByRole("region", { name: "Állapot" });
+
+// Records an agreed time with the day and hour chips (D144); the fold is open.
+async function recordAgreed(page: Page, day: string, hour: number) {
+  const main = content(page);
+  await main.getByRole("radiogroup", { name: "A meccs napja" }).getByRole("radio", { name: dayName(day) }).click();
+  await main.getByRole("radiogroup", { name: "Kezdés" }).getByRole("radio", { name: `${dayName(day)} ${hh(hour)}` }).click();
+  await page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
+}
 
 test("17. Kezdőlap shows the group, the division line, the next match with phones, the group's matches with the week off, Teendők", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
@@ -67,23 +79,40 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await visit(player.page, `/matches/${first!.id}`);
   const main = content(player.page);
   await expect(main.getByRole("heading", { name: "Hogyan egyeztessetek?" })).toBeVisible();
-  await expect(main).toContainText("Ajánljatok legalább 3 időpontot, legalább 2 különböző napra");
+  await expect(main).toContainText("Adjátok meg, mikor értek rá, legalább 2 különböző napra");
 
-  // Two slots on one day: refused with the rules' own messages.
-  await player.page.getByLabel("1. időpont").fill(slot(4, "18:00"));
-  await player.page.getByLabel("2. időpont").fill(slot(4, "06:30"));
-  await player.page.getByRole("button", { name: "Elküldöm az időpontokat" }).click();
-  await expect(main.getByRole("alert")).toContainText("Legalább 3 különböző időpontot ajánlj.");
-  await expect(main.getByRole("alert")).toContainText("Az időpontok legalább 2 különböző napra essenek.");
-  await expect(main.getByText("Az időpont 7:00 és 22:00 között kezdődjön.").first()).toBeVisible();
+  // Availability ranges with chips (D144). One day only: refused with the rules' own message.
+  const propose = main.getByRole("region", { name: "Ajánljatok ráérést" });
+  await expect(propose).toContainText("Adjatok meg ráérést legalább 2 különböző napra.");
+  const days = propose.getByRole("radiogroup", { name: "Nap" });
+  await days.getByRole("radio", { name: dayName(inDays(4)) }).click();
+  await propose.getByRole("button", { name: "Délután 14–18" }).click();
+  // The same day again, overlapping: joined into one range.
+  await propose.getByLabel("Ettől").click();
+  await player.page.getByRole("option", { name: "16:00" }).click();
+  await propose.getByLabel("Eddig").click();
+  await player.page.getByRole("option", { name: "19:00" }).click();
+  await propose.getByRole("button", { name: "Hozzáadom" }).click();
+  const list = propose.getByRole("list", { name: "Ráérésetek" });
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list).toContainText("14:00–19:00");
+  await propose.getByRole("button", { name: "Elküldöm a ráérésünket" }).click();
+  await expect(propose.getByRole("alert")).toContainText("Adj meg ráérést legalább 2 különböző napra.");
 
+  // A second day, its own range: sent.
   const offset = logOffset();
-  await player.page.getByLabel("2. időpont").fill(slot(5, "19:30"));
-  await player.page.getByLabel("3. időpont").fill(slot(6, "10:00"));
-  await player.page.getByRole("button", { name: "Elküldöm az időpontokat" }).click();
-  await expect(main.getByRole("status").filter({ hasText: "Elküldtük az időpontokat a másik párnak." })).toBeVisible();
+  await days.getByRole("radio", { name: dayName(inDays(5)) }).click();
+  await propose.getByLabel("Ettől").click();
+  await player.page.getByRole("option", { name: "19:00" }).click();
+  await propose.getByLabel("Eddig").click();
+  await player.page.getByRole("option", { name: "21:00" }).click();
+  await propose.getByRole("button", { name: "Hozzáadom" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await propose.getByRole("button", { name: "Elküldöm a ráérésünket" }).click();
+  await expect(main.getByRole("status").filter({ hasText: "Elküldtük a ráéréseteket a másik párnak." })).toBeVisible();
   await expect(status(player.page)).toContainText("Ajánlottatok időpontokat, a másik pár válaszára vár");
-  await expect(main.getByRole("heading", { name: "Ezeket ajánlottátok" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Ekkor értek rá" })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Ekkor értek rá" })).toContainText("14:00–19:00");
 
   // Instant email to both players of the other pair, with the link.
   const sent = await waitForEmails(offset, 2, (m) => m.subject.startsWith("Időpontokat ajánlottak"));
@@ -97,10 +126,13 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   await content(other.page).getByRole("link", { name: /^Válaszolj az időpont-ajánlatra/ }).click();
   await expect(other.page).toHaveURL(new RegExp(`/matches/${first!.id}$`));
   await other.page.waitForLoadState("networkidle");
-  await content(other.page).getByRole("radiogroup", { name: "Ajánlott időpontok" }).getByRole("radio").nth(1).click();
+  // Every whole hour a match fits in: 14:00–19:00 and 19:00–21:00 give 5 and 2; they pick 20:00.
+  const starts = content(other.page).getByRole("radiogroup", { name: "Választható kezdések" });
+  await expect(starts.getByRole("radio")).toHaveCount(5 + 2);
+  await starts.getByRole("radio", { name: `${dayName(inDays(5))} 20:00` }).click();
   await other.page.getByRole("button", { name: "Elfogadom" }).click();
   await expect(content(other.page).getByRole("status").filter({ hasText: "Lefixáltátok a meccset." })).toBeVisible();
-  await expect(status(other.page)).toContainText(/Lefixálva: .*19:30/);
+  await expect(status(other.page)).toContainText(/Lefixálva: .*20:00/);
   // Add to calendar (#192): the Google link and the .ics, with names and no contact data.
   const calendar = content(other.page).getByLabel("Naptárba");
   const google = new URL((await calendar.getByRole("link", { name: "Google Naptár" }).getAttribute("href"))!);
@@ -128,7 +160,7 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   const partner = await as(browser, PAIRS.p1[1]);
   await visit(partner.page, "/home");
   // In the group's matches the fixed one shows its time (D140).
-  await expect(content(partner.page).getByRole("group", { name: "A csoport meccsei" }).locator(`a[href="/matches/${first!.id}"]`)).toContainText("19:30");
+  await expect(content(partner.page).getByRole("group", { name: "A csoport meccsei" }).locator(`a[href="/matches/${first!.id}"]`)).toContainText("20:00");
   await partner.context.close();
   await player.context.close();
 });
@@ -139,11 +171,10 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${second!.id}`);
   const offset = logOffset();
-  // Late in the evening: an agreed time has no time window (spec 6.3). It is
-  // folded under the proposal form (D133).
+  // Tomorrow, the last start of the day, with the day and hour chips (D144).
+  // It is folded under the proposal form (D133).
   await player.page.getByText("Máshol már megbeszéltétek?").click();
-  await player.page.getByLabel("Megbeszélt időpont").fill(slot(1, "23:00"));
-  await player.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
+  await recordAgreed(player.page, inDays(1), 22);
   await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
   await expect(status(player.page)).toContainText("a másik pár megerősítésére vár");
   const sent = await waitForEmails(offset, 2, (m) => m.subject.startsWith("Erősítsd meg a meccs időpontját"));
@@ -153,7 +184,7 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   await visit(other.page, `/matches/${second!.id}`);
   await expect(content(other.page).getByText("Megerősíted az időpontot?")).toBeVisible();
   await other.page.getByRole("button", { name: "Megerősítem" }).click();
-  await expect(status(other.page)).toContainText(/Lefixálva: .*23:00/);
+  await expect(status(other.page)).toContainText(/Lefixálva: .*22:00/);
   const log = content(other.page).getByRole("region", { name: "Napló" });
   await expect(log).toContainText("Rögzítette a megbeszélt időpontot");
   await expect(log).toContainText("Megerősítette a megbeszélt időpontot");
@@ -173,10 +204,13 @@ test("19. agreed time → confirm; nobody outside the two pairs can open the mat
   await player.context.close();
 });
 
-// A datetime-local value about `hours` from now, on the hour, Budapest time.
-function hoursAhead(hours: number): string {
-  const { day, minutes } = budapestClock(new Date(Date.now() + hours * 3_600_000));
-  return `${day}T${String(Math.floor(minutes / 60)).padStart(2, "0")}:00`;
+// The first start the agreed-time chips offer at least 2 hours from now
+// (7:00–22:00 Budapest): always under 24 hours ahead, so cancelling it is late.
+function soonStart(): { day: string; hour: number } {
+  const { day, minutes } = budapestClock(new Date(Date.now() + 2 * 3_600_000));
+  const hour = Math.ceil(minutes / 60);
+  if (hour < 7) return { day, hour: 7 };
+  return hour > 22 ? { day: addDays(day, 1), hour: 7 } : { day, hour };
 }
 
 test("24. venue, then a cancellation 4 days ahead and a late one: the log says who and that it was late (#27)", async ({ browser }) => {
@@ -208,8 +242,8 @@ test("24. venue, then a cancellation 4 days ahead and a late one: the log says w
   // The other pair records a time 3 hours from now, anna confirms, then cancels: late.
   await visit(other.page, `/matches/${first!.id}`);
   await other.page.getByText("Máshol már megbeszéltétek?").click();
-  await other.page.getByLabel("Megbeszélt időpont").fill(hoursAhead(3));
-  await other.page.getByRole("button", { name: "Rögzítem az időpontot" }).click();
+  const soon = soonStart();
+  await recordAgreed(other.page, soon.day, soon.hour);
   await expect(content(other.page).getByRole("status").filter({ hasText: "Rögzítettük." })).toBeVisible();
   await visit(player.page, `/matches/${first!.id}`);
   await player.page.getByRole("button", { name: "Megerősítem" }).click();

@@ -29,6 +29,8 @@ const { RunBudget } = await import("~/lib/run-usage");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // Phase 1: Mon 9 – Sun 29 Nov 2026. One group of 4 pairs; by seed 1, 2, 3, 4.
 // Week 1: 1–4 and 2–3; week 2: 1–3 and 2–4; week 3: 1–2 and 3–4.
@@ -93,7 +95,7 @@ const pushQueue = (kind: string) => all("select user_id as user from notificatio
 // Pair 1 proposes on Tue 10 Nov, pair 4 accepts Thu 12 Nov 18:00.
 async function schedule14(): Promise<number> {
   const id = matchOf(1, 4);
-  expect(await M.matchStep("p1a", id, { kind: "propose", slots: SLOTS, clubId: null }, at("2026-11-10", 11))).toMatchObject({ ok: true });
+  expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, at("2026-11-10", 11))).toMatchObject({ ok: true });
   expect(await M.matchStep("p4a", id, { kind: "accept", slot: SLOTS[0]! }, at("2026-11-10", 12))).toMatchObject({ ok: true });
   // The steps' notifications carry the database clock; put them on Tuesday.
   h.raw.exec(`update notifications set created_at = ${sec("2026-11-10T11:00:00Z")}`);
@@ -194,7 +196,7 @@ describe("digest reminders (#31)", () => {
 
   it("a match with a proposal, a scheduled match or a played one gets none", async () => {
     const id = await schedule14();
-    await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", slots: SLOTS, clubId: null }, at("2026-11-10", 11));
+    await M.matchStep("p2a", matchOf(2, 3), { kind: "propose", ranges: hour(SLOTS), clubId: null }, at("2026-11-10", 11));
     h.raw.exec(`update matches set status = 'final' where id = ${matchOf(1, 3)}`);
     h.raw.exec("delete from notifications");
     await run(at("2026-11-11", 7));

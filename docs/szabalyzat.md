@@ -61,9 +61,9 @@ A részleteket lent találod.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
 - **Bármelyik pár ajánlhat időpontokat**, nem kell megvárni a másikat. Minél előbb ajánltok, annál könnyebb időpontot találni.
 - Az időpontot az oldalon egyeztetitek:
-  - Az egyik pár legalább **3 időpontot** ajánl, legalább **2 különböző napra**, 7:00 és 22:00 között, legalább **48 órával előre**.
-  - A másik pár elfogad egyet, vagy ugyanilyen feltételekkel új időpontokat ajánl. Elutasítani csak új ajánlattal lehet.
-- **Ha már megbeszéltétek** (Messengeren, személyesen), az időpontot közvetlenül is rögzíthetitek az oldalon, 3 ajánlat nélkül. A másik pár megerősíti, és a meccs le van fixálva. Ez is egyeztetésnek számít.
+  - Az egyik pár megadja, **mikor ér rá**: ráérési sávokat (például „szombat 14–18”) legalább **2 különböző napra**. Egész órákat adtok meg, egy meccs **60 perc**: minden sávba férjen bele legalább egy meccs. A meccs 7:00 és 22:00 között kezdődhet, és a sávok a kör határideje előtt legyenek.
+  - A másik pár ebből választ egy kezdést (egész órát), vagy ugyanilyen feltételekkel ő adja meg, mikor ér rá. Elutasítani csak új ajánlattal lehet.
+- **Ha már megbeszéltétek** (Messengeren, személyesen), az időpontot (egész órát) közvetlenül is rögzíthetitek az oldalon, ráérés megadása nélkül. A másik pár megerősíti, és a meccs le van fixálva. Ez is egyeztetésnek számít.
 - **Lemondás:** a megbeszélt időpontot bármelyik pár lemondhatja az oldalon, ilyenkor újra egyeztettek.
   - Ha 24 órán belül mondjátok le, nektek kell új időpontokat ajánlanotok. Ha a meccs a határidőig nem jön létre, úgy számít, mintha ti nem próbáltatok volna egyeztetni (lásd 5. pont).
 - A pályát az foglalja le, akit megbeszéltek, és rögzíti az oldalon, hol foglalt.

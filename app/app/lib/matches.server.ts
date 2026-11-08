@@ -1,15 +1,16 @@
 import {
+  acceptErrors,
   agreedTimeErrors,
   budapestDay,
   autoAcceptAt,
   isLateCancel,
+  mergeRanges,
   proposalErrors,
   proposalKind,
   resultActions,
   SCHEDULING_EVENT_KINDS,
   schedulingActions,
   schedulingState,
-  slotErrorMessage,
   type SchedulingActions,
   type SchedulingEvent,
   type ResultState,
@@ -17,6 +18,7 @@ import {
   type SchedulingState,
   type Side,
   type SlotError,
+  type SlotRange,
 } from "@padel-liga/rules";
 import { and, asc, count, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -24,6 +26,7 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import { clubs, groupPairs, groups, leagues, matchEvents, matches, pairs, seasonPhases, seasons, users } from "~/db/schema";
 import { queueMatchEmails } from "~/lib/email/outbox.server";
+import { slotErrorText, storedRanges, toStoredRanges, type StoredSlots } from "~/lib/slot-ranges";
 import {
   matchAgreedTimeMessage,
   matchCancelledMessage,
@@ -118,7 +121,7 @@ export type StoredEvent = {
   userId: string | null;
   userName: string | null;
   kind: SchedulingEventKind;
-  slots: number[] | null;
+  slots: StoredSlots | null;
   slot: Date | null;
   clubId: number | null;
   court: string | null;
@@ -155,7 +158,7 @@ export const toSchedulingEvent = (e: StoredEvent, pairA: number): SchedulingEven
   kind: e.kind,
   side: e.pairId === pairA ? "a" : "b",
   at: e.at,
-  slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+  ranges: e.slots ? storedRanges(e.slots) : null,
   slot: e.slot,
   clubId: e.clubId,
   court: e.court,
@@ -591,7 +594,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       text: eventText({
         kind: e.kind,
         at: e.at,
-        slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+        ranges: e.slots ? storedRanges(e.slots) : null,
         slot: e.slot,
         venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
         court: e.court,
@@ -685,7 +688,7 @@ export async function matchCalendarEvent(
 // --- Scheduling steps (#26) ---------------------------------------------------
 
 export type StepInput =
-  | { kind: "propose"; slots: Date[]; clubId: number | null }
+  | { kind: "propose"; ranges: SlotRange[]; clubId: number | null }
   | { kind: "accept"; slot: Date }
   | { kind: "agreed"; slot: Date; clubId: number | null }
   | { kind: "confirm" }
@@ -703,18 +706,11 @@ const CLOSED_RESULT = "A meccs eredménye már rögzítve van, itt már nem lehe
 const CLOSED_DEADLINE = "Lejárt a kör határideje, itt már nem lehet egyeztetni.";
 const BAD_CLUB = "Válassz a listából helyszínt, vagy hagyd üresen.";
 const NOTHING_TO_ANSWER = "Erre most nincs mit válaszolni. Frissítsd az oldalt.";
-const SLOT_GONE = "Ez az időpont már nem választható. Frissítsd az oldalt.";
 const NOT_SCHEDULED = "A meccsnek most nincs lefixált időpontja. Frissítsd az oldalt.";
 const STARTED = "A meccs időpontja már elkezdődött, nem lehet lemondani.";
 const NO_CLUB = "Válassz helyszínt a listából.";
 const LONG_COURT = `A pálya legfeljebb ${COURT_MAX} karakter lehet.`;
 
-const secs = (d: Date) => Math.floor(d.getTime() / 1000);
-
-// The first error of each kind, in Hungarian, for the form.
-export function slotErrorText(errors: readonly SlotError[]): string {
-  return [...new Set(errors.map((e) => slotErrorMessage(e.code)))].join(" ");
-}
 
 async function clubAllowed(clubId: number | null, city: string): Promise<boolean> {
   if (clubId === null) return true;
@@ -727,7 +723,7 @@ async function clubAllowed(clubId: number | null, city: string): Promise<boolean
 
 type NewEvent = {
   kind: SchedulingEventKind;
-  slots?: number[] | null;
+  ranges?: SlotRange[] | null;
   slot?: Date | null;
   clubId?: number | null;
   court?: string | null;
@@ -784,19 +780,22 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
       break;
     }
     case "propose": {
-      const slotErrors = proposalErrors(input.slots, now, deadline);
+      const slotErrors = proposalErrors(input.ranges, now, deadline);
       if (slotErrors.length > 0) return { ok: false, error: slotErrorText(slotErrors), slotErrors };
       if (!(await clubAllowed(input.clubId, ctx.city))) return { ok: false, error: BAD_CLUB };
-      const slots = [...new Set(input.slots.map(secs))].sort((x, y) => x - y);
-      event = { kind: proposalKind(state, side), slots, clubId: input.clubId };
-      notice = "Elküldtük az időpontokat a másik párnak.";
+      // Same-day ranges that overlap or touch are stored as one (D144).
+      event = { kind: proposalKind(state, side), ranges: mergeRanges(input.ranges), clubId: input.clubId };
+      notice = "Elküldtük a ráéréseteket a másik párnak.";
       break;
     }
-    case "accept":
-      if (!can.accept.some((s) => s.getTime() === input.slot.getTime())) return { ok: false, error: SLOT_GONE };
+    case "accept": {
+      // One start inside the other pair's open ranges (D144).
+      const slotErrors = acceptErrors(input.slot, can.accept, now);
+      if (slotErrors.length > 0) return { ok: false, error: slotErrorText(slotErrors), slotErrors };
       event = { kind: "accepted", slot: input.slot };
       notice = "Lefixáltátok a meccset.";
       break;
+    }
     case "agreed": {
       const slotErrors = agreedTimeErrors(input.slot, now, deadline);
       if (slotErrors.length > 0) return { ok: false, error: slotErrorText(slotErrors), slotErrors };
@@ -821,7 +820,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
         kind: event.kind,
         side,
         at: now,
-        slots: event.slots?.map((s) => new Date(s * 1000)),
+        ranges: event.ranges,
         slot: event.slot,
         clubId: event.clubId,
         court: event.court,
@@ -840,7 +839,7 @@ export async function matchStep(userId: string, matchId: number, input: StepInpu
         pairId,
         userId,
         kind: event.kind,
-        slots: event.slots ?? null,
+        slots: event.ranges ? toStoredRanges(event.ranges) : null,
         slot: event.slot ?? null,
         clubId: event.clubId ?? null,
         court: event.court ?? null,
@@ -899,10 +898,11 @@ async function tellOtherPair(ctx: MatchContext, side: Side, event: NewEvent, bef
     switch (event.kind) {
       case "proposal":
       case "counter_proposal": {
-        const slots = (event.slots ?? []).map((s) => new Date(s * 1000));
+        const ranges = event.ranges ?? [];
         const counter = event.kind === "counter_proposal";
-        await mail(theirs.players.map((p) => ({ kind: "match_proposal", toEmail: p.email, input: { ...base(p), counter, slots } })));
-        await send("match_proposal", matchProposalMessage({ matchId, week: ctx.match.week, counter, slots: slots.length }));
+        const days = new Set(ranges.map((r) => budapestDay(r.start))).size;
+        await mail(theirs.players.map((p) => ({ kind: "match_proposal", toEmail: p.email, input: { ...base(p), counter, ranges } })));
+        await send("match_proposal", matchProposalMessage({ matchId, week: ctx.match.week, counter, days }));
         break;
       }
       case "agreed_time":

@@ -91,12 +91,14 @@ const matchOf = (a: number, b: number) => one("select id, pair_a from matches wh
 const row = (id: number) => one("select status, outcome from matches where id = ?", id);
 const strikesOf = (...users: string[]) =>
   all(`select user_id, source, match_id, cancelled_at from strikes where user_id in (${users.map(() => "?").join(",")}) order by id`, ...users);
-const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19, 30), at("2026-11-14", 10)];
+const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // A player of `pair` proposes on the match against `other`.
 async function propose(pair: number, other: number, when = NOW, slots = SLOTS) {
   const m = matchOf(pair, other);
-  expect(await M.matchStep(`p${pair}a`, m.id, { kind: "propose", slots, clubId: null }, when)).toMatchObject({ ok: true });
+  expect(await M.matchStep(`p${pair}a`, m.id, { kind: "propose", ranges: hour(slots), clubId: null }, when)).toMatchObject({ ok: true });
   return m.id as number;
 }
 

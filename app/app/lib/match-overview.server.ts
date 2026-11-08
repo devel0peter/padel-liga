@@ -11,6 +11,7 @@ import { clubNames, eventsOf, groupCount, groupMembers, loadMatch, stateOf, toSc
 import { formatPhone } from "./phone";
 import { resultOf, resultsOf, type MatchResults } from "./result-log.server";
 import { neutralDecisionText, resultEventText } from "./results";
+import { storedRanges } from "~/lib/slot-ranges";
 
 // The organizer's overview of the running phase's matches and one match's
 // log (#158, D76), for the league's Szervező and the Admin (the routes check
@@ -241,7 +242,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         text: eventText({
           kind: e.kind,
           at: e.at,
-          slots: e.slots?.map((s) => new Date(s * 1000)) ?? null,
+          ranges: e.slots ? storedRanges(e.slots) : null,
           slot: e.slot,
           venue: e.clubId ? (venues.get(e.clubId) ?? null) : null,
           court: e.court,

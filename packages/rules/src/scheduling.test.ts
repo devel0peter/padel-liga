@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { budapestTime } from "./calendar";
+import type { SlotRange } from "./slots";
 import {
   activeSides,
   isValidActivity,
@@ -16,13 +17,16 @@ import {
 const at = (day: string, h: number, m = 0) => budapestTime(day, h, m);
 const deadline = at("2026-11-29", 23, 59);
 const now = at("2026-11-10", 12);
+const range = (day: string, from: number, to: number): SlotRange => ({ start: at(day, from), end: at(day, to) });
+// Three ranges one match long: their starts are the only choices.
 const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
+const RANGES: SlotRange[] = SLOTS.map((s) => ({ start: s, end: new Date(s.getTime() + 3600_000) }));
 
-const proposal = (side: "a" | "b", when = at("2026-11-10", 9), slots = SLOTS, clubId: number | null = null): SchedulingEvent => ({
+const proposal = (side: "a" | "b", when = at("2026-11-10", 9), ranges = RANGES, clubId: number | null = null): SchedulingEvent => ({
   kind: "proposal",
   side,
   at: when,
-  slots,
+  ranges,
   clubId,
 });
 
@@ -32,17 +36,17 @@ describe("schedulingState (spec 6, #26)", () => {
   });
 
   it("a proposal is open for the other pair", () => {
-    expect(schedulingState([proposal("a", undefined, SLOTS, 7)], now)).toEqual({
+    expect(schedulingState([proposal("a", undefined, RANGES, 7)], now)).toEqual({
       status: "proposed",
       by: "a",
-      slots: SLOTS,
+      ranges: RANGES,
       clubId: 7,
       at: at("2026-11-10", 9),
     });
   });
 
   it("accepting one slot schedules the match at it, with the proposal's venue", () => {
-    const log: SchedulingEvent[] = [proposal("a", undefined, SLOTS, 7), { kind: "accepted", side: "b", at: now, slot: SLOTS[1] }];
+    const log: SchedulingEvent[] = [proposal("a", undefined, RANGES, 7), { kind: "accepted", side: "b", at: now, slot: SLOTS[1] }];
     expect(schedulingState(log, now)).toEqual({ status: "scheduled", slot: SLOTS[1], clubId: 7 });
   });
 
@@ -53,17 +57,51 @@ describe("schedulingState (spec 6, #26)", () => {
   });
 
   it("a counter-proposal replaces the open proposal", () => {
-    const counter = [at("2026-11-20", 18), at("2026-11-21", 10), at("2026-11-21", 12)];
-    const log: SchedulingEvent[] = [proposal("a"), { kind: "counter_proposal", side: "b", at: now, slots: counter }];
+    const counter = [range("2026-11-20", 18, 20), range("2026-11-21", 10, 14)];
+    const log: SchedulingEvent[] = [proposal("a"), { kind: "counter_proposal", side: "b", at: now, ranges: counter }];
     const state = schedulingState(log, now);
-    expect(state).toMatchObject({ status: "proposed", by: "b", slots: counter });
+    expect(state).toMatchObject({ status: "proposed", by: "b", ranges: counter });
     // The first proposal's slots can't be accepted any more.
     expect(schedulingState([...log, { kind: "accepted", side: "b", at: now, slot: SLOTS[0] }], now).status).toBe("proposed");
   });
 
   it("slots that have started drop out; when all have, the proposal lapses", () => {
-    expect(schedulingState([proposal("a")], at("2026-11-13", 9))).toMatchObject({ slots: [SLOTS[1], SLOTS[2]] });
+    expect(schedulingState([proposal("a")], at("2026-11-13", 9))).toMatchObject({ ranges: [RANGES[1], RANGES[2]] });
     expect(schedulingState([proposal("a")], at("2026-11-14", 10))).toEqual({ status: "to_schedule" });
+  });
+
+  describe("ranges (D144)", () => {
+    const ranges = [range("2026-11-12", 14, 18), range("2026-11-13", 18, 20)];
+    const offer = proposal("a", undefined, ranges);
+    const accept = (slot: Date): SchedulingEvent => ({ kind: "accepted", side: "b", at: now, slot });
+
+    it("any whole-hour start inside a range schedules the match, up to the end minus 60 minutes", () => {
+      expect(schedulingState([offer, accept(at("2026-11-12", 15))], now)).toMatchObject({ status: "scheduled", slot: at("2026-11-12", 15) });
+      expect(schedulingState([offer, accept(at("2026-11-12", 17))], now)).toMatchObject({ status: "scheduled" });
+      expect(schedulingState([offer, accept(at("2026-11-13", 19))], now)).toMatchObject({ status: "scheduled" });
+    });
+
+    it("a start that doesn't fit a range changes nothing", () => {
+      for (const slot of [at("2026-11-12", 18), at("2026-11-12", 13), at("2026-11-12", 15, 30), at("2026-11-13", 20)])
+        expect(schedulingState([offer, accept(slot)], now).status).toBe("proposed");
+    });
+
+    it("a started range is trimmed to its next start; the proposal lapses when none is left", () => {
+      expect(schedulingState([offer], at("2026-11-12", 15, 20))).toMatchObject({ ranges: [range("2026-11-12", 16, 18), ranges[1]] });
+      expect(schedulingState([offer], at("2026-11-12", 17))).toMatchObject({ ranges: [ranges[1]] });
+      expect(schedulingState([offer], at("2026-11-13", 19))).toEqual({ status: "to_schedule" });
+    });
+
+    it("a proposal stored before D144 (off-hour starts, one match long) still works", () => {
+      const legacy = { start: at("2026-11-12", 19, 30), end: at("2026-11-12", 20, 30) };
+      const log = [proposal("a", undefined, [legacy, RANGES[1]!]), accept(legacy.start)];
+      expect(schedulingState(log, now)).toMatchObject({ status: "scheduled", slot: legacy.start });
+    });
+
+    it("the other pair can accept the open ranges", () => {
+      const state = schedulingState([offer], at("2026-11-12", 15, 20));
+      expect(schedulingActions(state, "b", at("2026-11-12", 15, 20), deadline).accept).toEqual([range("2026-11-12", 16, 18), ranges[1]]);
+    });
   });
 
   describe("agreed time (spec 6.3)", () => {
@@ -131,7 +169,7 @@ describe("schedulingActions (spec 6, #26)", () => {
 
   it("the other pair accepts one of the open slots or counter-proposes; no plain rejection", () => {
     const state = schedulingState([proposal("a")], now);
-    expect(schedulingActions(state, "b", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: SLOTS, confirm: false, decline: false, venue: false, cancel: false });
+    expect(schedulingActions(state, "b", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: RANGES, confirm: false, decline: false, venue: false, cancel: false });
     // The proposing pair doesn't wait: it can propose again.
     expect(schedulingActions(state, "a", now, deadline)).toEqual({ propose: true, recordAgreed: true, accept: [], confirm: false, decline: false, venue: false, cancel: false });
   });
@@ -206,10 +244,10 @@ describe("valid activity (spec 8)", () => {
 describe("venue and cancellation (spec 6.4 and 6.6, #27)", () => {
   // Scheduled by b accepting a's slot on Thu 12 Nov 18:00, venue 7 offered with it.
   const SLOT = SLOTS[0]!;
-  const booked: SchedulingEvent[] = [proposal("a", undefined, SLOTS, 7), { kind: "accepted", side: "b", at: now, slot: SLOT }];
+  const booked: SchedulingEvent[] = [proposal("a", undefined, RANGES, 7), { kind: "accepted", side: "b", at: now, slot: SLOT }];
   const cancel = (side: "a" | "b", when: Date): SchedulingEvent => ({ kind: "cancelled", side, at: when, slot: SLOT });
   const hours = (n: number) => new Date(SLOT.getTime() - n * 3_600_000);
-  const LATER = [at("2026-11-20", 18), at("2026-11-21", 9), at("2026-11-21", 12)];
+  const LATER = [range("2026-11-20", 18, 20), range("2026-11-21", 9, 13)];
 
   it("either pair records the venue and the court; the latest wins and the match stays scheduled", () => {
     const log: SchedulingEvent[] = [...booked, { kind: "venue", side: "b", at: now, clubId: 9, court: "2-es pálya" }];

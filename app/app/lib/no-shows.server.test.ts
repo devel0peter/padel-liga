@@ -45,6 +45,8 @@ const { resolveDeadlines } = await import("~/lib/deadline.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z"];
 const PUBLISHED = new Date("2026-11-08T08:00:00Z");
@@ -98,7 +100,7 @@ const lastReport = () => (one("select max(id) id from no_show_reports") as { id:
 // Pairs 1 and 3 agree on SLOT; returns the match id.
 async function scheduled(): Promise<number> {
   const id = matchOf(1, 3).id as number;
-  expect(await M.matchStep("p1a", id, { kind: "propose", slots: [SLOT, at("2026-11-13", 19), at("2026-11-14", 10)], clubId: null }, NOW)).toMatchObject({ ok: true });
+  expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour([SLOT, at("2026-11-13", 19), at("2026-11-14", 10)]), clubId: null }, NOW)).toMatchObject({ ok: true });
   expect(await M.matchStep("p3a", id, { kind: "accept", slot: SLOT }, NOW)).toMatchObject({ ok: true });
   return id;
 }

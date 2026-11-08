@@ -103,7 +103,7 @@ const RULES = [
   ["Csoportok", "4 pár csoportonként, szint szerint sorba rendezve. Ha nem jön ki, néhány csoport 3 páros."],
   ["Egy kör", "3 hét, hetente egy meccs, mindenki mindenkivel játszik a csoportban."],
   ["Határidő", "Minden meccsnek megvan a maga hete, érdemes akkor lejátszani. Ha nem jön össze, a kör végéig, a 3. hét vasárnapjáig pótolhatjátok."],
-  ["Időpontok", "Legalább 3 időpontot kell ajánlani, legalább 2 különböző napra, 48 órával előre."],
+  ["Időpontok", "Megadjátok, mikor értek rá, legalább 2 különböző napra (pl. szombat 14–18), a másik pár ebből választ egy órát."],
   ["Elmaradt meccs", "Ha a kör végéig sem jön össze, és csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap."],
   ["Meccs", "2 nyert szettig, egy szett 4 játékig, 4:4-nél tie-break, 1:1-nél szuper tie-break 10 pontig. Arany ponttal: 40:40-nél egy pont dönt. Egy óra pályafoglalás általában elég."],
   ["Eredmény", "Az egyik pár rögzíti, a másik megerősíti az oldalon."],

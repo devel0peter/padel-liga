@@ -858,8 +858,10 @@ export const matchEvents = sqliteTable(
     kind: text("kind", {
       enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled", "result_recorded", "result_confirmed", "result_disputed"],
     }).notNull(),
-    // A proposal's slots: JSON array of UTC instants in seconds.
-    slots: text("slots", { mode: "json" }).$type<number[]>(),
+    // A proposal's availability ranges (D144): JSON array of [start, end] in
+    // UTC seconds. Proposals before D144 stored bare starts (a number each),
+    // read as ranges one match long: always read with storedRanges().
+    slots: text("slots", { mode: "json" }).$type<(number | [number, number])[]>(),
     // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
     // The venue offered with a proposal or an agreed time (optional), or

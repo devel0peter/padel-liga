@@ -244,10 +244,11 @@ export function partnerFoundMessage(league: string): Message {
 const matchUrl = (matchId: number) => `/matches/${matchId}`;
 
 // To the other pair: a proposal or counter-proposal arrived (instant).
-export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; slots: number }): Message {
+// `days`: on how many days their ranges are (D144).
+export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; days: number }): Message {
   return {
     title: input.counter ? "Új időpontokat ajánlottak" : "Időpontokat ajánlottak",
-    body: `Az ellenfeletek ${input.slots} időpontot ajánlott a ${input.week}. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.`,
+    body: `Az ellenfeletek ${input.days} napra adta meg, mikor ér rá a ${input.week}. heti meccsetekre. Válassz egy kezdést, vagy ajánlj mást.`,
     url: matchUrl(input.matchId),
   };
 }

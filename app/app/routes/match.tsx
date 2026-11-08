@@ -1,10 +1,12 @@
-import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Plus, Users } from "lucide-react";
+import { proposalErrors } from "@padel-liga/rules";
+import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Users } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
 import { AppPage } from "~/components/app-page";
 import { Contacts, StatusPill } from "~/components/my-group";
+import { DayHourPicker, RangePicker, StartPicker } from "~/components/slot-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,16 +21,16 @@ import {
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { requireUser } from "~/lib/auth/session.server";
 import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ConfirmResult, RecordResult, ResultStatus, ScoreBoard } from "~/components/match-result";
-import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, parseSlot, parseSlots, statusView, venueLine } from "~/lib/matches";
+import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, statusView, venueLine } from "~/lib/matches";
 import { cn } from "~/lib/utils";
-import { loadMatch, matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
+import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
 import { parseScore, resultStatusView } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
@@ -60,17 +62,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const [substitutes, noShow] = await Promise.all([substitutePanel(ctx, page.side, user.id, now), noShowPanel(ctx, page.side, user.id, now)]);
   // A fixed time that has started: recording the result becomes the main step (D133).
   const started = page.state.status === "scheduled" && page.state.slot.getTime() <= now.getTime();
-  return { ...page, substitutes, noShow, started };
+  // `now`: the time pickers draw their days and hours from the server's clock.
+  return { ...page, substitutes, noShow, started, now };
 }
 
 const NONE = "none";
-const MAX_SLOTS = 8;
+// More ranges than anyone needs: the rest of a bigger form is ignored.
+const MAX_RANGES = 40;
 
 type ActionResult = {
   intent: string;
   ok: boolean;
   message: string;
-  rows?: Record<number, string>;
 };
 
 function clubId(form: FormData): number | null | undefined {
@@ -85,7 +88,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const id = matchId(params);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  const fail = (message: string, rows?: Record<number, string>) => data<ActionResult>({ intent, ok: false, message, rows }, { status: 400 });
+  const fail = (message: string) => data<ActionResult>({ intent, ok: false, message }, { status: 400 });
 
   // The result (#28): the form's games from this player's side; the server
   // turns them into the match's order with the player's side.
@@ -131,26 +134,20 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   let input: StepInput;
-  // Row numbers of the filled slot fields, so an error lands on its row.
-  let filled: number[] = [];
   if (intent === "propose") {
-    const raw = form.getAll("slot").map(String).slice(0, MAX_SLOTS);
-    filled = raw.flatMap((v, i) => (v.trim() ? [i] : []));
+    // The ranges as "2026-11-14|14|18" (D144), Budapest days and hours.
+    const ranges = form.getAll("range").map(String).slice(0, MAX_RANGES).map(parseRangeField);
     const club = clubId(form);
     if (club === undefined) return fail("Válassz a listából helyszínt, vagy hagyd üresen.");
-    input = { kind: "propose", slots: parseSlots(raw), clubId: club };
+    input = { kind: "propose", ranges, clubId: club };
   } else if (intent === "agreed") {
-    const slot = parseSlot(String(form.get("slot") ?? ""));
+    // "2026-11-14|18": a Budapest day and a whole hour.
     const club = clubId(form);
     if (club === undefined) return fail("Válassz a listából helyszínt, vagy hagyd üresen.");
-    input = {
-      kind: "agreed",
-      slot: slot || new Date(Number.NaN),
-      clubId: club,
-    };
+    input = { kind: "agreed", slot: parseStartField(String(form.get("slot") ?? "")), clubId: club };
   } else if (intent === "accept") {
     const at = Number(form.get("slot"));
-    if (!Number.isFinite(at)) return fail("Válassz egy időpontot.");
+    if (!Number.isFinite(at)) return fail("Válassz egy kezdést.");
     input = { kind: "accept", slot: new Date(at) };
   } else if (intent === "confirm" || intent === "decline" || intent === "cancel") {
     input = { kind: intent };
@@ -167,13 +164,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const result = await matchStep(user.id, id, input);
   if (result.ok) return data<ActionResult>({ intent, ok: true, message: result.notice });
   if (result.error === NOT_FOUND) throw new Response(NOT_FOUND, { status: 404 });
-  const rows: Record<number, string> = {};
-  for (const e of result.slotErrors ?? [])
-    if (e.slot !== undefined) {
-      const row = intent === "propose" ? filled[e.slot] : 0;
-      if (row !== undefined) rows[row] = [rows[row], slotErrorText([e])].filter(Boolean).join(" ");
-    }
-  return fail(result.error, rows);
+  return fail(result.error);
 }
 
 // A step's answer. Forms show only their errors; the summary shows every
@@ -256,50 +247,40 @@ function ClubSelect({ clubs, id }: { clubs: { id: number; name: string }[]; id: 
   );
 }
 
-const PROPOSE_RULES = "Legalább 3 időpont, legalább 2 különböző napra, 7:00 és 22:00 között, legalább 48 órával előre.";
+const PROPOSE_RULES = "Adjatok meg ráérést legalább 2 különböző napra. A másik pár ebből választ egy órát.";
 
-function ProposeForm({ clubs, result }: { clubs: { id: number; name: string }[]; result?: ActionResult }) {
+// A step's own error before sending (D144): the rules engine's messages, the
+// same the server would answer with.
+function ClientError({ message }: { message: string | null }) {
+  return message ? (
+    <p role="alert" className="font-semibold text-destructive">
+      {message}
+    </p>
+  ) : null;
+}
+
+function ProposeForm({ clubs, result, now, deadline }: { clubs: { id: number; name: string }[]; result?: ActionResult; now: Date; deadline: Date }) {
   const busy = useNavigation().state !== "idle";
-  const [rows, setRows] = useState(3);
-  const errors = result?.intent === "propose" && !result.ok ? (result.rows ?? {}) : {};
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Form method="post" className="grid gap-3">
+    <Form
+      method="post"
+      className="grid gap-4"
+      onSubmit={(e) => {
+        const ranges = new FormData(e.currentTarget).getAll("range").map(String).map(parseRangeField);
+        const errors = proposalErrors(ranges, new Date(), deadline);
+        setError(errors.length > 0 ? slotErrorText(errors) : null);
+        if (errors.length > 0) e.preventDefault();
+      }}
+    >
       <input type="hidden" name="intent" value="propose" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="grid content-start gap-1">
-            <Label htmlFor={`slot-${i}`}>{i + 1}. időpont</Label>
-            <Input
-              id={`slot-${i}`}
-              name="slot"
-              type="datetime-local"
-              step={900}
-              lang="hu"
-              className="w-full"
-              aria-invalid={errors[i] ? true : undefined}
-              aria-describedby={errors[i] ? `slot-${i}-error` : undefined}
-            />
-            {errors[i] && (
-              <p id={`slot-${i}-error`} className="text-sm text-destructive">
-                {errors[i]}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-      {rows < MAX_SLOTS && (
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setRows((n) => n + 1)}>
-            <Plus />
-            Még egy időpont
-          </Button>
-        </div>
-      )}
+      <RangePicker now={now} deadline={deadline} />
       <ClubSelect clubs={clubs} id="propose-club" />
-      <Feedback result={result} intent="propose" />
+      <ClientError message={error} />
+      {!error && <Feedback result={result} intent="propose" />}
       <div>
         <Button type="submit" disabled={busy}>
-          Elküldöm az időpontokat
+          Elküldöm a ráérésünket
         </Button>
       </div>
     </Form>
@@ -308,18 +289,25 @@ function ProposeForm({ clubs, result }: { clubs: { id: number; name: string }[];
 
 const AGREED_HELP = "Ha Messengeren vagy személyesen megegyeztetek, rögzítsd az időpontot. A másik pár megerősíti, és a meccs le van fixálva.";
 
-function AgreedForm({ clubs, result }: { clubs: { id: number; name: string }[]; result?: ActionResult }) {
+function AgreedForm({ clubs, result, now, deadline }: { clubs: { id: number; name: string }[]; result?: ActionResult; now: Date; deadline: Date }) {
   const busy = useNavigation().state !== "idle";
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Form method="post" className="grid gap-3">
+    <Form
+      method="post"
+      className="grid gap-3"
+      onSubmit={(e) => {
+        const missing = !new FormData(e.currentTarget).get("slot");
+        setError(missing ? "Válassz napot és órát." : null);
+        if (missing) e.preventDefault();
+      }}
+    >
       <p className="text-sm text-muted-foreground">{AGREED_HELP}</p>
       <input type="hidden" name="intent" value="agreed" />
-      <div className="grid gap-1">
-        <Label htmlFor="agreed-slot">Megbeszélt időpont</Label>
-        <Input id="agreed-slot" name="slot" type="datetime-local" step={900} lang="hu" required className="w-full sm:w-72" />
-      </div>
+      <DayHourPicker now={now} deadline={deadline} />
       <ClubSelect clubs={clubs} id="agreed-club" />
-      <Feedback result={result} intent="agreed" />
+      <ClientError message={error} />
+      {!error && <Feedback result={result} intent="agreed" />}
       <div>
         <Button type="submit" variant="outline" disabled={busy}>
           Rögzítem az időpontot
@@ -739,27 +727,14 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           )}
 
           {m.state.status === "proposed" && theirs && m.actions.accept.length > 0 && (
-            <Panel title="Válassz egy időpontot" description={m.venue ? `Helyszín: ${m.venue}.` : undefined} tone="main">
-              <Form method="post" className="grid gap-3">
+            <Panel
+              title="Válassz egy kezdést"
+              description={`Ekkor érnek rá. Egy meccs 60 perc.${m.venue ? ` Helyszín: ${m.venue}.` : ""}`}
+              tone="main"
+            >
+              <Form method="post" className="grid gap-4">
                 <input type="hidden" name="intent" value="accept" />
-                <RadioGroup name="slot" required aria-label="Ajánlott időpontok" className="grid gap-2 sm:grid-cols-2">
-                  {m.actions.accept.map((s) => {
-                    const id = `accept-${s.getTime()}`;
-                    return (
-                      <Label
-                        key={s.getTime()}
-                        htmlFor={id}
-                        className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 font-normal has-[[data-state=checked]]:border-nav-active has-[[data-state=checked]]:bg-nav-active-bg"
-                      >
-                        <RadioGroupItem value={String(s.getTime())} id={id} aria-label={formatSlot(s)} />
-                        <span className="grid">
-                          <span className="text-sm text-muted-foreground">{formatSlot(s).replace(/ \d{1,2}:\d{2}$/, "")}</span>
-                          <span className="text-lg font-bold tabular-nums">{formatSlot(s).match(/\d{1,2}:\d{2}$/)?.[0]}</span>
-                        </span>
-                      </Label>
-                    );
-                  })}
-                </RadioGroup>
+                <StartPicker ranges={m.actions.accept} />
                 <div>
                   <Button type="submit" size="lg" disabled={busy}>
                     Elfogadom
@@ -794,26 +769,28 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {ours && r.status === "none" && (
             <Panel
-              title={m.state.status === "proposed" ? "Ezeket ajánlottátok" : "Ezt rögzítettétek"}
-              description={m.state.status === "proposed" ? "A másik pár választ egyet, vagy újakat ajánl." : "A másik pár megerősíti, vagy újra egyeztettek."}
+              title={m.state.status === "proposed" ? "Ekkor értek rá" : "Ezt rögzítettétek"}
+              description={m.state.status === "proposed" ? "A másik pár ebből választ egy kezdést, vagy ő ajánl mást." : "A másik pár megerősíti, vagy újra egyeztettek."}
             >
               <ul className="flex flex-wrap gap-2 text-sm">
-                {(m.state.status === "proposed" ? m.state.slots : m.state.status === "agreed_time" ? [m.state.slot] : []).map((s) => (
-                  <li key={s.getTime()} className="rounded-md bg-muted px-2.5 py-1.5 font-medium">
-                    {formatSlot(s)}
-                  </li>
-                ))}
+                {m.state.status === "proposed"
+                  ? m.state.ranges.map((r) => (
+                      <li key={r.start.getTime()} className="rounded-md bg-muted px-2.5 py-1.5 font-medium">
+                        {formatRange(r)}
+                      </li>
+                    ))
+                  : m.state.status === "agreed_time" && <li className="rounded-md bg-muted px-2.5 py-1.5 font-medium">{formatSlot(m.state.slot)}</li>}
               </ul>
             </Panel>
           )}
 
           {proposeMain && (
             <Panel
-              title={m.state.status === "to_schedule" && m.state.nextBy === m.side ? "Ajánljatok új időpontokat" : "Ajánljatok időpontokat"}
+              title={m.state.status === "to_schedule" && m.state.nextBy === m.side ? "Ajánljatok új ráérést" : "Ajánljatok ráérést"}
               description={PROPOSE_RULES}
               tone="main"
             >
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} />
+              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Panel>
           )}
 
@@ -838,14 +815,14 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           {/* --- Everything else, folded --------------------------------------- */}
 
           {m.actions.propose && !proposeMain && (
-            <Fold title={theirs ? "Egyik sem jó? Ajánljatok másik időpontokat" : "Új időpontokat ajánlanátok?"} hint={PROPOSE_RULES} open={failed("propose")}>
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} />
+            <Fold title={theirs ? "Egyik sem jó? Adjátok meg, mikor értek rá" : "Új ráérést adnátok meg?"} hint={PROPOSE_RULES} open={failed("propose")}>
+              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 
           {m.actions.recordAgreed && (
             <Fold title="Máshol már megbeszéltétek?" hint="Rögzítsd az időpontot, a másik pár megerősíti." open={failed("agreed")}>
-              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} />
+              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 

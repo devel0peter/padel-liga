@@ -32,6 +32,8 @@ const { IN_RUNNING_PHASE, NOT_IN_RUNNING_PHASE, TAKEN_OUT_TEXT } = await import(
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // Phases from Monday 9 Nov 2026 (Budapest, UTC+1).
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
@@ -250,7 +252,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(page?.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect((await M.matchPage(6, "g", NOW))?.voided).toMatch(/^Visszaléptetek/);
     expect((await M.matchPage(1, "a", NOW))?.voided).toBeNull();
-    expect(await M.matchStep("c", 6, { kind: "propose", slots: [at("2026-11-27T17:00:00Z")], clubId: null }, NOW)).toEqual({
+    expect(await M.matchStep("c", 6, { kind: "propose", ranges: hour([at("2026-11-27T17:00:00Z")]), clubId: null }, NOW)).toEqual({
       ok: false,
       error: M.VOIDED,
     });

@@ -296,26 +296,26 @@ A player without a pair sends their own link; the partner registers and accepts 
   - A card "Bronz divízió, 1. csoport" (or "Réz divízió, 2. csoport"): the season and the round, where the pair stands ("A létra csúcsán vagytok, 3 kör van hátra"), "Tabella" (the league page), and the table (place, pair, M, Gy, V, Szett, Játék, P; "–" instead of places and "Még nincs végleges eredmény: a sorrend a kiemelés." until a result is final, D85). The group's matches are on the Tabella, not here.
   - "Hamarosan itt lesz a csoportod" is gone.
 
-### 18. A pair proposes slots, the other accepts one
+### 18. A pair gives its availability, the other picks a start
 
 - Page: `/matches/<id>` (from "Egyeztetés és részletek"), then the same as an opponent
 - Accounts: the player of step 17, then one of the opponents
-- Do: fill two times on the same day and press "Elküldöm az időpontokat"; then three times on two days, at least 48 hours ahead, and send again.
+- Do: pick a day chip, press "Délután 14–18", then add 16:00–19:00 with "Ettől"/"Eddig" and "Hozzáadom" (one range, 14:00–19:00), and press "Elküldöm a ráérésünket"; then pick another day, add 19:00–21:00 and send again.
 - Expect:
-  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok időpontokat" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D133).
-  - The first try is refused: "Legalább 3 különböző időpontot ajánlj." and "Az időpontok legalább 2 különböző napra essenek." (a time before 7:00 or after 22:00, or under 48 hours ahead, gets its own message under its row).
-  - The second goes through: "Elküldtük az időpontokat a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár". The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the link.
-  - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, pick a time and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
+  - The page starts with a summary (status, "Időpont", "Helyszín", the opponents' phones), then "Ajánljatok ráérést" open; "Máshol már megbeszéltétek?", "Már lejátszottátok? Rögzítsd az eredményt", "Helyettes kell?" and "Hogyan egyeztessetek?" (the 3-sentence guide) are folded below it (D133).
+  - The first try is refused before sending: "Adj meg ráérést legalább 2 különböző napra." (D144).
+  - The second goes through: "Elküldtük a ráéréseteket a másik párnak.", the status "Ajánlottatok időpontokat, a másik pár válaszára vár", and "Ekkor értek rá" lists both ranges. The terminal prints "Időpontokat ajánlottak a meccsetekre" to both opponents, with the ranges and the link.
+  - As the opponent: Kezdőlap's Teendők has "Válaszolj az időpont-ajánlatra"; on the match, "Választható kezdések" shows each whole hour a match fits in (14:00–18:00 and 19:00, 20:00); pick one and press "Elfogadom": "Lefixáltátok a meccset.", "Lefixálva: <time>". "Napló" lists both steps with who and when. No email for the acceptance (it is a daily-digest item, #31); both pairs see it in "Értesítések".
   - Once scheduled, both pairs see "Naptárba" under the status (#192): "Google Naptár" (opens Google Calendar's new-event page with the time, 60 minutes, the four names, the club if recorded and the match link) and ".ics letöltése" (`/matches/<id>/calendar.ics`, only for the four players and the league's organizers; anyone else gets 404). The file never has an email address or phone number. Cancel the time: the row stays with only ".ics letöltése" and "Lemondták az időpontot…"; the downloaded file is STATUS:CANCELLED and removes the entry. A new time gives the same entry (same UID, higher SEQUENCE), so a new download replaces the old one.
-  - Instead of accepting, the opponent can open "Egyik sem jó? Ajánljatok másik időpontokat" and send their own times: it replaces the first proposal.
+  - Instead of accepting, the opponent can open "Egyik sem jó? Adjátok meg, mikor értek rá" and send their own ranges: it replaces the first proposal.
   - Sending times again on the same match the same day: the opponents get it in "Értesítések" (and by push), but the terminal prints no second email; one scheduling email per match a day to each player (#191).
 
 ### 19. A pair records an agreed time, the other confirms
 
 - Page: the player's other match, then the same as an opponent
-- Do: under "Már megbeszéltétek?" fill tomorrow 23:00 and press "Rögzítem az időpontot"; as an opponent, press "Megerősítem" (or "Nem így beszéltük").
+- Do: under "Máshol már megbeszéltétek?" pick tomorrow's day chip and the 22:00 hour chip and press "Rögzítem az időpontot"; as an opponent, press "Megerősítem" (or "Nem így beszéltük").
 - Expect:
-  - Any future time before the deadline is fine, late evening too. "Rögzítettük. A másik pár megerősíti."; the terminal prints "Erősítsd meg a meccs időpontját" to both opponents.
+  - Any future whole hour before the deadline is fine (no 48 hours, no minimum, D144); the chips offer 7:00–22:00. "Rögzítettük. A másik pár megerősíti."; the terminal prints "Erősítsd meg a meccs időpontját" to both opponents.
   - Confirmed: "Lefixálva: <time>" for both pairs. Declined: back to "Egyeztetésre vár", and the recording pair gets an in-app notification.
   - Any other player opening `/matches/<id>` gets "Ez az oldal nem létezik."
 

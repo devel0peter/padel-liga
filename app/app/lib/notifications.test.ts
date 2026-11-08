@@ -196,12 +196,12 @@ describe("match scheduling notifications (#26, spec 13)", () => {
   const slot = new Date("2026-11-17T17:00:00Z");
 
   it("a proposal or counter-proposal links to the match, without names", () => {
-    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, slots: 3 })).toEqual({
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, days: 3 })).toEqual({
       title: "Időpontokat ajánlottak",
-      body: "Az ellenfeletek 3 időpontot ajánlott a 2. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.",
+      body: "Az ellenfeletek 3 napra adta meg, mikor ér rá a 2. heti meccsetekre. Válassz egy kezdést, vagy ajánlj mást.",
       url: "/matches/7",
     });
-    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, slots: 4 }).title).toBe("Új időpontokat ajánlottak");
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, days: 2 }).title).toBe("Új időpontokat ajánlottak");
   });
 
   it("an agreed time waiting for confirmation", () => {

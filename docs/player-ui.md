@@ -60,8 +60,8 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 |---|---|---|
 | M1 | A summary at the top: the state in words, when and where, the score once there is one (per set, winner marked), our pair and theirs, the opponents' call buttons, the calendar buttons once fixed. | D68, D106; Peter, 2026-11-07 |
 | M2 | One main action at a time, chosen by the state; everything else folded behind a one-line opener. | Peter, 2026-11-07 |
-| M3 | To schedule: the proposal form is the main action; "Máshol már megbeszéltétek?" (agreed time) folded; the short guide folded. | D68 |
-| M4 | Their proposal open: their slots as large tappable choices and "Elfogadom"; a counter-proposal and an agreed time folded ("Egyik sem jó?"). | D68 |
+| M3 | To schedule: the proposal form ("Ajánljatok ráérést") is the main action: day chips from today to the deadline, then quick ranges ("Délelőtt 8–12", "Délután 14–18", "Este 18–22", cut to the hours left) or Ettől/Eddig whole hours and "Hozzáadom"; the added ranges listed with a remove button; the rules' own messages before sending. "Máshol már megbeszéltétek?" (agreed time: day chips and hour chips 7:00–22:00) folded; the short guide folded. No native date or time field. | D68, D144 |
+| M4 | Their proposal open: their open ranges by day, each with its whole-hour starts as chips ("Választható kezdések"), and "Elfogadom"; a counter-proposal and an agreed time folded ("Egyik sem jó?"). | D68, D144 |
 | M5 | Their agreed time open: "Megerősítem" / "Nem így beszéltük". | spec 6.3 |
 | M6 | Our proposal or agreed time open: what we sent and that we wait; a new proposal folded. | D68 |
 | M7 | Fixed and not started yet: venue (open while none is recorded), calendar, cancel (folded, with the late-cancel warning). The result form is folded ("Már lejátszottátok?"). | D74, D106 |

@@ -60,6 +60,7 @@ export const AUDIT_ACTIONS = {
   "substitute.revoke": "Helyettes visszavonása",
   // Emails and reminders
   "broadcast.send": "Körlevél küldése",
+  "outbox.retry": "Hibás levelek újraküldése",
   "registration_invites.send": "Regisztrációs meghívók",
   "reminders.on": "Emlékeztetők be",
   "reminders.off": "Emlékeztetők ki",

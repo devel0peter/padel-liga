@@ -12,6 +12,7 @@ vi.mock("cloudflare:workers", () => ({
   env: { EMAIL_DAILY_LIMIT: "5000", EMAIL_SECRET: "test-secret", VAPID_PUBLIC_KEY: "pub", VAPID_PRIVATE_KEY: "priv" },
 }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 // One relay connection per batch of emails: one outgoing call.
 vi.mock("~/lib/email/send.server", async () => {
   const { countCall } = await import("~/lib/run-usage");
@@ -38,6 +39,7 @@ vi.mock("~/lib/match-reminders", async (original) => ({
 vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor", name: "Győr" }] }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const { RunBudget, RUN_LIMITS } = await import("~/lib/run-usage");
 const G = await import("~/lib/groups.server");
 const { MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
@@ -80,6 +82,7 @@ async function bigLeague() {
   }
   expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
   expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+  await settleBackground();
   h.raw.exec("delete from notifications");
   h.raw.exec("delete from email_messages");
   const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'a')");

@@ -1,20 +1,35 @@
-import { TriangleAlert } from "lucide-react";
+import { RotateCw, TriangleAlert } from "lucide-react";
+import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.outbox";
 import { AppPage } from "~/components/app-page";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { kindLabel, relayWarning } from "~/lib/email/outbox-view";
-import { dailyLimit, outboxLog, sentLast24h } from "~/lib/email/outbox.server";
+import { dailyLimit, outboxLog, retryFailed, sentLast24h } from "~/lib/email/outbox.server";
+import type { MessageKind } from "~/lib/email/budget";
 import { relayConfigured } from "~/lib/email/send.server";
 import { formatDateTime } from "~/lib/format";
 import { SITE_NAME } from "~/lib/site";
 
-// "Kimenő levelek" (#112): every email goes out by itself, so this is only
-// the log, per kind: how many wait, went out and failed, with the newest
-// failure's reason. No address, no buttons.
+// "Kimenő levelek" (#112): every email goes out by itself, so this is the
+// log, per kind: how many wait, went out and failed, with the newest
+// failure's reason. No address. One button per kind with failures,
+// "Újraküldés" (D150): back in the queue, after a confirmation.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Kimenő levelek – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
@@ -27,8 +42,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { log, sent, limit, relayWarning: relayWarning(relayConfigured(), import.meta.env.DEV, limit) };
 }
 
-export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
+export async function action({ request }: Route.ActionArgs) {
+  const actor = await requirePermission(request, { kind: "outbox.manage" });
+  const form = await request.formData();
+  const kind = String(form.get("kind") ?? "");
+  const known = new Set((await outboxLog()).map((k) => k.kind as string));
+  if (!known.has(kind) || !canRetry(kind)) throw data("Ismeretlen levélfajta.", { status: 400 });
+  return { retried: await retryFailed(kind as MessageKind, actor), kind };
+}
+
+// A login code is never resent: by now it has expired.
+function canRetry(kind: string): boolean {
+  return kind !== "login_code";
+}
+
+export default function AdminOutbox({ loaderData, actionData }: Route.ComponentProps) {
   const { log, sent, limit, relayWarning: notice } = loaderData;
+  const busy = useNavigation().state !== "idle";
   return (
     <AppPage
       title="Kimenő levelek"
@@ -39,6 +69,16 @@ export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
           <TriangleAlert />
           <AlertTitle>Nincs levelezőrelé</AlertTitle>
           <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
+      {actionData && (
+        <Alert className="mb-4" role="status">
+          <AlertTitle>
+            {actionData.retried > 0
+              ? `${actionData.retried} levél újra a sorban (${kindLabel(actionData.kind)}).`
+              : `Nincs újraküldhető levél (${kindLabel(actionData.kind)}).`}
+          </AlertTitle>
+          {actionData.retried > 0 && <AlertDescription>Most és a következő percekben mennek ki.</AlertDescription>}
         </Alert>
       )}
       {log.length === 0 ? (
@@ -53,6 +93,7 @@ export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
                 <TableHead className="text-right">Kiment</TableHead>
                 <TableHead className="text-right">Hiba</TableHead>
                 <TableHead>Utolsó hiba</TableHead>
+                <TableHead className="w-0" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -76,6 +117,9 @@ export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
                       "–"
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {k.failed > 0 && canRetry(k.kind) && <RetryButton kind={k.kind} failed={k.failed} busy={busy} />}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -83,5 +127,33 @@ export default function AdminOutbox({ loaderData }: Route.ComponentProps) {
         </div>
       )}
     </AppPage>
+  );
+}
+
+function RetryButton({ kind, failed, busy }: { kind: string; failed: number; busy: boolean }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="sm" disabled={busy}>
+          <RotateCw /> Újraküldés
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Újraküldöd a hibás leveleket?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {failed} hibás „{kindLabel(kind)}” levél kerül vissza a sorba. Ha a küldés közben szakadt meg, lehet, hogy egy részük
+            már kiment: nézd meg előbb a Google e-mail naplóját, különben valaki kétszer kapja meg.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Mégse</AlertDialogCancel>
+          <Form method="post">
+            <input type="hidden" name="kind" value={kind} />
+            <AlertDialogAction type="submit">Újraküldés</AlertDialogAction>
+          </Form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

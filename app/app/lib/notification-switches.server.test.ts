@@ -83,6 +83,8 @@ async function approve() {
   expect(await E.applyToSeason({ id: "a", email: "a@x.hu", name: "Anna", level: "halado" } as any, 1, DURING_REGISTRATION)).toMatchObject({
     ok: true,
   });
+  // The emails go after the response (D150).
+  await settleBackground();
 }
 
 const inbox = (userId: string) =>
@@ -134,6 +136,7 @@ describe("notification switches (#115)", () => {
     await N.setChannelEnabled("a", "email", false);
     await N.setChannelEnabled("a", "push", false);
     expect(await L.sendLoginCode("a@x.hu")).toEqual({ ok: true, email: "a@x.hu" });
+    await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["a@x.hu"]);
     expect(all("select kind, status from email_messages")).toEqual([{ kind: "login_code", status: "sent" }]);
   });
@@ -155,6 +158,7 @@ describe("notification switches (#115)", () => {
       { toEmail: "A@x.hu", input },
       { toEmail: "b@x.hu", input },
     ]);
+    await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["b@x.hu"]);
   });
 

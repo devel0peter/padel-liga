@@ -1,6 +1,7 @@
 import { ChevronRight, Hourglass, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
+import { Tip } from "~/components/tip";
 import type { FixtureMatch, FixtureSide, FixtureWeek } from "~/lib/fixtures";
 import { cn } from "~/lib/utils";
 
@@ -38,7 +39,7 @@ function splitWhen(when: string): [string, string] {
   return i > 0 ? [when.slice(0, i), when.slice(i + 1)] : [when, ""];
 }
 
-function Middle({ m, compact }: { m: FixtureMatch; compact: boolean }) {
+function Middle({ m, compact, inLink }: { m: FixtureMatch; compact: boolean; inLink: boolean }) {
   if (m.state === "final" && m.sets) {
     return (
       <span className="grid justify-items-center font-bold tabular-nums" aria-label={`Eredmény: ${m.sets.map(([a, b]) => `${a}:${b}`).join(", ")}`}>
@@ -70,15 +71,15 @@ function Middle({ m, compact }: { m: FixtureMatch; compact: boolean }) {
       </span>
     );
   }
-  // Waiting for confirmation or disputed: an icon in the middle, its words on
-  // hover and for a screen reader, so the row keeps one line (D143).
+  // Waiting for confirmation or disputed: an icon in the middle, its words in
+  // a CSS tooltip and for a screen reader, so the row keeps one line (D143).
   if (m.state === "pending" || m.state === "disputed") {
     const Icon = m.state === "pending" ? Hourglass : TriangleAlert;
     return (
-      <span title={STATE_LABEL[m.state]} className={cn("grid place-items-center", m.state === "disputed" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+      <Tip label={STATE_LABEL[m.state]} focusable={!inLink} className={cn("place-items-center p-0.5", m.state === "disputed" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
         <Icon aria-hidden className="size-4" />
         <span className="sr-only">{STATE_LABEL[m.state]}</span>
-      </span>
+      </Tip>
     );
   }
   return (
@@ -99,7 +100,7 @@ function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
     <>
       <Side side={m.a} won={m.winner === "a"} align="right" compact={compact} />
       <span className="grid place-items-center">
-        <Middle m={m} compact={compact} />
+        <Middle m={m} compact={compact} inLink={!!m.href} />
       </span>
       <Side side={m.b} won={m.winner === "b"} align="left" compact={compact} />
       {/* Under the names, so a long note never squeezes them (D133), nor moves the middle (D143). */}
@@ -127,26 +128,6 @@ function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   );
 }
 
-// What the icons in the middle mean, once under a list that has any.
-function IconLegend({ weeks }: { weeks: FixtureWeek[] }) {
-  const states = new Set(weeks.flatMap((w) => w.matches.map((m) => m.state)));
-  if (!states.has("pending") && !states.has("disputed")) return null;
-  return (
-    <p aria-hidden className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-      {states.has("pending") && (
-        <span className="inline-flex items-center gap-1">
-          <Hourglass className="size-3" /> {STATE_LABEL.pending}
-        </span>
-      )}
-      {states.has("disputed") && (
-        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
-          <TriangleAlert className="size-3" /> {STATE_LABEL.disputed}
-        </span>
-      )}
-    </p>
-  );
-}
-
 // The Tabella's group cards (D143): each week is a thin centred divider
 // ("1. hét · okt. 26. – nov. 1.") above its matches instead of a heading line,
 // and who rests shows on hover and to a screen reader, so the list is about
@@ -156,18 +137,27 @@ function CompactList({ weeks, label }: { weeks: FixtureWeek[]; label: string }) 
     <div className="grid gap-2" role="group" aria-label={label}>
       {weeks.map((w) => {
         const rest = w.resting ? `pihen: ${w.resting[0]} – ${w.resting[1]}` : null;
+        const head = (
+          <>
+            <span className={cn("font-bold", !w.current && "text-foreground")}>{w.week}. hét</span> · {w.range}
+            {w.current && <span className="font-semibold"> · ez a hét</span>}
+          </>
+        );
         return (
           <section key={w.week} aria-label={`${w.week}. hét`} className="grid gap-1">
-            <div
-              title={rest ?? undefined}
-              className={cn("flex items-center gap-2 text-[11px] leading-none", w.current ? "text-court" : "text-muted-foreground")}
-            >
+            <div className={cn("flex items-center gap-2 text-[11px] leading-none", w.current ? "text-court" : "text-muted-foreground")}>
               <span aria-hidden className="h-px flex-1 bg-border" />
-              <span className="whitespace-nowrap">
-                <span className={cn("font-bold", !w.current && "text-foreground")}>{w.week}. hét</span> · {w.range}
-                {w.current && <span className="font-semibold"> · ez a hét</span>}
-                {rest && <span className="sr-only"> · {rest}</span>}
-              </span>
+              {/* Who rests: in a CSS tooltip on the week's label (D143). */}
+              {rest ? (
+                <Tip label={rest} focusable className="whitespace-nowrap">
+                  <span>
+                    {head}
+                    <span className="sr-only"> · {rest}</span>
+                  </span>
+                </Tip>
+              ) : (
+                <span className="whitespace-nowrap">{head}</span>
+              )}
               <span aria-hidden className="h-px flex-1 bg-border" />
             </div>
             {w.matches.length === 0 ? (
@@ -182,7 +172,6 @@ function CompactList({ weeks, label }: { weeks: FixtureWeek[]; label: string }) 
           </section>
         );
       })}
-      <IconLegend weeks={weeks} />
     </div>
   );
 }
@@ -214,7 +203,6 @@ export function FixtureList({ weeks, label = "Meccsek", compact = false }: { wee
           )}
         </section>
       ))}
-      <IconLegend weeks={weeks} />
     </div>
   );
 }

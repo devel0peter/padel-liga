@@ -15,11 +15,12 @@ const STATE_LABEL: Record<Exclude<FixtureMatch["state"], "final" | "scheduled">,
   open: "Egyeztetés alatt",
 };
 
-function Side({ side, won, align }: { side: FixtureSide; won: boolean; align: "left" | "right" }) {
+function Side({ side, won, align, compact }: { side: FixtureSide; won: boolean; align: "left" | "right"; compact: boolean }) {
   return (
     <span
       className={cn(
-        "grid min-w-0 text-[13px] leading-snug sm:text-sm",
+        "grid min-w-0",
+        compact ? "text-xs leading-tight" : "text-[13px] leading-snug sm:text-sm",
         align === "right" ? "text-right" : "text-left",
         won && "font-bold",
         side.mine && "text-nav-active",
@@ -77,19 +78,22 @@ function Middle({ m }: { m: FixtureMatch }) {
   );
 }
 
-function Row({ m }: { m: FixtureMatch }) {
+function Row({ m, compact }: { m: FixtureMatch; compact: boolean }) {
   const body = (
     <>
-      <Side side={m.a} won={m.winner === "a"} align="right" />
+      <Side side={m.a} won={m.winner === "a"} align="right" compact={compact} />
       <span className="grid min-w-[3.75rem] place-items-center sm:min-w-[4.5rem]">
         <Middle m={m} />
       </span>
-      <Side side={m.b} won={m.winner === "b"} align="left" />
+      <Side side={m.b} won={m.winner === "b"} align="left" compact={compact} />
       {/* Under the names, so a long note never squeezes them (D133). */}
       {m.state === "final" && !m.sets && m.note && <span className="col-span-3 text-center text-xs font-semibold text-muted-foreground">{m.note}</span>}
     </>
   );
-  const grid = "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 rounded-lg border bg-background px-2 py-2 sm:gap-3 sm:px-3";
+  const grid = cn(
+    "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 border bg-background px-2",
+    compact ? "rounded-md py-1 sm:gap-2" : "rounded-lg py-2 sm:gap-3 sm:px-3",
+  );
   return (
     <li>
       {m.href ? (
@@ -105,25 +109,32 @@ function Row({ m }: { m: FixtureMatch }) {
   );
 }
 
-export function FixtureList({ weeks, label = "Meccsek" }: { weeks: FixtureWeek[]; label?: string }) {
+// `compact` (the Tabella's group cards, D143): tighter weeks and rows, and who
+// rests goes on the week's own line, so the list is about as tall as the table.
+export function FixtureList({ weeks, label = "Meccsek", compact = false }: { weeks: FixtureWeek[]; label?: string; compact?: boolean }) {
   return (
-    <div className="grid gap-4" role="group" aria-label={label}>
+    <div className={cn("grid", compact ? "gap-2.5" : "gap-4")} role="group" aria-label={label}>
       {weeks.map((w) => (
-        <section key={w.week} aria-label={`${w.week}. hét`} className="grid gap-2">
-          <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-bold">
+        <section key={w.week} aria-label={`${w.week}. hét`} className={cn("grid", compact ? "gap-1" : "gap-2")}>
+          <h4 className={cn("flex flex-wrap items-baseline gap-x-2 font-bold", compact ? "text-xs" : "text-sm")}>
             {w.week}. hét <span className="font-normal text-muted-foreground">{w.range}</span>
             {w.current && <span className="rounded-full bg-court px-2 py-px text-[10px] font-bold tracking-wide text-white uppercase">ez a hét</span>}
+            {compact && w.resting && (
+              <span className="text-[11px] font-normal text-muted-foreground">
+                · pihen: {w.resting[0]} – {w.resting[1]}
+              </span>
+            )}
           </h4>
           {w.matches.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ezen a héten nincs meccs.</p>
           ) : (
-            <ul className="grid gap-1.5">
+            <ul className={cn("grid", compact ? "gap-1" : "gap-1.5")}>
               {w.matches.map((m, i) => (
-                <Row key={i} m={m} />
+                <Row key={i} m={m} compact={compact} />
               ))}
             </ul>
           )}
-          {w.resting && (
+          {!compact && w.resting && (
             <p className="text-xs text-muted-foreground">
               Pihen: {w.resting[0]} – {w.resting[1]}
             </p>

@@ -54,7 +54,7 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   const panel = first.getByRole("group", { name: "1. csoport meccsei" });
   for (const week of ["1. hét", "2. hét", "3. hét"]) await expect(panel.getByRole("region", { name: week, exact: true })).toBeVisible();
   await expect(panel.getByRole("listitem")).toHaveCount(3);
-  await expect(panel).toContainText("Pihen:");
+  await expect(panel).toContainText(/pihen:/i);
   // 15-matches fixed a time for some matches: those show it, the open ones "Egyeztetés alatt".
   const count = (status: string) =>
     d1(

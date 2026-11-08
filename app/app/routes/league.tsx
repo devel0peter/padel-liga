@@ -72,7 +72,7 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
             )}
           </div>
           <div className={cn("grid content-start gap-2", view === "table" && "hidden @[44rem]:grid")}>
-            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
+            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} compact />
           </div>
           {/* Only when the two don't fit side by side. */}
           <Button variant="outline" className="w-full @[44rem]:hidden" onClick={() => setView(view === "table" ? "matches" : "table")}>

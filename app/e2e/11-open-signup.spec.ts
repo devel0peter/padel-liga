@@ -1,7 +1,7 @@
 // Walkthrough step 15: anyone can create an account (#113). An address that
 // logs in on /login, not through a league's register button, finishes the
 // first-login page and belongs to no league yet: Kezdőlap asks which league
-// they play in (#331). After "Csatlakozom" Párom shows their own pair link,
+// they play in (#331). After "Csatlakozom" Párod shows their own pair link,
 // and that the organizer pairs those with nobody. Runs last: the new player
 // has no pair, so the earlier steps' lists stay as they were.
 import { expect, test } from "@playwright/test";
@@ -46,7 +46,7 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(choose).not.toContainText("Példaváros");
   await expect(content(page)).not.toContainText("Hívd meg a párodat");
   await expect(content(page)).not.toContainText("Teszt szezon");
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page)).toContainText("Még nem csatlakoztál egyik ligához sem.");
   await visit(page, "/home");
   await content(page).getByRole("button", { name: "Csatlakozom" }).click();
@@ -60,7 +60,7 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   // Now the season and the own pair link (2026-10-31).
   await expect(content(page)).toContainText("Teszt szezon");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await expect(content(page)).toContainText("a szervező keres neked párt.");
   // The contact address once, and no "if it changes" line without a pair (#124).

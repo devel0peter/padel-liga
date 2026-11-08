@@ -15,6 +15,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { ProfileFields } from "~/components/profile-fields";
+import { FormerPairs, PairSection } from "~/components/pair-section";
 import { PlayerProfileView } from "~/components/player-profile-view";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
@@ -34,12 +35,15 @@ import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } f
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
-import { playerProfile } from "~/lib/profiles.server";
+import { pairSection, pairSectionAction } from "~/lib/pair-section.server";
+import { formerPairs, playerProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
 // The profile, inside the app shell (app.tsx), in two tabs (D136):
-// "Játékosprofil", what other players see (the summary, Élő-pont, pairs,
-// matches), and "Beállításaim" (`?tab=settings`): name, level, phone number,
+// "Játékosprofil": first the player's pair, "Párod" (D141, #346: the Párom
+// page before; /pair leads to #parod), and their former pairs, "Korábbi
+// párjaid" (D142, #347), then what other players see (the summary,
+// Élő-pont, pairs, matches); and "Beállításaim" (`?tab=settings`): name, level, phone number,
 // sex (#133; the phone is never shown on a public page), notification
 // settings, logout everywhere, deleting the account (#38).
 
@@ -50,13 +54,18 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
-  const [disabled, levelLocked, profile, deletion] = await Promise.all([
+  const [disabled, levelLocked, profile, deletion, pair, former] = await Promise.all([
     disabledKindsFor(user.id),
     hasTakenPartInSeason(user.id),
     playerProfile(user.id),
     planOwnDeletion(user.id),
+    pairSection(user, request),
+    formerPairs(user.id),
   ]);
   return {
+    // Párod (D141) and Korábbi párjaid (D142).
+    pair,
+    former,
     // Fiók törlése (#38): what it would do now, or why it can't.
     deletion: deletion.ok
       ? { effect: `${OWN_DELETION_EFFECTS[deletion.mode]} ${ownDeletionNote(actor.leagues.length > 0)}` }
@@ -86,11 +95,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 // Saves the profile form, or switches email or push (#115) or one
-// notification kind on or off (Értesítések section).
+// notification kind on or off (Értesítések section). Párod's "Nevezünk" and
+// "Párt keresek" (D141) too; Kezdőlap's "Párt keresek" posts here as well.
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const actor = (await getActor(request))!;
   const form = await request.formData();
+  const pairResult = await pairSectionAction(user, form);
+  if (pairResult) return pairResult;
   if (form.get("intent") === "delete-account") {
     // The same deletion as the Admin's (#152, D60); it ends every session
     // of the account, and this response clears this device's cookie.
@@ -215,17 +227,21 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
           <TabsTrigger value="settings">Beállításaim</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="player" className="grid gap-3">
-          {d.profile && (
-            <p className="text-sm text-muted-foreground">
-              Ezt látják rólad a belépett játékosok a{" "}
-              <Link to={`/players/${d.profile.player.id}`} className="font-medium">
-                profilodon
-              </Link>
-              .
-            </p>
-          )}
-          <PlayerProfileView profile={d.profile} own={{ rating: d.rating, rated: d.rated }} />
+        <TabsContent value="player" className="grid gap-6">
+          <PairSection data={d.pair} actionData={actionData && "intent" in actionData ? actionData : null} />
+          <FormerPairs list={d.former} />
+          <div className="grid gap-3">
+            {d.profile && (
+              <p className="text-sm text-muted-foreground">
+                Ezt látják rólad a belépett játékosok a{" "}
+                <Link to={`/players/${d.profile.player.id}`} className="font-medium">
+                  profilodon
+                </Link>
+                .
+              </p>
+            )}
+            <PlayerProfileView profile={d.profile} own={{ rating: d.rating, rated: d.rated }} />
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="grid max-w-2xl gap-6">

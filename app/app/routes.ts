@@ -18,11 +18,12 @@ export default [
   route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
   route("health", "routes/health.ts"),
+  // The old Párom address: leads to Profil's Párod section (D141).
+  route("pair", "routes/pair.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
   // section inside it has its own guard (admin.tsx).
   layout("routes/app.tsx", [
     route("home", "routes/app.home.tsx"),
-    route("pair", "routes/pair.tsx"),
     route("profile", "routes/profile.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("matches/:id", "routes/match.tsx"),

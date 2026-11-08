@@ -11,7 +11,7 @@ import { isWaiting, seasonEnd, type Season } from "./seasons";
 // first-login page inside `returnTo`.
 export const LEAGUE_PARAM = "league";
 
-// The Kezdőlap card for an account in no league, and Párom without a league.
+// The Kezdőlap card for an account in no league, and Párod without a league.
 export const CHOOSE_LEAGUE_TITLE = "Melyik ligában játszol?";
 export const CHOOSE_LEAGUE_TEXT = "Válaszd ki a ligádat, és utána párt is találsz, nevezni is tudsz.";
 export const CHOOSE_LEAGUE_BUTTON = "Csatlakozom";

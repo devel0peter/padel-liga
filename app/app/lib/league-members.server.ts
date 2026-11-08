@@ -15,7 +15,7 @@ import { joinableLeagues, type JoinableLeague, type JoinSource } from "./league-
 // means "the league's players" uses memberOf: Párok's players without a pair
 // (its counts, "Levél nekik", "Pár létrehozása", "Partner cseréje"), the
 // stuck reminders, the substitute pick, Párkeresők and "Párt keresek",
-// Kezdőlap and Párom. Admins and Szervezők follow the same rule.
+// Kezdőlap and Párod. Admins and Szervezők follow the same rule.
 
 export type ListedLeague = { id: number; name: string; slug: string; city: string };
 
@@ -50,7 +50,7 @@ export async function memberLeagueIds(userId: string): Promise<Set<number>> {
   return new Set([...joined, ...paired].map((r) => r.id));
 }
 
-// The listed leagues the account belongs to: what Kezdőlap and Párom show.
+// The listed leagues the account belongs to: what Kezdőlap and Párod show.
 export async function playerLeagues(userId: string): Promise<ListedLeague[]> {
   const [listed, mine] = await Promise.all([listedLeagues(), memberLeagueIds(userId)]);
   return listed.filter((l) => mine.has(l.id));

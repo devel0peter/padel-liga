@@ -15,8 +15,8 @@ test("16. a new player invites a partner with their pair link", async ({ browser
   await expect(content(owner.page).getByText("Hívd meg a párodat")).toBeVisible();
   const url = await content(owner.page).getByLabel("A meghívó linked").inputValue();
   expect(url).toMatch(/\/pair\/join\/[A-Za-z0-9_-]{24}$/);
-  // The same link on Párom, and again on the next visit.
-  await visit(owner.page, "/pair");
+  // The same link in Párod, and again on the next visit.
+  await visit(owner.page, "/profile");
   await expect(content(owner.page).getByLabel("A meghívó linked")).toHaveValue(url);
   // The own link can't be accepted.
   await visit(owner.page, new URL(url).pathname);
@@ -54,7 +54,7 @@ test("16. a new player invites a partner with their pair link", async ({ browser
   await expect(page).toHaveURL(/\/pair\/join\//);
   await page.getByRole("button", { name: "Elfogadom" }).click();
 
-  await expect(page).toHaveURL(/\/pair\?joined=1$/);
+  await expect(page).toHaveURL(/\/profile\?joined=1#parod$/);
   await expect(page.getByRole("status")).toContainText("Mostantól párban vagytok.");
   await expect(content(page)).toContainText("Új Játékos");
   await expect(content(page)).not.toContainText("Hívd meg a párodat");
@@ -66,7 +66,7 @@ test("16. a new player invites a partner with their pair link", async ({ browser
   expect(d1("select count(*) as n from email_messages where kind != 'login_code'")).toEqual(emailsBefore);
 
   // The owner sees the partner; the link box is gone, the link refuses.
-  await visit(owner.page, "/pair");
+  await visit(owner.page, "/profile");
   await expect(content(owner.page)).toContainText(PARTNER.name);
   await expect(content(owner.page)).not.toContainText("Hívd meg a párodat");
   await visit(owner.page, "/home");

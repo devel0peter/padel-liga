@@ -20,11 +20,22 @@ export const SOURCE_LABELS: Record<PairSource, string> = {
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";
 
-// Párom for a player with no pair, under the pair link and the "Párt
+// The pair lives in the "Párod" section of Profil (D141, #346; a page of its
+// own, "Párom" at /pair, before). /pair still leads there, query kept, for
+// links in mail and notices sent before.
+export const PAIR_SECTION_ID = "parod";
+export const PAIR_SECTION_PATH = `/profile#${PAIR_SECTION_ID}`;
+
+// The Párod section with a query ("?joined=1"); "" or "?" for none.
+export function pairSectionUrl(search = ""): string {
+  return `/profile${search === "?" ? "" : search}#${PAIR_SECTION_ID}`;
+}
+
+// Párod for a player with no pair, under the pair link and the "Párt
 // keresek" switch (partner-search.ts); the contact address follows the text.
 export const NO_PAIR_TEXT = "Kérdés esetén írj nekünk:";
 
-// The header line of Párom (#124). The "if it changes" sentence is only for
+// The header line of Párod (#124). The "if it changes" sentence is only for
 // someone who has a pair; without one, the contact address is given once, by
 // the card under the pair link (NO_PAIR_TEXT).
 export function pairPageDescription(hasPair: boolean, contactEmail: string): string {
@@ -32,12 +43,12 @@ export function pairPageDescription(hasPair: boolean, contactEmail: string): str
   return hasPair ? `${base} Ha változna, írj nekünk: ${contactEmail}` : base;
 }
 
-// The pair link (2026-10-31): the box on /home and /pair while the player
+// The pair link (2026-10-31): the box on /home and in Párod while the player
 // has no pair in the league.
 export const PAIR_LINK_TITLE = "Hívd meg a párodat";
 export const PAIR_LINK_TEXT =
   "Küldd el neki ezt a linket (Messenger, SMS, bárhol). Ha megnyitja, regisztrál és elfogadja, már párban is vagytok, és nevezhettek.";
-// On /pair after "Elfogadom".
+// In Párod after "Elfogadom".
 export const PAIR_LINK_ACCEPTED = "Mostantól párban vagytok. Már nevezhettek is.";
 export const PAIR_LINK_SHARE_TEXT = "Legyél a párom a Padelpárbajon! Itt tudsz csatlakozni:";
 

@@ -91,7 +91,7 @@ describe("sidebar", () => {
     const nav = appNav(superadmin, [gyor, debrecen]);
     expect(nav.map((s) => s.role)).toEqual([undefined, "Szervező", "Admin"]);
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr", "Platform"]);
-    expect(nav[0].items.map((i) => i.to)).toEqual(["/home", "/pair", "/notifications"]);
+    expect(nav[0].items.map((i) => i.to)).toEqual(["/home", "/notifications"]);
     expect(nav[1].items.map((i) => i.to)).toEqual([
       "/admin/leagues/gyor",
       "/admin/leagues/gyor/seasons",
@@ -146,8 +146,8 @@ describe("sidebar", () => {
     expect(nav[1].label).toBe("Padelpárbaj Győr");
   });
 
-  it("shows a player only the app home, their pair and notifications", () => {
-    expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home", "/pair", "/notifications"]]);
+  it("shows a player only the app home and notifications: no Párom, the pair is in Profil (D141)", () => {
+    expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home", "/notifications"]]);
     expect(adminHome(player)).toBeNull();
   });
 });

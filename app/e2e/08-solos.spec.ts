@@ -28,7 +28,7 @@ test("13. the Szervező pairs two players who look for a partner on Párkeresők
   await context.close();
 
   const player = await as(browser, boglarka);
-  await visit(player.page, "/pair");
+  await visit(player.page, "/profile");
   await expect(content(player.page)).toContainText(akos.name);
   await player.context.close();
 });

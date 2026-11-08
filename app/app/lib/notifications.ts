@@ -6,6 +6,7 @@ import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
+import { PAIR_SECTION_PATH } from "./pairs";
 import { WAITING_START } from "./season-entries";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
@@ -164,7 +165,7 @@ export function seasonEntryMessage(
 ): Message {
   const where = `${input.season}, ${input.league}.`;
   if (event === "removed")
-    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: "/pair" };
+    return { title: "A szervező kivett titeket a szezonból", body: `${where} Ha kérdésetek van, írjatok neki.`, url: PAIR_SECTION_PATH };
   const start =
     input.joins === null
       ? "A következő szezontól játszotok."
@@ -174,7 +175,7 @@ export function seasonEntryMessage(
   return {
     title: event === "entered" ? "Beneveztetek" : "A szervező benevezett titeket",
     body: `${where} ${start}`,
-    url: "/pair",
+    url: PAIR_SECTION_PATH,
   };
 }
 
@@ -200,7 +201,7 @@ export function pairWithdrawnMessage(
     return {
       title: "A szervező visszaléptetett titeket a körből",
       body: `${where} A meccseitek nem számítanak, és a szezonból is kikerültetek. Ha újra játszanátok, szóljatok a szervezőnek. Indok: ${input.reason}`,
-      url: "/pair",
+      url: PAIR_SECTION_PATH,
     };
   return {
     title: "Visszalépett egy pár a csoportodból",
@@ -227,12 +228,12 @@ export function groupsPublishedMessage(input: {
 
 // A Szervező paired two registered players who asked for a partner ("Párt
 // keresek", D59; Párok, #260). In the app and as a push; the email is
-// pairCreated. Párom shows the partner, with address and phone (D121).
+// pairCreated. Párod shows the partner, with address and phone (D121).
 export function partnerFoundMessage(league: string): Message {
   return {
     title: "Párt találtunk neked",
-    body: `A szervező párba tett valakivel (${league}). A Párom oldalon látod, ki az.`,
-    url: "/pair",
+    body: `A szervező párba tett valakivel (${league}). A Profil oldalon látod, ki az.`,
+    url: PAIR_SECTION_PATH,
   };
 }
 

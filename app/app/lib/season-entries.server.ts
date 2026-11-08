@@ -115,7 +115,7 @@ function entryFor(entries: readonly StoredEntry[], seasonId: number, pair: Activ
   );
 }
 
-// What the player sees for each of these seasons (Párom and the home page):
+// What the player sees for each of these seasons (Párod and the home page):
 // a season with nothing to show is left out.
 export async function entryViews(user: User, list: readonly Season[], now = new Date()): Promise<Map<number, EntryView>> {
   const views = new Map<number, EntryView>();

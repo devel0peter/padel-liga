@@ -3,6 +3,7 @@
 
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "../format";
 import { withArticle } from "../groups";
+import { PAIR_SECTION_PATH } from "../pairs";
 import { SITE_NAME, SITE_URL } from "../site";
 
 export type Email = { subject: string; html: string; text: string };
@@ -93,7 +94,7 @@ const SIGNATURE = `Péter\n${SITE_NAME}`;
 // An organizer put two registered players in a pair (Párkeresők, Párok or
 // "Partner cseréje", #260): each gets the partner's name, address and phone
 // (D121, so two strangers can reach each other; phone formatted, "" when
-// none) and the way to Párom, where they enter the season. Names stay plain
+// none) and the way to Párod, where they enter the season. Names stay plain
 // text.
 export function pairCreated(input: {
   to: string;
@@ -102,7 +103,7 @@ export function pairCreated(input: {
   partnerPhone: string;
   league: string;
 }): Email {
-  const pairPage = `${SITE_URL}/pair`;
+  const pairPage = `${SITE_URL}${PAIR_SECTION_PATH}`;
   const contact = [`E-mail: ${input.partnerEmail}`, ...(input.partnerPhone ? [`Telefon: ${input.partnerPhone}`] : [])];
   return buildPlain(
     `Van párod – ${SITE_NAME}`,
@@ -110,7 +111,7 @@ export function pairCreated(input: {
       `Szia ${input.to}!`,
       `A szervező párba tett: a párod ${input.partnerName} (${input.league}).`,
       [`Így éred el:`, ...contact].join("\n"),
-      `Beszéljétek meg, és nevezzetek a szezonra a Párom oldalon (ott is megtalálod az elérhetőségét):`,
+      `Beszéljétek meg, és nevezzetek a szezonra a Profil oldalon (ott is megtalálod az elérhetőségét):`,
       pairPage,
       `Ha valami nem stimmel, válaszolj erre a levélre.`,
       SIGNATURE,
@@ -184,7 +185,7 @@ export function seasonEntered(input: {
   // season still waiting for its minimum entries (D124).
   joins: { phase: number; startsAt: Date | null } | null;
 }): Email {
-  const pairPage = `${SITE_URL}/pair`;
+  const pairPage = `${SITE_URL}${PAIR_SECTION_PATH}`;
   const where = `${input.season}, ${input.league}`;
   const start =
     input.joins === null
@@ -198,7 +199,7 @@ export function seasonEntered(input: {
       `Szia ${input.to}!`,
       `Beneveztetek ${input.partnerName} pároddal (${where}).`,
       start,
-      `A nevezéseteket a Párom oldalon is látod:`,
+      `A nevezéseteket a Profil oldalon is látod:`,
       pairPage,
       SIGNATURE,
     ],
@@ -369,7 +370,7 @@ function reminderDates(input: StuckReminderInput, plural: boolean): string {
 // never in it. Like every mail to many, it has an unsubscribe link.
 export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string): Email {
   const hi = input.to.trim() ? `Szia ${input.to.trim()}!` : "Szia!";
-  const pairPage = `${SITE_URL}/pair`;
+  const pairPage = `${SITE_URL}${PAIR_SECTION_PATH}`;
   const registered = `Azért kaptad ezt a levelet, mert regisztráltál a ${SITE_URL.replace("https://", "")} oldalon.`;
   const parts = (() => {
     switch (input.situation) {
@@ -395,7 +396,7 @@ export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string)
             hi,
             `Még nincs párod (${input.league}). A „Hívd meg a párodat” kártyán van a saját linked: küldd el a párodnak. Ha megnyitja és regisztrál, párban vagytok, és nevezhettek.`,
             link,
-            `Ha nincs kivel játszanod, a Párom oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,
+            `Ha nincs kivel játszanod, a Profil oldalon kapcsold be a „Párt keresek” kapcsolót, és a szervező keres neked párt:`,
             pairPage,
             reminderDates(input, false),
           ],
@@ -408,7 +409,7 @@ export function stuckReminder(input: StuckReminderInput, unsubscribeUrl: string)
           subject: `Nevezzetek a szezonra – ${SITE_NAME}`,
           paragraphs: [
             hi,
-            `${input.partner ?? "A"} pároddal még nem neveztetek (${input.season}, ${input.league}). Egyikőtök nyomja meg a „Nevezünk” gombot a Párom oldalon:`,
+            `${input.partner ?? "A"} pároddal még nem neveztetek (${input.season}, ${input.league}). Egyikőtök nyomja meg a „Nevezünk” gombot a Profil oldalon:`,
             pairPage,
             reminderDates(input, true),
           ],

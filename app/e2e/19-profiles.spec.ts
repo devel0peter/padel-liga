@@ -7,7 +7,7 @@
 // league page's or a profile's address (D134); a member
 // reaches the pair from the league page's table, then a player from the pair
 // page; neither page shows an email or phone. Anna finds the links on Profil
-// and Párom.
+// and Párod.
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { PAIRS, as, content, d1, d1Update, visit } from "./support";
@@ -129,14 +129,14 @@ test("33. an unknown pair or player is a 404 for a member", async ({ browser }) 
   await context.close();
 });
 
-test("33. Anna finds her profile on Profil and the pair's on Párom", async ({ browser }) => {
+test("33. Anna finds her profile and the pair's in Profil's Párod section", async ({ browser }) => {
   const { context, page } = await as(browser, anna);
   await visit(page, "/profile");
   // "Játékosprofil", the default tab (D136), links the page others see.
   await content(page).getByRole("link", { name: "profilodon" }).click();
   await expect(page).toHaveURL(/\/players\/[0-9a-f-]+$/);
   await expect(content(page).getByRole("heading", { level: 1 })).toHaveText(anna.name);
-  await visit(page, "/pair");
+  await visit(page, "/profile");
   await content(page).getByRole("link", { name: "A párotok oldala" }).click();
   await expect(page).toHaveURL(/\/pairs\/\d+$/);
   await expect(content(page).getByRole("heading", { level: 1 })).toContainText(partner.name);

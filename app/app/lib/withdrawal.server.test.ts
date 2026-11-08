@@ -270,11 +270,11 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     await withdraw();
     // A notice of another withdrawal with a reason, not about this pair, stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('h', 'pair_withdrawn', 'x', 'Más. Indok: Költözés', '/profile#parod')")
       .run();
     // Another pair withdrawn with the same reason: its player's notice stays.
     h.raw
-      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/pair')")
+      .prepare("insert into notifications (user_id, kind, title, body, url) values ('i', 'pair_withdrawn', 'x', ?, '/profile#parod')")
       .run(`Más pár. Indok: ${REASON}`);
     expect(await A.deleteAccount("o", "g", NOW)).toEqual({ ok: true, mode: "anonymize" });
     expect(row("select withdrawn_at is not null as w, withdrawal_reason from group_pairs where pair_id = 4")).toEqual({
@@ -324,7 +324,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     ]);
   });
 
-  it("Párom: both players read that the organizer took them out, with no Nevezünk button", async () => {
+  it("Párod: both players read that the organizer took them out, with no Nevezünk button", async () => {
     await withdraw();
     const seasons = await S.listSeasons(1);
     for (const id of ["g", "h"]) {

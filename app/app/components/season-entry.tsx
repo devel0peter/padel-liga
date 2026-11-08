@@ -2,9 +2,10 @@ import { Form, Link, useNavigation } from "react-router";
 
 import { Button } from "~/components/ui/button";
 import { formatShortDate } from "~/lib/format";
+import { PAIR_SECTION_PATH } from "~/lib/pairs";
 import { fromPhase, WAITING_START, type EntryView } from "~/lib/season-entries";
 
-// A season's entry for the player (#23), on Párom and the home page: the
+// A season's entry for the player (#23), in Profil's Párod section and on the home page: the
 // status (with a note left from the approval step), the "Nevezünk" button,
 // or why they can't enter yet. The form posts intent "enter" to the page's
 // own action. The entry counts at once (#153).
@@ -18,7 +19,7 @@ export function enteredNotice(joins: { phase: number; startsAt: Date | null } | 
 }
 
 const BLOCKED_LINKS: Partial<Record<Extract<EntryView, { kind: "blocked" }>["reason"], { to: string; label: string }>> = {
-  no_pair: { to: "/pair", label: "Párom" },
+  no_pair: { to: PAIR_SECTION_PATH, label: "Párod a Profilban" },
   no_level: { to: "/profile?tab=settings#adatok", label: "Megadom a szintem" },
 };
 

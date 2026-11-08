@@ -41,7 +41,7 @@ A részleteket lent találod.
 
 ## 2. Jelentkezés
 - Párban jelentkeztek. Ha nincs párod:
-  - a „Hívd meg a párodat” kártyán (Kezdőlap vagy Párom) másold ki a meghívó linkedet, és küldd el annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
+  - a „Hívd meg a párodat” kártyán (Kezdőlap vagy Profil) másold ki a meghívó linkedet, és küldd el annak, akivel játszanál: ha elfogadja, párt alkottok, vagy
   - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.

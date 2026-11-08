@@ -6,8 +6,12 @@ import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
+
+// "Az 1." / "A 2.": the article and number, starting a sentence.
+const capitalArticle = (n: number) => withArticle(n).replace(/^a/, "A");
 import { PAIR_SECTION_PATH } from "./pairs";
 import { WAITING_START } from "./season-entries";
+import { substitutesEnabled } from "./substitutes";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
@@ -97,7 +101,9 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
-  return actor.platformRole === "superadmin" || actor.leagues.length > 0 ? ["result_disputed", "substitute_requested", "no_show_reported"] : [];
+  if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
+  // No substitutes in the first season (D145): no switch for their requests.
+  return substitutesEnabled() ? ["result_disputed", "substitute_requested", "no_show_reported"] : ["result_disputed", "no_show_reported"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -244,28 +250,33 @@ export function partnerFoundMessage(league: string): Message {
 const matchUrl = (matchId: number) => `/matches/${matchId}`;
 
 // To the other pair: a proposal or counter-proposal arrived (instant).
-export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; slots: number }): Message {
+// `days`: on how many days their ranges are (D144).
+export function matchProposalMessage(input: { matchId: number; week: number; counter: boolean; days: number }): Message {
   return {
     title: input.counter ? "Új időpontokat ajánlottak" : "Időpontokat ajánlottak",
-    body: `Az ellenfeletek ${input.slots} időpontot ajánlott a ${input.week}. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.`,
+    body: `Az ellenfeleitek megírták, mikor érnek rá ${withArticle(input.week)} heti meccsetekre (${input.days} nap). Válasszatok egy időpontot, vagy ajánljatok mást.`,
     url: matchUrl(input.matchId),
   };
 }
 
 // To the other pair: an agreed time waits for confirmation (instant).
-export function matchAgreedTimeMessage(input: { matchId: number; slot: Date }): Message {
+// It becomes fixed by itself at `fixesAt` unless they say otherwise (D148).
+export function matchAgreedTimeMessage(input: { matchId: number; slot: Date; fixesAt: Date }): Message {
   return {
-    title: "Erősítsd meg az időpontot",
-    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.`,
+    title: "Megbeszélt időpont",
+    body: `Az ellenfeletek rögzítette a megbeszélt időpontot: ${formatDeadline(input.slot)}. Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek.`,
     url: matchUrl(input.matchId),
   };
 }
 
 // To the pair that proposed or recorded: the match is scheduled (digest item).
-export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean }): Message {
+// `auto`: to both pairs, the agreed time became fixed by itself (D148).
+export function matchScheduledMessage(input: { matchId: number; slot: Date; confirmed: boolean; auto?: boolean }): Message {
   return {
     title: "Lefixálva a meccsetek",
-    body: `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
+    body: input.auto
+      ? `Magától fix lett a megbeszélt időpont: ${formatDeadline(input.slot)}.`
+      : `Az ellenfeletek ${input.confirmed ? "megerősítette a megbeszélt időpontot" : "elfogadta az időpontot"}: ${formatDeadline(input.slot)}.`,
     url: matchUrl(input.matchId),
   };
 }
@@ -334,7 +345,7 @@ export function disputeRecipients(organizerIds: readonly string[], adminIds: rea
 export function resultDisputedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Vitatott eredmény · ${input.leagueName}`,
-    body: `A ${input.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
+    body: `${capitalArticle(input.week)} heti meccsek egyikének eredményét vitatják. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -346,7 +357,7 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
 export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Helyettes kérés · ${input.leagueName}`,
-    body: `Egy pár helyettest kér a ${input.week}. heti meccsére. A jóváhagyás rád vár.`,
+    body: `Egy pár helyettest kér ${withArticle(input.week)} heti meccsére. A jóváhagyás rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/substitutes`,
   };
 }
@@ -395,7 +406,7 @@ export function substituteRevokedMessage(input: SubstituteNotice & { ours: boole
 export function noShowReportedMessage(input: { matchId: number; leagueSlug: string; leagueName: string; week: number }): Message {
   return {
     title: `Nem jöttek el · ${input.leagueName}`,
-    body: `Egy pár jelezte, hogy az ellenfele nem jött el a ${input.week}. heti meccsre. A döntés rád vár.`,
+    body: `Egy pár jelezte, hogy az ellenfele nem jött el ${withArticle(input.week)} heti meccsre. A döntés rád vár.`,
     url: `/admin/leagues/${input.leagueSlug}/matches/${input.matchId}/decide`,
   };
 }
@@ -406,10 +417,10 @@ export function noShowDecidedMessage(input: { matchId: number; confirmed: boolea
   const url = matchUrl(input.matchId);
   if (input.confirmed)
     return input.reported
-      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4-0 4-0-val megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.", url }
       : {
           title: "A szervező szerint nem jöttetek el",
-          body: "A meccs 0-4 0-4-es vereség nektek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          body: "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
           url,
         };
   return input.reported

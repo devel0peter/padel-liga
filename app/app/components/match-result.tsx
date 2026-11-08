@@ -223,8 +223,9 @@ export function ConfirmResult({ m, feedback }: { m: View; feedback: Feedback }) 
 export const RESULT_HELP =
   "Csak a végeredményt írd be: 2 nyert szettig, egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.";
 
-// Recording the result, or correcting ours while it waits (D77).
-export function RecordResult({ m, feedback }: { m: View; feedback: Feedback }) {
+// Recording the result, or correcting ours while it waits (D77). `children`:
+// more fields above the button (the match page's venue, D146).
+export function RecordResult({ m, feedback, children }: { m: View; feedback: Feedback; children?: React.ReactNode }) {
   const busy = useNavigation().state !== "idle";
   const correcting = m.result.status === "recorded";
   return (
@@ -232,6 +233,7 @@ export function RecordResult({ m, feedback }: { m: View; feedback: Feedback }) {
       <p className="text-sm text-muted-foreground">{RESULT_HELP}</p>
       <input type="hidden" name="intent" value="result-record" />
       <ScoreFields id="record" columns={["Ti", "Ők"]} />
+      {children}
       {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-record" />}
       <div>
         <Button type="submit" disabled={busy}>

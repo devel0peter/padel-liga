@@ -39,10 +39,10 @@ import {
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers disputed results, substitute requests and no-shows to Szervezők and Admins only (no new signups since #333)", () => {
+  it("offers disputed results and no-shows to Szervezők and Admins only (no new signups since #333; no substitutes this season, D145)", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "substitute_requested", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "no_show_reported"]);
   });
 });
 
@@ -196,18 +196,18 @@ describe("match scheduling notifications (#26, spec 13)", () => {
   const slot = new Date("2026-11-17T17:00:00Z");
 
   it("a proposal or counter-proposal links to the match, without names", () => {
-    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, slots: 3 })).toEqual({
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: false, days: 3 })).toEqual({
       title: "Időpontokat ajánlottak",
-      body: "Az ellenfeletek 3 időpontot ajánlott a 2. heti meccsetekre. Válassz egyet, vagy ajánlj másikat.",
+      body: "Az ellenfeleitek megírták, mikor érnek rá a 2. heti meccsetekre (3 nap). Válasszatok egy időpontot, vagy ajánljatok mást.",
       url: "/matches/7",
     });
-    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, slots: 4 }).title).toBe("Új időpontokat ajánlottak");
+    expect(matchProposalMessage({ matchId: 7, week: 2, counter: true, days: 2 }).title).toBe("Új időpontokat ajánlottak");
   });
 
-  it("an agreed time waiting for confirmation", () => {
-    expect(matchAgreedTimeMessage({ matchId: 7, slot })).toEqual({
-      title: "Erősítsd meg az időpontot",
-      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Erősítsd meg, vagy jelezd, ha nem így beszéltétek.",
+  it("an agreed time: when it becomes fixed by itself (D148)", () => {
+    expect(matchAgreedTimeMessage({ matchId: 7, slot, fixesAt: new Date(slot.getTime() - 6 * 3_600_000) })).toEqual({
+      title: "Megbeszélt időpont",
+      body: "Az ellenfeletek rögzítette a megbeszélt időpontot: nov. 17., kedd 18:00. Fix lesz nov. 17., kedd 12:00-kor, ha nem jelzitek, hogy nem így beszéltétek.",
       url: "/matches/7",
     });
   });
@@ -217,6 +217,7 @@ describe("match scheduling notifications (#26, spec 13)", () => {
     expect(matchScheduledMessage({ matchId: 7, slot, confirmed: true }).body).toBe(
       "Az ellenfeletek megerősítette a megbeszélt időpontot: nov. 17., kedd 18:00.",
     );
+    expect(matchScheduledMessage({ matchId: 7, slot, confirmed: false, auto: true }).body).toBe("Magától fix lett a megbeszélt időpont: nov. 17., kedd 18:00.");
   });
 
   it("declined", () => {
@@ -361,7 +362,7 @@ describe("no-show notices (#33, D108)", () => {
     const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true });
     const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false });
     expect(won).toMatchObject({ title: "Jóváhagyta a szervező: nem jöttek el", url: "/matches/7" });
-    expect(won.body).toContain("4-0 4-0");
+    expect(won.body).toContain("4:0, 4:0");
     expect(lost.body).toContain("fekete pontot");
     expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true }).title).toBe("A szervező elutasította a bejelentésed");
     expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");

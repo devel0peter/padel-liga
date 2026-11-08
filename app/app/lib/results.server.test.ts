@@ -23,6 +23,8 @@ const M = await import("~/lib/matches.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 
 // The first season: phase 1 runs Mon 9 – Sun 29 Nov 2026 (Budapest, UTC+1).
 const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
@@ -84,7 +86,7 @@ const inbox = () => all("select n.kind, n.url, u.id as user from notifications n
 const events = (matchId: number) => all("select kind, pair_id, user_id, slots, slot, club_id from match_events where match_id = ? order by id", matchId);
 
 const R = await import("~/lib/results.server");
-const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19, 30), at("2026-11-14", 10)];
+const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
 const WIN: [number, number][] = [
   [4, 1],
@@ -117,15 +119,15 @@ describe("recording a result (#28)", () => {
 
   it("an invalid score is refused with the engine's Hungarian message, nothing written", async () => {
     const { id, rec } = setup();
-    expect(await R.resultStep(rec, id, { kind: "record", score: score([[4, 3], [4, 0]]) }, PLAYED)).toEqual({
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[4, 3], [4, 0]]) }, PLAYED)).toEqual({
       ok: false,
       error: "1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4.",
     });
-    expect(await R.resultStep(rec, id, { kind: "record", score: score([[4, 1], [2, 4]]) }, PLAYED)).toEqual({
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[4, 1], [2, 4]]) }, PLAYED)).toEqual({
       ok: false,
       error: "1:1-es szettállásnál add meg a szuper tie-break eredményét.",
     });
-    expect(await R.resultStep(rec, id, { kind: "record", score: score([[4, Number.NaN], [4, 0]]) }, PLAYED)).toEqual({
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[4, Number.NaN], [4, 0]]) }, PLAYED)).toEqual({
       ok: false,
       error: "1. szett: a játékok száma 0 vagy pozitív egész szám.",
     });
@@ -137,7 +139,7 @@ describe("recording a result (#28)", () => {
   it("a valid score is logged and waits; the other pair gets an instant email and an app notice", async () => {
     const { id, a, b, rec, opp, oppPartner } = setup();
     const s = score([[4, 1], [2, 4]], [10, 8]);
-    expect(await R.resultStep(rec, id, { kind: "record", score: s }, PLAYED)).toEqual({ ok: true, notice: "Rögzítettük. A másik pár megerősíti." });
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: s }, PLAYED)).toEqual({ ok: true, notice: "Rögzítettük. A másik pár megerősíti." });
     expect(resultEvents(id)).toEqual([{ kind: "result_recorded", pair_id: a, user_id: rec, score: JSON.stringify(s), note: null }]);
     expect(matchRow(id)).toMatchObject({ status: "result_pending", outcome: null, revision: 1 });
 
@@ -165,10 +167,10 @@ describe("recording a result (#28)", () => {
 
   it("scheduling stops once a result is recorded", async () => {
     const { id, rec, opp } = setup();
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     const page = (await M.matchPage(id, opp, PLAYED))!;
     expect(page.actions).toEqual({ propose: false, recordAgreed: false, accept: [], confirm: false, decline: false, venue: false, cancel: false });
-    expect(await M.matchStep(opp, id, { kind: "propose", slots: SLOTS, clubId: null }, NOW)).toEqual({
+    expect(await M.matchStep(opp, id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, NOW)).toEqual({
       ok: false,
       error: "A meccs eredménye már rögzítve van, itt már nem lehet egyeztetni.",
     });
@@ -176,13 +178,13 @@ describe("recording a result (#28)", () => {
 
   it("the recorder can correct while it waits; the other pair can't record over it", async () => {
     const { id, rec, recPartner, opp } = setup();
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
-    expect(await R.resultStep(opp, id, { kind: "record", score: score([[1, 4], [1, 4]]) }, PLAYED)).toEqual({
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
+    expect(await R.resultStep(opp, id, { kind: "record", clubId: 1, score: score([[1, 4], [1, 4]]) }, PLAYED)).toEqual({
       ok: false,
       error: "Ezt most nem lehet. Frissítsd az oldalt.",
     });
     const fixed = score([[4, 1], [5, 3]]);
-    expect(await R.resultStep(recPartner, id, { kind: "record", score: fixed }, new Date(PLAYED.getTime() + HOUR))).toEqual({
+    expect(await R.resultStep(recPartner, id, { kind: "record", clubId: 1, score: fixed }, new Date(PLAYED.getTime() + HOUR))).toEqual({
       ok: true,
       notice: "Javítottuk. A másik pár megerősíti.",
     });
@@ -194,10 +196,99 @@ describe("recording a result (#28)", () => {
   it("nobody outside the two pairs can record, confirm or dispute", async () => {
     const { id, rec } = setup();
     for (const user of ["x", "p2a", "o"])
-      expect(await R.resultStep(user, id, { kind: "record", score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: "Nincs ilyen meccs." });
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+      expect(await R.resultStep(user, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: "Nincs ilyen meccs." });
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     expect(await R.resultStep("p2a", id, { kind: "confirm" }, PLAYED)).toEqual({ ok: false, error: "Nincs ilyen meccs." });
     expect(await R.resultStep(rec, 9999, { kind: "confirm" }, PLAYED)).toEqual({ ok: false, error: "Nincs ilyen meccs." });
+  });
+});
+
+describe("where it was played, with the result (D146)", () => {
+  beforeEach(freshDb);
+
+  const venueRow = (id: number) => all("select club_id, court from match_events where match_id = ? and kind = 'result_recorded' order by id", id);
+  const clubOf = (id: number) => all("select club_id from matches where id = ?", id)[0].club_id;
+  // Scheduled through a proposal and its acceptance, with the proposal's club.
+  async function scheduled(id: number, rec: string, opp: string, clubId: number | null) {
+    expect(await M.matchStep(rec, id, { kind: "propose", ranges: hour(SLOTS), clubId }, NOW)).toMatchObject({ ok: true });
+    expect(await M.matchStep(opp, id, { kind: "accept", slot: SLOTS[0]! }, NOW)).toMatchObject({ ok: true });
+  }
+
+  it("without a known club the result must say where: refused without one, nothing written", async () => {
+    const { id, rec } = setup();
+    expect((await M.matchPage(id, rec, PLAYED))!.venueAsked).toBe(true);
+    expect(await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: R.NO_VENUE });
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: null, court: "2-es", score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: R.NO_VENUE });
+    expect(resultEvents(id)).toEqual([]);
+    expect(matchRow(id)).toMatchObject({ status: "open", revision: 0 });
+  });
+
+  it("refuses an inactive club, another city's club and a too long court", async () => {
+    const { id, rec } = setup();
+    for (const clubId of [2, 3, 999])
+      expect(await R.resultStep(rec, id, { kind: "record", clubId, score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: "Válassz helyszínt a listából." });
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, court: "x".repeat(41), score: score(WIN) }, PLAYED)).toEqual({
+      ok: false,
+      error: "A pálya legfeljebb 40 karakter lehet.",
+    });
+    expect(resultEvents(id)).toEqual([]);
+  });
+
+  it("stores the club and the court on the result and on the match; the page shows it and doesn't ask again", async () => {
+    const { id, rec, recPartner, opp } = setup();
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, court: " 2-es pálya ", score: score(WIN) }, PLAYED)).toMatchObject({ ok: true });
+    expect(venueRow(id)).toEqual([{ club_id: 1, court: "2-es pálya" }]);
+    expect(clubOf(id)).toBe(1);
+    for (const user of [rec, opp]) {
+      const page = (await M.matchPage(id, user, PLAYED))!;
+      expect(page.where).toBe("Ace Padel, 2-es pálya");
+      expect(page.venueAsked).toBe(false);
+    }
+    // A correction isn't asked again; a club sent anyway is ignored.
+    expect(await R.resultStep(recPartner, id, { kind: "record", clubId: 3, score: score([[4, 1], [5, 3]]) }, PLAYED)).toMatchObject({ ok: true });
+    expect(venueRow(id)).toEqual([
+      { club_id: 1, court: "2-es pálya" },
+      { club_id: null, court: null },
+    ]);
+    expect(clubOf(id)).toBe(1);
+    expect((await M.matchPage(id, opp, PLAYED))!.where).toBe("Ace Padel, 2-es pálya");
+  });
+
+  it("isn't asked when the club came with the booking: one sent anyway is ignored", async () => {
+    const { id, rec, opp } = setup();
+    await scheduled(id, rec, opp, 1);
+    expect((await M.matchPage(id, rec, PLAYED))!.venueAsked).toBe(false);
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 3, court: "x".repeat(41), score: score(WIN) }, PLAYED)).toMatchObject({ ok: true });
+    expect(venueRow(id)).toEqual([{ club_id: null, court: null }]);
+    expect(clubOf(id)).toBe(1);
+    expect((await M.matchPage(id, opp, PLAYED))!.where).toBe("Ace Padel");
+  });
+
+  it("isn't asked once the venue was recorded after booking (#27)", async () => {
+    const { id, rec, opp } = setup();
+    await scheduled(id, rec, opp, null);
+    expect((await M.matchPage(id, rec, NOW))!.venueAsked).toBe(true);
+    expect(await M.matchStep(opp, id, { kind: "venue", clubId: 1, court: "3-as" }, NOW)).toMatchObject({ ok: true });
+    expect((await M.matchPage(id, rec, PLAYED))!.venueAsked).toBe(false);
+    expect(await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED)).toMatchObject({ ok: true });
+    expect((await M.matchPage(id, rec, PLAYED))!.where).toBe("Ace Padel, 3-as");
+  });
+
+  it("a booking without a club still asks, and the summary then shows the result's club", async () => {
+    const { id, rec, opp } = setup();
+    await scheduled(id, rec, opp, null);
+    expect(await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED)).toEqual({ ok: false, error: R.NO_VENUE });
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, court: "", score: score(WIN) }, PLAYED)).toMatchObject({ ok: true });
+    expect(venueRow(id)).toEqual([{ club_id: 1, court: null }]);
+    expect((await M.matchPage(id, opp, PLAYED))!.where).toBe("Ace Padel");
+  });
+
+  it("a city with no active club can't be asked", async () => {
+    const { id, rec } = setup();
+    h.raw.exec("update clubs set active = 0 where city = 'gyor'");
+    expect((await M.matchPage(id, rec, PLAYED))!.venueAsked).toBe(false);
+    expect(await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED)).toMatchObject({ ok: true });
+    expect(clubOf(id)).toBeNull();
   });
 });
 
@@ -207,7 +298,7 @@ describe("confirming a result (#28)", () => {
   it("the other pair confirms: final for both, both pairs told (digest kind)", async () => {
     const { id, a, b, rec, recPartner, opp, oppPartner } = setup();
     const s = score(WIN);
-    await R.resultStep(rec, id, { kind: "record", score: s }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: s }, PLAYED);
     h.raw.exec("delete from notifications");
     expect(await R.resultStep(rec, id, { kind: "confirm" }, PLAYED)).toEqual({ ok: false, error: "Ezt most nem lehet. Frissítsd az oldalt." });
     expect(await R.resultStep(oppPartner, id, { kind: "confirm" }, PLAYED)).toEqual({ ok: true, notice: "Megerősítetted, az eredmény végleges." });
@@ -240,7 +331,7 @@ describe("disputing a result (#28)", () => {
 
   it("the other pair disputes with its own version: it doesn't count, the organizer decides", async () => {
     const { id, b, rec, opp } = setup();
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     h.raw.exec("delete from notifications");
     h.mails = [];
     // The same score is a confirmation, not a dispute; an invalid one is refused.
@@ -283,7 +374,7 @@ describe("disputing a result (#28)", () => {
     h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
     h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o'), (1, 'o2'), (1, 'adm'), (1, 'o3'), (2, 'o4')`);
     h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('o2', 'result_disputed')`);
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     h.raw.exec("delete from notifications");
     h.mails = [];
 
@@ -312,7 +403,7 @@ describe("disputing a result (#28)", () => {
     h.raw.exec(`insert into users (id, email, name, level, consent_at, platform_role) values ('adm', 'adm@x.hu', 'Admin', 'halado', 1, 'superadmin')`);
     h.raw.exec(`update users set platform_role = 'superadmin' where id = '${opp}'`);
     h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o'), (1, '${opp}')`);
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     h.raw.exec("delete from notifications");
 
     await R.resultStep(opp, id, { kind: "dispute", score: score([[1, 4], [1, 4]]), note: "" }, PLAYED);
@@ -324,7 +415,7 @@ describe("disputing a result (#28)", () => {
   it("a failed notice never undoes the dispute", async () => {
     const { id, rec, opp } = setup();
     h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`);
-    await R.resultStep(rec, id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     h.raw.exec("delete from notifications");
     h.raw.exec("drop table notification_opt_outs");
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -340,7 +431,7 @@ describe("auto-accept after 48 hours (#28)", () => {
   it("not before 48 hours, then on the next run; both pairs told; only once", async () => {
     const { id, rec, recPartner, opp, oppPartner } = setup();
     const s = score([[5, 4], [4, 2]]);
-    await R.resultStep(rec, id, { kind: "record", score: s }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: s }, PLAYED);
     h.raw.exec("delete from notifications");
 
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 48 * HOUR - 60_000))).toBe(0);
@@ -365,7 +456,7 @@ describe("auto-accept after 48 hours (#28)", () => {
 
   it("the in-app items carry the run's scheduled time, not the database clock (#222, #188)", async () => {
     const { id, rec } = setup();
-    await R.resultStep(rec, id, { kind: "record", score: score([[5, 4], [4, 2]]) }, PLAYED);
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[5, 4], [4, 2]]) }, PLAYED);
     h.raw.exec("delete from notifications");
     const run = new Date(PLAYED.getTime() + 49 * HOUR);
     expect(await R.autoAcceptResults(run)).toBe(1);
@@ -381,11 +472,11 @@ describe("auto-accept after 48 hours (#28)", () => {
     const first = setup();
     const second = matchOf(2, 4);
     const secondRec = `p${matchRow(second).pair_a}a`;
-    await R.resultStep(first.rec, first.id, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(first.rec, first.id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     await R.resultStep(first.opp, first.id, { kind: "confirm" }, PLAYED);
-    await R.resultStep(secondRec, second, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(secondRec, second, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     const third = matchOf(1, 4);
-    await R.resultStep(`p${matchRow(third).pair_a}a`, third, { kind: "record", score: score(WIN) }, PLAYED);
+    await R.resultStep(`p${matchRow(third).pair_a}a`, third, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 49 * HOUR))).toBe(2);
     expect(decisions(first.id)).toEqual([]);
     expect([matchRow(second).status, matchRow(third).status]).toEqual(["final", "final"]);
@@ -401,7 +492,7 @@ describe("auto-accept after 48 hours (#28)", () => {
 
   it("at most the batch size per run; the rest on the next", async () => {
     const ids = [matchOf(1, 3), matchOf(2, 4), matchOf(1, 4)];
-    for (const id of ids) await R.resultStep(`p${matchRow(id).pair_a}a`, id, { kind: "record", score: score(WIN) }, PLAYED);
+    for (const id of ids) await R.resultStep(`p${matchRow(id).pair_a}a`, id, { kind: "record", clubId: 1, score: score(WIN) }, PLAYED);
     const late = new Date(PLAYED.getTime() + 50 * HOUR);
     expect(await R.autoAcceptResults(late, 2)).toBe(2);
     expect(await R.autoAcceptResults(late, 2)).toBe(1);

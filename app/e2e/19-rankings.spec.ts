@@ -31,9 +31,9 @@ test("33a. once round 1 has started: every placed player and pair by Élő-pont,
   d1Update(`update season_phases set starts_at = ${Math.floor(Date.now() / 1000) - 86_400} where ${ROUND_1}`);
   try {
     const { context, page } = await as(browser, anna);
-    // From the Tabella's header, as on a phone.
-    await visit(page, "/league/minta");
-    await content(page).getByRole("link", { name: "Ranglista" }).click();
+    // From the sidebar (the Tabella has no button to it, D143).
+    await visit(page, "/home");
+    await page.getByRole("link", { name: "Ranglista", exact: true }).locator("visible=true").first().click();
     await expect(page).toHaveURL(/\/league\/minta\/rankings$/);
     const main = content(page);
 
@@ -44,10 +44,6 @@ test("33a. once round 1 has started: every placed player and pair by Élő-pont,
     const elos = (await players.locator("tbody tr td:nth-child(3)").allTextContents()).map(Number);
     expect(elos).toEqual([...elos].sort((x, y) => y - x));
     await expect(players.getByRole("link", { name: anna.name })).toHaveAttribute("href", /^\/players\//);
-    // Each row in its division's colour, explained once (D138); two groups: Bronz and Réz.
-    await expect(main.getByRole("list", { name: "Divíziók" })).toContainText("Bronz");
-    await expect(players.locator("tbody tr").filter({ hasText: anna.name })).toContainText(/(Bronz|Réz) divízió/);
-    await expect(players.locator("tbody tr").filter({ hasText: anna.name }).locator("td").first()).toHaveClass(/border-l-(amber|teal)-700/);
 
     await main.getByRole("tab", { name: "Párok" }).click();
     await expect(page).toHaveURL(/\?view=pairs$/);

@@ -21,6 +21,7 @@ import {
   type MatchOutcome,
   type MatchScore,
   type Side,
+  type SlotRange,
 } from "@padel-liga/rules";
 
 import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedSql } from "./seed";
@@ -44,7 +45,7 @@ export type SeedEvent = {
   kind: SeedEventKind;
   side: Side;
   at: Date;
-  slots?: Date[];
+  ranges?: SlotRange[];
   slot?: Date;
   club?: string;
   court?: string;
@@ -101,13 +102,16 @@ export function seasonPlan(now: Date): SeasonPlan {
   const at = (day: string, h: number, m = 0) => budapestTime(day, h, m);
   const ago = (hours: number) => new Date(now.getTime() - hours * 3600_000);
   const later = (d: Date, hours: number) => new Date(d.getTime() + hours * 3600_000);
+  // A proposal's availability range (D144): from and to whole hours on a day.
+  const range = (day: string, from: number, to: number): SlotRange => ({ start: at(day, from), end: at(day, to) });
+  const hoursFrom = (start: Date, hours: number): SlotRange => ({ start, end: later(start, hours) });
   const D = (n: number) => addDays(start, n);
   const T = (n: number) => addDays(today, n);
   const otherSide = (s: Side): Side => (s === "a" ? "b" : "a");
 
   // A proposal and its acceptance: the first two steps of a booked match.
   const booked = (proposer: Side, slot: Date, club: string, proposedAt: Date): SeedEvent[] => [
-    { kind: "proposal", side: proposer, at: proposedAt, slots: [slot, later(slot, 26), later(slot, 49)], club },
+    { kind: "proposal", side: proposer, at: proposedAt, ranges: [hoursFrom(slot, 2), hoursFrom(later(slot, 26), 1), hoursFrom(later(slot, 49), 1)], club },
     { kind: "accepted", side: otherSide(proposer), at: later(proposedAt, 5), slot },
   ];
   const recorded = (score: MatchScore, by: Side, when: Date): SeedEvent => ({ kind: "result_recorded", side: by, at: when, score });
@@ -130,7 +134,7 @@ export function seasonPlan(now: Date): SeasonPlan {
     const s1 = at(D(2), 19);
     const sc1: MatchScore = { sets: [[4, 2], [4, 1]] };
     matches.push(final(0, 3, [...booked("a", s1, "minta-padel-arena", at(D(0), 9)), recorded(sc1, "a", at(D(2), 21)), confirmed("a", at(D(2), 21))], s1, "minta-padel-arena", sc1));
-    const s2 = at(D(4), 18, 30);
+    const s2 = at(D(4), 18);
     const sc2: MatchScore = { sets: [[2, 4], [5, 3]], superTieBreak: [10, 8] };
     matches.push(
       final(
@@ -159,13 +163,13 @@ export function seasonPlan(now: Date): SeasonPlan {
     matches.push({
       a: 1,
       b: 3,
-      events: [{ kind: "proposal", side: "a", at: ago(2), slots: [at(T(3), 18), at(T(4), 19), at(T(5), 8)], club: "minta-padel-arena" }],
+      events: [{ kind: "proposal", side: "a", at: ago(2), ranges: [range(T(3), 18, 21), range(T(4), 19, 22), range(T(5), 8, 12)], club: "minta-padel-arena" }],
       status: "open",
     });
     matches.push({
       a: 0,
       b: 1,
-      events: [{ kind: "proposal", side: "b", at: ago(3), slots: [at(T(3), 19), at(T(4), 18, 30), at(T(5), 10)], club: "teszt-sportcentrum" }],
+      events: [{ kind: "proposal", side: "b", at: ago(3), ranges: [range(T(3), 19, 21), range(T(4), 18, 20), range(T(5), 10, 13)], club: "teszt-sportcentrum" }],
       status: "open",
     });
   }
@@ -206,15 +210,15 @@ export function seasonPlan(now: Date): SeasonPlan {
     matches.push({
       a: 5,
       b: 7,
-      events: [{ kind: "agreed_time", side: "a", at: ago(2), slot: at(T(2), 19, 30), club: "pelda-padel-club" }],
+      events: [{ kind: "agreed_time", side: "a", at: ago(2), slot: at(T(2), 19), club: "pelda-padel-club" }],
       status: "open",
     });
     matches.push({
       a: 4,
       b: 5,
       events: [
-        { kind: "proposal", side: "a", at: ago(30), slots: [at(T(2), 7), at(T(3), 7), at(T(4), 7)], club: "teszt-sportcentrum" },
-        { kind: "counter_proposal", side: "b", at: ago(6), slots: [at(T(3), 19), at(T(4), 20), at(T(5), 18)], club: "teszt-sportcentrum" },
+        { kind: "proposal", side: "a", at: ago(30), ranges: [range(T(2), 7, 9), range(T(3), 7, 8), range(T(4), 7, 10)], club: "teszt-sportcentrum" },
+        { kind: "counter_proposal", side: "b", at: ago(6), ranges: [range(T(3), 19, 22), range(T(4), 20, 22), range(T(5), 18, 21)], club: "teszt-sportcentrum" },
       ],
       status: "open",
     });
@@ -312,7 +316,8 @@ export function seasonStatements(now: Date): string[] {
             PAIR(pair),
             q(seasonUserId(pairs[pair]!.a)),
             q(e.kind),
-            e.slots ? json(e.slots.map(secs)) : "NULL",
+            // As matches.server.ts stores them (D144, slot-ranges.ts): [start, end] in seconds.
+            e.ranges ? json(e.ranges.map((r) => [secs(r.start), secs(r.end)])) : "NULL",
             e.slot ? secs(e.slot) : "NULL",
             CLUB(e.club),
             q(e.court ?? null),

@@ -9,7 +9,6 @@ const row = (key: string, name: string, rating: number, extra: Partial<RankInput
   href: null,
   mine: false,
   matches: null,
-  division: null,
   ...extra,
 });
 
@@ -44,11 +43,7 @@ describe("rankRows (D137)", () => {
 
   it("keeps the link, the viewer's mark and the match count", () => {
     const [r] = rankRows([row("u1", "Anna", 1000, { href: "/players/u1", mine: true, matches: 3 })]);
-    expect(r).toEqual({ key: "u1", name: "Anna", elo: 1000, place: 1, href: "/players/u1", mine: true, matches: 3, division: null });
-  });
-
-  it("keeps the division (D138)", () => {
-    expect(rankRows([row("p1", "Anna – Bea", 1400, { division: "rez" })])[0].division).toBe("rez");
+    expect(r).toEqual({ key: "u1", name: "Anna", elo: 1000, place: 1, href: "/players/u1", mine: true, matches: 3 });
   });
 
   it("is empty for nobody", () => {

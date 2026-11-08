@@ -32,9 +32,8 @@ test("29. the group table counts the confirmed win and the organizer's decision"
 
   // The played match shows its sets (from the 1st pair's side, as in the app)
   // with the super tie-break in brackets, and the decision its note, each
-  // once, under its own week (#202, D133), in the group's side panel (D136).
-  await group.getByRole("button", { name: /^A csoport meccsei/ }).click();
-  const panel = page.getByRole("dialog");
+  // once, under its own week (#202, D133), beside the group's table (D143).
+  const panel = group.getByRole("group", { name: /csoport meccsei$/ });
   const played = panel.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);

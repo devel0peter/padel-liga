@@ -1,7 +1,10 @@
 // Email content. Pure (no I/O) so it can be unit tested and previewed in the
 // browser. Every email has an HTML and a plain-text version.
 
+import type { SlotRange } from "@padel-liga/rules";
+
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "../format";
+import { formatRange } from "../slot-ranges";
 import { withArticle } from "../groups";
 import { PAIR_SECTION_PATH } from "../pairs";
 import { SITE_NAME, SITE_URL } from "../site";
@@ -220,7 +223,7 @@ export function seasonStart(input: { to: string; league: string; season: string;
       `Szia ${input.to}!`,
       `Összegyűlt elég nevezés, így eldőlt, mikor indul a szezon (${input.season}, ${input.league}).`,
       `Az 1. kör kezdete: ${day}. A csoportbeosztást legkésőbb aznap reggel megkapjátok e-mailben és az oldalon.`,
-      `A kezdést a Kezdőlapon is látod:`,
+      `Az időpontot a Kezdőlapon is látod:`,
       home,
       SIGNATURE,
     ],
@@ -279,17 +282,17 @@ type MatchEmailInput = {
 const matchFooter = () =>
   footer(`Azért kaptad ezt a levelet, mert a pároddal játszol a ${SITE_URL.replace("https://", "")} ligájában. Az értesítéseket a profilodban állíthatod be.`);
 
-// A proposal or counter-proposal arrived (#26, spec 13): the slots and a
-// one-tap link to answer. Names stay plain text.
-export function matchProposal(input: MatchEmailInput & { counter: boolean; slots: Date[] }): Email {
+// A proposal or counter-proposal arrived (#26, spec 13): the ranges (D144)
+// and a one-tap link to answer. Names stay plain text.
+export function matchProposal(input: MatchEmailInput & { counter: boolean; ranges: SlotRange[] }): Email {
   const link = `${SITE_URL}/matches/${input.matchId}`;
   return buildPlain(
     `${input.counter ? "Új időpontokat" : "Időpontokat"} ajánlottak a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott a ${input.week}. heti meccsetekre:\n${input.slots.map((s) => formatDeadline(s)).join("\n")}`,
+      `${input.opponents} ${input.counter ? "új időpontokat" : "időpontokat"} ajánlott ${withArticle(input.week)} heti meccsetekre. Ekkor érnek rá:\n${input.ranges.map((r) => formatRange(r)).join("\n")}`,
       input.venue ? `Helyszín: ${input.venue}` : null,
-      `Válassz egyet, vagy ajánlj másikat (határidő: ${formatDeadline(input.deadline)}):`,
+      `Válassz ezek közül egy időpontot, vagy ajánlj mást (határidő: ${formatDeadline(input.deadline)}):`,
       link,
       SIGNATURE,
     ].filter((p): p is string => p !== null),
@@ -307,7 +310,7 @@ export function matchResult(input: MatchEmailInput & { score: string; autoAccept
     `Erősítsd meg a meccs eredményét – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} rögzítette a ${input.week}. heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
+      `${input.opponents} rögzítette ${withArticle(input.week)} heti meccsetek eredményét (ti vagytok elöl): ${input.score}.`,
       `Erősítsd meg, vagy jelezd, ha nem így volt:`,
       link,
       `Ha ${formatDeadline(input.autoAcceptAt)}-ig nem válaszoltok, magától elfogadjuk.`,
@@ -319,15 +322,16 @@ export function matchResult(input: MatchEmailInput & { score: string; autoAccept
 }
 
 // An agreed time waits for confirmation (#26, spec 6.3 and 13).
-export function matchAgreedTime(input: MatchEmailInput & { slot: Date }): Email {
+// `fixesAt`: when it becomes fixed by itself unless they object (D148).
+export function matchAgreedTime(input: MatchEmailInput & { slot: Date; fixesAt: Date }): Email {
   const link = `${SITE_URL}/matches/${input.matchId}`;
   return buildPlain(
-    `Erősítsd meg a meccs időpontját – ${SITE_NAME}`,
+    `Megbeszélt időpont a meccsetekre – ${SITE_NAME}`,
     [
       `Szia ${input.to}!`,
-      `${input.opponents} rögzítette a ${input.week}. heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
+      `${input.opponents} rögzítette ${withArticle(input.week)} heti meccsetek megbeszélt időpontját: ${formatDeadline(input.slot)}.`,
       input.venue ? `Helyszín: ${input.venue}` : null,
-      `Erősítsd meg, vagy jelezd, ha nem így beszéltétek:`,
+      `Fix lesz ${formatDeadline(input.fixesAt)}-kor, ha nem jelzitek, hogy nem így beszéltétek. Ha nem így volt, addig jelezd itt:`,
       link,
       SIGNATURE,
     ].filter((p): p is string => p !== null),

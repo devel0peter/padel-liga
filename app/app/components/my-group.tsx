@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { autoAcceptAt } from "@padel-liga/rules";
 
 import { FixtureList } from "~/components/fixture-list";
+import { GroupMessage } from "~/components/group-message";
 import { StandingsTable } from "~/components/standings-table";
 import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -89,13 +90,17 @@ export function todos(groups: readonly HomeGroup[]): Todo[] {
 }
 
 // Teendők (spec 13, docs/player-ui.md H1): every open item, each a link to it,
-// with its deadline. The page leaves it out when there is none.
+// with its deadline. The page leaves it out when there is none. A light tint,
+// a stronger edge and the count set it apart from the other cards (D143).
 export function Todos({ items }: { items: Todo[] }) {
   return (
-    <Card role="region" aria-labelledby="teendok" className="ring-nav-active/40">
+    <Card role="region" aria-labelledby="teendok" className="bg-nav-active-bg/40 ring-2 ring-nav-active/50">
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} id="teendok" className="font-display text-lg font-bold">
+        <CardTitle role="heading" aria-level={2} id="teendok" className="flex items-center gap-2 font-display text-lg font-bold">
           Teendők
+          <span className="rounded-full bg-nav-active px-2 py-px text-xs font-bold text-white tabular-nums dark:text-background">
+            {items.length}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -133,9 +138,10 @@ function whenWhere(m: HomeMatch): string | null {
 
 // Következő meccsetek (docs/player-ui.md H2, D140): the first match whose
 // result isn't final yet: opponents, its state, when and where once fixed,
-// the opponents' contacts and the way in. Nothing once every match is final;
+// the opponents' contacts, Írj mindenkinek (D147) and the way in. Nothing once every match is final;
 // the group's fixture list under the table has them all.
-export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLeague: boolean }) {
+// `origin`: the site's, for the match link in the Írj mindenkinek text (D147).
+export function NextMatch({ group: g, multiLeague, origin }: { group: HomeGroup; multiLeague: boolean; origin: string }) {
   const m = nextMatch(g);
   if (!m) return null;
   const status = statusOf(m);
@@ -159,6 +165,7 @@ export function NextMatch({ group: g, multiLeague }: { group: HomeGroup; multiLe
           {fixed && <p className="text-sm font-medium">{fixed}</p>}
         </div>
         <Contacts contacts={m.contacts} />
+        <GroupMessage message={m.message} week={m.week} url={`${origin}/matches/${m.id}`} matchId={m.id} />
         <Button asChild size="sm" className="w-fit">
           <Link to={`/matches/${m.id}`} className="no-underline">
             A meccs oldala

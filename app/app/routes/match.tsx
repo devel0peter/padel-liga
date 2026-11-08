@@ -1,10 +1,13 @@
-import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Plus, Users } from "lucide-react";
+import { proposalErrors } from "@padel-liga/rules";
+import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Users } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
 import { AppPage } from "~/components/app-page";
+import { GroupMessage } from "~/components/group-message";
 import { Contacts, StatusPill } from "~/components/my-group";
+import { DayHourPicker, RangePicker, StartPicker } from "~/components/slot-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,20 +22,20 @@ import {
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { requireUser } from "~/lib/auth/session.server";
 import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { ConfirmResult, RecordResult, ResultStatus, ScoreBoard } from "~/components/match-result";
-import { COURT_MAX, SCHEDULING_GUIDE, formatSlot, groupLine, parseSlot, parseSlots, statusView, venueLine } from "~/lib/matches";
+import { COURT_MAX, SCHEDULING_GUIDE, fixesAtText, formatSlot, groupLine, statusView } from "~/lib/matches";
 import { cn } from "~/lib/utils";
-import { loadMatch, matchPage, matchStep, NOT_FOUND, slotErrorText, type StepInput } from "~/lib/matches.server";
+import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
+import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
 import { parseScore, resultStatusView } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
-import { substituteLine } from "~/lib/substitutes";
+import { substituteLine, substitutesEnabled } from "~/lib/substitutes";
 import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
 import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
@@ -56,21 +59,27 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const ctx = await loadMatch(matchId(params));
   const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
-  // Substitutes (#37) and no-shows (#33): only for the four players, like the rest of the page.
-  const [substitutes, noShow] = await Promise.all([substitutePanel(ctx, page.side, user.id, now), noShowPanel(ctx, page.side, user.id, now)]);
+  // Substitutes (#37) and no-shows (#33): only for the four players, like the
+  // rest of the page. No substitutes in the first season (D145).
+  const [substitutes, noShow] = await Promise.all([
+    substitutesEnabled() ? substitutePanel(ctx, page.side, user.id, now) : null,
+    noShowPanel(ctx, page.side, user.id, now),
+  ]);
   // A fixed time that has started: recording the result becomes the main step (D133).
   const started = page.state.status === "scheduled" && page.state.slot.getTime() <= now.getTime();
-  return { ...page, substitutes, noShow, started };
+  // `now`: the time pickers draw their days and hours from the server's clock.
+  // `url`: this page, absolute, for the Írj mindenkinek text (D147).
+  return { ...page, substitutes, noShow, started, now, url: `${new URL(request.url).origin}/matches/${page.id}` };
 }
 
 const NONE = "none";
-const MAX_SLOTS = 8;
+// More ranges than anyone needs: the rest of a bigger form is ignored.
+const MAX_RANGES = 40;
 
 type ActionResult = {
   intent: string;
   ok: boolean;
   message: string;
-  rows?: Record<number, string>;
 };
 
 function clubId(form: FormData): number | null | undefined {
@@ -85,7 +94,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const id = matchId(params);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  const fail = (message: string, rows?: Record<number, string>) => data<ActionResult>({ intent, ok: false, message, rows }, { status: 400 });
+  const fail = (message: string) => data<ActionResult>({ intent, ok: false, message }, { status: 400 });
 
   // The result (#28): the form's games from this player's side; the server
   // turns them into the match's order with the player's side.
@@ -96,7 +105,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       intent === "result-confirm"
         ? { kind: "confirm" }
         : intent === "result-record"
-          ? { kind: "record", score: parseScore(form, page.side) }
+          ? // Where it was played: read only while no club is known (D146).
+            { kind: "record", score: parseScore(form, page.side), clubId: clubId(form) ?? null, court: String(form.get("court") ?? "") }
           : {
               kind: "dispute",
               score: parseScore(form, page.side),
@@ -108,7 +118,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     return fail(done.error);
   }
 
-  // A substitute for an absent player of the pair (#37, D109).
+  // A substitute for an absent player of the pair (#37, D109); while hidden
+  // (D145) both steps refuse.
   if (intent === "substitute-request" || intent === "substitute-withdraw") {
     const done =
       intent === "substitute-request"
@@ -131,23 +142,17 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   let input: StepInput;
-  // Row numbers of the filled slot fields, so an error lands on its row.
-  let filled: number[] = [];
   if (intent === "propose") {
-    const raw = form.getAll("slot").map(String).slice(0, MAX_SLOTS);
-    filled = raw.flatMap((v, i) => (v.trim() ? [i] : []));
+    // The ranges as "2026-11-14|14|18" (D144), Budapest days and hours.
+    const ranges = form.getAll("range").map(String).slice(0, MAX_RANGES).map(parseRangeField);
     const club = clubId(form);
     if (club === undefined) return fail("Válassz a listából helyszínt, vagy hagyd üresen.");
-    input = { kind: "propose", slots: parseSlots(raw), clubId: club };
+    input = { kind: "propose", ranges, clubId: club };
   } else if (intent === "agreed") {
-    const slot = parseSlot(String(form.get("slot") ?? ""));
+    // "2026-11-14|18": a Budapest day and a whole hour.
     const club = clubId(form);
     if (club === undefined) return fail("Válassz a listából helyszínt, vagy hagyd üresen.");
-    input = {
-      kind: "agreed",
-      slot: slot || new Date(Number.NaN),
-      clubId: club,
-    };
+    input = { kind: "agreed", slot: parseStartField(String(form.get("slot") ?? "")), clubId: club };
   } else if (intent === "accept") {
     const at = Number(form.get("slot"));
     if (!Number.isFinite(at)) return fail("Válassz egy időpontot.");
@@ -167,13 +172,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const result = await matchStep(user.id, id, input);
   if (result.ok) return data<ActionResult>({ intent, ok: true, message: result.notice });
   if (result.error === NOT_FOUND) throw new Response(NOT_FOUND, { status: 404 });
-  const rows: Record<number, string> = {};
-  for (const e of result.slotErrors ?? [])
-    if (e.slot !== undefined) {
-      const row = intent === "propose" ? filled[e.slot] : 0;
-      if (row !== undefined) rows[row] = [rows[row], slotErrorText([e])].filter(Boolean).join(" ");
-    }
-  return fail(result.error, rows);
+  return fail(result.error);
 }
 
 // A step's answer. Forms show only their errors; the summary shows every
@@ -221,7 +220,7 @@ function Fold({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group max-w-2xl rounded-xl border bg-card" open={open || undefined}>
+    <details className="group max-w-2xl rounded-xl border bg-card" open={open || undefined} aria-label={title}>
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 py-2 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="grid">
@@ -256,72 +255,86 @@ function ClubSelect({ clubs, id }: { clubs: { id: number; name: string }[]; id: 
   );
 }
 
-const PROPOSE_RULES = "Legalább 3 időpont, legalább 2 különböző napra, 7:00 és 22:00 között, legalább 48 órával előre.";
+const PROPOSE_RULES = "Írjátok meg, mikor értek rá, legalább 2 különböző napon. A másik pár ebből választ egy időpontot.";
 
-function ProposeForm({ clubs, result }: { clubs: { id: number; name: string }[]; result?: ActionResult }) {
+// A step's own error before sending (D144): the rules engine's messages, the
+// same the server would answer with.
+function ClientError({ message }: { message: string | null }) {
+  return message ? (
+    <p role="alert" className="font-semibold text-destructive">
+      {message}
+    </p>
+  ) : null;
+}
+
+function ProposeForm({ clubs, result, now, deadline }: { clubs: { id: number; name: string }[]; result?: ActionResult; now: Date; deadline: Date }) {
   const busy = useNavigation().state !== "idle";
-  const [rows, setRows] = useState(3);
-  const errors = result?.intent === "propose" && !result.ok ? (result.rows ?? {}) : {};
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Form method="post" className="grid gap-3">
+    <Form
+      method="post"
+      className="grid gap-4"
+      onSubmit={(e) => {
+        const ranges = new FormData(e.currentTarget).getAll("range").map(String).map(parseRangeField);
+        const errors = proposalErrors(ranges, new Date(), deadline);
+        setError(errors.length > 0 ? slotErrorText(errors) : null);
+        if (errors.length > 0) e.preventDefault();
+      }}
+    >
       <input type="hidden" name="intent" value="propose" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="grid content-start gap-1">
-            <Label htmlFor={`slot-${i}`}>{i + 1}. időpont</Label>
-            <Input
-              id={`slot-${i}`}
-              name="slot"
-              type="datetime-local"
-              step={900}
-              lang="hu"
-              className="w-full"
-              aria-invalid={errors[i] ? true : undefined}
-              aria-describedby={errors[i] ? `slot-${i}-error` : undefined}
-            />
-            {errors[i] && (
-              <p id={`slot-${i}-error`} className="text-sm text-destructive">
-                {errors[i]}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-      {rows < MAX_SLOTS && (
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setRows((n) => n + 1)}>
-            <Plus />
-            Még egy időpont
-          </Button>
-        </div>
-      )}
+      <RangePicker now={now} deadline={deadline} />
       <ClubSelect clubs={clubs} id="propose-club" />
-      <Feedback result={result} intent="propose" />
+      <ClientError message={error} />
+      {!error && <Feedback result={result} intent="propose" />}
       <div>
         <Button type="submit" disabled={busy}>
-          Elküldöm az időpontokat
+          Elküldöm, mikor érünk rá
         </Button>
       </div>
     </Form>
   );
 }
 
-const AGREED_HELP = "Ha Messengeren vagy személyesen megegyeztetek, rögzítsd az időpontot. A másik pár megerősíti, és a meccs le van fixálva.";
+// D148: one step. The other pair may object for 24 hours (or until the
+// start, if sooner); otherwise the time is fixed by itself.
+const AGREED_HELP = "A másik pár 24 órán belül (vagy a kezdésig, ha az hamarabb van) jelezheti, ha nem így beszéltétek. Ha nem jelez, az időpont fix.";
+const AGREED_TITLE = "Megbeszéltétek? Rögzítsétek az időpontot";
+const PROPOSE_TITLE = "Vagy adjátok meg, mikor értek rá, és a másik pár választ";
+const TALK_LINE = "Beszéljétek meg SMS-ben vagy e-mailben, aztán rögzítsétek itt az időpontot.";
 
-function AgreedForm({ clubs, result }: { clubs: { id: number; name: string }[]; result?: ActionResult }) {
+function AgreedForm({
+  clubs,
+  result,
+  now,
+  deadline,
+  primary = false,
+}: {
+  clubs: { id: number; name: string }[];
+  result?: ActionResult;
+  now: Date;
+  deadline: Date;
+  primary?: boolean;
+}) {
   const busy = useNavigation().state !== "idle";
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Form method="post" className="grid gap-3">
+    <Form
+      method="post"
+      className="grid gap-3"
+      onSubmit={(e) => {
+        const missing = !new FormData(e.currentTarget).get("slot");
+        setError(missing ? "Válassz napot és órát." : null);
+        if (missing) e.preventDefault();
+      }}
+    >
       <p className="text-sm text-muted-foreground">{AGREED_HELP}</p>
       <input type="hidden" name="intent" value="agreed" />
-      <div className="grid gap-1">
-        <Label htmlFor="agreed-slot">Megbeszélt időpont</Label>
-        <Input id="agreed-slot" name="slot" type="datetime-local" step={900} lang="hu" required className="w-full sm:w-72" />
-      </div>
+      <DayHourPicker now={now} deadline={deadline} />
       <ClubSelect clubs={clubs} id="agreed-club" />
-      <Feedback result={result} intent="agreed" />
+      <ClientError message={error} />
+      {!error && <Feedback result={result} intent="agreed" />}
       <div>
-        <Button type="submit" variant="outline" disabled={busy}>
+        <Button type="submit" variant={primary ? "default" : "outline"} disabled={busy}>
           Rögzítem az időpontot
         </Button>
       </div>
@@ -329,8 +342,53 @@ function AgreedForm({ clubs, result }: { clubs: { id: number; name: string }[]; 
   );
 }
 
-// Whoever booked the court records where (#27); both pairs see it. Only the
-// city's active clubs; the court is optional free text.
+// The club (required) and the court (optional free text): the city's active
+// clubs only. The venue form's fields (#27); the result form, while the match
+// has no club, asks only for the club (D146: the court doesn't matter there).
+function VenueFields({
+  clubs,
+  id,
+  label,
+  clubId = null,
+  court = null,
+  withCourt = true,
+}: {
+  clubs: { id: number; name: string }[];
+  id: string;
+  label: string;
+  clubId?: number | null;
+  court?: string | null;
+  withCourt?: boolean;
+}) {
+  const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
+  return (
+    <div className={cn("grid gap-3", withCourt && "sm:grid-cols-2")}>
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${id}-club`}>{label}</Label>
+        <Select name="club" defaultValue={current} required>
+          <SelectTrigger id={`${id}-club`} className="w-full">
+            <SelectValue placeholder="Válassz klubot" />
+          </SelectTrigger>
+          <SelectContent>
+            {clubs.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {withCourt && (
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${id}-court`}>Pálya (nem kötelező)</Label>
+          <Input id={`${id}-court`} name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Whoever booked the court records where (#27); both pairs see it.
 function VenueForm({
   clubs,
   clubId,
@@ -343,31 +401,10 @@ function VenueForm({
   result?: ActionResult;
 }) {
   const busy = useNavigation().state !== "idle";
-  const current = clubs.some((c) => c.id === clubId) ? String(clubId) : undefined;
   return (
     <Form method="post" className="grid gap-3">
       <input type="hidden" name="intent" value="venue" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="venue-club">Helyszín</Label>
-          <Select name="club" defaultValue={current} required>
-            <SelectTrigger id="venue-club" className="w-full">
-              <SelectValue placeholder="Válassz klubot" />
-            </SelectTrigger>
-            <SelectContent>
-              {clubs.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="venue-court">Pálya (nem kötelező)</Label>
-          <Input id="venue-court" name="court" defaultValue={court ?? ""} maxLength={COURT_MAX} placeholder="pl. 2-es pálya" className="w-full" />
-        </div>
-      </div>
+      <VenueFields clubs={clubs} id="venue" label="Helyszín" clubId={clubId} court={court} />
       <Feedback result={result} intent="venue" />
       <div>
         <Button type="submit" variant="outline" disabled={busy}>
@@ -383,8 +420,8 @@ function VenueForm({
 // that means before asking.
 function cancelConsequence(late: boolean): string {
   return late
-    ? "24 órán belül vagytok a kezdéshez képest, ez késői lemondás: utána nektek kell új időpontokat ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeletek nyer 4-0 4-0-val."
-    : "Utána újra egyeztettek. 24 órán belül a kezdéshez képest a lemondás már késői: akkor nektek kell új időpontokat ajánlani.";
+    ? "Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek 4:0, 4:0-ra."
+    : "Utána újra egyeztettek. Ha a kezdés előtti 24 órában mondjátok le, az késői lemondás: akkor nektek kell új időpontot ajánlani.";
 }
 
 function CancelButton({ late }: { late: boolean }) {
@@ -522,7 +559,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
     <>
       {s.canReport && (
         <p className="text-sm text-muted-foreground">
-          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4-0 4-0-val nyertek, és ők fekete pontot kapnak.
+          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4:0, 4:0-ra nyertek, és ők fekete pontot kapnak.
         </p>
       )}
       {s.open && (
@@ -550,8 +587,8 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
               <span className="break-words">
                 {d.confirmed
                   ? d.ours
-                    ? "A szervező jóváhagyta a bejelentéseteket: 4-0 4-0 nektek."
-                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0-4 0-4, és fekete pontot kaptatok."
+                    ? "A szervező jóváhagyta a bejelentéseteket: 4:0, 4:0 nektek."
+                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0:4, 0:4, és fekete pontot kaptatok."
                   : d.ours
                     ? "A szervező elutasította a bejelentéseteket."
                     : "A szervező elutasította az ellenfeleitek bejelentését."}{" "}
@@ -573,7 +610,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Biztosan nem jöttek el?</AlertDialogTitle>
               <AlertDialogDescription>
-                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4-0 4-0-val nyertek, az ellenfeletek fekete pontot kap. Amíg nem döntött, visszavonhatod.
+                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4:0, 4:0-ra nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -625,9 +662,9 @@ function whenLine(m: Route.ComponentProps["loaderData"]): string {
     case "scheduled":
       return formatSlot(m.state.slot);
     case "agreed_time":
-      return `${formatSlot(m.state.slot)} (megerősítésre vár)`;
+      return `${formatSlot(m.state.slot)} (még nem fix)`;
     case "proposed":
-      return "Ajánlott időpontok várnak választásra";
+      return "Válasszatok az ajánlott időpontokból";
     case "to_schedule":
       return m.result.status === "none" ? "Még nincs időpont" : "Nincs rögzített időpont";
   }
@@ -652,7 +689,6 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const r = m.result;
   const theirs = m.state.status !== "to_schedule" && m.state.status !== "scheduled" && m.state.by !== m.side;
   const ours = (m.state.status === "proposed" || m.state.status === "agreed_time") && !theirs;
-  const where = m.state.status === "scheduled" ? venueLine(m.venue, m.state.court) : m.venue;
   const failed = (intent: string) => result?.intent === intent && !result.ok;
   const keyed = m.log.length;
 
@@ -661,8 +697,13 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const recordMain = r.status === "none" && m.resultActions.record && m.started;
   const recordFolded = m.resultActions.record && !recordMain && !confirmResult;
   const venueMain = m.state.status === "scheduled" && m.actions.venue && !m.started && m.state.clubId === null && m.clubs.length > 0;
-  const proposeMain = m.actions.propose && m.state.status === "to_schedule";
-  const substitutesShown = m.substitutes.approved.length > 0 || m.substitutes.ours.length > 0;
+  // No fixed time yet and nothing of theirs to answer (D148): first talk by
+  // SMS or e-mail, then record the time (open), the ranges folded below.
+  // With our own agreed time waiting, recording another one stays folded.
+  const talk = m.actions.propose && !!m.message && m.message.to.length > 0;
+  const agreedOpen = m.actions.recordAgreed && !theirs && m.state.status !== "agreed_time";
+  const subs = m.substitutes;
+  const substitutesShown = !!subs && (subs.approved.length > 0 || subs.ours.length > 0);
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
 
   return (
@@ -688,7 +729,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
                 {whenLine(m)}
               </Fact>
               <Fact icon={MapPin} label="Helyszín">
-                {where ?? "Még nincs megadva"}
+                {m.where ?? "Még nincs megadva"}
               </Fact>
             </div>
             <p className="flex items-center gap-2 text-sm">
@@ -705,6 +746,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               <div className="grid gap-1.5">
                 <p className="text-sm font-medium">Az ellenfeleitek elérhetősége:</p>
                 <Contacts contacts={m.contacts} />
+                {/* While scheduling, Írjatok egymásnak below has it. */}
+                {!talk && <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />}
               </div>
             )}
             {m.calendar && <CalendarRow calendar={m.calendar} />}
@@ -734,32 +777,21 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {recordMain && (
             <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main">
-              <RecordResult key={`r${keyed}`} m={m} feedback={result} />
+              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+              </RecordResult>
             </Panel>
           )}
 
           {m.state.status === "proposed" && theirs && m.actions.accept.length > 0 && (
-            <Panel title="Válassz egy időpontot" description={m.venue ? `Helyszín: ${m.venue}.` : undefined} tone="main">
-              <Form method="post" className="grid gap-3">
+            <Panel
+              title="Válasszatok időpontot"
+              description={`Ekkor érnek rá. Egy meccs 60 perc.${m.venue ? ` Helyszín: ${m.venue}.` : ""}`}
+              tone="main"
+            >
+              <Form method="post" className="grid gap-4">
                 <input type="hidden" name="intent" value="accept" />
-                <RadioGroup name="slot" required aria-label="Ajánlott időpontok" className="grid gap-2 sm:grid-cols-2">
-                  {m.actions.accept.map((s) => {
-                    const id = `accept-${s.getTime()}`;
-                    return (
-                      <Label
-                        key={s.getTime()}
-                        htmlFor={id}
-                        className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 font-normal has-[[data-state=checked]]:border-nav-active has-[[data-state=checked]]:bg-nav-active-bg"
-                      >
-                        <RadioGroupItem value={String(s.getTime())} id={id} aria-label={formatSlot(s)} />
-                        <span className="grid">
-                          <span className="text-sm text-muted-foreground">{formatSlot(s).replace(/ \d{1,2}:\d{2}$/, "")}</span>
-                          <span className="text-lg font-bold tabular-nums">{formatSlot(s).match(/\d{1,2}:\d{2}$/)?.[0]}</span>
-                        </span>
-                      </Label>
-                    );
-                  })}
-                </RadioGroup>
+                <StartPicker ranges={m.actions.accept} />
                 <div>
                   <Button type="submit" size="lg" disabled={busy}>
                     Elfogadom
@@ -772,7 +804,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
           {m.state.status === "agreed_time" && m.actions.confirm && (
             <Panel
               title="Megerősíted az időpontot?"
-              description={`Az ellenfeletek szerint így beszéltétek meg: ${formatSlot(m.state.slot)}${m.venue ? `, ${m.venue}` : ""}.`}
+              description={`Az ellenfeletek szerint így beszéltétek meg: ${formatSlot(m.state.slot)}${m.venue ? `, ${m.venue}` : ""}. Fix lesz ${fixesAtText(m.state.fixesAt)}, ha nem jelzitek, hogy nem így beszéltétek.`}
               tone="main"
             >
               <div className="flex flex-wrap gap-2">
@@ -794,26 +826,36 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {ours && r.status === "none" && (
             <Panel
-              title={m.state.status === "proposed" ? "Ezeket ajánlottátok" : "Ezt rögzítettétek"}
-              description={m.state.status === "proposed" ? "A másik pár választ egyet, vagy újakat ajánl." : "A másik pár megerősíti, vagy újra egyeztettek."}
+              title={m.state.status === "proposed" ? "Ekkor értek rá" : "Ezt rögzítettétek"}
+              description={
+                m.state.status === "proposed"
+                  ? "A másik pár ebből választ egy időpontot, vagy mást ajánl."
+                  : m.state.status === "agreed_time"
+                    ? `Fix lesz ${fixesAtText(m.state.fixesAt)}, ha a másik pár nem jelez.`
+                    : undefined
+              }
             >
               <ul className="flex flex-wrap gap-2 text-sm">
-                {(m.state.status === "proposed" ? m.state.slots : m.state.status === "agreed_time" ? [m.state.slot] : []).map((s) => (
-                  <li key={s.getTime()} className="rounded-md bg-muted px-2.5 py-1.5 font-medium">
-                    {formatSlot(s)}
-                  </li>
-                ))}
+                {m.state.status === "proposed"
+                  ? m.state.ranges.map((r) => (
+                      <li key={r.start.getTime()} className="rounded-md bg-muted px-2.5 py-1.5 font-medium">
+                        {formatRange(r)}
+                      </li>
+                    ))
+                  : m.state.status === "agreed_time" && <li className="rounded-md bg-muted px-2.5 py-1.5 font-medium">{formatSlot(m.state.slot)}</li>}
               </ul>
             </Panel>
           )}
 
-          {proposeMain && (
-            <Panel
-              title={m.state.status === "to_schedule" && m.state.nextBy === m.side ? "Ajánljatok új időpontokat" : "Ajánljatok időpontokat"}
-              description={PROPOSE_RULES}
-              tone="main"
-            >
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} />
+          {talk && (
+            <Panel title="Írjatok egymásnak" description={TALK_LINE} tone={theirs ? undefined : "main"}>
+              <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />
+            </Panel>
+          )}
+
+          {agreedOpen && (
+            <Panel title={AGREED_TITLE} tone={talk ? undefined : "main"}>
+              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} primary />
             </Panel>
           )}
 
@@ -829,23 +871,27 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Panel>
           )}
 
-          {substitutesShown && (
+          {subs && substitutesShown && (
             <Panel title="Helyettes">
-              <SubstituteBody key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
+              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
             </Panel>
           )}
 
           {/* --- Everything else, folded --------------------------------------- */}
 
-          {m.actions.propose && !proposeMain && (
-            <Fold title={theirs ? "Egyik sem jó? Ajánljatok másik időpontokat" : "Új időpontokat ajánlanátok?"} hint={PROPOSE_RULES} open={failed("propose")}>
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} />
+          {m.actions.recordAgreed && !agreedOpen && (
+            <Fold title={AGREED_TITLE} hint="A másik pár 24 órán belül jelezheti, ha nem így volt." open={failed("agreed")}>
+              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 
-          {m.actions.recordAgreed && (
-            <Fold title="Máshol már megbeszéltétek?" hint="Rögzítsd az időpontot, a másik pár megerősíti." open={failed("agreed")}>
-              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} />
+          {m.actions.propose && (
+            <Fold
+              title={theirs && m.state.status === "proposed" ? "Egyik sem jó? Adjátok meg, mikor értek rá" : PROPOSE_TITLE}
+              hint={PROPOSE_RULES}
+              open={failed("propose")}
+            >
+              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
             </Fold>
           )}
 
@@ -857,16 +903,18 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {recordFolded && (
             <Fold
-              title={r.status === "recorded" ? "Elírtátok? Javítsd ki" : "Már lejátszottátok? Rögzítsd az eredményt"}
+              title={r.status === "recorded" ? "Elírtátok? Javítsátok ki" : "Már lejátszottátok? Írjátok be az eredményt"}
               hint={r.status === "recorded" ? "A 48 óra újraindul." : "Ha a meccs megvolt, itt írjátok be."}
               open={failed("result-record")}
             >
-              <RecordResult key={`r${keyed}`} m={m} feedback={result} />
+              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+              </RecordResult>
             </Fold>
           )}
 
           {m.state.status === "scheduled" && m.actions.cancel && (
-            <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: 24 órán belül vagytok." : "Lemondhatjátok, utána újra egyeztettek."}>
+            <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: már 24 órán belül van a kezdés." : "Lemondhatjátok, utána újra egyeztettek."}>
               <CancelButton late={m.cancelLate} />
             </Fold>
           )}
@@ -877,9 +925,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Fold>
           )}
 
-          {m.substitutes.form && !substitutesShown && (
+          {subs?.form && !substitutesShown && (
             <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani." open={failed("substitute-request")}>
-              <SubstituteBody key={`s${m.substitutes.ours.length}`} s={m.substitutes} deadline={m.deadline} result={result} />
+              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
             </Fold>
           )}
 

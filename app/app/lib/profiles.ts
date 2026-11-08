@@ -118,7 +118,7 @@ export type ProfileMatchView = {
   verdict: string;
   /** From the pair's side: "4:1, 2:4, szuper tie-break 10:8", "Játék nélküli győzelem (4:0, 4:0)". */
   result: string;
-  /** "Visszalépés miatt nem számít a tabellába." */
+  /** "Visszalépés miatt nem számít bele a tabellába." */
   note: string | null;
   /** The player's Elo change, on a player profile: "+12", and the rating after it. */
   elo: { delta: string; after: number } | null;
@@ -170,7 +170,7 @@ export function matchViews(
         date: m.scheduledAt ? formatDate(m.scheduledAt) : null,
         opponents: side === "a" ? m.b : m.a,
         ...text,
-        note: m.withdrawn ? "Visszalépés miatt nem számít a tabellába." : null,
+        note: m.withdrawn ? "Visszalépés miatt nem számít bele a tabellába." : null,
         elo: change ? { delta: signed(Math.round(change.delta)), after: shownElo(change.after) } : null,
       },
     });

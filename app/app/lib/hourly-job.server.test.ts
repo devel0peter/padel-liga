@@ -21,6 +21,9 @@ vi.mock("~/lib/auth/login-code.server", () => ({
 vi.mock("~/lib/results.server", () => ({
   autoAcceptResults: async (now?: Date) => (step("auto-accept", now), h.result["auto-accept"]),
 }));
+vi.mock("~/lib/agreed-auto-fix.server", () => ({
+  autoFixAgreedTimes: async (now?: Date) => (step("auto-fix", now), { fixed: h.result["auto-fix"] ?? 0, left: false }),
+}));
 vi.mock("~/lib/deadline.server", () => ({
   resolveDeadlines: async (now?: Date) => (step("deadline", now), { resolved: h.result.deadline ?? 0, left: false }),
 }));
@@ -57,7 +60,7 @@ const { runCron } = await import("~/lib/hourly-job.server");
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "match", "stuck", "interest list", "push", "deliver", "push stats"];
+const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "auto-fix", "match", "stuck", "interest list", "push", "deliver", "push stats"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -77,7 +80,7 @@ const errorLines = () => lines.filter((l) => l.level === "error").map((l) => `${
 const stepResults = () => lines.filter((l) => l.event === "cron step").map((l) => l.result);
 
 describe("runCron", () => {
-  it("runs the steps in order: login code cleanup, auto-accept, deadline resolution, round switch draft, match reminders, stuck reminders, interest list deletion, pushes, email delivery, push stats", async () => {
+  it("runs the steps in order: login code cleanup, auto-accept, deadline resolution, round switch draft, agreed time auto-fix, match reminders, stuck reminders, interest list deletion, pushes, email delivery, push stats", async () => {
     await runCron(RUN);
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([]);
@@ -94,6 +97,7 @@ describe("runCron", () => {
     h.result = {
       cleanup: 1,
       "auto-accept": 2,
+      "auto-fix": 3,
       deadline: 6,
       "round draft": "drafted phase 2 of season 1",
       stuck: 3,
@@ -107,6 +111,7 @@ describe("runCron", () => {
       "auto-accepted 2 results",
       "resolved 6 matches at the deadline",
       "drafted phase 2 of season 1",
+      "fixed 3 agreed times",
       "queued 3 reminders",
       "interest list deletion finished: deleted 0 signups, 1 emails, 0 reminder records",
       "pushed 4 notifications",
@@ -164,6 +169,7 @@ describe("runCron", () => {
       "cron step failed: auto-accept",
       "cron step failed: deadline resolution",
       "cron step failed: round switch draft",
+      "cron step failed: agreed time auto-fix",
       "cron step failed: match reminders",
       "cron step failed: stuck reminders",
       "cron step failed: interest list deletion",

@@ -46,15 +46,15 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   // A table with 3 rows per group, all at zero and no places before the first result.
   await expect(first.getByRole("row")).toHaveCount(4); // header + 3 pairs
   await expect(first).toContainText("Még nincs végleges eredmény: a sorrend a kiemelés.");
-  // No fixture list on the page itself.
-  await expect(main.getByRole("region", { name: "1. hét", exact: true })).toHaveCount(0);
+  // The groups sit in their division's band (D143).
+  await expect(main.getByRole("region", { name: "Bronz divízió", exact: true }).getByRole("region", { name: "1. csoport" })).toHaveCount(1);
 
-  // The matches open in a side panel: every week with one match in a group of 3.
-  await first.getByRole("button", { name: "A csoport meccsei (3)" }).click();
-  const panel = page.getByRole("dialog", { name: "1. csoport meccsei" });
+  // The matches sit beside the table on a wide card (D143): every week with one match in a group of 3.
+  await expect(first.getByRole("group", { name: "Nézet" })).toBeHidden();
+  const panel = first.getByRole("group", { name: "1. csoport meccsei" });
   for (const week of ["1. hét", "2. hét", "3. hét"]) await expect(panel.getByRole("region", { name: week, exact: true })).toBeVisible();
   await expect(panel.getByRole("listitem")).toHaveCount(3);
-  await expect(panel).toContainText("Pihen:");
+  await expect(panel).toContainText(/pihen:/i);
   // 15-matches fixed a time for some matches: those show it, the open ones "Egyeztetés alatt".
   const count = (status: string) =>
     d1(
@@ -65,8 +65,6 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(panel.locator("li", { hasText: /\d{2}:\d{2}/ })).toHaveCount(count("scheduled"));
   // Anna's own matches link to their page.
   await expect(panel.locator('a[href^="/matches/"]')).toHaveCount(2);
-  await page.keyboard.press("Escape");
-  await expect(panel).toHaveCount(0);
   await expect(main).toContainText("1. kör, indul");
 
   // The explainer: three points in a tooltip behind the "?" by the title (D138).
@@ -78,6 +76,23 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(tip).toContainText("A divíziók a létra harmadai");
   await expect(tip).toContainText("Egy fel, egy le");
   await expect(main.getByRole("heading", { level: 1, name: "Tabella", exact: true })).toBeVisible();
+  // Escape and a pointer elsewhere close it: on a phone it would cover the card's switch.
+  await page.keyboard.press("Escape");
+  await page.mouse.move(0, 0);
+  await expect(tip).toBeHidden();
+
+  // On a phone the card shows one of the two; the header's switch flips to the matches and back (D143).
+  await page.setViewportSize({ width: 390, height: 844 });
+  const view = first.getByRole("group", { name: "Nézet" });
+  await expect(first.getByRole("table")).toBeVisible();
+  await expect(panel).toBeHidden();
+  await view.getByRole("button", { name: "Meccsek (3)" }).click();
+  await expect(view.getByRole("button", { name: "Meccsek (3)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(panel).toBeVisible();
+  await expect(first.getByRole("table")).toBeHidden();
+  await view.getByRole("button", { name: "Tabella" }).click();
+  await expect(first.getByRole("table")).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   // Not for search engines or link previews.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);

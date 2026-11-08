@@ -16,7 +16,13 @@ const d = (iso: string) => new Date(iso);
 const S1 = d("2026-11-12T17:00:00Z"); // 18:00 Budapest
 const S2 = d("2026-11-13T18:30:00Z");
 
-const proposal = (at: string, slots: Date[], clubId: number | null = null): SchedulingEvent => ({ kind: "proposal", side: "a", at: d(at), slots, clubId });
+const proposal = (at: string, starts: Date[], clubId: number | null = null): SchedulingEvent => ({
+  kind: "proposal",
+  side: "a",
+  at: d(at),
+  ranges: starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) })),
+  clubId,
+});
 const accepted = (at: string, slot: Date): SchedulingEvent => ({ kind: "accepted", side: "b", at: d(at), slot });
 const cancelled = (at: string, slot: Date, side: "a" | "b" = "a"): SchedulingEvent => ({ kind: "cancelled", side, at: d(at), slot });
 const venue = (at: string, clubId: number, court?: string): SchedulingEvent => ({ kind: "venue", side: "a", at: d(at), clubId, court });

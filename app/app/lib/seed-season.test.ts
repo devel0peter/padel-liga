@@ -68,7 +68,7 @@ describe("seasonPlan", () => {
       m.events.forEach((e, i) => {
         if (i > 0) expect(e.at.getTime()).toBeGreaterThanOrEqual(m.events[i - 1]!.at.getTime());
         expect(e.at.getTime()).toBeLessThanOrEqual(now.getTime());
-        if (e.kind === "proposal" || e.kind === "counter_proposal") expect(proposalErrors(e.slots!, e.at, deadline)).toEqual([]);
+        if (e.kind === "proposal" || e.kind === "counter_proposal") expect(proposalErrors(e.ranges!, e.at, deadline)).toEqual([]);
         if (e.kind === "agreed_time") expect(agreedTimeErrors(e.slot!, e.at, deadline)).toEqual([]);
       });
     }

@@ -17,6 +17,9 @@ export type StoredResultEvent = {
   kind: ResultEventKind;
   score: MatchScore | null;
   note: string | null;
+  // Where it was played, given with a result while the match had no club (D146).
+  clubId: number | null;
+  court: string | null;
   at: Date;
 };
 
@@ -95,6 +98,8 @@ async function logOf(ids: number[] | SQLWrapper) {
         kind: matchEvents.kind,
         score: matchEvents.score,
         note: matchEvents.note,
+        clubId: matchEvents.clubId,
+        court: matchEvents.court,
         at: matchEvents.at,
       })
       .from(matchEvents)

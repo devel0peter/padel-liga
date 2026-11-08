@@ -1,9 +1,10 @@
 import { budapestTime, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
-import { SCHEDULING_GUIDE, eventText, groupLine, parseSlot, schedulingEmailDue, parseSlots, statusView, telHref, todoFor, venueLine } from "./matches";
+import { SCHEDULING_GUIDE, eventText, groupLine, schedulingEmailDue, statusView, telHref, todoFor, venueLine } from "./matches";
 
 const slot = budapestTime("2026-11-12", 18, 0);
+const ranges = [{ start: slot, end: budapestTime("2026-11-12", 21, 0) }];
 
 describe("groupLine (spec 14, #25)", () => {
   it("names the division and the group", () => {
@@ -20,15 +21,22 @@ describe("statusView (#25 requirement 2)", () => {
   });
 
   it("a proposal waits for you or for them", () => {
-    const state: SchedulingState = { status: "proposed", by: "a", slots: [slot], clubId: null, at: slot };
-    expect(statusView(state, "a")).toEqual({ label: "Ajánlottatok időpontokat, a másik pár válaszára vár", tone: "waiting" });
+    const state: SchedulingState = { status: "proposed", by: "a", ranges, clubId: null, at: slot };
+    expect(statusView(state, "a")).toEqual({ label: "Ajánlottatok időpontokat, várjuk a másik pár válaszát", tone: "waiting" });
     expect(statusView(state, "b")).toEqual({ label: "Időpontokat ajánlottak, válaszolj", tone: "todo" });
   });
 
-  it("an agreed time waits for you or for them", () => {
-    const state = { status: "agreed_time", by: "b", slot, clubId: null, at: slot } as const;
-    expect(statusView(state, "a")).toEqual({ label: "Megbeszélt időpont (nov. 12., csütörtök 18:00), erősítsd meg", tone: "todo" });
-    expect(statusView(state, "b").tone).toBe("waiting");
+  it("an agreed time says when it becomes fixed by itself (D148)", () => {
+    const fixesAt = new Date(slot.getTime() - 6 * 3_600_000);
+    const state = { status: "agreed_time", by: "b", slot, clubId: null, at: slot, fixesAt } as const;
+    expect(statusView(state, "a")).toEqual({
+      label: "Megbeszélt időpont (nov. 12., csütörtök 18:00), fix lesz nov. 12., csütörtök 12:00-kor, ha nem jelzitek, hogy nem így beszéltétek",
+      tone: "todo",
+    });
+    expect(statusView(state, "b")).toEqual({
+      label: "Megbeszélt időpont (nov. 12., csütörtök 18:00), fix lesz nov. 12., csütörtök 12:00-kor, ha a másik pár nem jelez",
+      tone: "waiting",
+    });
   });
 
   it("scheduled: the time and the venue", () => {
@@ -45,51 +53,41 @@ describe("todoFor (#25 requirement 3)", () => {
 
   it("an item for each open step that waits on this player", () => {
     expect(todoFor({ status: "to_schedule" }, "a", them)).toBe("Ajánlj időpontot (Kiss Anna – Nagy Béla ellen)");
-    expect(todoFor({ status: "proposed", by: "b", slots: [slot], clubId: null, at: slot }, "a", them)).toBe(
+    expect(todoFor({ status: "proposed", by: "b", ranges, clubId: null, at: slot }, "a", them)).toBe(
       "Válaszolj az időpont-ajánlatra (Kiss Anna – Nagy Béla)",
     );
-    expect(todoFor({ status: "agreed_time", by: "b", slot, clubId: null, at: slot }, "a", them)).toBe(
-      "Erősítsd meg a megbeszélt időpontot (Kiss Anna – Nagy Béla)",
+    expect(todoFor({ status: "agreed_time", by: "b", slot, clubId: null, at: slot, fixesAt: slot }, "a", them)).toBe(
+      "Nézd meg a megbeszélt időpontot (Kiss Anna – Nagy Béla): nov. 12., csütörtök 18:00-kor magától fix lesz",
     );
   });
 
   it("nothing while the other pair has to answer, or once scheduled", () => {
-    expect(todoFor({ status: "proposed", by: "a", slots: [slot], clubId: null, at: slot }, "a", them)).toBeNull();
-    expect(todoFor({ status: "agreed_time", by: "a", slot, clubId: null, at: slot }, "a", them)).toBeNull();
+    expect(todoFor({ status: "proposed", by: "a", ranges, clubId: null, at: slot }, "a", them)).toBeNull();
+    expect(todoFor({ status: "agreed_time", by: "a", slot, clubId: null, at: slot, fixesAt: slot }, "a", them)).toBeNull();
     expect(todoFor({ status: "scheduled", slot, clubId: null }, "a", them)).toBeNull();
   });
 });
 
 describe("eventText (#26 requirement 4)", () => {
   it("describes each step", () => {
-    const later = budapestTime("2026-11-13", 9, 30);
-    expect(eventText({ kind: "proposal", slots: [slot, later], venue: "Ace Padel" })).toBe(
-      "Időpontokat ajánlott: nov. 12., csütörtök 18:00; nov. 13., péntek 09:30, helyszín: Ace Padel",
+    // A range one match long reads as its start, like a proposal stored before D144.
+    const legacy = { start: budapestTime("2026-11-13", 9, 30), end: budapestTime("2026-11-13", 10, 30) };
+    expect(eventText({ kind: "proposal", ranges: [...ranges, legacy], venue: "Ace Padel" })).toBe(
+      "Időpontokat ajánlott: nov. 12., csütörtök 18:00–21:00; nov. 13., péntek 09:30, helyszín: Ace Padel",
     );
-    expect(eventText({ kind: "counter_proposal", slots: [slot] })).toBe("Új időpontokat ajánlott: nov. 12., csütörtök 18:00");
+    expect(eventText({ kind: "counter_proposal", ranges })).toBe("Új időpontokat ajánlott: nov. 12., csütörtök 18:00–21:00");
     expect(eventText({ kind: "accepted", slot })).toBe("Elfogadta: nov. 12., csütörtök 18:00");
     expect(eventText({ kind: "agreed_time", slot })).toBe("Rögzítette a megbeszélt időpontot: nov. 12., csütörtök 18:00");
     expect(eventText({ kind: "agreed_confirmed", slot })).toBe("Megerősítette a megbeszélt időpontot");
     expect(eventText({ kind: "agreed_declined", slot })).toBe("Nem erősítette meg a megbeszélt időpontot, újra egyeztettek");
-  });
-});
-
-describe("parseSlot", () => {
-  it("reads a datetime-local value as Budapest time, in winter and in summer", () => {
-    expect(parseSlot("2026-11-12T18:00")).toEqual(new Date("2026-11-12T17:00:00Z"));
-    expect(parseSlot("2027-04-01T18:00")).toEqual(new Date("2027-04-01T16:00:00Z"));
-  });
-
-  it("empty is empty; anything else unreadable is null", () => {
-    expect(parseSlot("  ")).toBe("");
-    for (const bad of ["2026-11-12", "2026-11-31T10:00", "2026-11-12T24:00", "2026-11-12T10:60", "holnap"]) expect(parseSlot(bad)).toBeNull();
-  });
-
-  it("parseSlots skips empty rows and keeps unreadable ones as invalid dates", () => {
-    const out = parseSlots(["2026-11-12T18:00", "", "rossz"]);
-    expect(out).toHaveLength(2);
-    expect(out[0]).toEqual(new Date("2026-11-12T17:00:00Z"));
-    expect(Number.isNaN(out[1]!.getTime())).toBe(true);
+    // D148: a tap says only that the SMS or mail app was opened.
+    expect(eventText({ kind: "contacted", note: "sms" })).toBe("SMS-t indított a többieknek");
+    expect(eventText({ kind: "contacted", note: "email" })).toBe("E-mailt indított a többieknek");
+    // Fixed by itself: after 24 hours, or at the start when that came sooner.
+    expect(eventText({ kind: "agreed_auto_fixed", slot, at: new Date(slot.getTime() - 3_600_000) })).toBe(
+      "Magától fix lett (nov. 12., csütörtök 18:00): a másik pár 24 órán belül nem jelzett.",
+    );
+    expect(eventText({ kind: "agreed_auto_fixed", slot, at: slot })).toBe("Magától fix lett (nov. 12., csütörtök 18:00): a másik pár a kezdésig nem jelzett.");
   });
 });
 
@@ -100,13 +98,16 @@ describe("telHref", () => {
 });
 
 describe("SCHEDULING_GUIDE (#26 requirement 7)", () => {
-  it("is 2–3 short sentences about proposing, recording an agreed time and the other pair's answer", () => {
+  it("is 2–3 short sentences: talk by SMS or e-mail, record the time (fixed unless the other pair objects), or give ranges", () => {
     expect(SCHEDULING_GUIDE.length).toBeGreaterThanOrEqual(2);
     expect(SCHEDULING_GUIDE.length).toBeLessThanOrEqual(3);
     const text = SCHEDULING_GUIDE.join(" ");
-    expect(text).toContain("legalább 3 időpontot");
-    expect(text).toContain("2 különböző napra");
-    expect(text).toContain("megbeszéltétek");
+    expect(text).toContain("SMS-ben vagy e-mailben");
+    expect(text).toContain("legalább 2 különböző napon");
+    expect(text).toContain("60 perc");
+    expect(text).not.toContain("48 órával");
+    expect(text).toContain("nem így beszéltétek");
+    expect(text).toContain("24 órán belül");
     expect(text).toContain("A másik pár");
   });
 });

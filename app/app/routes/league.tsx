@@ -1,5 +1,6 @@
 import type { Division } from "@padel-liga/rules";
-import { ListOrdered, Medal } from "lucide-react";
+import { ListOrdered, Table2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/league";
@@ -8,20 +9,21 @@ import { FixtureList } from "~/components/fixture-list";
 import { HelpTip } from "~/components/help-tip";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "~/components/ui/sheet";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { DIVISION_DOT } from "~/lib/division-colors";
-import type { LadderGroup } from "~/lib/ladder";
+import type { LadderBand, LadderGroup } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { requireUser } from "~/lib/auth/session.server";
 import { ladderPage, pairIdsOf } from "~/lib/ladder.server";
 import { pairPath } from "~/lib/profiles";
 import { SITE_NAME } from "~/lib/site";
+import { cn } from "~/lib/utils";
 
 // The league page, the player's "Tabella" (#30, spec section 14): the phase's
 // groups top-down, each a card with its division and its table; the group's
-// matches open in a side panel (D136). For logged-in players only, inside the app
+// matches beside its table when there is room, behind a "Mérkőzések" switch
+// when there isn't; every group open, in division bands on a faint colour of
+// their own (D143). For logged-in players only, inside the app
 // shell (D134): a visitor goes to the login page and comes back. Names only:
 // no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -38,48 +40,99 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+// "Tabella | Meccsek" in the card's header, only on a card too narrow for the
+// two side by side (D143). Pressed state for a screen reader.
+function ViewSwitch({ view, onChange, count }: { view: "table" | "matches"; onChange: (v: "table" | "matches") => void; count: number }) {
+  const item = (v: "table" | "matches", icon: React.ReactNode, text: string) => (
+    <button
+      type="button"
+      aria-pressed={view === v}
+      onClick={() => onChange(v)}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&_svg]:size-3.5",
+        view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {icon}
+      {text}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Nézet" className="inline-flex rounded-lg bg-muted p-0.5 @[46rem]/group:hidden">
+      {item("table", <Table2 aria-hidden />, "Tabella")}
+      {item("matches", <ListOrdered aria-hidden />, `Meccsek (${count})`)}
+    </div>
+  );
+}
+
+// One group: its table and, beside it, its matches by week when the card is
+// wide enough (a container query on the card, 46rem); on a narrower card one
+// of the two shows at a time, switched in the header (D143).
 function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
+  const [view, setView] = useState<"table" | "matches">("table");
   const count = group.weeks.reduce((n, w) => n + w.matches.length, 0);
   return (
-    <Card role="region" aria-label={`${group.number}. csoport`} className={group.mine ? "ring-2 ring-nav-active/60" : undefined}>
+    <Card role="region" aria-label={`${group.number}. csoport`} className={cn("@container/group", group.mine && "ring-2 ring-nav-active/60")}>
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
-        <CardDescription className="flex items-center gap-1.5">
+        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold whitespace-nowrap">{group.number}. csoport</CardTitle>
+        <CardDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
           {label}
+          {/* On a phone the badge sits here; the header's right side has only the switch. */}
+          {group.mine && (
+            <Badge variant="secondary" className="@[30rem]/group:hidden">
+              A ti csoportotok
+            </Badge>
+          )}
         </CardDescription>
-        {group.mine && (
-          <CardAction>
-            <Badge variant="secondary">A ti csoportotok</Badge>
-          </CardAction>
-        )}
+        {/* The badge and the switch side by side once the card has room (D143). */}
+        <CardAction className="flex items-center justify-end gap-2">
+          {group.mine && (
+            <Badge variant="secondary" className="hidden @[30rem]/group:inline-flex">
+              A ti csoportotok
+            </Badge>
+          )}
+          <ViewSwitch view={view} onChange={setView} count={count} />
+        </CardAction>
       </CardHeader>
-      <CardContent className="grid gap-2">
-        <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
-        {group.withdrawn.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
-          </p>
-        )}
-        {/* The matches open in a side panel (D136): the page under it stays put. */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <ListOrdered aria-hidden />A csoport meccsei ({count})
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full gap-0 sm:max-w-lg">
-            <SheetHeader className="border-b pr-12">
-              <SheetTitle className="font-display text-lg font-bold">{group.number}. csoport meccsei</SheetTitle>
-              <SheetDescription>{label}</SheetDescription>
-            </SheetHeader>
-            <div className="overflow-y-auto p-4">
-              <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
-            </div>
-          </SheetContent>
-        </Sheet>
+      <CardContent>
+        <div className="grid gap-4 @[46rem]/group:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[46rem]/group:gap-6">
+          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[46rem]/group:grid")}>
+            <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
+            {group.withdrawn.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
+              </p>
+            )}
+          </div>
+          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[46rem]/group:grid")}>
+            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} compact />
+          </div>
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Faint division colours behind each band of the ladder (D143), the dots' hues.
+const BAND: Record<Division, string> = {
+  bronz: "bg-amber-50 ring-amber-200/70 dark:bg-amber-950/25 dark:ring-amber-900/50",
+  rez: "bg-teal-50 ring-teal-200/70 dark:bg-teal-950/25 dark:ring-teal-900/50",
+  rookie: "bg-violet-50 ring-violet-200/70 dark:bg-violet-950/25 dark:ring-violet-900/50",
+};
+
+// A division of the ladder: its name, then its groups top-down, on its colour.
+function Band({ band }: { band: LadderBand }) {
+  return (
+    <section aria-label={band.label} className={cn("-mx-2 grid gap-4 rounded-2xl p-2 ring-1 sm:mx-0 sm:p-4", BAND[band.division])}>
+      <h2 className="flex items-center gap-2 px-1 font-display text-base font-bold">
+        <span aria-hidden className={`size-2.5 rounded-full ${DIVISION_DOT[band.division]}`} />
+        {band.label}
+      </h2>
+      {band.groups.map((g) => (
+        <GroupCard key={g.number} group={g} division={band.division} label={band.label} />
+      ))}
+    </section>
   );
 }
 
@@ -132,28 +185,19 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
     <AppPage
       title="Tabella"
       help={<Explainer />}
-      actions={
-        // The Ranglista (D137): one tap from the Tabella, also on a phone.
-        <Button asChild variant="outline" size="sm">
-          <Link to="rankings" relative="path" className="no-underline">
-            <Medal aria-hidden />
-            Ranglista
-          </Link>
-        </Button>
-      }
       description={
         <>
           {where} · {page.started ? `${page.phase}. kör, ${page.week}. hét (${page.weekFrom} – ${page.weekTo})` : `${page.phase}. kör, indul ${page.startsOn}`}
         </>
       }
     >
-      {/* One grid down the ladder (D136): 1, 2 / 3, 4 …; each card names its division. */}
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
-        {page.bands.flatMap((band) =>
-          band.groups.map((g) => <GroupCard key={g.number} group={g} division={band.division} label={band.label} />),
-        )}
-      </div>
       <StandingsLegend />
+      {/* Down the ladder, band by band, every group open (D143). */}
+      <div className="grid gap-6">
+        {page.bands.map((band) => (
+          <Band key={band.division} band={band} />
+        ))}
+      </div>
     </AppPage>
   );
 }

@@ -1,4 +1,3 @@
-import { DIVISIONS, DIVISION_NAMES } from "@padel-liga/rules";
 import { Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/rankings";
@@ -7,7 +6,6 @@ import { Card, CardContent } from "~/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { requireUser } from "~/lib/auth/session.server";
-import { DIVISION_DOT, DIVISION_EDGE } from "~/lib/division-colors";
 import type { RankRow } from "~/lib/rankings";
 import { rankingsPage } from "~/lib/rankings.server";
 import { SITE_NAME } from "~/lib/site";
@@ -16,7 +14,8 @@ import { cn } from "~/lib/utils";
 // The Ranglista (D137): a league's players and pairs by Élő-pont, in two
 // tabs (`?view=pairs`). For logged-in players only, inside the app shell;
 // names and ratings only. Ties share a place until #345 brings the rules.
-// Each row's left edge has its division's colour, as on the Tabella (D138).
+// The viewer's own row is bold (D143); no division marks, since a higher
+// Élő-pont can sit in a lower division and that only confuses (D143).
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const page = await rankingsPage(params.league ?? "", user.id);
@@ -50,8 +49,8 @@ function Ranking({ rows, label, own, players }: { rows: RankRow[]; label: string
           </TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.key} className={cn(r.mine && "bg-nav-active-bg/60 font-semibold hover:bg-nav-active-bg/80")}>
-                <TableCell className={cn("border-l-4 px-3 font-bold tabular-nums", r.division ? DIVISION_EDGE[r.division] : "border-l-transparent")}>
+              <TableRow key={r.key} className={cn(r.mine && "font-bold")}>
+                <TableCell className="px-3 font-bold tabular-nums">
                   {r.place}.
                 </TableCell>
                 <TableCell className="px-2 whitespace-normal">
@@ -62,8 +61,7 @@ function Ranking({ rows, label, own, players }: { rows: RankRow[]; label: string
                   ) : (
                     r.name
                   )}
-                  {r.mine && <span className="text-xs font-semibold text-nav-active"> ({own})</span>}
-                  {r.division && <span className="sr-only">, {DIVISION_NAMES[r.division]} divízió</span>}
+                  {r.mine && <span className="sr-only"> ({own})</span>}
                 </TableCell>
                 <TableCell className={cn(num, "font-extrabold")}>{r.elo}</TableCell>
                 {players && <TableCell className={cn(num, "pr-3")}>{r.matches}</TableCell>}
@@ -73,21 +71,6 @@ function Ranking({ rows, label, own, players }: { rows: RankRow[]; label: string
         </Table>
       </CardContent>
     </Card>
-  );
-}
-
-// What the colours mean, once above both tabs.
-function DivisionLegend() {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Divíziók">
-      {DIVISIONS.map((d) => (
-        <li key={d} className="flex items-center gap-1.5">
-          <span aria-hidden className={cn("size-2.5 rounded-full", DIVISION_DOT[d])} />
-          {DIVISION_NAMES[d]}
-        </li>
-      ))}
-      <li>A szín: a pár divíziója a Tabellán.</li>
-    </ul>
   );
 }
 
@@ -118,7 +101,6 @@ export default function Rankings({ loaderData: d }: Route.ComponentProps) {
             <TabsTrigger value="players">Játékosok</TabsTrigger>
             <TabsTrigger value="pairs">Párok</TabsTrigger>
           </TabsList>
-          <DivisionLegend />
           <TabsContent value="players" className="grid gap-2">
             <Ranking rows={d.players} label="Játékosok Élő-pont szerint" own="te" players />
             <p className="text-xs text-muted-foreground">Meccs: az Élő-pontot változtató meccsek. Azonos Élő-pontnál egyelőre közös a hely.</p>

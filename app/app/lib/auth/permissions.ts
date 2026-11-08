@@ -1,6 +1,8 @@
 // Who may do what (docs/admin-plan.md, spec section 2). Pure: the guard in
 // admin.server.ts loads the actor and asks can(); every rule is unit tested.
 
+import { substitutesEnabled } from "../substitutes";
+
 export type PlatformRole = "player" | "superadmin";
 
 export type LeagueRef = { id: number; slug: string; city: string; name: string };
@@ -90,8 +92,11 @@ function leagueItems(league: LeagueRef): NavItem[] {
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
     // Disputed results and decisions on any match (#29).
     { label: "Viták", to: `${base}/disputes`, icon: "disputes", permission: { kind: "league.manage", league: league.slug } },
-    // Substitute requests to approve (#37, D109).
-    { label: "Helyettesek", to: `${base}/substitutes`, icon: "substitutes", permission: { kind: "league.manage", league: league.slug } },
+    // Substitute requests to approve (#37, D109); hidden in the first season
+    // (D145), the page stays reachable by URL.
+    ...(substitutesEnabled()
+      ? ([{ label: "Helyettesek", to: `${base}/substitutes`, icon: "substitutes", permission: { kind: "league.manage", league: league.slug } }] satisfies NavItem[])
+      : []),
   ];
 }
 

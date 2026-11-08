@@ -13,6 +13,9 @@ import { AUDIT_ACTIONS, isSystemAction, type AuditAction } from "~/lib/audit";
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
+// Substitutes are hidden in the first season (D145); their audit entries are
+// covered with the feature on.
+vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => true }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
@@ -43,6 +46,8 @@ const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
 const SUBSTITUTES = await import("~/lib/substitutes.server");
 const NOSHOWS = await import("~/lib/no-shows.server");
+const MATCHES = await import("~/lib/matches.server");
+const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
 const PURGE = await import("~/lib/interest-list-purge.server");
 const { RunBudget } = await import("~/lib/run-usage");
 
@@ -166,6 +171,18 @@ const STEPS: Step[] = [
       expect(await RESULTS.resultStep(pa.player_a, id, { kind: "record", score: { sets: [[4, 1], [4, 2]] } }, PLAYED)).toMatchObject({ ok: true });
       mark = lastId();
       expect(await RESULTS.autoAcceptResults(AFTER_48H)).toBe(1);
+    },
+  },
+  {
+    // An agreed time the other pair never answered (D148): fixed by itself
+    // 24 hours later, written by the cron; the player's step has no entry.
+    action: "match.agreed_auto_fix",
+    actor: null,
+    run: async () => {
+      const id = matchIds()[5]!;
+      const [pa] = all("select p.player_a from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
+      await expectOk(MATCHES.matchStep(pa.player_a, id, { kind: "agreed", slot: new Date("2026-11-14T17:00:00Z"), clubId: null }, IN_PHASE));
+      expect(await AUTOFIX.autoFixAgreedTimes(AFTER_48H)).toEqual({ fixed: 1, left: false });
     },
   },
   { action: "season_entry.withdraw", actor: ORG, run: () => expectOk(ENTRIES.withdrawPairMidPhase({ id: ORG }, 1, 7, 1, "Sérülés.", IN_PHASE)) },

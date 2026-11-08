@@ -850,16 +850,35 @@ export const matchEvents = sqliteTable(
     matchId: integer("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
-    // The acting pair, one of the match's two.
+    // The acting pair, one of the match's two; for "agreed_auto_fixed" the
+    // pair that didn't answer.
     pairId: integer("pair_id")
       .notNull()
       .references(() => pairs.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind", {
-      enum: ["proposal", "counter_proposal", "accepted", "agreed_time", "agreed_confirmed", "agreed_declined", "venue", "cancelled", "result_recorded", "result_confirmed", "result_disputed"],
+      enum: [
+        "proposal",
+        "counter_proposal",
+        "accepted",
+        "agreed_time",
+        "agreed_confirmed",
+        "agreed_declined",
+        "venue",
+        "cancelled",
+        // D148: a tap on "SMS mindenkinek" / "E-mail mindenkinek", and the
+        // system's line for an agreed time fixed by itself (user_id null).
+        "contacted",
+        "agreed_auto_fixed",
+        "result_recorded",
+        "result_confirmed",
+        "result_disputed",
+      ],
     }).notNull(),
-    // A proposal's slots: JSON array of UTC instants in seconds.
-    slots: text("slots", { mode: "json" }).$type<number[]>(),
+    // A proposal's availability ranges (D144): JSON array of [start, end] in
+    // UTC seconds. Proposals before D144 stored bare starts (a number each),
+    // read as ranges one match long: always read with storedRanges().
+    slots: text("slots", { mode: "json" }).$type<(number | [number, number])[]>(),
     // The accepted slot, or the agreed time; for "cancelled" the slot given up.
     slot: integer("slot", { mode: "timestamp" }),
     // The venue offered with a proposal or an agreed time (optional), or
@@ -870,7 +889,8 @@ export const matchEvents = sqliteTable(
     // A recorded result, or the disputing pair's version (#28); sides as
     // pair_a/pair_b.
     score: text("score", { mode: "json" }).$type<MatchScore>(),
-    // The disputing pair's note to the organizer (#28, optional).
+    // The disputing pair's note to the organizer (#28, optional); for
+    // "contacted" the channel tapped, "sms" or "email" (D148).
     note: text("note"),
     at: integer("at", { mode: "timestamp" })
       .notNull()

@@ -1,11 +1,10 @@
-import { currentElo, pairElo, type Division } from "@padel-liga/rules";
+import { currentElo, pairElo } from "@padel-liga/rules";
 import { and, count, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { cities, eloChanges, groupPairs, groups, pairs, seasonPhases, seasons, users } from "~/db/schema";
 
-import { pairDivisions } from "./ladder.server";
 import { getLeague } from "./leagues.server";
 import { rankRows, type RankInput, type RankRow } from "./rankings";
 
@@ -14,7 +13,6 @@ import { rankRows, type RankInput, type RankRow } from "./rankings";
 // (D112): only pairs that have been in one of the league's published groups,
 // and their players whose account is not deleted; ratings only once the
 // league has started (spec 17). Names and ratings only: no email or phone.
-// Each row carries the division its pair plays in on the Tabella (D138).
 
 export type RankingsPage = {
   league: { name: string; slug: string };
@@ -66,13 +64,6 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
     .innerJoin(playerB, eq(playerB.id, pairs.playerB))
     .where(and(eq(pairs.leagueId, league.id), inArray(pairs.id, placed)));
-  const divisions = await pairDivisions(league.id, now);
-  // A player's division: the one of their pair in the shown phase (one per league).
-  const playerDivision = new Map<string, Division>();
-  for (const r of rows) {
-    const division = divisions.get(r.pairId);
-    if (division) for (const id of [r.aId, r.bId]) playerDivision.set(id, division);
-  }
 
   // Each player once, from any of their pairs; a deleted account is left out.
   const people = new Map<string, { name: string; rating: number }>();
@@ -99,7 +90,6 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
     href: `/players/${id}`,
     mine: id === viewerId,
     matches: matchCount.get(id) ?? 0,
-    division: playerDivision.get(id) ?? null,
   }));
 
   // Pairs that still play together, both accounts still there.
@@ -115,7 +105,6 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
         href: `/pairs/${r.pairId}`,
         mine: r.aId === viewerId || r.bId === viewerId,
         matches: null,
-        division: divisions.get(r.pairId) ?? null,
       },
     ];
   });

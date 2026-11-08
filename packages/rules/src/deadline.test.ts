@@ -8,9 +8,12 @@ import { groupStandings } from "./standings";
 const at = (day: string, h: number, m = 0) => budapestTime(day, h, m);
 const DEADLINE = at("2026-11-29", 23, 59);
 const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
+// Ranges one match long: their starts are the only choices.
+const oneHour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3600_000) }));
+const RANGES = oneHour(SLOTS);
 
-const proposal = (side: "a" | "b", when = at("2026-11-10", 9), slots = SLOTS): SchedulingEvent => ({ kind: "proposal", side, at: when, slots });
-const counter = (side: "a" | "b", when: Date, slots = SLOTS): SchedulingEvent => ({ kind: "counter_proposal", side, at: when, slots });
+const proposal = (side: "a" | "b", when = at("2026-11-10", 9), ranges = RANGES): SchedulingEvent => ({ kind: "proposal", side, at: when, ranges });
+const counter = (side: "a" | "b", when: Date, ranges = RANGES): SchedulingEvent => ({ kind: "counter_proposal", side, at: when, ranges });
 const accepted = (side: "a" | "b", when: Date, slot: Date): SchedulingEvent => ({ kind: "accepted", side, at: when, slot });
 const cancelled = (side: "a" | "b", when: Date, slot: Date): SchedulingEvent => ({ kind: "cancelled", side, at: when, slot });
 
@@ -44,12 +47,12 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
   });
 
   it("one side proposed, the other never answered (its slots lapsed): walkover", () => {
-    const lapsed = [proposal("a"), proposal("a", at("2026-11-20", 9), [at("2026-11-23", 18), at("2026-11-24", 18), at("2026-11-25", 18)])];
+    const lapsed = [proposal("a"), proposal("a", at("2026-11-20", 9), oneHour([at("2026-11-23", 18), at("2026-11-24", 18), at("2026-11-25", 18)]))];
     expect(resolveAtDeadline(lapsed, DEADLINE)).toEqual({ outcome: { kind: "walkover", winner: "a" }, inactive: ["b"] });
   });
 
   it("both active, no agreement: unplayed, no strikes", () => {
-    const log = [proposal("a"), counter("b", at("2026-11-11", 9), [at("2026-11-15", 18), at("2026-11-16", 18), at("2026-11-17", 18)])];
+    const log = [proposal("a"), counter("b", at("2026-11-11", 9), oneHour([at("2026-11-15", 18), at("2026-11-16", 18), at("2026-11-17", 18)]))];
     expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
   });
 
@@ -59,7 +62,24 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
 
   it("recording or confirming an agreed time is valid activity", () => {
     const slot = at("2026-11-20", 18);
-    expect(resolveAtDeadline([{ kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot }], DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
+    // a declined it in time (not valid activity): b recorded, b is the active side.
+    const log: SchedulingEvent[] = [
+      { kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot },
+      { kind: "agreed_declined", side: "a", at: at("2026-11-10", 10) },
+    ];
+    expect(resolveAtDeadline(log, DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
+  });
+
+  it("an agreed time nobody answered became fixed by itself (D148): an agreed slot, both active, no strikes", () => {
+    const slot = at("2026-11-20", 18);
+    const log: SchedulingEvent[] = [{ kind: "agreed_time", side: "b", at: at("2026-11-10", 9), slot }];
+    expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
+  });
+
+  it("tapping the SMS or e-mail button is valid activity (D148)", () => {
+    const log: SchedulingEvent[] = [proposal("a"), { kind: "contacted", side: "b", at: at("2026-11-12", 9) }];
+    expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
+    expect(resolveAtDeadline([{ kind: "contacted", side: "b", at: at("2026-11-12", 9) }], DEADLINE).outcome).toEqual({ kind: "walkover", winner: "b" });
   });
 
   it("accepting or declining alone is not valid activity", () => {
@@ -96,7 +116,7 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
     // b's only steps were accepting and an early cancel: not valid activity.
     expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "walkover", winner: "a" }, inactive: ["b"] });
     // Had b proposed again, both were active: unplayed.
-    const again = [...log, proposal("b", at("2026-11-13", 9), [at("2026-11-20", 18), at("2026-11-21", 18), at("2026-11-22", 18)])];
+    const again = [...log, proposal("b", at("2026-11-13", 9), oneHour([at("2026-11-20", 18), at("2026-11-21", 18), at("2026-11-22", 18)]))];
     expect(resolveAtDeadline(again, DEADLINE)).toEqual({ outcome: { kind: "unplayed" }, inactive: [] });
   });
 
@@ -108,10 +128,10 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
   it("a late canceller who proposed earlier (and again after) still loses by walkover", () => {
     const log = [
       proposal("a"),
-      counter("b", at("2026-11-10", 11), SLOTS),
+      counter("b", at("2026-11-10", 11), RANGES),
       accepted("a", at("2026-11-10", 12), SLOTS[0]!),
       cancelled("a", at("2026-11-12", 9), SLOTS[0]!),
-      proposal("a", at("2026-11-13", 9), [at("2026-11-20", 18), at("2026-11-21", 18), at("2026-11-22", 18)]),
+      proposal("a", at("2026-11-13", 9), oneHour([at("2026-11-20", 18), at("2026-11-21", 18), at("2026-11-22", 18)])),
     ];
     expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "walkover", winner: "b" }, inactive: ["a"] });
   });

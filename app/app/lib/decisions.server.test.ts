@@ -99,7 +99,7 @@ async function disputed() {
   const id = matchOf(1, 3);
   const a = matchRow(id).pair_a as number;
   const b = a === 1 ? 3 : 1;
-  await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+  await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
   await R.resultStep(`p${b}b`, id, { kind: "dispute", score: LOSS, note: "Fordítva volt." }, PLAYED);
   h.raw.exec("delete from notifications");
   return { id, a, b };
@@ -233,7 +233,7 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
     const id = matchOf(1, 3);
     const a = matchRow(id).pair_a as number;
     const b = a === 1 ? 3 : 1;
-    await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+    await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
     await R.resultStep(`p${b}a`, id, { kind: "confirm" }, PLAYED);
     expect((await D.decideMatch("o", 1, id, { kind: "walkover", winner: "b" }, "Nem jelent meg az 1. pár.", LATER)).ok).toBe(true);
     expect((await D.decideMatch("o", 1, id, { kind: "unplayed" }, "Mégis elmaradt.", new Date(LATER.getTime() + 60_000))).ok).toBe(true);
@@ -243,10 +243,10 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
       ["organizer", "o", "Mégis elmaradt."],
     ]);
     const page = (await D.decisionPage(1, id))!;
-    expect(page.label).toBe("Döntés: Elmaradt: nem számít a tabellába");
+    expect(page.label).toBe("Döntés: Elmaradt: nem számít bele a tabellába");
     expect(page.log.slice(-2).map((l) => [l.who, l.role, l.text])).toEqual([
       ["Org", "szervező", `Döntés: Játék nélküli győzelem: Játékos ${b}A – Játékos ${b}B (4:0, 4:0). Indoklás: Nem jelent meg az 1. pár.`],
-      ["Org", "szervező", "Döntés: Elmaradt: nem számít a tabellába. Indoklás: Mégis elmaradt."],
+      ["Org", "szervező", "Döntés: Elmaradt: nem számít bele a tabellába. Indoklás: Mégis elmaradt."],
     ]);
 
     // A match nobody touched: both inactive.
@@ -274,7 +274,7 @@ describe("deciding and overriding (#29 requirements 2-5)", () => {
   it("a decision is not auto-accepted over", async () => {
     const id = matchOf(1, 3);
     const a = matchRow(id).pair_a as number;
-    await R.resultStep(`p${a}a`, id, { kind: "record", score: WIN }, PLAYED);
+    await R.resultStep(`p${a}a`, id, { kind: "record", clubId: 1, score: WIN }, PLAYED);
     await D.decideMatch("o", 1, id, { kind: "walkover", winner: "a" }, "A napló alapján.", LATER);
     expect(await R.autoAcceptResults(new Date(PLAYED.getTime() + 100 * 3600_000))).toBe(0);
     expect(decisions(id)).toHaveLength(1);

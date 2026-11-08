@@ -43,9 +43,19 @@ const result = (page: Page) => content(page).getByRole("region", { name: "Eredm�
 
 // Recording is folded until the fixed time has started (D133): open it if it is.
 async function openRecord(page: Page) {
-  const fold = content(page).getByText("Már lejátszottátok? Rögzítsd az eredményt");
+  const fold = content(page).getByText("Már lejátszottátok? Írjátok be az eredményt");
   if (await fold.isVisible()) await fold.click();
   await expect(content(page).getByRole("button", { name: "Rögzítem az eredményt" })).toBeVisible();
+}
+
+// Where it was played (D146): asked with the result while the match has no
+// club (neither of these two got one at booking); the club only, no court.
+// The venue form, when it shows, has its own fields: this is the result form's.
+async function pickVenue(page: Page) {
+  const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
+  await form.getByRole("combobox", { name: "Hol játszottatok?" }).click();
+  await page.getByRole("option", { name: "Minta Padel Aréna" }).click();
+  await expect(form.getByLabel("Pálya (nem kötelező)")).toHaveCount(0);
 }
 
 async function fillScore(page: Page, rows: [string, string][]) {
@@ -69,6 +79,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
 
   await visit(player.page, `/matches/${first!.id}`);
   await openRecord(player.page);
+  await pickVenue(player.page);
 
   // 4:3 doesn't end a set: the engine's Hungarian message.
   await fillScore(player.page, [
@@ -87,6 +98,8 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   await player.page.getByRole("button", { name: "Rögzítem az eredményt" }).click();
   await expect(content(player.page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
   await expect(status(player.page)).toContainText("Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár");
+  // The venue given with the result is the match's now (D146).
+  await expect(status(player.page)).toContainText("Minta Padel Aréna");
 
   // Instant email to the other pair, the score from their side, the link.
   const sent = await waitForEmails(offset, 2, (m) => m.subject.startsWith("Erősítsd meg a meccs eredményét"));
@@ -107,6 +120,9 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   const log = content(other.page).getByRole("region", { name: "Napló" });
   await expect(log).toContainText("Rögzítette az eredményt: 1:4, 4:2, szuper tie-break 8:10");
   await expect(log).toContainText("Megerősítette az eredményt");
+  // Final: no contacts and no Írj mindenkinek any more (D135, D147).
+  await expect(content(other.page).getByRole("group", { name: "Írj mindenkinek" })).toHaveCount(0);
+  await expect(content(other.page).locator('a[href^="sms:"], a[href^="tel:"]')).toHaveCount(0);
   await other.context.close();
 
   // Played for anna's side too, on Kezdőlap.
@@ -132,6 +148,7 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${second!.id}`);
   await openRecord(player.page);
+  await pickVenue(player.page);
   await fillScore(player.page, [
     ["4", "2"],
     ["5", "3"],

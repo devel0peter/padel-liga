@@ -22,6 +22,8 @@ const O = await import("~/lib/match-overview.server");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (day: string, hour: number, minute = 0) => budapestTime(day, hour, minute);
+// Starts as ranges one match long (D144): the start is the only choice.
+const hour = (starts: Date[]) => starts.map((s) => ({ start: s, end: new Date(s.getTime() + 3_600_000) }));
 const hours = (from: Date, n: number) => new Date(from.getTime() + n * 3600 * 1000);
 
 // Phase 1 runs Mon 9 – Sun 29 Nov 2026 (Budapest, UTC+1).
@@ -79,12 +81,12 @@ const all = (q: string, ...params: unknown[]) => h.raw.prepare(q).all(...params)
 const matchOf = (a: number, b: number): number =>
   all("select id from matches where (pair_a = ? and pair_b = ?) or (pair_a = ? and pair_b = ?)", a, b, b, a)[0].id;
 
-const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19, 30), at("2026-11-14", 10)];
+const SLOTS = [at("2026-11-12", 18), at("2026-11-13", 19), at("2026-11-14", 10)];
 
 // One match in each scheduling status, and a few that nobody touched.
 async function play() {
   // 1–3: a proposal on Monday, unanswered by Wednesday: stuck.
-  expect((await M.matchStep("p1a", matchOf(1, 3), { kind: "propose", slots: SLOTS, clubId: null }, MONDAY)).ok).toBe(true);
+  expect((await M.matchStep("p1a", matchOf(1, 3), { kind: "propose", ranges: hour(SLOTS), clubId: null }, MONDAY)).ok).toBe(true);
   // 2–4: an agreed time, confirmed: scheduled at Ace Padel.
   expect((await M.matchStep("p2a", matchOf(2, 4), { kind: "agreed", slot: at("2026-11-12", 20), clubId: 1 }, hours(NOW, -3))).ok).toBe(true);
   expect((await M.matchStep("p4b", matchOf(2, 4), { kind: "confirm" }, hours(NOW, -2))).ok).toBe(true);
@@ -124,7 +126,7 @@ describe("runningPhases (#158)", () => {
     expect(byId.get(matchOf(1, 4))).toMatchObject({
       week: 2,
       status: "agreed_time",
-      label: "Megbeszélt időpont (nov. 17., kedd 19:00), Játékos 1A – Játékos 1B megerősítésére vár",
+      label: "Megbeszélt időpont (nov. 17., kedd 19:00), fix lesz nov. 12., csütörtök 10:00-kor, ha Játékos 1A – Játékos 1B nem jelez",
       lastActivity: hours(NOW, -1),
       stuck: null,
     });
@@ -196,10 +198,10 @@ async function results() {
   const played = matchOf(2, 4);
   const waiting = matchOf(1, 3);
   const disputed = matchOf(6, 7);
-  expect((await R.resultStep(`p${pairA(played)}a`, played, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(played)}a`, played, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -1))).ok).toBe(true);
   expect((await R.resultStep(`p${pairB(played)}b`, played, { kind: "confirm" }, hours(NOW, -0.5))).ok).toBe(true);
-  expect((await R.resultStep(`p${pairA(waiting)}a`, waiting, { kind: "record", score: WIN }, hours(NOW, -0.25))).ok).toBe(true);
-  expect((await R.resultStep(`p${pairA(disputed)}a`, disputed, { kind: "record", score: WIN }, hours(NOW, -1))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(waiting)}a`, waiting, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -0.25))).ok).toBe(true);
+  expect((await R.resultStep(`p${pairA(disputed)}a`, disputed, { kind: "record", clubId: 1, score: WIN }, hours(NOW, -1))).ok).toBe(true);
   expect((await R.resultStep(`p${pairB(disputed)}a`, disputed, { kind: "dispute", score: LOSS, note: "" }, hours(NOW, -0.75))).ok).toBe(true);
   return { played, waiting, disputed };
 }

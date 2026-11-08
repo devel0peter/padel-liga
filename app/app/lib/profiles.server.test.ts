@@ -214,8 +214,8 @@ describe("once the league has started", () => {
     h.raw.prepare("update group_pairs set withdrawn_at = ?, withdrawal_reason = 'titkos ok' where pair_id = 2").run(sec("2026-11-15T10:00:00Z"));
     const two = await pairProfile(2, DURING);
     expect(two!.groups[0]).toMatchObject({ place: null, withdrawn: true });
-    expect(two!.matches[0]!.note).toBe("Visszalépés miatt nem számít a tabellába.");
-    expect((await pairProfile(1, DURING))!.matches[0]!.note).toBe("Visszalépés miatt nem számít a tabellába.");
+    expect(two!.matches[0]!.note).toBe("Visszalépés miatt nem számít bele a tabellába.");
+    expect((await pairProfile(1, DURING))!.matches[0]!.note).toBe("Visszalépés miatt nem számít bele a tabellába.");
     expect(JSON.stringify(two)).not.toContain("titkos ok");
   });
 

@@ -1,6 +1,6 @@
 import type { Division } from "@padel-liga/rules";
-import { ChevronRight, ListOrdered } from "lucide-react";
-import { useRef, useState } from "react";
+import { ListOrdered, Table2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/league";
@@ -10,21 +10,21 @@ import { HelpTip } from "~/components/help-tip";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "~/components/ui/sheet";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { DIVISION_DOT } from "~/lib/division-colors";
-import type { LadderGroup } from "~/lib/ladder";
+import type { LadderBand, LadderGroup } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { requireUser } from "~/lib/auth/session.server";
 import { ladderPage, pairIdsOf } from "~/lib/ladder.server";
 import { pairPath } from "~/lib/profiles";
 import { SITE_NAME } from "~/lib/site";
+import { cn } from "~/lib/utils";
 
 // The league page, the player's "Tabella" (#30, spec section 14): the phase's
 // groups top-down, each a card with its division and its table; the group's
-// matches open in a side panel (D136). Down the ladder one group is open as a
-// full card, the viewer's on load; the others are compact rows above and
-// below it (number, division, pairs), and a tap on one opens it (D143). For logged-in players only, inside the app
+// matches beside its table when there is room, behind a "Mérkőzések" switch
+// when there isn't; every group open, in division bands on a faint colour of
+// their own (D143). For logged-in players only, inside the app
 // shell (D134): a visitor goes to the login page and comes back. Names only:
 // no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -41,12 +41,16 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+// One group: its table and, beside it, its matches by week when the card is
+// wide enough (a container query, 44rem); on a narrower card one of the two
+// shows at a time and "Mérkőzések" / "Tabella" switches between them (D143).
 function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
+  const [view, setView] = useState<"table" | "matches">("table");
   const count = group.weeks.reduce((n, w) => n + w.matches.length, 0);
   return (
     <Card role="region" aria-label={`${group.number}. csoport`} className={group.mine ? "ring-2 ring-nav-active/60" : undefined}>
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
+        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold">{group.number}. csoport</CardTitle>
         <CardDescription className="flex items-center gap-1.5">
           <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
           {label}
@@ -57,88 +61,58 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
           </CardAction>
         )}
       </CardHeader>
-      <CardContent className="grid gap-2">
-        <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
-        {group.withdrawn.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
-          </p>
-        )}
-        {/* The matches open in a side panel (D136): the page under it stays put. */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <ListOrdered aria-hidden />A csoport meccsei ({count})
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full gap-0 sm:max-w-lg">
-            <SheetHeader className="border-b pr-12">
-              <SheetTitle className="font-display text-lg font-bold">{group.number}. csoport meccsei</SheetTitle>
-              <SheetDescription>{label}</SheetDescription>
-            </SheetHeader>
-            <div className="overflow-y-auto p-4">
-              <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
-            </div>
-          </SheetContent>
-        </Sheet>
+      <CardContent className="@container">
+        <div className="grid gap-4 @[44rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[44rem]:gap-6">
+          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[44rem]:grid")}>
+            <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
+            {group.withdrawn.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
+              </p>
+            )}
+          </div>
+          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[44rem]:grid")}>
+            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
+          </div>
+          {/* Only when the two don't fit side by side. */}
+          <Button variant="outline" className="w-full @[44rem]:hidden" onClick={() => setView(view === "table" ? "matches" : "table")}>
+            {view === "table" ? (
+              <>
+                <ListOrdered aria-hidden />
+                Mérkőzések ({count})
+              </>
+            ) : (
+              <>
+                <Table2 aria-hidden />
+                Tabella
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-// A group that isn't open: one row with its number, division and pairs; a tap
-// opens it. It keeps the region and the division, so the ladder still reads
-// top-down.
-function GroupRow({ group, division, label, onOpen }: { group: LadderGroup; division: Division; label: string; onOpen: () => void }) {
-  return (
-    <section aria-label={`${group.number}. csoport`}>
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={`${group.number}. csoport megnyitása`}
-        className="flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-      >
-        <span className="grid min-w-0 flex-1 gap-0.5">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className="font-display font-bold">{group.number}. csoport</span>
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
-              {label}
-            </span>
-            {group.mine && <span className="text-xs font-semibold text-nav-active">a ti csoportotok</span>}
-          </span>
-          <span className="truncate text-xs text-muted-foreground">{group.rows.map((r) => r.names.join(" – ")).join(" · ")}</span>
-        </span>
-        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      </button>
-    </section>
-  );
-}
+// Faint division colours behind each band of the ladder (D143), the dots' hues.
+const BAND: Record<Division, string> = {
+  bronz: "bg-amber-50 ring-amber-200/70 dark:bg-amber-950/25 dark:ring-amber-900/50",
+  rez: "bg-teal-50 ring-teal-200/70 dark:bg-teal-950/25 dark:ring-teal-900/50",
+  rookie: "bg-violet-50 ring-violet-200/70 dark:bg-violet-950/25 dark:ring-violet-900/50",
+};
 
-// The ladder (D143): the open group as a full card, the rest as rows in their
-// place. Opening another one brings its card into view.
-function Ladder({ groups, initial }: { groups: { g: LadderGroup; division: Division; label: string }[]; initial: number }) {
-  const [open, setOpen] = useState(initial);
-  const card = useRef<HTMLDivElement>(null);
-  const show = (i: number) => {
-    setOpen(i);
-    requestAnimationFrame(() => {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      card.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
-    });
-  };
+// A division of the ladder: its name, then its groups top-down, on its colour.
+function Band({ band }: { band: LadderBand }) {
   return (
-    <div className="grid max-w-3xl gap-2">
-      {groups.map(({ g, division, label }, i) =>
-        i === open ? (
-          <div key={g.number} ref={card} className="scroll-mt-4 py-2">
-            <GroupCard group={g} division={division} label={label} />
-          </div>
-        ) : (
-          <GroupRow key={g.number} group={g} division={division} label={label} onOpen={() => show(i)} />
-        ),
-      )}
-    </div>
+    <section aria-label={band.label} className={cn("-mx-2 grid gap-4 rounded-2xl p-2 ring-1 sm:mx-0 sm:p-4", BAND[band.division])}>
+      <h2 className="flex items-center gap-2 px-1 font-display text-base font-bold">
+        <span aria-hidden className={`size-2.5 rounded-full ${DIVISION_DOT[band.division]}`} />
+        {band.label}
+      </h2>
+      {band.groups.map((g) => (
+        <GroupCard key={g.number} group={g} division={band.division} label={band.label} />
+      ))}
+    </section>
   );
 }
 
@@ -168,8 +142,6 @@ function Explainer() {
 }
 
 export default function League({ loaderData: page }: Route.ComponentProps) {
-  const groups = page.kind === "ladder" ? page.bands.flatMap((band) => band.groups.map((g) => ({ g, division: band.division, label: band.label }))) : [];
-  const focus = Math.max(0, groups.findIndex(({ g }) => g.mine));
   const where = [page.league.name, page.season].filter(Boolean).join(" · ");
   if (page.kind === "waiting")
     return (
@@ -200,8 +172,12 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
       }
     >
       <StandingsLegend />
-      {/* Down the ladder, one group open, the viewer's on load (D143). */}
-      <Ladder groups={groups} initial={focus} />
+      {/* Down the ladder, band by band, every group open (D143). */}
+      <div className="grid gap-6">
+        {page.bands.map((band) => (
+          <Band key={band.division} band={band} />
+        ))}
+      </div>
     </AppPage>
   );
 }

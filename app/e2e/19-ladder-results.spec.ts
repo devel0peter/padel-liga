@@ -15,10 +15,6 @@ test("29. the group table counts the confirmed win and the organizer's decision"
     .getByRole("region", { name: /^\d+\. csoport$/ })
     .filter({ hasText: anna.name });
   await expect(group).toHaveCount(1);
-  // One group is open at a time, the viewer's (D143): open Anna's if it isn't.
-  const opener = group.getByRole("button", { name: /csoport megnyitása$/ });
-  if (await opener.count()) await opener.click();
-  await expect(group.locator("tbody tr")).toHaveCount(3);
 
   // Column order: #, Pár, M, Gy, V, Szett, Játék, P (D133). Read the M and P cells of the body rows.
   const column = (nth: number) =>
@@ -36,9 +32,8 @@ test("29. the group table counts the confirmed win and the organizer's decision"
 
   // The played match shows its sets (from the 1st pair's side, as in the app)
   // with the super tie-break in brackets, and the decision its note, each
-  // once, under its own week (#202, D133), in the group's side panel (D136).
-  await group.getByRole("button", { name: /^A csoport meccsei/ }).click();
-  const panel = page.getByRole("dialog");
+  // once, under its own week (#202, D133), beside the group's table (D143).
+  const panel = group.getByRole("group", { name: /csoport meccsei$/ });
   const played = panel.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);

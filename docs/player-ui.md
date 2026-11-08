@@ -35,7 +35,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| F0 | On the Tabella the fixture list opens in a side panel from each group's card ("A csoport meccsei"), so the page under it doesn't move. Kezdőlap shows it under the group's table, the pair's own rows a link. | Peter, 2026-11-07 (D136); 2026-11-08 (D138, D140) |
+| F0 | On the Tabella the fixture list sits beside each group's table when there is room, compact (weeks as thin dividers, states as icons with a tooltip); on a narrow card the header switch flips to it. Kezdőlap shows it under the group's table, the pair's own rows a link. | Peter, 2026-11-07 (D136); 2026-11-08 (D138, D140, D143) |
 | F1 | Every match of the group, grouped by week (1.–3. hét with the dates), like a fixture list: pair A, the score or the time in the middle, pair B. | Peter, 2026-11-07; spec 5 |
 | F2 | A played match shows its sets and who won (the winner in bold). | Peter, 2026-11-07 |
 | F3 | A match without a final result shows its state: time and venue once fixed, "Egyeztetés alatt", "Eredmény megerősítésre vár" or "Vitatott eredmény". No match disappears from the list because of its state. | Peter, 2026-11-07; D80 |
@@ -86,7 +86,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| L1 | The league page ("Tabella", in the app shell, D134) uses the same table (section 2) and fixture list (section 3) per group. The groups sit one under the other in a list that scrolls on its own while the page keeps the screen's height; the group in the middle is full size, those above and below shrink and fade with their distance; on load the viewer's group is in the middle. | spec 14, D85, D143 |
+| L1 | The league page ("Tabella", in the app shell, D134) uses the same table (section 2) and fixture list (section 3) per group. Every group is open, in division bands on a faint colour of their own; the matches sit beside the table when the card has room, otherwise a "Tabella | Meccsek" switch in the card's header shows one of the two. | spec 14, D85, D143 |
 | L2 | At 390 px pair names don't break into four lines; at desktop width the table doesn't spread its numbers across the page. | Peter, 2026-11-07 |
 | L3 | A Ranglista: players and pairs by Élő-pont in two tabs, the viewer marked, each name linking its profile; one tap from the Tabella and in the sidebar. Ties share a place until #345. No division marks: a higher Élő-pont can sit in a lower division. | Peter, 2026-11-07 (D137); 2026-11-08 (D143) |
 | L4 | "Hogyan működik a létra?" is behind a "?" next to the Tabella's title, in a tooltip (hover, tap or focus). | Peter, 2026-11-08 (D138) |

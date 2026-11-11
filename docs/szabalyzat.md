@@ -54,6 +54,7 @@ A részleteket lent találod.
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
+- A szervező a futó kört **meghosszabbíthatja** (például ha nehéz pályát foglalni): ilyenkor az új határidőről értesítünk, és a későbbi körök is ennyivel később kezdődnek.
 - **Bármelyik pár kezdeményezhet**, nem kell megvárni a másikat. Minél előbb szóltok, annál könnyebb időpontot találni.
 - **Beszéljétek meg SMS-ben vagy e-mailben.** A meccs oldalán az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és a két ellenfélnek.
 - **Rögzítsétek az időpontot az oldalon** (egész órát), és ha tudjátok, a helyszínt is. A másik pár **24 órán belül** jelezheti, ha nem így beszéltétek (ha a meccs ennél hamarabb kezdődik, a kezdésig). Ha nem jelez, az időpont fix. Megerősíteni hamarabb is lehet.

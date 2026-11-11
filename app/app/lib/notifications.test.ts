@@ -30,6 +30,7 @@ import {
   pairWithdrawnMessage,
   seasonEntryMessage,
   seasonStartMessage,
+  roundExtendedMessage,
   parseSubscription,
   pushPayload,
   safeTarget,
@@ -181,6 +182,15 @@ describe("player messages (#115)", () => {
       body: "2026/27 tél, Padelpárbaj Győr. Az 1. kör kezdete: nov. 23., hétfő. A csoportbeosztást legkésőbb aznap reggel megkapjátok.",
       url: "/home",
     });
+  });
+
+  it("#356: an extended round, with the new deadline in Budapest time", () => {
+    expect(roundExtendedMessage({ ...base, phase: 1, deadline: new Date("2026-12-06T22:59:00Z") })).toEqual({
+      title: "Meghosszabbítottuk a kört",
+      body: "Meghosszabbítottuk az 1. kört: új határidő dec. 6., vasárnap 23:59. 2026/27 tél, Padelpárbaj Győr.",
+      url: "/home",
+    });
+    expect(roundExtendedMessage({ ...base, phase: 2, deadline: new Date("2026-12-27T22:59:00Z") }).body).toMatch(/^Meghosszabbítottuk a 2\. kört/);
   });
 
   it("the groups: group, phase and deadline in Budapest time", () => {

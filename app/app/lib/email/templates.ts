@@ -232,6 +232,28 @@ export function seasonStart(input: { to: string; league: string; season: string;
   );
 }
 
+// The organizer extended the running round (#356, D151): every player of the
+// round gets the new deadline and, when there is one, the next round's new
+// start. Names only the recipient.
+export function roundExtended(input: { to: string; league: string; season: string; phase: number; deadline: Date; nextStart: Date | null }): Email {
+  const home = `${SITE_URL}/home`;
+  const round = withArticle(input.phase);
+  return buildPlain(
+    `Meghosszabbítottuk ${round} kört – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `Meghosszabbítottuk ${round} kört (${input.season}, ${input.league}).`,
+      `Új határidő: ${formatDeadline(input.deadline)}. Addig lejátszhatjátok a még hátralévő meccseiteket.`,
+      ...(input.nextStart ? [`${withArticle(input.phase + 1).replace(/^a/, "A")} kör kezdete: ${formatWeekdayDate(input.nextStart)}.`] : []),
+      `A meccseiteket a Kezdőlapon látod:`,
+      home,
+      SIGNATURE,
+    ],
+    [home],
+    footer(`Azért kaptad ezt a levelet, mert a pároddal ebben a körben játszotok a ${SITE_URL.replace("https://", "")} oldalon.`),
+  );
+}
+
 // The groups are published (#24, D22): each player gets their group, the
 // pair they play each week (names only, never an email or phone) and the
 // deadline. Names stay plain text.

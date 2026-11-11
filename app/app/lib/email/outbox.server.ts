@@ -36,6 +36,7 @@ import {
   pairCreated,
   seasonEntered,
   seasonStart,
+  roundExtended,
   strikeWarning,
   stuckReminder,
   type Email,
@@ -262,6 +263,21 @@ export async function queueSeasonStart(
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
     .map((m): NewMessage => ({ kind: "season_start", toEmail: m.toEmail, ...seasonStart(m.input) }));
+  sendAfterResponse(await enqueue(queued));
+}
+
+// The organizer extended the running round (#356, D151): one email per
+// player of the round, sent right after the response (D150). Unsubscribed or
+// bounced addresses, and players who switched email off (#115), get nothing;
+// the in-app notice and push still have it.
+export async function queueRoundExtended(
+  messages: { toEmail: string; input: Parameters<typeof roundExtended>[0] }[],
+): Promise<void> {
+  if (messages.length === 0) return;
+  const suppressed = await suppressedSet();
+  const queued = messages
+    .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
+    .map((m): NewMessage => ({ kind: "round_extended", toEmail: m.toEmail, ...roundExtended(m.input) }));
   sendAfterResponse(await enqueue(queued));
 }
 

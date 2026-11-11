@@ -9,8 +9,9 @@ import { activityLine, overviewStatus, resultStatus, statusOf, stuckReason, type
 import { type Tone } from "./matches";
 import { clubNames, eventWho, eventsOf, groupCount, groupMembers, isSystemEvent, loadMatch, stateOf, storedEventText, toSchedulingEvent } from "./matches.server";
 import { formatPhone } from "./phone";
-import { resultOf, resultsOf, type MatchResults } from "./result-log.server";
+import { resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { neutralDecisionText, resultEventText } from "./results";
+import { roundStatus, type RoundMatch, type RoundStatus } from "./round-status";
 
 // The organizer's overview of the running phase's matches and one match's
 // log (#158, D76), for the league's Szervező and the Admin (the routes check
@@ -44,6 +45,8 @@ export type OverviewPhase = {
   groupCount: number;
   groups: number[];
   matches: OverviewMatch[];
+  // How the round stands (#350): totals, burn-down and forecast.
+  round: RoundStatus;
 };
 
 const ID_CHUNK = 90;
@@ -67,8 +70,8 @@ const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.
 /**
  * Every match of the league's running phases (groups published, deadline not
  * passed), by group and week; not those of a pair withdrawn mid-phase (#34),
- * which don't count. Normally one phase; a league running two
- * seasons at once gets one each.
+ * which don't count (the round's numbers count them as "Nem számít" only).
+ * Normally one phase; a league running two seasons at once gets one each.
  */
 export async function runningPhases(leagueId: number, now = new Date()): Promise<OverviewPhase[]> {
   const groupRows = await db
@@ -105,7 +108,8 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
   const results = await resultsOf(matchRows);
   const groupById = new Map(groupRows.map((g) => [g.id, g]));
 
-  const phases = new Map<string, OverviewPhase>();
+  type Building = Omit<OverviewPhase, "round"> & { history: RoundMatch[]; voided: number };
+  const phases = new Map<string, Building>();
   for (const g of groupRows) {
     const key = `${g.seasonId}:${g.phase}`;
     if (!phases.has(key))
@@ -117,6 +121,8 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
         groupCount: await groupCount(g.seasonId, g.phase),
         groups: [],
         matches: [],
+        history: [],
+        voided: 0,
       });
     phases.get(key)!.groups.push(g.number);
   }
@@ -124,7 +130,11 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
   for (const m of matchRows) {
     const g = groupById.get(m.groupId)!;
     const pairsOf = members.get(m.groupId) ?? [];
-    if (pairsOf.some((p) => p.withdrawn && (p.pairId === m.pairA || p.pairId === m.pairB))) continue;
+    const phase = phases.get(`${g.seasonId}:${g.phase}`)!;
+    if (pairsOf.some((p) => p.withdrawn && (p.pairId === m.pairA || p.pairId === m.pairB))) {
+      phase.voided++;
+      continue;
+    }
     const name = (pairId: number) => {
       const p = pairsOf.find((x) => x.pairId === pairId);
       return p ? pairName(p.players) : "Ismeretlen pár";
@@ -140,22 +150,36 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     const active = { a: sides.includes("a"), b: sides.includes("b") };
     const result = results.get(m.id) ?? EMPTY_RESULT;
     const status = resultStatus(result.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
-    phases.get(`${g.seasonId}:${g.phase}`)!.matches.push({
+    const overview = statusOf(state, result.state);
+    const stuck = stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now });
+    phase.history.push({
+      groupNumber: g.number,
+      week: m.week,
+      status: overview,
+      stuck: stuck !== null,
+      scheduling: log.map((e) => toSchedulingEvent(e, m.pairA)),
+      results: result.events.map((e) => toResultEvent(e, m.pairA)),
+      rulings: result.decisions.map(toRuling),
+    });
+    phase.matches.push({
       id: m.id,
       groupNumber: g.number,
       week: m.week,
       names,
       players: { a: playersOf(m.pairA), b: playersOf(m.pairB) },
-      status: statusOf(state, result.state),
+      status: overview,
       label: status.label,
       tone: status.tone,
       lastActivity: newest([log.at(-1)?.at, result.events.at(-1)?.at, result.decisions.at(-1)?.at]),
       active,
       activity: activityLine(active, names),
-      stuck: stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now }),
+      stuck,
     });
   }
-  return [...phases.values()];
+  return [...phases.values()].map(({ history, voided, ...p }) => ({
+    ...p,
+    round: roundStatus({ phaseStartsAt: p.phaseStartsAt, deadline: p.deadline, groups: p.groups, matches: history, voided, now }),
+  }));
 }
 
 // --- One match ----------------------------------------------------------------

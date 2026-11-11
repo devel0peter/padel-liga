@@ -74,6 +74,7 @@ export function RoundStatusSection({ round, groupCount, title, anchor }: { round
         <div className="grid gap-2">
           <h3 className="text-sm font-semibold">Napról napra</h3>
           <RoundBurndown round={round} />
+          {!started && <p className="text-xs text-muted-foreground">A kör még nem kezdődött el: a vonalak az első napjától töltődnek.</p>}
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">

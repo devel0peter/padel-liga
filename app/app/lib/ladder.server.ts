@@ -6,7 +6,7 @@ import { db } from "~/db/client.server";
 import { cities, groupPairs, groups, matches, pairs, seasonEntries, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
-import { buildLadder, countedOutcome, isValidOutcome, phaseWeek, type LadderBand, type LadderGroupInput } from "./ladder";
+import { buildLadder, countedOutcome, isValidOutcome, phaseSpan, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague, minEntriesByLeague } from "./leagues.server";
 import { logWarn } from "./log";
 import { averageElo } from "./season-entries";
@@ -32,7 +32,10 @@ export type LadderPage = {
       week: number;
       // "november 9-én": when the phase starts.
       startsOn: string;
-      // The week shown, "nov. 9." – "nov. 15.".
+      // An extended round (#356, D151) past its three weeks: the header
+      // shows the extension instead of week 3.
+      extension: boolean;
+      // The week (or extension) shown, "nov. 9." – "nov. 15.".
       weekFrom: string;
       weekTo: string;
       bands: LadderBand[];
@@ -154,17 +157,20 @@ export async function ladderPage(slug: string, now = new Date(), mine: ReadonlyS
   }
 
   const start: Day = budapestDay(shown.startsAt);
-  const { week, started } = phaseWeek(start, budapestDay(now));
+  const span = phaseSpan(start, budapestDay(shown.deadline), budapestDay(now));
+  const { week, started } = span;
   return {
     ...head,
     kind: "ladder",
     phase: shown.number,
     started,
     week,
+    extension: span.extension,
     startsOn: formatOnDate(shown.startsAt),
-    weekFrom: formatShortDay(addDays(start, (week - 1) * 7)),
-    weekTo: formatShortDay(addDays(start, (week - 1) * 7 + 6)),
-    bands: buildLadder(await phaseInput(season.id, shown.number), started && now <= shown.deadline ? week : null, shown.startsAt, mine),
+    weekFrom: formatShortDay(span.from),
+    weekTo: formatShortDay(span.to),
+    // No week is current during an extension.
+    bands: buildLadder(await phaseInput(season.id, shown.number), started && !span.extension && now <= shown.deadline ? week : null, shown.startsAt, mine),
   };
 }
 

@@ -3,6 +3,7 @@ export * from "./calendar";
 export * from "./deadline";
 export * from "./divisions";
 export * from "./elo";
+export * from "./extension";
 export * from "./fixtures";
 export * from "./groups";
 export * from "./no-show";

@@ -213,6 +213,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - The terminal prints one email per player: the group, the opponents' names per week (or the rest week), the deadline and a link. No email address of another player is in any of them.
   - The groups are locked: no select, no "Újragenerálás". The "1. kör" link on Szezonok now reads "Közzétéve", and the season can't be edited or deleted.
+  - Szezonok shows "1. kör meghosszabbítása" under the season's rounds until round 1's deadline (#356, D151). It asks for a new deadline (1–4 Sundays later) and shows the old and new deadline and how many weeks later rounds 2–4 start. Don't confirm it here; if you do, every player of the round gets a notice and an email ("Meghosszabbítottuk az 1. kört") and the rounds move.
   - A pair in a published group can't be dissolved or changed ("Felbontás" and "Partner cseréje" on Párok are disabled, with the reason, until the round's deadline).
   - A pair entering after publishing joins round 2 (to see it, keep one pair out of step 7 until now, then let it enter: "Beneveztetek: a 2. körtől játszotok.").
 

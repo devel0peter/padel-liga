@@ -192,6 +192,9 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     expect(list).toEqual([
       expect.objectContaining({ id: report, matchId: id, reporting: "Játékos 1A – Játékos 1B", absent: "Játékos 3A – Játékos 3B", slot: SLOT, reportedAt: AFTER }),
     ]);
+    // The same pairs' players by id, for the Admin's links (#301).
+    expect(list[0]!.reportingPlayers.map((p) => p.name)).toEqual(["Játékos 1A", "Játékos 1B"]);
+    expect(list[0]!.absentPlayers.map((p) => p.name)).toEqual(["Játékos 3A", "Játékos 3B"]);
     expect(await N.leagueNoShows(2)).toEqual([]);
     expect(await N.leagueNoShows(1, id)).toHaveLength(1);
   });

@@ -132,7 +132,11 @@ describe("the league's disputes and matches (#29 requirement 1)", () => {
       disputedBy: names(b),
       counter: "1:4, 2:4",
       label: "Vitatott eredmény",
+      recordedBySide: "a",
     });
+    // The players by id, for the Admin's links to their profiles (#301).
+    expect(disputes[0]!.players.a.map((p) => p.name)).toEqual([`Játékos ${a}A`, `Játékos ${a}B`]);
+    expect(disputes[0]!.players.b.every((p) => typeof p.id === "string" && p.id.length > 0)).toBe(true);
     // 6 + 3 matches of the two published groups, in group and week order.
     expect(matches).toHaveLength(9);
     expect(matches.map((m) => [m.groupNumber, m.week])).toEqual([...matches.map((m) => [m.groupNumber, m.week])].sort((x, y) => x[0]! - y[0]! || x[1]! - y[1]!));
@@ -169,6 +173,10 @@ describe("one match for the organizer (#29)", () => {
     const page = (await D.decisionPage(1, id))!;
     expect(page.result).toMatchObject({ status: "disputed" });
     expect(page.note).toBe("Fordítva volt.");
+    expect(page.players.a).toHaveLength(2);
+    // Each step names who did it, by id too (the Admin's link, #301).
+    expect(page.log.every((l) => l.whoId !== undefined)).toBe(true);
+    expect(page.log.filter((l) => l.role !== "automatikus").every((l) => typeof l.whoId === "string")).toBe(true);
     expect(page.current).toEqual({ kind: "played", score: WIN });
     expect(page.log.map((l) => [l.role, l.text])).toEqual([
       ["1. pár", "Rögzítette az eredményt: 4:1, 4:2"],

@@ -3,7 +3,7 @@ import { data, Form, Link, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/admin.season-groups";
 import { AppPage } from "~/components/app-page";
-import { PairNames, PersonLink } from "~/components/person-link";
+import { PairNames } from "~/components/person-link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,7 +180,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       endingPhase: s.endingPhase,
       state: s.state,
       fast: s.fast,
-      leaving: s.leaving.map((l) => ({ id: l.pair.pairId, name: pairName(l.pair.players), reason: LEAVE_REASONS[l.reason] })),
+      leaving: s.leaving.map((l) => ({
+        id: l.pair.pairId,
+        players: l.pair.players.map((x) => ({ id: x.id, name: x.name })),
+        reason: LEAVE_REASONS[l.reason],
+      })),
       disputes: s.disputes.map((d) => ({
         matchId: d.matchId,
         kind: BLOCKER_KINDS[d.kind],
@@ -430,7 +434,9 @@ function SwitchPanel({ d }: { d: LoaderData }) {
             <ul className="grid gap-1.5">
               {s.leaving.map((l) => (
                 <li key={l.id} className="flex flex-wrap gap-x-2">
-                  <span className="font-medium">{l.name}</span>
+                  <span className="font-medium">
+                    <PairNames players={l.players} />
+                  </span>
                   <span className="text-muted-foreground">{l.reason}</span>
                 </li>
               ))}

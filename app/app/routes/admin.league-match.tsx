@@ -83,7 +83,7 @@ export default function LeagueMatch({ loaderData }: Route.ComponentProps) {
             {m.log.map((e) => (
               <li key={e.id} className="grid gap-0.5 rounded-md border p-3">
                 <span className="text-xs break-words text-muted-foreground">
-                  {formatDateTime(e.at)} · {e.who} ({e.pair})
+                  {formatDateTime(e.at)} · <PersonLink id={e.whoId} name={e.who} /> ({e.pair})
                 </span>
                 <span className="break-words">{e.text}</span>
               </li>

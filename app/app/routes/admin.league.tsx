@@ -2,6 +2,7 @@ import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.league";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -37,7 +38,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     name: league.name,
     city: cityName(league.city, await listCities()),
     // Names only: co-organizers don't need each other's email here.
-    organizers: organizers.map((o) => o.name || "Névtelen"),
+    organizers: organizers.map((o) => ({ id: o.userId, name: o.name || "Névtelen" })),
     minEntries: minimums.get(league.id) ?? 0,
     // Editable only while the first season waits for it; shown (read-only)
     // only before the league has a season, where it is about to matter.
@@ -69,7 +70,16 @@ export default function LeagueOverview({ loaderData, actionData }: Route.Compone
     <AppPage title={loaderData.name} description={loaderData.city}>
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold">Szervezők</h2>
-        <p>{loaderData.organizers.length ? loaderData.organizers.join(", ") : "Még nincs szervezője."}</p>
+        <p>
+          {loaderData.organizers.length
+            ? loaderData.organizers.map((o, i) => (
+                <span key={o.id}>
+                  {i > 0 && ", "}
+                  <PersonLink id={o.id} name={o.name} />
+                </span>
+              ))
+            : "Még nincs szervezője."}
+        </p>
       </div>
       {(loaderData.minShown || actionData) && (
         <section className="grid max-w-xl gap-2">

@@ -290,10 +290,11 @@ describe("organizerMatch (#158)", () => {
         id: expect.any(Number),
         at: hours(NOW, -3),
         who: "Játékos 2A",
+        whoId: expect.any(String),
         pair: "Játékos 2A – Játékos 2B",
         text: "Rögzítette a megbeszélt időpontot: nov. 12., csütörtök 20:00, helyszín: Ace Padel",
       },
-      { id: expect.any(Number), at: hours(NOW, -2), who: "Játékos 4B", pair: "Játékos 4A – Játékos 4B", text: "Megerősítette a megbeszélt időpontot" },
+      { id: expect.any(Number), at: hours(NOW, -2), who: "Játékos 4B", whoId: expect.any(String), pair: "Játékos 4A – Játékos 4B", text: "Megerősítette a megbeszélt időpontot" },
     ]);
     expect(JSON.stringify(m)).not.toContain("@");
   });

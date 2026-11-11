@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.leagues";
 import { AppPage } from "~/components/app-page";
-import { PairNames, PersonLink } from "~/components/person-link";
+import { PersonLink } from "~/components/person-link";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";

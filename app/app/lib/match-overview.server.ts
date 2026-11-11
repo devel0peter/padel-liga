@@ -180,7 +180,7 @@ export type OrganizerMatch = {
   // Both pairs with their players; phones only while the phase runs.
   // id: for the Admin's link to the player's profile (#301).
   pairs: { side: Side; name: string; active: boolean; players: { id: string; name: string; phone: string | null }[] }[];
-  log: { id: number; at: Date; who: string; pair: string; text: string }[];
+  log: { id: number; at: Date; who: string; whoId: string | null; pair: string; text: string }[];
 };
 
 /**
@@ -242,6 +242,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: eventWho(e),
+        whoId: isSystemEvent(e) ? null : e.userId,
         pair: isSystemEvent(e) ? "automatikus" : pairOf(e.pairId),
         text: storedEventText(e, venues),
       })),
@@ -249,6 +250,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: e.userName || "Törölt játékos",
+        whoId: e.userId,
         pair: pairOf(e.pairId),
         // The score from the 1st pair's side, as the status line.
         text: resultEventText(e, "a"),
@@ -257,6 +259,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: -d.id,
         at: d.at,
         who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+        whoId: d.kind === "organizer" ? d.userId : null,
         pair: d.kind === "organizer" ? "szervező" : "automatikus",
         text: neutralDecisionText(d, names),
       })),

@@ -10,9 +10,8 @@ import { daysLeftText, LIST_ANCHOR, paceText, SECTION_ANCHOR, shareText, verdict
 
 // "A kör állása" at the top of "Meccsek" (#350): totals by status, progress,
 // the verdict, the burn-down, and per week and per group, each count a link
-// to the list below filtered to those matches.
-
-const filterLink = (params: Record<string, string>) => `?${new URLSearchParams(params)}#${LIST_ANCHOR}`;
+// to the list below filtered to those matches. With two rounds running at
+// once the list's filters span both, so the counts are not links then.
 
 const VERDICT_BADGE: Record<Verdict, "default" | "destructive" | "secondary"> = {
   on_track: "default",
@@ -20,18 +19,52 @@ const VERDICT_BADGE: Record<Verdict, "default" | "destructive" | "secondary"> = 
   early: "secondary",
 };
 
-function CountLink({ to, label, count }: { to: string; label: string; count: number }) {
-  return (
-    <Link to={to} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm no-underline hover:bg-muted">
+const TILE = "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm";
+
+// `to` null: the same tile without a link.
+function CountLink({ to, label, count }: { to: string | null; label: string; count: number }) {
+  const inner = (
+    <>
       <span>{label}</span>
       <span className="font-semibold tabular-nums">{count}</span>
+    </>
+  );
+  return to === null ? (
+    <p className={TILE}>{inner}</p>
+  ) : (
+    <Link to={to} className={`${TILE} no-underline hover:bg-muted`}>
+      {inner}
     </Link>
   );
 }
 
-// `anchor`: the first section only, so the id stays unique.
-export function RoundStatusSection({ round, groupCount, title, anchor }: { round: RoundStatus; groupCount: number; title: string; anchor?: boolean }) {
+function RowLink({ to, children }: { to: string | null; children: React.ReactNode }) {
+  return to === null ? (
+    <span className="font-medium">{children}</span>
+  ) : (
+    <Link to={to} className="font-medium underline">
+      {children}
+    </Link>
+  );
+}
+
+// `anchor`: the first section only, so the id stays unique. `linked`: false
+// when another round runs too.
+export function RoundStatusSection({
+  round,
+  groupCount,
+  title,
+  anchor,
+  linked = true,
+}: {
+  round: RoundStatus;
+  groupCount: number;
+  title: string;
+  anchor?: boolean;
+  linked?: boolean;
+}) {
   const started = round.today >= round.firstDay;
+  const filterLink = (params: Record<string, string>) => (linked ? `?${new URLSearchParams(params)}#${LIST_ANCHOR}` : null);
   return (
     <Card role="region" aria-label={title} id={anchor ? SECTION_ANCHOR : undefined} className="max-w-3xl scroll-mt-6">
       <CardHeader>
@@ -92,9 +125,7 @@ export function RoundStatusSection({ round, groupCount, title, anchor }: { round
                 {round.weeks.map((w) => (
                   <TableRow key={w.week}>
                     <TableCell>
-                      <Link to={filterLink({ week: String(w.week) })} className="font-medium underline">
-                        {w.week}. hét
-                      </Link>
+                      <RowLink to={filterLink({ week: String(w.week) })}>{w.week}. hét</RowLink>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {w.played}/{w.total}
@@ -118,9 +149,7 @@ export function RoundStatusSection({ round, groupCount, title, anchor }: { round
                 {round.groups.map((g) => (
                   <TableRow key={g.group}>
                     <TableCell className="whitespace-normal">
-                      <Link to={filterLink({ group: String(g.group) })} className="font-medium underline">
-                        {groupLine(g.group, groupCount)}
-                      </Link>
+                      <RowLink to={filterLink({ group: String(g.group) })}>{groupLine(g.group, groupCount)}</RowLink>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {g.behind && (

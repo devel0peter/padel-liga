@@ -157,6 +157,7 @@ export default function LeagueMatches({ loaderData }: Route.ComponentProps) {
             <RoundStatusSection
               key={`${p.season}:${p.phase}`}
               anchor={i === 0}
+              linked={phases.length === 1}
               round={p.round}
               groupCount={p.groupCount}
               title={phases.length > 1 ? `A kör állása: ${p.season}, ${p.phase}. kör` : "A kör állása"}

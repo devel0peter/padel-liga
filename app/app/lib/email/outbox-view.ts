@@ -11,7 +11,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   signup_confirmation: "Jelentkezés visszaigazolása",
   partner_notice: "Szólunk a megadott párnak",
   broadcast: "Körlevél",
-  pair_intro: "Párkeresők bemutatása",
+  pair_intro: "Párbemutatás (régi)",
   registration_invite: "Regisztrációs meghívó",
   pair_invite: "Pármeghívó",
   pair_answer: "Válasz a pármeghívóra",

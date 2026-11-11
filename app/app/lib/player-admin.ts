@@ -2,11 +2,19 @@
 // player's name, phone, level and sex. Pure, so every rule is unit tested;
 // the D1 side is player-admin.server.ts.
 
+import { DELETED_NAME } from "./account-deletion";
 import { MAX_NAME, parseSex, SEX_REQUIRED, type Sex } from "./auth/rules";
 import { isLevel, type Level } from "./interest";
 import { parsePhone } from "./phone";
 
 export const adminProfilePath = (userId: string) => `/admin/users/${encodeURIComponent(userId)}`;
+
+// Where a player's name on an admin page links (PersonLink): the profile,
+// for whoever may open it (the Admin), unless there is no account id or the
+// account is anonymized ("Törölt játékos": it has no profile). Null: plain text.
+export function profileLink(id: string | null | undefined, name: string, canView: boolean): string | null {
+  return id && canView && name !== DELETED_NAME ? adminProfilePath(id) : null;
+}
 
 export type EditableProfile = { name: string; phone: string | null; level: Level | null; sex: Sex | null };
 export type ProfileField = keyof EditableProfile;

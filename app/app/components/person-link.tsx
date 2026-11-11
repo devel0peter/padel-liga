@@ -1,9 +1,8 @@
 import { Fragment } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 
-import { DELETED_NAME } from "~/lib/account-deletion";
 import { can, type Actor } from "~/lib/auth/permissions";
-import { adminProfilePath } from "~/lib/player-admin";
+import { profileLink } from "~/lib/player-admin";
 import { cn } from "~/lib/utils";
 
 // A player's name on an admin page (#301): for the Admin a link to the
@@ -12,9 +11,10 @@ import { cn } from "~/lib/utils";
 // anonymized account ("Törölt játékos", which has no profile): plain text.
 export function PersonLink({ id, name, className }: { id: string | null | undefined; name: string; className?: string }) {
   const actor = useRouteLoaderData<{ actor?: Actor }>("routes/app")?.actor ?? null;
-  if (!id || name === DELETED_NAME || !can(actor, { kind: "users.view" })) return <span className={className}>{name}</span>;
+  const to = profileLink(id, name, can(actor, { kind: "users.view" }));
+  if (!to) return <span className={className}>{name}</span>;
   return (
-    <Link to={adminProfilePath(id)} className={cn("underline-offset-2 hover:underline", className)}>
+    <Link to={to} className={cn("underline-offset-2 hover:underline", className)}>
       {name}
     </Link>
   );

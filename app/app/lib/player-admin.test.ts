@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminProfilePath, changedFields, editDetail, LEVEL_LOCKED_ADMIN, validateAdminProfile, type EditableProfile } from "./player-admin";
+import { adminProfilePath, changedFields, profileLink, editDetail, LEVEL_LOCKED_ADMIN, validateAdminProfile, type EditableProfile } from "./player-admin";
 
 const FULL: EditableProfile = { name: "Kovács Anna", phone: "+36301234567", level: "kezdo", sex: "female" };
 const EMPTY: EditableProfile = { name: "Régi Fiók", phone: null, level: null, sex: null };
@@ -55,6 +55,19 @@ describe("changedFields and editDetail", () => {
     const detail = editDetail(["name", "phone", "level", "sex"]);
     expect(detail).toBe("Módosítva: név, telefonszám, szint, nem");
     expect(detail).not.toMatch(/\d/);
+  });
+});
+
+describe("profileLink (#301)", () => {
+  it("links a player's name for the Admin only", () => {
+    expect(profileLink("u-1", "Kovács Anna", true)).toBe("/admin/users/u-1");
+    expect(profileLink("u-1", "Kovács Anna", false)).toBeNull();
+  });
+
+  it("leaves an anonymized account and a name without an account as plain text", () => {
+    expect(profileLink("u-2", "Törölt játékos", true)).toBeNull();
+    expect(profileLink(null, "Szervező", true)).toBeNull();
+    expect(profileLink(undefined, "Padelpárbaj", true)).toBeNull();
   });
 });
 

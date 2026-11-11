@@ -280,6 +280,10 @@ describe("phaseSpan (#356)", () => {
     expect(phaseSpan("2026-11-09", "2026-12-13", "2026-12-13")).toEqual({ week: 3, started: true, extension: true, from: "2026-11-30", to: "2026-12-13" });
   });
 
+  it("an extended round after its new deadline (until the next round starts): still the extension", () => {
+    expect(phaseSpan("2026-11-09", "2026-12-06", "2026-12-20")).toEqual({ week: 3, started: true, extension: true, from: "2026-11-30", to: "2026-12-06" });
+  });
+
   it("not extended: after the deadline it stays week 3; before the start, week 1", () => {
     expect(phaseSpan("2026-11-09", "2026-11-29", "2026-12-01")).toMatchObject({ week: 3, extension: false, from: "2026-11-23", to: "2026-11-29" });
     expect(phaseSpan("2026-11-09", "2026-11-29", "2026-11-08")).toMatchObject({ week: 1, started: false, extension: false });

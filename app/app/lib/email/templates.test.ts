@@ -13,6 +13,7 @@ import {
   pairCreated,
   seasonEntered,
   seasonStart,
+  roundExtended,
   textToHtml,
 } from "./templates";
 
@@ -152,6 +153,38 @@ describe("seasonStart (D124, #335)", () => {
 
   it("keeps the name plain text", () => {
     expect(seasonStart({ ...base, to: "<b>Anna</b>" }).html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
+  });
+});
+
+describe("roundExtended (#356, D151)", () => {
+  const base = {
+    to: "Nagy Anna",
+    league: "Padelpárbaj Győr",
+    season: "Első szezon",
+    phase: 1,
+    deadline: new Date("2026-12-06T22:59:00Z"),
+    nextStart: new Date("2026-12-06T23:00:00Z"),
+  };
+
+  it("gives the new deadline and the next round's start, in the spec's date format", () => {
+    const email = roundExtended(base);
+    expect(email.subject).toBe("Meghosszabbítottuk az 1. kört – Padelpárbaj");
+    expect(email.text).toContain("Szia Nagy Anna!");
+    expect(email.text).toContain("Meghosszabbítottuk az 1. kört (Első szezon, Padelpárbaj Győr).");
+    expect(email.text).toContain("Új határidő: dec. 6., vasárnap 23:59. Addig lejátszhatjátok a még hátralévő meccseiteket.");
+    expect(email.text).toContain("A 2. kör kezdete: dec. 7., hétfő.");
+    expect(email.html).toContain('href="https://padelparbaj.hu/home"');
+    expect(email.text).toContain("\n\nPéter\nPadelpárbaj\n\n--\n");
+  });
+
+  it("the last round: no next round", () => {
+    const email = roundExtended({ ...base, phase: 4, nextStart: null });
+    expect(email.subject).toBe("Meghosszabbítottuk a 4. kört – Padelpárbaj");
+    expect(email.text).not.toContain("kör kezdete");
+  });
+
+  it("keeps the name plain text", () => {
+    expect(roundExtended({ ...base, to: "<b>Anna</b>" }).html).toContain("&lt;b&gt;Anna&lt;/b&gt;");
   });
 });
 

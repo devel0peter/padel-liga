@@ -79,7 +79,10 @@ export type PlayerKind =
   | "no_show_rejected"
   // A league's first season reached its minimum entries (D124, #335): every
   // entered player, in the app and by push, plus one email (season_start).
-  | "season_start";
+  | "season_start"
+  // The organizer extended the running round (#356, D151): every player of
+  // the round, in the app and by push, plus one email (round_extended).
+  | "round_extended";
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -191,6 +194,16 @@ export function seasonStartMessage(input: { league: string; season: string; star
   return {
     title: "Indul a szezon",
     body: `${input.season}, ${input.league}. Az 1. kör kezdete: ${formatWeekdayDate(input.start)}. A csoportbeosztást legkésőbb aznap reggel megkapjátok.`,
+    url: "/home",
+  };
+}
+
+// The organizer extended the running round (#356, D151): to every player of
+// the round, with the new deadline. No names.
+export function roundExtendedMessage(input: { league: string; season: string; phase: number; deadline: Date }): Message {
+  return {
+    title: "Meghosszabbítottuk a kört",
+    body: `Meghosszabbítottuk ${withArticle(input.phase)} kört: új határidő ${formatDeadline(input.deadline)}. ${input.season}, ${input.league}.`,
     url: "/home",
   };
 }

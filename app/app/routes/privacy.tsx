@@ -133,7 +133,9 @@ export default function Privacy() {
               nem. A fekete pontról az oldalon és push értesítésben szólunk; a
               másodiknál egy figyelmeztető levelet is küldünk. Ha egy új liga
               első szezonja összegyűjti a szükséges nevezéseket, minden nevezett
-              játékosnak egy levelet küldünk az indulás napjával.
+              játékosnak egy levelet küldünk az indulás napjával. Ha a szervező
+              meghosszabbítja a futó kört, a kör minden játékosának küldünk egy
+              levelet az új határidővel.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (nem fejezted be a regisztrációt;

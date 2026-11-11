@@ -49,7 +49,7 @@ import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } f
 import { SITE_URL } from "./site";
 import { pairName } from "./groups";
 import { COURT_MAX, venueLine } from "./matches";
-import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseWeek, type TableRow } from "./ladder";
+import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseSpan, type TableRow } from "./ladder";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureWeek, type Zone } from "./fixtures";
 import { formatPhone } from "./phone";
 import { isAnonymizedEmail } from "./account-deletion";
@@ -357,7 +357,8 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       const groupCountNow = await groupCount(g.seasonId, g.phase);
       const zones = moveZones(table.length, g.number, groupCountNow, ranked);
       const namesOf = (players: readonly { name: string }[]) => [players[0]?.name || "Névtelen", players[1]?.name || "Névtelen"] as [string, string];
-      const { week, started } = phaseWeek(budapestDay(g.startsAt), budapestDay(now));
+      // No week is current during an extension (#356).
+      const { week, started, extension } = phaseSpan(budapestDay(g.startsAt), budapestDay(g.deadline), budapestDay(now));
       return {
         groupId: g.groupId,
         league: g.league,
@@ -389,7 +390,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
               venue: venueOf(m),
             };
           }),
-          { phaseStartsAt: g.startsAt, currentWeek: started ? week : null, mine: g.pairId },
+          { phaseStartsAt: g.startsAt, currentWeek: started && !extension ? week : null, mine: g.pairId },
         ),
         withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
         matches: own.map((m) => {

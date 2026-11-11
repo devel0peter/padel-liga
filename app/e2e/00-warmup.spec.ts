@@ -23,6 +23,9 @@ test("warm up the dev server", async ({ browser }) => {
     "/admin/cities",
     "/admin/clubs",
     "/admin/leagues",
+    // Meccsek loads the chart library (Recharts, #350): found on a later
+    // visit, Vite reloads the page mid-navigation.
+    "/admin/leagues/minta/matches",
     "/admin/outbox",
     "/admin/users",
   ]) {

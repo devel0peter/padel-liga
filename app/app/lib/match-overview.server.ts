@@ -174,7 +174,8 @@ export type OrganizerMatch = {
   stuck: StuckReason | null;
   activity: string;
   // Both pairs with their players; phones only while the phase runs.
-  pairs: { side: Side; name: string; active: boolean; players: { name: string; phone: string | null }[] }[];
+  // id: for the Admin's link to the player's profile (#301).
+  pairs: { side: Side; name: string; active: boolean; players: { id: string; name: string; phone: string | null }[] }[];
   log: { id: number; at: Date; who: string; pair: string; text: string }[];
 };
 
@@ -228,7 +229,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       side,
       name: names[side],
       active: active[side],
-      players: ctx.pairs[side].players.map((p) => ({ name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
+      players: ctx.pairs[side].players.map((p) => ({ id: p.id, name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
     })),
     // Scheduling and result steps in order, then the rulings by time; a
     // ruling's id is negative so it can't clash with a step's.

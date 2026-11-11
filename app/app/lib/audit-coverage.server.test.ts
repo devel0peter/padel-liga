@@ -49,6 +49,7 @@ const NOSHOWS = await import("~/lib/no-shows.server");
 const MATCHES = await import("~/lib/matches.server");
 const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
 const PURGE = await import("~/lib/interest-list-purge.server");
+const PLAYER_ADMIN = await import("~/lib/player-admin.server");
 const { RunBudget } = await import("~/lib/run-usage");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
@@ -217,6 +218,14 @@ const STEPS: Step[] = [
       expect(await OUTBOX.retryFailed("groups_published", { id: ADMIN })).toBe(1);
     },
   },
+  // The Admin on a player's profile (#301, D156).
+  {
+    action: "user.update",
+    actor: ADMIN,
+    run: () => PLAYER_ADMIN.updatePlayerByAdmin(ADMIN, "q1", { name: "Játékos Q egy", phone: "", level: "halado", sex: "" }).then((r) => expect(r).toEqual({ ok: true, changed: 1 })),
+  },
+  { action: "partner_search.on", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, true).then((ok) => expect(ok).toBe(true)) },
+  { action: "partner_search.off", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, false).then((ok) => expect(ok).toBe(true)) },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },
   {
     action: "account.anonymize",
@@ -273,7 +282,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
-  "admin.league-solos.tsx": ["pair.create"],
+  "admin.league-players.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.outbox.tsx": ["outbox.retry"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
@@ -281,6 +290,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
   "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
+  "admin.user.tsx": ["user.update", "partner_search.on", "partner_search.off"],
 };
 
 describe("every organizer and system change leaves one audit entry (#225)", () => {

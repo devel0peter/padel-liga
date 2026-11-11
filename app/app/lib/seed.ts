@@ -55,7 +55,7 @@ export const PAIR_PLAYERS: { a: Person; b: Person; level: Level }[] = [
 ];
 
 // And four players without a partner, who switch on "Párt keresek" so the
-// Szervező pairs them on Párkeresők.
+// Szervező pairs them on Játékosok.
 export const SOLO_PLAYERS: { who: Person; level: Level }[] = [
   { who: person("Varga Dóra", "varga.dora"), level: "kozephalado" },
   { who: person("Kiss Miklós", "kiss.miklos"), level: "kozephalado" },

@@ -8,14 +8,15 @@
 // most one active pair per league. A pair can't be dissolved or changed while
 // it plays in a published group whose round hasn't reached its deadline.
 
-// "search": made from Regisztráltak on Párkeresők (D113, #297).
+// "search": two players who both switched "Párt keresek" on, paired by the
+// organizer (D113, #297; on Párkeresők, on Játékosok or a profile since #301).
 export type PairSource = "signup" | "manual" | "link" | "search";
 
 export const SOURCE_LABELS: Record<PairSource, string> = {
   signup: "jelentkezésből",
   manual: "kézzel",
   link: "linkkel",
-  search: "Párkeresők",
+  search: "párkeresésből",
 };
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";

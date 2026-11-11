@@ -307,7 +307,7 @@ describe("deleting an account (#152)", () => {
     expect((await pairCandidates({ id: 1 })).map((c) => c.id)).not.toContain("a");
     expect(await findUserIdByEmail("a@x.hu")).toBeNull();
     // Párok still lists the dissolved pair, but "Levél nekik" doesn't write to them.
-    const audience = (await leaguePairsAudience({ id: 1, city: "gyor", name: "Padelpárbaj Győr" }, { entry: null, q: "" })).people;
+    const audience = (await leaguePairsAudience({ id: 1, name: "Padelpárbaj Győr" }, { entry: null, q: "" })).people;
     expect(audience.map((p) => p.email)).toContain("b@x.hu");
     expect(audience.map((p) => p.email).filter((e) => e.endsWith("@deleted.invalid"))).toEqual([]);
     expect(all("select action, target, detail from audit_log where action like 'account.%' or action like 'pair.%' order by id")).toEqual([

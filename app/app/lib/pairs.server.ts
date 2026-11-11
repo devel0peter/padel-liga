@@ -317,8 +317,8 @@ async function announcePair(pairId: number): Promise<void> {
 }
 
 // "Pár létrehozása": two registered players without a pair in the league.
-// `source`: "search" when made from Regisztráltak on Párkeresők (D113, #297),
-// so its Összehozott párok can list it.
+// `source`: "search" when both have "Párt keresek" on (D113, #297; pairUp in
+// league-players.server.ts); Párok shows it as "párkeresésből".
 export async function createPair(
   actorId: string,
   leagueId: number,

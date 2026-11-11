@@ -2,6 +2,7 @@ import { Form, Link, useFetcher, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.users";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
 import {
@@ -36,7 +37,8 @@ import {
   type FilterKey,
 } from "~/lib/users-filter";
 
-// Every account (Admin only). Roles are shown, not edited: Szervezők are
+// Every account (Admin only); a name opens the player's profile (#301).
+// Roles are shown, not edited: Szervezők are
 // appointed on Ligák, the Admin only by the CLI. Phone numbers tap to call
 // (D126).
 // "Utolsó belépés" and "Törlés" (#152) only for the Admin, even if the page
@@ -218,7 +220,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               {users.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium whitespace-normal">
-                    {u.name || <span className="text-muted-foreground">nincs megadva</span>}
+                    <PersonLink id={u.id} name={u.name || "Névtelen"} />
                     {/* The columns that don't fit a phone fold under the name (#146). */}
                     <div className="grid gap-0.5 text-sm font-normal break-all text-muted-foreground sm:hidden">
                       <span>{u.email}</span>

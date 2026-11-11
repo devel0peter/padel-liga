@@ -3,7 +3,7 @@
 // after the walkthrough, on the state it left (nothing here changes it).
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, ORGANIZER, PAIRS, WAITING_SOLOS, as, content, visit } from "./support";
+import { ADMIN, ORGANIZER, PAIRS, SEEKERS, WAITING_SOLOS, as, content, playersTable, visit } from "./support";
 
 const ENTERED = /Nevezés \(.+\): Nevezett/;
 
@@ -29,7 +29,7 @@ test("Felhasználók: status chips and, for the Admin, the last login", async ({
   await context.close();
 });
 
-test("Párok and Párkeresők: entries, a seeker back after a dissolve, phones but no email addresses", async ({ browser }) => {
+test("Párok and Játékosok: entries, a seeker back after a dissolve, phones but no email addresses", async ({ browser }) => {
   const [boglarka, akos] = WAITING_SOLOS;
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta/pairs");
@@ -38,15 +38,14 @@ test("Párok and Párkeresők: entries, a seeker back after a dissolve, phones b
   // Both players' phones, tap to call (D126).
   await expect(p1.locator('a[href="tel:+36301234567"]')).toHaveCount(2);
 
-  // The pair made on Párkeresők in step 13 was dissolved in step 14: it is
-  // gone from Összehozott párok; Ákos, still looking, is back under
-  // Regisztráltak; Boglárka, now Török Hanna's partner, isn't.
-  await visit(page, "/admin/leagues/minta/solos");
-  const registered = page.getByRole("region", { name: "Regisztráltak", exact: true });
-  await expect(registered).toContainText(akos.name);
-  await expect(registered).not.toContainText(boglarka.name);
-  await expect(page.getByRole("region", { name: "Összehozott párok" })).not.toContainText(boglarka.name);
-  await expect(registered.getByRole("row").filter({ hasText: akos.name }).locator('a[href="tel:+36301234567"]')).toBeVisible();
+  // The pair made on Játékosok in step 13 was dissolved in step 14: Ákos,
+  // still looking, is back under "Párt keres"; Boglárka, now Török Hanna's
+  // partner, isn't (#301).
+  await visit(page, SEEKERS);
+  const seekers = playersTable(page);
+  await expect(seekers).toContainText(akos.name);
+  await expect(seekers).not.toContainText(boglarka.name);
+  await expect(seekers.getByRole("row").filter({ hasText: akos.name }).locator('a[href="tel:+36301234567"]')).toBeVisible();
   await expect(content(page)).not.toContainText("@example.test");
   await context.close();
 });

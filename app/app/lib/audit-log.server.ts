@@ -45,6 +45,20 @@ export type LogPage = {
 
 const actorUser = alias(users, "actor_user");
 
+// The entries about one account (#301, the profile's Napló): written by it,
+// naming it (target or detail), or about one of its pairs or their entries.
+// Subqueries, not a list of ids (D1: at most 100 bound parameters).
+function about(userId: string): SQL {
+  const theirPairs = sql`select ${pairs.id} from ${pairs} where ${pairs.playerA} = ${userId} or ${pairs.playerB} = ${userId}`;
+  return or(
+    eq(auditLog.actorId, userId),
+    eq(auditLog.target, `user:${userId}`),
+    sql`instr(coalesce(${auditLog.detail}, ''), ${`user:${userId}`}) > 0`,
+    sql`${auditLog.target} in (select 'pair:' || id from (${theirPairs}))`,
+    sql`${auditLog.target} in (select 'season_entry:' || ${seasonEntries.id} from ${seasonEntries} where ${seasonEntries.pairId} in (${theirPairs}))`,
+  )!;
+}
+
 function where(f: LogFilters): SQL | undefined {
   const { since, before } = logBounds(f);
   const system = SYSTEM_ACTIONS as string[];
@@ -59,6 +73,7 @@ function where(f: LogFilters): SQL | undefined {
   return and(
     f.action ? eq(auditLog.action, f.action) : undefined,
     actor,
+    f.person ? about(f.person) : undefined,
     f.league ? eq(auditLog.leagueId, f.league) : undefined,
     since ? gte(auditLog.at, since) : undefined,
     before ? lt(auditLog.at, before) : undefined,

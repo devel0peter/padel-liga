@@ -19,6 +19,10 @@ export type LogFilters = {
   from: Day | null; // Budapest days, both included
   to: Day | null;
   page: number; // from 1
+  // An account id: the entries about one player (#301, their profile's
+  // Napló): what they did, what was done to their account, their pairs and
+  // their pairs' entries.
+  person: string | null;
 };
 
 // From the address (?action=&actor=&league=&from=&to=&page=). Anything
@@ -38,11 +42,12 @@ export function parseLogFilters(params: URLSearchParams): LogFilters {
     from: day("from"),
     to: day("to"),
     page: Number.isInteger(page) && page > 1 ? page : 1,
+    person: text("person"),
   };
 }
 
 export function hasLogFilters(f: LogFilters): boolean {
-  return !!(f.action || f.actor || f.league || f.from || f.to);
+  return !!(f.action || f.actor || f.league || f.from || f.to || f.person);
 }
 
 // The UTC bounds of the date filter: from 00:00 of `from` until 00:00 after `to`.

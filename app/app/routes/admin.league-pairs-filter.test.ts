@@ -41,9 +41,7 @@ const args = (url: string, cookie: string, league = "gyor") =>
   ({ request: new Request(url, { headers: { Cookie: cookie } }), params: { league }, context: {} }) as any;
 const pairsPage = (query: string, cookie: string) => Pairs.loader(args(`http://localhost/admin/leagues/gyor/pairs${query}`, cookie));
 
-const STAFF = new Set(["admin", "szervezo"]);
-const mine = (rows: any[]) => rows.filter((r) => r.kind !== "solo" || !STAFF.has(r.player.id));
-const names = (rows: any[]) => mine(rows).map((r) => (r.kind === "solo" ? r.player.name : r.pair.players.map((p: any) => p.name).join(" + ")));
+const names = (rows: any[]) => rows.map((r) => r.players.map((p: any) => p.name).join(" + "));
 
 beforeEach(() => {
   h.raw = migratedDatabase();
@@ -81,19 +79,28 @@ beforeEach(() => {
 });
 
 describe("Párok search and filter (#148)", () => {
-  it("lists the players without a pair as rows, and Nincs a ligában lists exactly them and the pairs not entered", async () => {
+  it("lists the pairs only (the players without a pair are on Játékosok, #301); Nincs a ligában lists the pairs not entered", async () => {
     const cookie = await cookieFor("szervezo", "player", 1);
     const all = await pairsPage("", cookie);
-    expect(names(all.rows)).toEqual(["Szabó Cecil + Tóth Dóra", "Kovács Anna + Nagy Béla", "Kiss Edit + Varga Ferenc", "Ákos Sándor", "Kiss Edit", "Pál Boglárka", "Varga Ferenc"]);
-    expect(all.rows.find((r: any) => r.kind === "solo" && r.player.id === "k")).toMatchObject({ player: { seeking: true } });
-    expect(all.rows.find((r: any) => r.kind === "solo" && r.player.id === "g")).toMatchObject({ player: { seeking: false } });
+    expect(names(all.rows)).toEqual(["Szabó Cecil + Tóth Dóra", "Kovács Anna + Nagy Béla", "Kiss Edit + Varga Ferenc"]);
+    // "Pár létrehozása" still offers the players without a pair.
+    expect(all.candidates.map((c: any) => c.id)).toEqual(["g", "e", "k", "szervezo", "f"]);
 
     const out = await pairsPage("?entry=not_in_league", cookie);
-    expect(names(out.rows)).toEqual(["Szabó Cecil + Tóth Dóra", "Ákos Sándor", "Kiss Edit", "Pál Boglárka", "Varga Ferenc"]);
+    expect(names(out.rows)).toEqual(["Szabó Cecil + Tóth Dóra"]);
     expect(names((await pairsPage("?entry=entered", cookie)).rows)).toEqual(["Kovács Anna + Nagy Béla"]);
     expect(names((await pairsPage("?entry=dissolved", cookie)).rows)).toEqual(["Kiss Edit + Varga Ferenc"]);
-    // The Szervező's own account is a row without a pair too.
-    expect(out.counts).toEqual({ entered: 1, not_entered: 1, rejected: 0, withdrawn: 0, no_pair: 5, dissolved: 1, not_in_league: 6 });
+    expect(out.counts).toEqual({ entered: 1, not_entered: 1, rejected: 0, withdrawn: 0, dissolved: 1, not_in_league: 1 });
+  });
+
+  it("sends the old Nincs párja address to Játékosok with the same filter and search (#301 requirement 5)", async () => {
+    const cookie = await cookieFor("szervezo", "player", 1);
+    const moved = await pairsPage("?entry=no_pair&q=%20kiss", cookie).then(
+      () => null,
+      (r: Response) => r,
+    );
+    expect(moved?.status).toBe(302);
+    expect(moved?.headers.get("Location")).toBe("/admin/leagues/gyor/players?filter=no_pair&q=kiss");
   });
 
   it("searches by name, ignoring case and accents; the counts follow the search", async () => {
@@ -102,7 +109,7 @@ describe("Párok search and filter (#148)", () => {
     expect(names(page.rows)).toEqual(["Kovács Anna + Nagy Béla"]);
     expect(page.counts).toMatchObject({ entered: 1, not_in_league: 0 });
     expect(names((await pairsPage("?q=dora&entry=not_entered", cookie)).rows)).toEqual(["Szabó Cecil + Tóth Dóra"]);
-    expect(names((await pairsPage("?q=akos", cookie)).rows)).toEqual(["Ákos Sándor"]);
+    expect(names((await pairsPage("?q=akos", cookie)).rows)).toEqual([]);
     expect((await pairsPage("?q=kovacs", cookie)).query).toEqual({ entry: null, q: "kovacs" });
   });
 
@@ -110,7 +117,7 @@ describe("Párok search and filter (#148)", () => {
     for (const cookie of [await cookieFor("admin", "superadmin"), await cookieFor("szervezo", "player", 1)]) {
       const page = await pairsPage("?entry=not_in_league", cookie);
       expect(JSON.stringify(page)).not.toContain("@");
-      const phones = page.rows.flatMap((r: any) => (r.kind === "solo" ? [r.player.phone] : r.pair.players.map((p: any) => p.phone)));
+      const phones = page.rows.flatMap((r: any) => r.players.map((p: any) => p.phone));
       expect(phones).toContain("+36 30 123 4567");
       // The player choices of "Pár létrehozása" and "Csere" carry none.
       expect(JSON.stringify(page.candidates)).not.toContain("+36");
@@ -118,8 +125,8 @@ describe("Párok search and filter (#148)", () => {
   });
 
   it("offers Levél nekik to the Admin only (the broadcast page is theirs)", async () => {
-    expect((await pairsPage("?entry=no_pair", await cookieFor("admin", "superadmin"))).canMail).toBe(true);
-    expect((await pairsPage("?entry=no_pair", await cookieFor("szervezo", "player", 1))).canMail).toBe(false);
+    expect((await pairsPage("?entry=entered", await cookieFor("admin", "superadmin"))).canMail).toBe(true);
+    expect((await pairsPage("?entry=entered", await cookieFor("szervezo", "player", 1))).canMail).toBe(false);
   });
 });
 
@@ -127,11 +134,11 @@ describe("Levél nekik from Párok opens the broadcast page with those players (
   it("Nincs a ligában: exactly those players, each address once, minus suppressed ones; nothing sent", async () => {
     const admin = await cookieFor("admin", "superadmin");
     const page = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=gyor&entry=not_in_league", admin));
-    // Cecil + Dóra (Dóra bounced), Ákos, and the solos Edit, Boglárka, Ferenc (their pair is dissolved).
-    expect(page.recipients.map((r: any) => r.email).sort()).toEqual(["admin@x.hu", "c@x.hu", "e@x.hu", "f@x.hu", "g@x.hu", "k@x.hu"]);
+    // Cecil + Dóra (Dóra bounced).
+    expect(page.recipients.map((r: any) => r.email).sort()).toEqual(["c@x.hu"]);
     expect(page.suppressed).toBe(1);
     expect(page.label).toBe("Párok, Padelpárbaj Győr · Nincs a ligában");
-    expect(page.back).toEqual({ to: "/admin/leagues/gyor/pairs?entry=not_in_league", note: expect.any(String) });
+    expect(page.back).toEqual({ to: "/admin/leagues/gyor/pairs?entry=not_in_league", label: "Szűrők módosítása", note: expect.any(String) });
     expect(h.sent).toEqual([]);
     expect(h.raw.prepare("select count(*) as n from email_messages").get().n).toBe(0);
   });
@@ -154,37 +161,33 @@ describe("Levél nekik from Párok opens the broadcast page with those players (
   });
 });
 
-describe("two leagues in two cities: each Párok has only its players (#331, D128)", () => {
+describe("two leagues in two cities: each Párok offers only its players (#331, D128)", () => {
   beforeEach(() => {
     h.raw.exec("insert or replace into cities (slug, name, listed) values ('deb', 'Debrecen', 1)");
     h.raw.exec("insert into leagues (id, city, slug, name) values (2, 'deb', 'deb', 'Padelpárbaj Debrecen')");
     h.raw.exec("insert into users (id, email, name, consent_at) values ('h', 'h@x.hu', 'Hegedűs Hanna', 1)");
-    // Ákos and Hanna joined Debrecen only, Edit both leagues. Boglárka's
-    // Debrecen signup decides nothing (#331 requirement 4).
+    // Ákos and Hanna joined Debrecen only, Edit both leagues.
     h.raw.exec("delete from league_members where user_id = 'g'");
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'g', 'register'), (2, 'h', 'chosen'), (2, 'e', 'chosen')`);
-    h.raw.exec(`insert into interest_signups (city, mode, name1, email1, level, consent_at) values ('deb', 'solo', 'Boglárka', 'k@x.hu', 'kezdo', 1)`);
   });
-  const solos = (rows: any[]) => rows.filter((r) => r.kind === "solo").map((r) => r.player.id);
 
-  it("lists, counts and offers for a new pair only the league's players; staff only where they joined", async () => {
+  it("offers for a new pair only the league's players; staff only where they joined", async () => {
     const admin = await cookieFor("admin", "superadmin");
     const gyor = await Pairs.loader(args("http://localhost/admin/leagues/gyor/pairs", admin));
-    expect(solos(gyor.rows)).toEqual(["admin", "e", "k", "f"]);
-    expect(gyor.counts.no_pair).toBe(4);
     expect(gyor.candidates.map((c: any) => c.id)).toEqual(["admin", "e", "k", "f"]);
     const deb = await Pairs.loader(args("http://localhost/admin/leagues/deb/pairs", admin, "deb"));
-    expect(solos(deb.rows)).toEqual(["g", "h", "e"]);
-    expect(deb.counts.no_pair).toBe(3);
+    expect(deb.rows).toEqual([]);
     expect(deb.candidates.map((c: any) => c.id)).toEqual(["g", "h", "e"]);
   });
 
-  it("Levél nekik addresses only the league's players", async () => {
+  it("an old Levél nekik link for Nincs párja goes to Játékosok's audience, never to every pair", async () => {
     const admin = await cookieFor("admin", "superadmin");
-    const gyor = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=gyor&entry=no_pair", admin));
-    expect(gyor.recipients.map((r: any) => r.email).sort()).toEqual(["admin@x.hu", "e@x.hu", "f@x.hu", "k@x.hu"]);
-    const deb = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=deb&entry=no_pair", admin));
-    expect(deb.recipients.map((r: any) => r.email).sort()).toEqual(["e@x.hu", "g@x.hu", "h@x.hu"]);
+    const moved = await Broadcast.loader(args("http://localhost/admin/broadcasts/new?pairs=deb&entry=no_pair", admin)).then(
+      () => null,
+      (r: Response) => r,
+    );
+    expect(moved?.status).toBe(302);
+    expect(moved?.headers.get("Location")).toBe("/admin/broadcasts/new?players=deb&filter=no_pair");
     expect(h.sent).toEqual([]);
   });
 });

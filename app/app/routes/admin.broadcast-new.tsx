@@ -29,30 +29,67 @@ import {
 } from "~/lib/email/outbox.server";
 import { broadcastEmail, NAME_PLACEHOLDER } from "~/lib/email/templates";
 import { getLeague } from "~/lib/leagues.server";
-import { pairsQueryString, parsePairsQuery } from "~/lib/league-pairs-view";
+import type { Recipient } from "~/lib/email/audience";
+import { pairsQueryString, parsePairsQuery, RETIRED_NO_PAIR } from "~/lib/league-pairs-view";
 import { leaguePairsAudience } from "~/lib/league-pairs-view.server";
+import { parsePlayersQuery, playersPath, playersQueryString } from "~/lib/league-players";
+import { leaguePlayersAudience, recipientsOf } from "~/lib/league-players.server";
+import { adminProfilePath } from "~/lib/player-admin";
 
 const MAX_SUBJECT = 200;
 const MAX_BODY = 20000;
 
-// "Levél nekik" on Párok (#148, D64): the players of the rows it shows. The
-// only audience since the interest list's went (#333, D129); without one the
-// page has nobody to write to.
-async function audience(params: URLSearchParams) {
-  if (!params.has("pairs")) throw redirect("/admin/broadcasts");
-  const league = await getLeague(params.get("pairs") ?? "");
+type Found = { label: string; people: Recipient[]; back: { to: string; label: string; note: string } };
+
+// Who the page writes to (the interest list's audiences went, #333, D129):
+// "Levél nekik" on Párok (?pairs=, #148, D64) or on Játékosok (?players=,
+// #301) for the rows they show, or "Levél neki" on a player's profile
+// (?user=, #301). Without one the page has nobody to write to.
+async function findAudience(params: URLSearchParams): Promise<Found> {
+  const user = params.get("user");
+  if (user) {
+    const people = await recipientsOf([user]);
+    if (people.length === 0) throw new Response("Nincs ilyen fiók.", { status: 404 });
+    return {
+      label: people[0]!.name || "Egy játékos",
+      people,
+      back: { to: adminProfilePath(user), label: "Vissza az adatlapra", note: "Csak ő kapja." },
+    };
+  }
+  const slug = params.get("players") ?? params.get("pairs");
+  if (slug === null) throw redirect("/admin/broadcasts");
+  const league = await getLeague(slug);
   if (!league) throw new Response("Nincs ilyen liga.", { status: 404 });
+  if (params.has("players")) {
+    const query = parsePlayersQuery(params);
+    return {
+      ...(await leaguePlayersAudience(league, query)),
+      back: { to: playersPath(league.slug, query), label: "Szűrők módosítása", note: "A Játékosok oldalon látott játékosok kapják, mindenki egyszer." },
+    };
+  }
+  // Párok's "Nincs párja" moved to Játékosok (#301): an old link must not
+  // fall back to every pair (the filter is unknown to Párok now).
+  if (params.get("entry") === RETIRED_NO_PAIR) {
+    const moved = playersQueryString({ filter: "no_pair", q: params.get("q")?.trim() ?? "" });
+    throw redirect(`/admin/broadcasts/new?players=${encodeURIComponent(league.slug)}&${moved}`);
+  }
   const query = parsePairsQuery(params);
-  const [{ label, people }, suppressed, off] = await Promise.all([leaguePairsAudience(league, query), suppressedSet(), emailSwitchedOff()]);
-  // Unsubscribed or bounced addresses, and accounts that switched email off, get nothing (#115).
-  const recipients = people.filter((p) => !suppressed.has(p.email) && !off.has(p.email));
   const back = pairsQueryString(query);
   return {
-    label,
-    recipients,
-    suppressed: people.length - recipients.length,
-    back: { to: `/admin/leagues/${league.slug}/pairs${back ? `?${back}` : ""}`, note: "A Párok oldalon látott játékosok kapják, mindenki egyszer." },
+    ...(await leaguePairsAudience(league, query)),
+    back: {
+      to: `/admin/leagues/${league.slug}/pairs${back ? `?${back}` : ""}`,
+      label: "Szűrők módosítása",
+      note: "A Párok oldalon látott játékosok kapják, mindenki egyszer.",
+    },
   };
+}
+
+async function audience(params: URLSearchParams) {
+  const [{ label, people, back }, suppressed, off] = await Promise.all([findAudience(params), suppressedSet(), emailSwitchedOff()]);
+  // Unsubscribed or bounced addresses, and accounts that switched email off, get nothing (#115).
+  const recipients = people.filter((p) => !suppressed.has(p.email) && !off.has(p.email));
+  return { label, recipients, suppressed: people.length - recipients.length, back };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -110,7 +147,7 @@ export default function AdminBroadcastNew({ loaderData }: Route.ComponentProps) 
             {suppressed > 0 && ` (${suppressed} címet kihagyunk: leiratkozott, nem kézbesíthető, vagy kikapcsolta az e-mailt)`}
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link to={back.to}>Szűrők módosítása</Link>
+            <Link to={back.to}>{back.label}</Link>
           </Button>
         </div>
         <p className="mt-2 text-muted-foreground">

@@ -119,7 +119,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Account: `admin@example.test`
 - Expect:
   - You land on Kezdőlap with a "Teszt szezon" card (league Padelpárbaj Mintaváros): "Nevezés" dates, the four rounds with their deadlines, "Szezon vége:".
-  - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Párkeresők, Klubok.
+  - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Játékosok, Párok, Klubok. Hovering Játékosok, Párok or Felhasználók says in one line what the page lists.
   - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet, és még nincs párod." with the link "Párod a Profilban".
 
 ### 2. Admin checks the setup pages
@@ -167,7 +167,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - Párod shows "Mostantól párban vagytok." and the partner's name, email and phone; the first partner sees the same after a reload.
   - A "Nevezés" card with the "Teszt szezon" and a "Nevezünk" button.
-- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" in Párod (Profil), and the Szervező pairs them on Párkeresők (`/admin/leagues/minta/solos`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
+- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" in Párod (Profil), and the Szervező pairs them on Játékosok (`/admin/leagues/minta/players?filter=seeking`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
 
 ### 7. A pair enters the season
 
@@ -225,13 +225,14 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 ### 13. Szervező pairs two who look for a partner (side path)
 
 - Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" in Párod (Profil) (off by default, #333).
-- Page: `/admin/leagues/minta/solos` ("Párkeresők")
+- Page: `/admin/leagues/minta/players` ("Játékosok", #301); the old `/admin/leagues/minta/solos` opens it with "Párt keres".
 - Account: `szervezo@example.test`
-- Expect: "2 regisztrált játékos keres párt, 1 párt hoztál össze": the two under "Regisztráltak", by level, with their phone numbers. No "Még nem regisztráltak" part and no address. Idegen Ilona, who looks for a partner in Példaváros, is not listed.
-- Do: tick both, press "Párba teszem (2/2)", confirm.
+- Expect: every registered player of Mintaváros once, with level, phone, pair, entry and what's missing; "Párt keres (2)": the two, with their phone numbers. No address. Idegen Ilona, who looks for a partner in Példaváros, is not listed. The names are plain text for the Szervező.
+- Do: under "Párt keres", tick both, press "Párba teszem (2/2)", confirm.
 - Expect:
-  - "0 regisztrált játékos keres párt, 2 párt hoztál össze"; the pair is under "Összehozott párok" and can be dissolved on Párok.
+  - "Párt keres (0)"; on Párok the pair reads "párkeresésből" and can be dissolved there.
   - Both get the in-app message "Párt találtunk neked" and the "Van párod" email; Párod shows the partner.
+  - The other filters: "Nincs párja", "Van párja", "Nevezett", "Nem nevezett", "Hiányzó adat", each with its count; the name search finds a player by their own or their partner's name.
 
 ### 14. Szervező changes pairs (side path)
 
@@ -239,7 +240,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 
 - Page: `/admin/leagues/minta/pairs` ("Párok")
 - Account: `szervezo@example.test`
-- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("kézzel", "linkkel", "Párkeresők"; "jelentkezésből" on pairs from before #333), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
+- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("kézzel", "linkkel", "párkeresésből"; "jelentkezésből" on pairs from before #333). Only pairs: the players without a pair are on Játékosok (`?entry=no_pair` opens it), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
 - Expect, between the intro text and the filter: nothing (no counts table, #298). The filter options show their counts.
 - Expect, at 390px (#278): each pair is a card with both names, Elo, source, state, entry and its buttons; nothing is cut and nothing scrolls sideways. At desktop width it is the table.
 - Do:
@@ -269,7 +270,7 @@ Anyone can create an account, no invite needed (#113). Logging in on `/register`
   - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párod says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
   - After "Csatlakozom": the card is gone; Kezdőlap and Párod show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párod also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
-  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Párok lists only her, and Mintaváros's Párok, Párkeresők and Helyettes pick never list her.
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok, Játékosok and Helyettes pick never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
@@ -447,7 +448,7 @@ On a deletion request the Admin removes the account (#152, decision log (`docs/d
 - Account: `admin@example.test`
 - Do: "Törlés" on the player of step 15 (`uj.jatekos@example.test`; skip step 16, or their link pair goes with them), read the dialog, press "Törlés".
 - Expect:
-  - The dialog names the account and its address and says everything goes, because it has no history. "A fiók törölve." shows and the row is gone; the account isn't in Párok, Párkeresők or any count either, and logging in with the address starts a new registration.
+  - The dialog names the account and its address and says everything goes, because it has no history. "A fiók törölve." shows and the row is gone; the account isn't in Párok, Játékosok or any count either, and its profile (`/admin/users/<id>`) is gone (404), and logging in with the address starts a new registration.
   - "Törlés" on a player whose pair is in a published group (after step 11): the dialog says it can't be deleted until the pair is withdrawn, with no delete button. On your own row: "A saját fiókodat itt nem törölheted."
   - Nothing new in the terminal or on Kimenő levelek.
   - A Szervező has no Felhasználók page at all.
@@ -507,6 +508,19 @@ The league's players and pairs by Élő-pont (decision log (`docs/decisions.md`)
   - Once it has started: "Játékosok" lists every player of the published groups with place, name (a link to the profile), Élő-pont and "Meccs" (rated matches), highest first; the player's own row says "(te)". Equal Élő-pont shares a place ("1., 1., 3.") and goes by name (#345 brings the tiebreaks).
   - "Párok" (`?view=pairs`) lists the pairs with the pair's Élő-pont, its players' average; the player's pair says "(ti)".
   - No email address or phone number on the page.
+
+### 33b. Admin opens and fixes a player's profile (side path)
+
+Every player's name on the admin pages opens their profile for the Admin (#301, decision log (`docs/decisions.md`) D156).
+
+- Page: `/admin/leagues/minta/players`, then a name
+- Account: `admin@example.test`
+- Expect: `/admin/users/<id>` with the name as title and "Felhasználók" above it; "Adatok": email, phone (tap to call), level ("lezárult" once they played), sex, role, login method, registration, last login, the status chips; "Ligák": the pair with "Benevezés"/"Kivétel a szezonból", "Partner cseréje" and "Felbontás" (as on Párok), or "Nincs párja" with the "Párt keres" switch and "Párba teszem"; "Párok és nevezések": every pair with its dates and entries; "Napló": the entries about them, newest first.
+- Do: "Adatok módosítása", fix the name, "Mentés".
+- Expect: the new name in the title; Napló reads "Játékos adatainak módosítása: … Módosítva: név", without the value. A locked level shows as text in the dialog. Emptying a phone number that is there: "A telefonszámot nem törölheted, csak javíthatod." No email or notification to the player.
+- Do: "Levél neki".
+- Expect: the broadcast page with that one player as the recipient.
+- As `szervezo@example.test`: the names on Játékosok and Párok are plain text; `/admin/users/<id>` shows "Ehhez nincs jogod".
 
 ### 34. A player gets strikes; the Szervező cancels one (side path)
 

@@ -10,7 +10,7 @@ import { listSeasons } from "./seasons.server";
 import type { PlayerStatus } from "./player-status";
 
 // Where each account stands, for the admin tables (Jelentkezők, Felhasználók,
-// Párkeresők): first-login page done, the active pair per league and its
+// Játékosok): first-login page done, the active pair per league and its
 // entry in the league's current or next season. Whole tables, joined and
 // filtered here, never a long list of ids (D1: at most 100 bound parameters
 // per statement); the volumes are small (hundreds of accounts).

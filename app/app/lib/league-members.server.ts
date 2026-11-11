@@ -14,7 +14,7 @@ import { joinableLeagues, type JoinableLeague, type JoinSource } from "./league-
 // state (an entry always belongs to a pair of the league). Every reader that
 // means "the league's players" uses memberOf: Párok's players without a pair
 // (its counts, "Levél nekik", "Pár létrehozása", "Partner cseréje"), the
-// stuck reminders, the substitute pick, Párkeresők and "Párt keresek",
+// stuck reminders, the substitute pick, Játékosok and "Párt keresek",
 // Kezdőlap and Párod. Admins and Szervezők follow the same rule.
 
 export type ListedLeague = { id: number; name: string; slug: string; city: string };

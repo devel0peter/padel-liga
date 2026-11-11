@@ -14,14 +14,10 @@ import {
 import { ENTRY_STATUS_LABELS } from "./season-entries";
 
 const pair = (id: string, names: [string, string], status: "active" | "dissolved", entry: string | null): PairsRow => ({
-  kind: "pair",
-  pair: {
-    status,
-    entry: entry ? { status: entry as any } : null,
-    players: names.map((name, i) => ({ id: `${id}${i}`, name })),
-  },
+  status,
+  entry: entry ? { status: entry as any } : null,
+  players: names.map((name, i) => ({ id: `${id}${i}`, name })),
 });
-const solo = (id: string, name: string): PairsRow => ({ kind: "solo", player: { id, name } });
 
 const ROWS: PairsRow[] = [
   pair("e", ["Kovács Anna", "Nagy Béla"], "active", "approved"),
@@ -29,23 +25,19 @@ const ROWS: PairsRow[] = [
   pair("r", ["Kiss Edit", "Varga Ferenc"], "active", "rejected"),
   pair("w", ["Molnár Gábor", "Farkas Hanna"], "active", "withdrawn"),
   pair("d", ["Kovács Anna", "Lakatos Imre"], "dissolved", "withdrawn"),
-  solo("s1", "Ákos Sándor"),
-  solo("s2", "Pál Boglárka"),
 ];
 
 const q = (entry: string | null, search = "") => parsePairsQuery(new URLSearchParams({ ...(entry ? { entry } : {}), q: search }));
-const names = (rows: PairsRow[]) => rows.map((r) => (r.kind === "solo" ? r.player.name : r.pair.players[0]!.name));
+const names = (rows: PairsRow[]) => rows.map((r) => r.players[0]!.name);
 
 describe("rowFilters (#148)", () => {
-  it("puts each row in its entry state, and everyone not in the season in Nincs a ligában", () => {
+  it("puts each pair in its entry state, and every pair not in the season in Nincs a ligában", () => {
     expect(ROWS.map(rowFilters)).toEqual([
       ["entered"],
       ["not_entered", "not_in_league"],
       ["rejected", "not_in_league"],
       ["withdrawn", "not_in_league"],
       ["dissolved"],
-      ["no_pair", "not_in_league"],
-      ["no_pair", "not_in_league"],
     ]);
   });
 
@@ -55,8 +47,8 @@ describe("rowFilters (#148)", () => {
 });
 
 describe("filterPairsRows", () => {
-  it("Nincs a ligában lists exactly the players without a pair and the pairs not entered", () => {
-    expect(names(filterPairsRows(ROWS, q("not_in_league")))).toEqual(["Szabó Cecil", "Kiss Edit", "Molnár Gábor", "Ákos Sándor", "Pál Boglárka"]);
+  it("Nincs a ligában lists exactly the active pairs not entered (the players without a pair are on Játékosok, #301)", () => {
+    expect(names(filterPairsRows(ROWS, q("not_in_league")))).toEqual(["Szabó Cecil", "Kiss Edit", "Molnár Gábor"]);
   });
 
   it("Nevezett lists exactly the entered pairs; Felbontott párok the dissolved ones", () => {
@@ -67,7 +59,7 @@ describe("filterPairsRows", () => {
   it("searches names ignoring case and accents; a pair matches when either player does", () => {
     expect(names(filterPairsRows(ROWS, q(null, "kovacs")))).toEqual(["Kovács Anna", "Kovács Anna"]);
     expect(names(filterPairsRows(ROWS, q(null, "DORA")))).toEqual(["Szabó Cecil"]);
-    expect(names(filterPairsRows(ROWS, q(null, "akos")))).toEqual(["Ákos Sándor"]);
+    expect(names(filterPairsRows(ROWS, q(null, "imre")))).toEqual(["Kovács Anna"]);
     expect(names(filterPairsRows(ROWS, q("entered", "kovacs")))).toEqual(["Kovács Anna"]);
   });
 
@@ -87,16 +79,17 @@ describe("pairsFilterCounts", () => {
       not_entered: 1,
       rejected: 1,
       withdrawn: 1,
-      no_pair: 2,
       dissolved: 1,
-      not_in_league: 5,
+      not_in_league: 3,
     });
   });
 });
 
 describe("the query in the address", () => {
   it("reads a known filter and the search, ignores an unknown filter", () => {
-    expect(parsePairsQuery(new URLSearchParams("entry=no_pair&q=%20kiss%20"))).toEqual({ entry: "no_pair", q: "kiss" });
+    expect(parsePairsQuery(new URLSearchParams("entry=rejected&q=%20kiss%20"))).toEqual({ entry: "rejected", q: "kiss" });
+    // Nincs párja moved to Játékosok (#301): Párok's loader redirects it.
+    expect(parsePairsQuery(new URLSearchParams("entry=no_pair"))).toEqual({ entry: null, q: "" });
     expect(parsePairsQuery(new URLSearchParams("entry=toString"))).toEqual({ entry: null, q: "" });
     expect(parsePairsQuery(new URLSearchParams("entry=pending"))).toEqual({ entry: null, q: "" });
   });
@@ -111,7 +104,7 @@ describe("the query in the address", () => {
 
 describe("rowAccounts", () => {
   it("each player of the rows, once", () => {
-    expect(rowAccounts([ROWS[0]!, ROWS[0]!, ROWS[5]!])).toEqual(["e0", "e1", "s1"]);
+    expect(rowAccounts([ROWS[0]!, ROWS[0]!, ROWS[1]!])).toEqual(["e0", "e1", "n0", "n1"]);
   });
 });
 

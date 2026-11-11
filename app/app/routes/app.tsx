@@ -79,8 +79,8 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard,
   seasons: CalendarDays,
   matches: Swords,
-  pairs: UsersRound,
-  solos: HeartHandshake,
+  pairs: HeartHandshake,
+  players: UsersRound,
   disputes: Scale,
   substitutes: ArrowLeftRight,
   reminders: BellRing,
@@ -194,7 +194,7 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
           return (
             <SidebarMenuItem key={item.to}>
               <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label}>
-                <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
+                <NavLink to={item.to} title={item.hint} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
                   <span>{item.label}</span>
                 </NavLink>

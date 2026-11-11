@@ -271,8 +271,8 @@ describe("organizerMatch (#158)", () => {
         name: "Játékos 2A – Játékos 2B",
         active: true,
         players: [
-          { name: "Játékos 2A", phone: "+36 30 200 0001" },
-          { name: "Játékos 2B", phone: "+36 30 200 0002" },
+          { id: expect.any(String), name: "Játékos 2A", phone: "+36 30 200 0001" },
+          { id: expect.any(String), name: "Játékos 2B", phone: "+36 30 200 0002" },
         ],
       },
       {
@@ -280,8 +280,8 @@ describe("organizerMatch (#158)", () => {
         name: "Játékos 4A – Játékos 4B",
         active: true,
         players: [
-          { name: "Játékos 4A", phone: "+36 30 400 0001" },
-          { name: "Játékos 4B", phone: "+36 30 400 0002" },
+          { id: expect.any(String), name: "Játékos 4A", phone: "+36 30 400 0001" },
+          { id: expect.any(String), name: "Játékos 4B", phone: "+36 30 400 0002" },
         ],
       },
     ]);

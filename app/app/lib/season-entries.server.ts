@@ -516,7 +516,8 @@ export type EntryRow = {
   joinsPhase: number | null;
   decidedAt: Date | null;
   pairActive: boolean;
-  players: { name: string; level: string | null }[];
+  // id: for the Admin's link to the player's profile (#301).
+  players: { id: string; name: string; level: string | null }[];
   averageElo: number | null;
 };
 
@@ -532,9 +533,11 @@ export async function listSeasonEntries(seasonId: number): Promise<EntryRow[]> {
       joinsPhase: seasonEntries.joinsPhase,
       decidedAt: seasonEntries.decidedAt,
       pairStatus: pairs.status,
+      idA: playerA.id,
       nameA: playerA.name,
       levelA: playerA.level,
       eloA: playerA.elo,
+      idB: playerB.id,
       nameB: playerB.name,
       levelB: playerB.level,
       eloB: playerB.elo,
@@ -554,8 +557,8 @@ export async function listSeasonEntries(seasonId: number): Promise<EntryRow[]> {
     decidedAt: r.decidedAt,
     pairActive: r.pairStatus === "active",
     players: [
-      { name: r.nameA, level: r.levelA },
-      { name: r.nameB, level: r.levelB },
+      { id: r.idA, name: r.nameA, level: r.levelA },
+      { id: r.idB, name: r.nameB, level: r.levelB },
     ],
     averageElo: averageElo({ elo: r.eloA, level: r.levelA }, { elo: r.eloB, level: r.levelB }),
   }));

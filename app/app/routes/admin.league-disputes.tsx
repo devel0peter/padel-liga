@@ -3,12 +3,13 @@ import { data, Link } from "react-router";
 
 import type { Route } from "./+types/admin.league-disputes";
 import { AppPage } from "~/components/app-page";
+import { PairNames } from "~/components/person-link";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { leagueMatches, type LeagueMatch } from "~/lib/decisions.server";
 import { formatDateTime, formatSlot } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { leagueNoShows } from "~/lib/no-shows.server";
-import { versusText } from "~/lib/results";
+import { article } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Viták (#29): the league's disputed results with both pairs' versions, and
@@ -25,6 +26,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "league.manage", league: league.slug });
   const [list, noShows] = await Promise.all([leagueMatches(league.id), leagueNoShows(league.id)]);
   return { league, ...list, noShows };
+}
+
+// "X a Y ellen" with each player a link for the Admin (#301).
+function Versus({ m }: { m: Pick<LeagueMatch, "b" | "players"> }) {
+  return (
+    <>
+      <PairNames players={m.players.a} /> {article(m.b)} <PairNames players={m.players.b} /> ellen
+    </>
+  );
 }
 
 const where = (m: Pick<LeagueMatch, "season" | "phase" | "groupNumber" | "week">) => `${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét`;
@@ -46,15 +56,18 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={d.id} className="grid gap-1 rounded-lg border p-4 text-sm">
                 <p className="text-xs text-muted-foreground">{where(d)}</p>
                 <p className="font-medium break-words">
-                  {versusText(d.a, d.b)}
+                  <Versus m={d} />
                 </p>
                 <p className="break-words">
-                  {d.recordedBy} szerint: <strong>{d.recorded}</strong>
+                  <PairNames players={d.players[d.recordedBySide]} /> szerint: <strong>{d.recorded}</strong>
                 </p>
                 <p className="break-words">
-                  {d.disputedBy} szerint: <strong>{d.counter ?? "nem adott meg eredményt"}</strong> ({formatDateTime(d.disputedAt)})
+                  <PairNames players={d.players[d.recordedBySide === "a" ? "b" : "a"]} /> szerint:{" "}
+                  <strong>{d.counter ?? "nem adott meg eredményt"}</strong> ({formatDateTime(d.disputedAt)})
                 </p>
-                <p className="text-xs text-muted-foreground">Az eredmények az 1. pár ({d.a}) szemszögéből.</p>
+                <p className="text-xs text-muted-foreground">
+                  Az eredmények az 1. pár (<PairNames players={d.players.a} />) szemszögéből.
+                </p>
                 <Link to={decide(d.id)} className="inline-flex w-fit items-center gap-1 font-semibold underline">
                   Döntök
                   <ChevronRight className="size-4" />
@@ -77,7 +90,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={n.id} className="grid gap-1 rounded-lg border p-4 text-sm">
                 <p className="text-xs text-muted-foreground">{where(n)}</p>
                 <p className="font-medium break-words">
-                  {n.reporting} szerint {n.absent} nem jött el
+                  <PairNames players={n.reportingPlayers} /> szerint <PairNames players={n.absentPlayers} /> nem jött el
                 </p>
                 <p className="break-words">
                   {n.slot ? `Időpont: ${formatSlot(n.slot)} · ` : ""}Bejelentve: {formatDateTime(n.reportedAt)}
@@ -104,7 +117,7 @@ export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
               <li key={m.id} className="grid gap-0.5 rounded-md border p-3 text-sm">
                 <p className="text-xs text-muted-foreground">{where(m)}</p>
                 <p className="font-medium break-words">
-                  {versusText(m.a, m.b)}
+                  <Versus m={m} />
                 </p>
                 <p className="break-words">{m.label}</p>
                 <Link to={decide(m.id)} className="inline-flex w-fit items-center gap-1 underline">

@@ -79,8 +79,8 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard,
   seasons: CalendarDays,
   matches: Swords,
-  pairs: UsersRound,
-  solos: HeartHandshake,
+  pairs: HeartHandshake,
+  players: UsersRound,
   disputes: Scale,
   substitutes: ArrowLeftRight,
   reminders: BellRing,
@@ -193,10 +193,18 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
           const Icon = ICONS[item.icon];
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label}>
+              <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label} size={item.hint ? "lg" : "default"}>
                 <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
-                  <span>{item.label}</span>
+                  {item.hint ? (
+                    // The people pages say in one line what they list (#301).
+                    <span className="grid min-w-0 leading-tight">
+                      <span className="truncate">{item.label}</span>
+                      <span className="truncate text-xs text-muted-foreground">{item.hint}</span>
+                    </span>
+                  ) : (
+                    <span>{item.label}</span>
+                  )}
                 </NavLink>
               </SidebarMenuButton>
               {item.to === "/notifications" && unread > 0 && (

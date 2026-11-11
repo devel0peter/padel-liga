@@ -3,6 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.leagues";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -132,7 +133,7 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
                 <ul className="grid gap-1">
                   {league.organizers.map((o) => (
                     <li key={o.userId} className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">{o.name || o.email}</span>
+                      <PersonLink id={o.userId} name={o.name || o.email} className="font-medium" />
                       <span className="text-muted-foreground">{o.email}</span>
                       <RemoveButton label="Szervező elvétele" intent="revoke" league={league.slug} name="userId" value={o.userId} />
                     </li>

@@ -342,7 +342,9 @@ export default function Privacy() {
               <li>
                 <strong>Levelek:</strong> a levél szövegét csak a kiküldésig
                 őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
-                azt, hogy kinek, mikor és milyen tárggyal ment.
+                azt, hogy kinek, mikor és milyen tárggyal ment, és ha a Resend
+                visszajelzi, azt is, hogy megérkezett-e, visszapattant-e vagy
+                spamnek jelölted-e. Ezt csak az admin látja.
               </li>
               <li>
                 <strong>Belépési kód:</strong> magát a kódot nem tároljuk,

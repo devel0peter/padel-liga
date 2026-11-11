@@ -33,14 +33,29 @@ const pa = alias(users, "pa_user");
 const pb = alias(users, "pb_user");
 
 // The names of the league's pairs, by id: one query (pairs belong to a league).
-async function pairNames(leagueId: number): Promise<Map<number, string>> {
+// A player as the organizer's pages show them: the id only for the Admin's
+// link to the profile (#301).
+export type PairPlayer = { id: string; name: string };
+
+async function pairNames(leagueId: number): Promise<Map<number, { name: string; players: PairPlayer[] }>> {
   const rows = await db
-    .select({ id: pairs.id, a: pa.name, b: pb.name })
+    .select({ id: pairs.id, aId: pa.id, a: pa.name, bId: pb.id, b: pb.name })
     .from(pairs)
     .innerJoin(pa, eq(pa.id, pairs.playerA))
     .innerJoin(pb, eq(pb.id, pairs.playerB))
     .where(eq(pairs.leagueId, leagueId));
-  return new Map(rows.map((r) => [r.id, pairName([{ name: r.a }, { name: r.b }])]));
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      {
+        name: pairName([{ name: r.a }, { name: r.b }]),
+        players: [
+          { id: r.aId, name: r.a },
+          { id: r.bId, name: r.b },
+        ],
+      },
+    ]),
+  );
 }
 
 // The league of a match in a published group, or null.
@@ -64,6 +79,7 @@ export type LeagueMatch = {
   week: number;
   a: string;
   b: string;
+  players: Record<Side, PairPlayer[]>;
   result: ResultState;
   // The status in a few words, for the organizer.
   label: string;
@@ -74,6 +90,7 @@ export type LeagueMatch = {
 export type Dispute = LeagueMatch & {
   // Who recorded what, and the other pair's version (match order: a first).
   recordedBy: string;
+  recordedBySide: Side;
   recorded: string;
   disputedBy: string;
   counter: string | null;
@@ -127,12 +144,13 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
     .where(inLeague);
   const [names, results] = await Promise.all([pairNames(leagueId), resultsOf(rows, ids)]);
   const list: LeagueMatch[] = rows.map((r) => {
-    const a = names.get(r.pairA) ?? "";
-    const b = names.get(r.pairB) ?? "";
+    const a = names.get(r.pairA)?.name ?? "";
+    const b = names.get(r.pairB)?.name ?? "";
+    const players = { a: names.get(r.pairA)?.players ?? [], b: names.get(r.pairB)?.players ?? [] };
     const result = results.get(r.id)?.state ?? { status: "none" };
     const voided = !r.live;
     const label = voided ? VOIDED_LABEL : organizerLabel({ result, status: r.status, a, b });
-    return { id: r.id, season: r.season, phase: r.phase, groupNumber: r.groupNumber, week: r.week, a, b, result, label, voided };
+    return { id: r.id, season: r.season, phase: r.phase, groupNumber: r.groupNumber, week: r.week, a, b, players, result, label, voided };
   });
   const disputes = list.flatMap((m): Dispute[] => {
     const r = m.result;
@@ -142,6 +160,7 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
       {
         ...m,
         recordedBy: by(r.by),
+        recordedBySide: r.by,
         recorded: neutralScoreText(r.score),
         disputedBy: by(r.by === "a" ? "b" : "a"),
         counter: r.counter ? neutralScoreText(r.counter) : null,
@@ -164,13 +183,14 @@ export type DecisionPage = {
   deadline: Date;
   a: string;
   b: string;
+  players: Record<Side, PairPlayer[]>;
   result: ResultState;
   label: string;
   // The disputing pair's note, if any.
   note: string | null;
   // The prefill of the form: the current outcome, or the recorded score.
   current: MatchOutcome | null;
-  log: { key: string; at: Date; who: string; role: string; text: string }[];
+  log: { key: string; at: Date; who: string; whoId: string | null; role: string; text: string }[];
   // A pair of it was withdrawn mid-phase (#34): nothing to decide.
   voided: boolean;
 };
@@ -190,6 +210,7 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       id: e.id,
       at: e.at,
       who: eventWho(e),
+      whoId: isSystemEvent(e) ? null : e.userId,
       role: isSystemEvent(e) ? "automatikus" : pairLabel(e.pairId),
       text: storedEventText(e, venues),
     })),
@@ -198,6 +219,7 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       id: e.id,
       at: e.at,
       who: e.userName || "Törölt játékos",
+      whoId: e.userId,
       role: pairLabel(e.pairId),
       // In match order: "1. pár" first.
       text: resultEventText(e, "a"),
@@ -207,6 +229,7 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       id: Number.MAX_SAFE_INTEGER,
       at: d.at,
       who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+      whoId: d.kind === "organizer" ? d.userId : null,
       role: d.kind === "organizer" ? "szervező" : "automatikus",
       text: neutralDecisionText(d, names),
     })),
@@ -223,6 +246,10 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
     week: ctx.match.week,
     deadline: ctx.match.deadline,
     ...names,
+    players: {
+      a: ctx.pairs.a.players.map((p) => ({ id: p.id, name: p.name })),
+      b: ctx.pairs.b.players.map((p) => ({ id: p.id, name: p.name })),
+    },
     result,
     label: ctx.voided ? VOIDED_LABEL : organizerLabel({ result, status: ctx.match.status, ...names }),
     note,

@@ -17,6 +17,7 @@ How the live system is set up and how to restore it. The reasons behind each cho
 - DMARC: one record, `p=none` with a `rua` address; reports go to Cloudflare DMARC Management. Tighten to `quarantine` once the mail passes.
 - A request never sends mail itself: it stores it, and it goes out right after the response, the rest with the 10-minute cron, at most 10 per claim (D150). An email whose send was cut short is marked failed ("interrupted while sending") and never resent by itself. Check the Google Admin email log search (sender `hello@padelparbaj.hu`, subject) for what really left, then use "Újraküldés" on Kimenő levelek (`/admin/outbox`) for that kind.
 - Secrets: `RESEND_API_KEY` and `EMAIL_SECRET` (local: `app/.dev.vars`; without a key, dev logs emails to the console).
+- Resend webhook: `https://padelparbaj.hu/webhooks/resend`, secret `RESEND_WEBHOOK_SECRET`, events `email.bounced`, `email.complained` and, for the player profile's email log (D157, #242), `email.delivered`. Without `email.delivered` a Resend email stays "Elküldve" in the log; bounces and complaints still mark it. Each event logs "email delivery" with the state and whether a stored email matched (no address).
 
 ## Backups
 

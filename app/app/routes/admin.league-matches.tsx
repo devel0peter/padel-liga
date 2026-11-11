@@ -3,6 +3,7 @@ import { data, Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.league-matches";
 import { AppPage } from "~/components/app-page";
+import { PairNames } from "~/components/person-link";
 import { StatusPill } from "~/components/my-group";
 import { RoundStatusSection } from "~/components/round-status";
 import { Badge } from "~/components/ui/badge";
@@ -16,7 +17,7 @@ import { runningPhases, type OverviewMatch } from "~/lib/match-overview.server";
 import { getLeague } from "~/lib/leagues.server";
 import { LIST_ANCHOR } from "~/lib/round-status";
 import { groupLine } from "~/lib/matches";
-import { versusText } from "~/lib/results";
+import { article, versusText } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Every match of the league's running phase for its Szervező and the Admin
@@ -114,7 +115,15 @@ function Filters({ groups, weeks, stuckCount }: { groups: number[]; weeks: numbe
 function MatchRow({ m, slug }: { m: OverviewMatch; slug: string }) {
   return (
     <li className="grid gap-1.5 rounded-md border p-3 text-sm" aria-label={`${m.names.a} – ${m.names.b}`}>
-      <p className="font-medium break-words">{versusText(m.names.a, m.names.b)}</p>
+      <p className="font-medium break-words">
+        {m.players.a.length === 0 || m.players.b.length === 0 ? (
+          versusText(m.names.a, m.names.b)
+        ) : (
+          <>
+            <PairNames players={m.players.a} /> {article(m.names.b)} <PairNames players={m.players.b} /> ellen
+          </>
+        )}
+      </p>
       <div className="flex flex-wrap gap-1.5">
         <StatusPill label={m.label} tone={m.tone} />
         {m.stuck && <Badge variant="destructive">{STUCK_TEXT[m.stuck]}</Badge>}

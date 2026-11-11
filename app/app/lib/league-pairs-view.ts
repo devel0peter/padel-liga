@@ -1,46 +1,38 @@
 // Párok's rows, search and entry filter (#148, D64). Pure (no I/O) so every
-// rule is unit tested. A row is a pair of the league, or a registered player
-// without an active pair in it ("Nincs párja"). The filter and the search
-// live in the address (?entry=, ?q=), so a reload or a shared link shows the
-// same list.
+// rule is unit tested. A row is a pair of the league; the players without a
+// pair are on Játékosok since #301 (D155). The filter and the search live in
+// the address (?entry=, ?q=), so a reload or a shared link shows the same
+// list.
 
 import { ENTRY_STATUS_LABELS, type EntryStatus } from "./season-entries";
 import { matchesSearch } from "./search";
 
 // The options, in the order the page shows them. "not_in_league" is the
-// shortcut: everyone not in the season (no pair, or a pair without an entry
-// that counts).
+// shortcut: every pair not in the season (no entry that counts).
 export const PAIRS_FILTERS = {
   entered: "Nevezett",
   not_entered: "Nem nevezett",
   rejected: "Elutasítva",
   // The same word as the entry badge (ENTRY_STATUS_LABELS, #174).
   withdrawn: ENTRY_STATUS_LABELS.withdrawn,
-  no_pair: "Nincs párja",
   dissolved: "Felbontott párok",
   not_in_league: "Nincs a ligában",
 } as const;
 
 export type PairsFilter = keyof typeof PAIRS_FILTERS;
 
-type PairLike = {
+export type PairsRow = {
   status: "active" | "dissolved";
   entry: { status: EntryStatus } | null;
   players: readonly { id: string; name: string }[];
 };
-type SoloLike = { id: string; name: string };
-
-export type PairsRow<P extends PairLike = PairLike, S extends SoloLike = SoloLike> =
-  | { kind: "pair"; pair: P }
-  | { kind: "solo"; player: S };
 
 // The filters a row is in. An active pair's entry is the one in the league's
 // current (or next) season (homeEntry). "pending" is left from the approval
 // step (#153): such a pair is not in the season, and in no other option.
 export function rowFilters(row: PairsRow): PairsFilter[] {
-  if (row.kind === "solo") return ["no_pair", "not_in_league"];
-  if (row.pair.status === "dissolved") return ["dissolved"];
-  switch (row.pair.entry?.status) {
+  if (row.status === "dissolved") return ["dissolved"];
+  switch (row.entry?.status) {
     case "approved":
       return ["entered"];
     case undefined:
@@ -55,7 +47,7 @@ export function rowFilters(row: PairsRow): PairsFilter[] {
 }
 
 export function rowNames(row: PairsRow): string[] {
-  return row.kind === "solo" ? [row.player.name] : row.pair.players.map((p) => p.name);
+  return row.players.map((p) => p.name);
 }
 
 export type PairsQuery = { entry: PairsFilter | null; q: string };
@@ -67,6 +59,10 @@ export function parsePairsQuery(params: URLSearchParams): PairsQuery {
     q: (params.get("q") ?? "").trim(),
   };
 }
+
+// "Nincs párja" (?entry=no_pair) from before #301: those players are on
+// Játékosok now, where the old address redirects (requirement 5).
+export const RETIRED_NO_PAIR = "no_pair";
 
 // The address of a query: only what is set, so clearing gives the bare page.
 export function pairsQueryString(query: PairsQuery): string {
@@ -96,6 +92,5 @@ export function pairsFilterCounts(rows: readonly PairsRow[], q: string): Record<
 
 // "Levél nekik": the accounts of the rows shown, each once.
 export function rowAccounts(rows: readonly PairsRow[]): string[] {
-  const ids = rows.flatMap((r) => (r.kind === "solo" ? [r.player.id] : r.pair.players.map((p) => p.id)));
-  return [...new Set(ids)];
+  return [...new Set(rows.flatMap((r) => r.players.map((p) => p.id)))];
 }

@@ -166,6 +166,9 @@ export type NoShowReport = {
   // The pair that reported it, and the pair it says didn't come.
   reporting: string;
   absent: string;
+  // The same pairs' players, for the Admin's links to their profiles (#301).
+  reportingPlayers: { id: string; name: string }[];
+  absentPlayers: { id: string; name: string }[];
   slot: Date | null;
   reportedAt: Date;
 };
@@ -191,9 +194,13 @@ export async function leagueNoShows(leagueId: number, matchId?: number): Promise
       phase: groups.phase,
       groupNumber: groups.number,
       week: matches.week,
+      raId: ra.id,
       ra: ra.name,
+      rbId: rb.id,
       rb: rb.name,
+      aaId: aa.id,
       aa: aa.name,
+      abId: ab.id,
       ab: ab.name,
       slot: matches.scheduledAt,
       reportedAt: noShowReports.reportedAt,
@@ -229,6 +236,14 @@ export async function leagueNoShows(leagueId: number, matchId?: number): Promise
     week: r.week,
     reporting: pairName([{ name: r.ra || NAMELESS }, { name: r.rb || NAMELESS }]),
     absent: pairName([{ name: r.aa || NAMELESS }, { name: r.ab || NAMELESS }]),
+    reportingPlayers: [
+      { id: r.raId, name: r.ra || NAMELESS },
+      { id: r.rbId, name: r.rb || NAMELESS },
+    ],
+    absentPlayers: [
+      { id: r.aaId, name: r.aa || NAMELESS },
+      { id: r.abId, name: r.ab || NAMELESS },
+    ],
     slot: r.slot,
     reportedAt: r.reportedAt,
   }));

@@ -97,6 +97,11 @@ export const emailMessages = sqliteTable(
     providerId: text("provider_id"),
     claimedAt: integer("claimed_at", { mode: "timestamp" }),
     sentAt: integer("sent_at", { mode: "timestamp" }),
+    // What Resend reported after sending (#242, D157): delivered, bounced
+    // for good ("bounced") or for now ("soft_bounced"), or marked as spam.
+    // Null: nothing reported (the relay reports nothing back).
+    delivery: text("delivery", { enum: ["delivered", "bounced", "soft_bounced", "complained"] }),
+    deliveryAt: integer("delivery_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -105,6 +110,8 @@ export const emailMessages = sqliteTable(
     index("email_messages_status_idx").on(t.status, t.id),
     index("email_messages_sent_at_idx").on(t.sentAt),
     index("email_messages_to_idx").on(t.toEmail),
+    // A Resend event names the email by its id (#242).
+    index("email_messages_provider_idx").on(t.providerId),
   ],
 );
 

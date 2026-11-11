@@ -19,7 +19,7 @@ const CODE_WINDOW_MS = HOUR;
 export const MAX_CODES_PER_WINDOW = 5;
 
 export const DEFAULT_RETURN_TO = "/home";
-const MAX_NAME = 80;
+export const MAX_NAME = 80;
 const MAX_EMAIL = 254;
 
 export function normalizeEmail(input: string): string {

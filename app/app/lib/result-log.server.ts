@@ -13,6 +13,7 @@ import { matchDecisions, matchEvents, users } from "~/db/schema";
 export type StoredResultEvent = {
   id: number;
   pairId: number;
+  userId: string | null;
   userName: string | null;
   kind: ResultEventKind;
   score: MatchScore | null;
@@ -26,6 +27,7 @@ export type StoredResultEvent = {
 export type StoredDecision = {
   id: number;
   kind: RulingKind;
+  userId: string | null;
   userName: string | null;
   outcome: MatchOutcome;
   reason: string | null;
@@ -94,6 +96,7 @@ async function logOf(ids: number[] | SQLWrapper) {
         id: matchEvents.id,
         matchId: matchEvents.matchId,
         pairId: matchEvents.pairId,
+        userId: matchEvents.userId,
         userName: users.name,
         kind: matchEvents.kind,
         score: matchEvents.score,
@@ -111,6 +114,7 @@ async function logOf(ids: number[] | SQLWrapper) {
         id: matchDecisions.id,
         matchId: matchDecisions.matchId,
         kind: matchDecisions.kind,
+        userId: matchDecisions.userId,
         userName: decider.name,
         outcome: matchDecisions.outcome,
         reason: matchDecisions.reason,

@@ -25,6 +25,8 @@ export type OverviewMatch = {
   groupNumber: number;
   week: number;
   names: Record<Side, string>;
+  // The pairs' players, for the Admin's links to their profiles (#301).
+  players: Record<Side, { id: string; name: string }[]>;
   status: OverviewStatus;
   label: string;
   tone: Tone;
@@ -138,6 +140,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       return p ? pairName(p.players) : "Ismeretlen pár";
     };
     const names = { a: name(m.pairA), b: name(m.pairB) };
+    const playersOf = (pairId: number) => (pairsOf.find((x) => x.pairId === pairId)?.players ?? []).map((p) => ({ id: p.id, name: p.name }));
     const log = events.get(m.id) ?? [];
     const state = states.get(m.id)!;
     const sides = activeSides(
@@ -163,6 +166,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       groupNumber: g.number,
       week: m.week,
       names,
+      players: { a: playersOf(m.pairA), b: playersOf(m.pairB) },
       status: overview,
       label: status.label,
       tone: status.tone,
@@ -198,8 +202,9 @@ export type OrganizerMatch = {
   stuck: StuckReason | null;
   activity: string;
   // Both pairs with their players; phones only while the phase runs.
-  pairs: { side: Side; name: string; active: boolean; players: { name: string; phone: string | null }[] }[];
-  log: { id: number; at: Date; who: string; pair: string; text: string }[];
+  // id: for the Admin's link to the player's profile (#301).
+  pairs: { side: Side; name: string; active: boolean; players: { id: string; name: string; phone: string | null }[] }[];
+  log: { id: number; at: Date; who: string; whoId: string | null; pair: string; text: string }[];
 };
 
 /**
@@ -252,7 +257,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       side,
       name: names[side],
       active: active[side],
-      players: ctx.pairs[side].players.map((p) => ({ name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
+      players: ctx.pairs[side].players.map((p) => ({ id: p.id, name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
     })),
     // Scheduling and result steps in order, then the rulings by time; a
     // ruling's id is negative so it can't clash with a step's.
@@ -261,6 +266,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: eventWho(e),
+        whoId: isSystemEvent(e) ? null : e.userId,
         pair: isSystemEvent(e) ? "automatikus" : pairOf(e.pairId),
         text: storedEventText(e, venues),
       })),
@@ -268,6 +274,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: e.userName || "Törölt játékos",
+        whoId: e.userId,
         pair: pairOf(e.pairId),
         // The score from the 1st pair's side, as the status line.
         text: resultEventText(e, "a"),
@@ -276,6 +283,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: -d.id,
         at: d.at,
         who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+        whoId: d.kind === "organizer" ? d.userId : null,
         pair: d.kind === "organizer" ? "szervező" : "automatikus",
         text: neutralDecisionText(d, names),
       })),

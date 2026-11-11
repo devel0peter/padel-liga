@@ -6,29 +6,34 @@ import { expect, test } from "@playwright/test";
 
 import { ADMIN, ORGANIZER, OUTSIDER, PAIRS, as, content, visit } from "./support";
 
-test("Mintaváros's Párok and Párkeresők hold only its own players", async ({ browser }) => {
+test("Mintaváros's Párok and Játékosok hold only its own players", async ({ browser }) => {
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta/pairs");
   await expect(content(page)).toContainText(PAIRS.p1[0].name);
   await expect(content(page)).not.toContainText(OUTSIDER.name);
+  // Párok's old "Nincs párja" is Játékosok's now (#301).
   await visit(page, "/admin/leagues/minta/pairs?entry=no_pair");
+  await expect(page).toHaveURL(/\/admin\/leagues\/minta\/players\?filter=no_pair$/);
   await expect(content(page)).not.toContainText(OUTSIDER.name);
-  await visit(page, "/admin/leagues/minta/solos");
+  await visit(page, "/admin/leagues/minta/players");
+  await expect(content(page)).toContainText(PAIRS.p1[0].name);
   await expect(content(page)).not.toContainText(OUTSIDER.name);
   await context.close();
 });
 
-test("Példaváros's Párok and Párkeresők hold only her", async ({ browser }) => {
+test("Példaváros's Párok and Játékosok hold only her", async ({ browser }) => {
   const { context, page } = await as(browser, ADMIN.email);
+  // No pair there yet: Párok has no rows (the players without a pair are on
+  // Játékosok, #301).
   await visit(page, "/admin/leagues/pelda/pairs");
-  const rows = page.getByRole("table", { name: "Párok listája" }).locator("tbody tr");
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText(OUTSIDER.name);
+  await expect(page.getByRole("table", { name: "Párok listája" })).toHaveCount(0);
   await expect(content(page)).not.toContainText(PAIRS.p1[0].name);
-  await visit(page, "/admin/leagues/pelda/solos");
-  const registered = page.getByRole("region", { name: "Regisztráltak", exact: true });
-  await expect(registered).toContainText(OUTSIDER.name);
-  await expect(registered.getByRole("row").filter({ hasText: PAIRS.p1[0].name })).toHaveCount(0);
+  await visit(page, "/admin/leagues/pelda/players");
+  const players = page.getByRole("table", { name: "Játékosok listája" });
+  await expect(players.locator("tbody tr")).toHaveCount(1);
+  await expect(players).toContainText(OUTSIDER.name);
+  await expect(players).toContainText("Párt keres");
+  await expect(players.getByRole("row").filter({ hasText: PAIRS.p1[0].name })).toHaveCount(0);
   await context.close();
 });
 

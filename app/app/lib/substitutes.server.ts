@@ -243,8 +243,12 @@ export type SubstituteRequest = {
   // The asking pair and its opponents.
   pair: string;
   opponents: string;
-  absent: { name: string; elo: number | null };
-  substitute: { name: string; elo: number | null };
+  // The same pairs' players, for the Admin's links to their profiles (#301).
+  pairPlayers: { id: string; name: string }[];
+  opponentPlayers: { id: string; name: string }[];
+  // id: for the Admin's link to the player's profile (#301).
+  absent: { id: string; name: string; elo: number | null };
+  substitute: { id: string; name: string; elo: number | null };
   status: SubstituteStatus;
   open: boolean;
   closesAt: Date;
@@ -278,13 +282,19 @@ export async function leagueSubstitutes(leagueId: number, now = new Date()): Pro
       season: seasons.name,
       phase: groups.phase,
       groupNumber: groups.number,
+      paId: pa.id,
       pa: pa.name,
+      pbId: pb.id,
       pb: pb.name,
+      oaId: oa.id,
       oa: oa.name,
+      obId: ob.id,
       ob: ob.name,
+      absentId: absentUser.id,
       absentName: absentUser.name,
       absentElo: absentUser.elo,
       absentLevel: absentUser.level,
+      substituteId: substituteUser.id,
       substituteName: substituteUser.name,
       substituteElo: substituteUser.elo,
       substituteLevel: substituteUser.level,
@@ -321,8 +331,16 @@ export async function leagueSubstitutes(leagueId: number, now = new Date()): Pro
       week: r.week,
       pair: pairName([{ name: r.pa || NAMELESS }, { name: r.pb || NAMELESS }]),
       opponents: pairName([{ name: r.oa || NAMELESS }, { name: r.ob || NAMELESS }]),
-      absent: { name: r.absentName || NAMELESS, elo: currentElo(r.absentElo, r.absentLevel) },
-      substitute: { name: r.substituteName || NAMELESS, elo: currentElo(r.substituteElo, r.substituteLevel) },
+      pairPlayers: [
+        { id: r.paId, name: r.pa || NAMELESS },
+        { id: r.pbId, name: r.pb || NAMELESS },
+      ],
+      opponentPlayers: [
+        { id: r.oaId, name: r.oa || NAMELESS },
+        { id: r.obId, name: r.ob || NAMELESS },
+      ],
+      absent: { id: r.absentId, name: r.absentName || NAMELESS, elo: currentElo(r.absentElo, r.absentLevel) },
+      substitute: { id: r.substituteId, name: r.substituteName || NAMELESS, elo: currentElo(r.substituteElo, r.substituteLevel) },
       status: r.status,
       open,
       closesAt,

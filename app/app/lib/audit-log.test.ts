@@ -14,10 +14,13 @@ describe("Napló filters (#226)", () => {
       from: "2026-11-01",
       to: "2026-11-04",
       page: 3,
+      person: null,
     });
-    expect(p("league=x&from=tegnap&to=2026-13-01&page=-1")).toEqual({ action: null, actor: null, league: null, from: null, to: null, page: 1 });
+    expect(p("league=x&from=tegnap&to=2026-13-01&page=-1")).toEqual({ action: null, actor: null, league: null, from: null, to: null, page: 1, person: null });
     expect(hasLogFilters(p("page=2"))).toBe(false);
     expect(hasLogFilters(p("to=2026-11-04"))).toBe(true);
+    expect(p("person=u7").person).toBe("u7");
+    expect(hasLogFilters(p("person=u7"))).toBe(true);
   });
 
   it("turns the Budapest days into UTC bounds, the last day included", () => {

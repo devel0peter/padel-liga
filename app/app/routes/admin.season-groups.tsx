@@ -3,6 +3,7 @@ import { data, Form, Link, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/admin.season-groups";
 import { AppPage } from "~/components/app-page";
+import { PairNames } from "~/components/person-link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,6 +104,8 @@ function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, orig
       return {
         id: p.pairId,
         name: pairName(p.players),
+        // Ids for the Admin's links to the profiles (#301); never the email.
+        players: p.players.map((x) => ({ id: x.id, name: x.name })),
         elo: formatElo(p.averageElo),
         active: p.active,
         withdrawn: p.withdrawn,
@@ -177,7 +180,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       endingPhase: s.endingPhase,
       state: s.state,
       fast: s.fast,
-      leaving: s.leaving.map((l) => ({ id: l.pair.pairId, name: pairName(l.pair.players), reason: LEAVE_REASONS[l.reason] })),
+      leaving: s.leaving.map((l) => ({
+        id: l.pair.pairId,
+        players: l.pair.players.map((x) => ({ id: x.id, name: x.name })),
+        reason: LEAVE_REASONS[l.reason],
+      })),
       disputes: s.disputes.map((d) => ({
         matchId: d.matchId,
         kind: BLOCKER_KINDS[d.kind],
@@ -287,7 +294,7 @@ function GroupCard({ group, groups, editable, phase }: { group: Group; groups: G
                 <span className="w-5 text-muted-foreground tabular-nums">{i + 1}.</span>
                 <div className="grid min-w-0 flex-1 basis-40">
                   <span className="font-medium">
-                    {p.name}
+                    <PairNames players={p.players} />
                     {!p.active && (
                       <Badge variant="outline" className="ml-2">
                         megszűnt
@@ -427,7 +434,9 @@ function SwitchPanel({ d }: { d: LoaderData }) {
             <ul className="grid gap-1.5">
               {s.leaving.map((l) => (
                 <li key={l.id} className="flex flex-wrap gap-x-2">
-                  <span className="font-medium">{l.name}</span>
+                  <span className="font-medium">
+                    <PairNames players={l.players} />
+                  </span>
                   <span className="text-muted-foreground">{l.reason}</span>
                 </li>
               ))}

@@ -80,7 +80,7 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
       { actor_id: "szervezo", action: "pair.create" },
     ]);
     const page = await R.loader(args(get(admin)));
-    expect(page.rows.flatMap((r) => (r.kind === "pair" ? [r.pair.players.map((x) => x.id)] : []))).toEqual([["a", "b"]]);
+    expect(page.rows.map((r) => r.players.map((x) => x.id))).toEqual([["a", "b"]]);
     expect(JSON.stringify(page)).not.toContain("@");
     expect(h.mails).toEqual([]);
   });

@@ -515,12 +515,22 @@ Every player's name on the admin pages opens their profile for the Admin (#301, 
 
 - Page: `/admin/leagues/minta/players`, then a name
 - Account: `admin@example.test`
-- Expect: `/admin/users/<id>` with the name as title and "Felhasználók" above it; "Adatok": email, phone (tap to call), level ("lezárult" once they played), sex, role, login method, registration, last login, the status chips; "Ligák": the pair with "Benevezés"/"Kivétel a szezonból", "Partner cseréje" and "Felbontás" (as on Párok), or "Nincs párja" with the "Párt keres" switch and "Párba teszem"; "Párok és nevezések": every pair with its dates and entries; "Napló": the entries about them, newest first.
+- Expect: `/admin/users/<id>` with the name as title and "Felhasználók" above it; "Adatok": email, phone (tap to call), level ("lezárult" once they played), sex, role, login method, registration, last login, the status chips; "Ligák": the pair with "Benevezés"/"Kivétel a szezonból", "Partner cseréje" and "Felbontás" (as on Párok), or "Nincs párja" with the "Párt keres" switch and "Párba teszem"; "Párok és nevezések": every pair with its dates and entries; "Levelek": every email made for them (step 33c); "Napló": the entries about them, newest first.
 - Do: "Adatok módosítása", fix the name, "Mentés".
 - Expect: the new name in the title; Napló reads "Játékos adatainak módosítása: … Módosítva: név", without the value. A locked level shows as text in the dialog. Emptying a phone number that is there: "A telefonszámot nem törölheted, csak javíthatod." No email or notification to the player.
 - Do: "Levél neki".
 - Expect: the broadcast page with that one player as the recipient.
 - As `szervezo@example.test`: the names on Játékosok and Párok are plain text; `/admin/users/<id>` shows "Ehhez nincs jogod".
+
+### 33c. Admin reads a player's email log (side path, after step 11)
+
+Which emails a player got, when, and what became of them (#242, decision log (`docs/decisions.md`) D157).
+
+- Page: a player's profile (`/admin/users/<id>`, step 33b), section "Levelek"
+- Account: `admin@example.test`
+- Expect: every email made for the address, newest first: the kind as on Kimenő levelek (e.g. "Belépőkód", "Kihirdetett csoportok"), the subject, when it was made and when it went out, and the state. Locally every email went to the console: "Elküldve", "Konzol (fejlesztés)". In production an email through the Google relay reads "Elküldve" with "A Google-relé nem jelzi vissza a kézbesítést."; one through Resend turns "Kézbesítve" (or "Visszapattant", "Spamnek jelölte") when Resend reports it. A failed one shows the reason with addresses hidden. No other person's address anywhere.
+- Expect, for a blocked address: a line at the top, "Letiltott cím: …, <date> óta."
+- As `szervezo@example.test`: the profile, so the log too, is "Ehhez nincs jogod".
 
 ### 34. A player gets strikes; the Szervező cancels one (side path)
 

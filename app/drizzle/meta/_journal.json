@@ -337,6 +337,13 @@
       "when": 1794011315431,
       "tag": "0054_first_season_minimum",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1794435785248,
+      "tag": "0057_email_delivery",
+      "breakpoints": true
     }
   ]
 }

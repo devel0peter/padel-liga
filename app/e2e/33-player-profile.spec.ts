@@ -1,6 +1,6 @@
-// The Admin's player profile (#301, D156): opened by clicking a name on
-// Játékosok, with the facts, the pair and the Napló entries about the player;
-// the Admin fixes the name (audited) and sets it back. A Szervező sees the
+// The Admin's player profile (#301, D156) with the email log (#242, D157):
+// opened by clicking a name on Játékosok, with the facts, the pair, the
+// emails and the Napló entries about the player; the Admin fixes the name (audited) and sets it back. A Szervező sees the
 // name without a link and gets 403 on the profile. Runs after the
 // walkthrough; leaves the state as it found it (the name is restored).
 import { expect, test } from "@playwright/test";
@@ -22,6 +22,12 @@ test("the Admin opens a player's profile from Játékosok and fixes the name", a
   await expect(main.getByRole("region", { name: "Ligák" })).toContainText(partner.name);
   await expect(main.getByRole("region", { name: "Párok és nevezések" })).toContainText(partner.name);
   await expect(main.getByRole("link", { name: "Levél neki" })).toBeVisible();
+  // Her email log (#242): the login codes she got, sent to the dev console;
+  // no address in it.
+  const mail = main.getByRole("region", { name: "Levelek" });
+  await expect(mail.getByRole("row").filter({ hasText: "Belépőkód" }).first()).toContainText("Elküldve");
+  await expect(mail).toContainText("Konzol (fejlesztés)");
+  await expect(mail).not.toContainText("@");
 
   const fixed = `${anna.name} (javítva)`;
   for (const name of [fixed, anna.name]) {

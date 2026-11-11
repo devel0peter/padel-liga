@@ -30,6 +30,8 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
 import { SEXES } from "~/lib/auth/rules";
 import { auditLogPage } from "~/lib/audit-log.server";
+import { personCommsLog } from "~/lib/email/comms-log.server";
+import { COMMS_LOG_LIMIT, suppressionNote, VIA_LABELS } from "~/lib/email/delivery";
 import { formatDate, formatDateTime } from "~/lib/format";
 import { LEVELS } from "~/lib/interest";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
@@ -42,8 +44,8 @@ import { SITE_NAME } from "~/lib/site";
 // A player's profile for the Admin (#301, D156): every admin page links a
 // player's name here. Name, email, phone, level, sex, role, login; the pair
 // per league with Párok's actions (they post to Párok, so the same server
-// functions run); "Párt keresek"; every pair with its entries; the Napló
-// entries about them. Admin only: it shows the email address, and only the
+// functions run); "Párt keresek"; every pair with its entries; every email
+// sent to them and what became of it (#242); the Napló entries about them. Admin only: it shows the email address, and only the
 // Admin edits someone else's account. An anonymized or deleted account has
 // no profile (404).
 
@@ -57,9 +59,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const actor = await requirePermission(request, { kind: "users.view" });
   const profile = await adminPlayerProfile(params.id);
   if (!profile) throw data("Nincs ilyen fiók.", { status: 404 });
-  const log = await auditLogPage({ action: null, actor: null, league: null, from: null, to: null, page: 1, person: profile.id });
+  const [log, mail] = await Promise.all([
+    auditLogPage({ action: null, actor: null, league: null, from: null, to: null, page: 1, person: profile.id }),
+    // The email log (#242): Admin only, like the whole profile.
+    personCommsLog(profile.email),
+  ]);
   return {
     profile,
+    mail,
     log: { rows: log.rows.slice(0, LOG_ROWS), total: log.total },
     canEdit: can(actor, { kind: "users.edit" }),
     canMail: can(actor, { kind: "broadcasts.send" }),
@@ -356,6 +363,75 @@ function PairHistory({ profile }: { profile: Profile }) {
   );
 }
 
+const TONE = { ok: "secondary", todo: "outline", bad: "destructive", muted: "outline" } as const;
+
+// Every email made for their address, newest first (#242, D157): made and
+// sent (Budapest time), kind, subject, how it went out and what became of it.
+// Only this person's address is on the page (in Adatok); subjects and
+// failure reasons have every address hidden.
+function MailLog({ mail }: { mail: Route.ComponentProps["loaderData"]["mail"] }) {
+  const blocked = suppressionNote(mail.suppression ? { ...mail.suppression, since: new Date(mail.suppression.since) } : null);
+  return (
+    <section aria-labelledby="levelek" className="grid gap-3">
+      <h2 id="levelek" className="font-display text-lg font-bold">
+        Levelek
+      </h2>
+      {blocked && (
+        <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          {blocked}
+        </p>
+      )}
+      {mail.rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Még nem kapott tőlünk levelet.</p>
+      ) : (
+        <>
+          {mail.total > mail.rows.length && (
+            <p className="text-sm text-muted-foreground">
+              A legújabb {COMMS_LOG_LIMIT} a {mail.total} levélből.
+            </p>
+          )}
+          <div className="rounded-lg border">
+            <Table aria-label="Levelei">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Levél</TableHead>
+                  <TableHead className="hidden sm:table-cell">Elkészült</TableHead>
+                  <TableHead className="hidden sm:table-cell">Kiment</TableHead>
+                  <TableHead>Állapot</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mail.rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="min-w-48 whitespace-normal">
+                      <div className="font-medium">{r.kindLabel}</div>
+                      <div className="text-sm break-words text-muted-foreground">{r.subject}</div>
+                      <div className="text-xs text-muted-foreground tabular-nums sm:hidden">
+                        {formatDateTime(new Date(r.createdAt))}
+                        {r.sentAt && ` · kiment: ${formatDateTime(new Date(r.sentAt))}`}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden text-sm whitespace-nowrap tabular-nums sm:table-cell">{formatDateTime(new Date(r.createdAt))}</TableCell>
+                    <TableCell className="hidden text-sm whitespace-nowrap tabular-nums sm:table-cell">
+                      {r.sentAt ? formatDateTime(new Date(r.sentAt)) : "–"}
+                      {r.via && <div className="text-xs text-muted-foreground">{VIA_LABELS[r.via]}</div>}
+                    </TableCell>
+                    <TableCell className="min-w-40 whitespace-normal">
+                      <Badge variant={TONE[r.tone]}>{r.status}</Badge>
+                      {r.deliveryAt && <div className="text-xs text-muted-foreground tabular-nums">{formatDateTime(new Date(r.deliveryAt))}</div>}
+                      {r.note && <div className="text-xs break-words text-muted-foreground">{r.note}</div>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function Log({ log, id }: { log: Route.ComponentProps["loaderData"]["log"]; id: string }) {
   return (
     <section aria-labelledby="naplo" className="grid gap-3">
@@ -393,7 +469,7 @@ function Log({ log, id }: { log: Route.ComponentProps["loaderData"]["log"]; id: 
 }
 
 export default function AdminUser({ loaderData }: Route.ComponentProps) {
-  const { profile, log, canEdit, canMail } = loaderData;
+  const { profile, log, mail, canEdit, canMail } = loaderData;
   return (
     <AppPage
       title={profile.name || "Névtelen"}
@@ -415,6 +491,7 @@ export default function AdminUser({ loaderData }: Route.ComponentProps) {
       <Facts profile={profile} />
       <Leagues profile={profile} canEdit={canEdit} />
       <PairHistory profile={profile} />
+      <MailLog mail={mail} />
       <Log log={log} id={profile.id} />
     </AppPage>
   );

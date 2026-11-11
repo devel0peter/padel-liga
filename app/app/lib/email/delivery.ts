@@ -103,5 +103,10 @@ export function suppressionNote(s: { reason: keyof typeof SUPPRESSION_LABELS; si
   return s ? `Letiltott cím: ${SUPPRESSION_LABELS[s.reason]}, ${formatDateTime(s.since)} óta. Körlevelet és értesítő levelet nem küldünk rá.` : null;
 }
 
-// A subject shows no address (a pair intro may name the partner's).
-export const shownSubject = (subject: string) => hideAddresses(subject);
+// A subject shows no address (a pair intro may name the partner's), and a
+// login code's subject ("216 950 a belépőkódod") not the code: the Admin
+// must not be able to log in as the player with it.
+export function shownSubject(kind: string, subject: string): string {
+  const shown = hideAddresses(subject);
+  return kind === "login_code" ? shown.replace(/\d/g, "•") : shown;
+}

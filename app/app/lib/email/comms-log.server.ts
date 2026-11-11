@@ -70,7 +70,7 @@ export async function personCommsLog(email: string): Promise<CommsLog> {
         id: r.id,
         kind: r.kind,
         kindLabel: kindLabel(r.kind),
-        subject: shownSubject(r.subject),
+        subject: shownSubject(r.kind, r.subject),
         createdAt: r.createdAt,
         sentAt: r.sentAt,
         via: r.status === "sent" ? sentVia(r.providerId) : null,

@@ -5,7 +5,7 @@ import type { MatchOutcome } from "@padel-liga/rules";
 import { formatSlot } from "./format";
 
 const START = new Date("2026-11-01T23:00:00Z"); // Mon 2 Nov 00:00 Budapest
-import { buildLadder, countedOutcome, groupTable, isValidOutcome, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
+import { buildLadder, countedOutcome, groupTable, isValidOutcome, phaseSpan, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
 const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játékos ${id}A`, `Játékos ${id}B`], elo });
 
@@ -265,6 +265,28 @@ describe("phaseWeek", () => {
 
   it("stays at week 3 after the phase's last week", () => {
     expect(phaseWeek("2026-11-09", "2026-12-20")).toEqual({ week: 3, started: true });
+  });
+});
+
+describe("phaseSpan (#356)", () => {
+  it("the current week while the round's three weeks run", () => {
+    expect(phaseSpan("2026-11-09", "2026-11-29", "2026-11-18")).toEqual({ week: 2, started: true, extension: false, from: "2026-11-16", to: "2026-11-22" });
+    // An extended round, still in its third week.
+    expect(phaseSpan("2026-11-09", "2026-12-06", "2026-11-29")).toEqual({ week: 3, started: true, extension: false, from: "2026-11-23", to: "2026-11-29" });
+  });
+
+  it("an extended round past its three weeks: the extension up to the deadline, not week 3", () => {
+    expect(phaseSpan("2026-11-09", "2026-12-06", "2026-11-30")).toEqual({ week: 3, started: true, extension: true, from: "2026-11-30", to: "2026-12-06" });
+    expect(phaseSpan("2026-11-09", "2026-12-13", "2026-12-13")).toEqual({ week: 3, started: true, extension: true, from: "2026-11-30", to: "2026-12-13" });
+  });
+
+  it("an extended round after its new deadline (until the next round starts): still the extension", () => {
+    expect(phaseSpan("2026-11-09", "2026-12-06", "2026-12-20")).toEqual({ week: 3, started: true, extension: true, from: "2026-11-30", to: "2026-12-06" });
+  });
+
+  it("not extended: after the deadline it stays week 3; before the start, week 1", () => {
+    expect(phaseSpan("2026-11-09", "2026-11-29", "2026-12-01")).toMatchObject({ week: 3, extension: false, from: "2026-11-23", to: "2026-11-29" });
+    expect(phaseSpan("2026-11-09", "2026-11-29", "2026-11-08")).toMatchObject({ week: 1, started: false, extension: false });
   });
 });
 

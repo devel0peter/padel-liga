@@ -49,6 +49,7 @@ const NOSHOWS = await import("~/lib/no-shows.server");
 const MATCHES = await import("~/lib/matches.server");
 const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
 const PURGE = await import("~/lib/interest-list-purge.server");
+const EXTENSION = await import("~/lib/round-extension.server");
 const { RunBudget } = await import("~/lib/run-usage");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
@@ -69,7 +70,8 @@ const PUBLISHED = new Date("2026-11-08T08:00:00Z");
 const PLAYED = new Date("2026-11-10T19:00:00Z");
 const IN_PHASE = new Date("2026-11-11T10:00:00Z");
 const AFTER_48H = new Date("2026-11-13T10:00:00Z");
-const AFTER_PHASE = new Date("2026-12-01T10:00:00Z");
+// After round 1's deadline, once extended to 6 Dec (phase.extend).
+const AFTER_PHASE = new Date("2026-12-08T10:00:00Z");
 
 function world() {
   h.raw = migratedDatabase();
@@ -186,6 +188,8 @@ const STEPS: Step[] = [
     },
   },
   { action: "season_entry.withdraw", actor: ORG, run: () => expectOk(ENTRIES.withdrawPairMidPhase({ id: ORG }, 1, 7, 1, "Sérülés.", IN_PHASE)) },
+  // Round 1 a week longer (#356): to Sunday 6 Dec.
+  { action: "phase.extend", actor: ORG, run: () => expectOk(EXTENSION.extendRunningRound({ id: ORG }, 1, 1, "2026-12-06", IN_PHASE)) },
   // One match resolved after the deadline (#11): nobody scheduled it, so both
   // pairs' players get a strike (#294), which the organizer then cancels.
   { action: "match.deadline", actor: null, run: () => DEADLINE.resolveDeadlines(AFTER_PHASE, undefined, 1).then((r) => expect(r.resolved).toBe(1)) },
@@ -272,7 +276,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
-  "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete"],
+  "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete", "phase.extend"],
   "admin.league-solos.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.outbox.tsx": ["outbox.retry"],
@@ -308,7 +312,7 @@ describe("every organizer and system change leaves one audit entry (#225)", () =
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/@/);
       expect(`${r.target} ${r.detail}`, r.action).not.toMatch(/\+?36\d{6,}/);
     }
-    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|groups|match|result|reminders|league_admin|league|solo|strike|substitute)\./.test(r.action));
+    const leagueActions = rows.filter((r: any) => /^(pair|season|season_entry|phase|groups|match|result|reminders|league_admin|league|solo|strike|substitute)\./.test(r.action));
     for (const r of leagueActions) expect(r.league_id, r.action).not.toBeNull();
   });
 

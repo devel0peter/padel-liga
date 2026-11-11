@@ -1,5 +1,5 @@
 import { budapestDay } from "@padel-liga/rules";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { data, Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 
@@ -21,10 +21,15 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { formatDate, formatShortDate } from "~/lib/format";
+import { formatDate, formatDeadline, formatShortDate } from "~/lib/format";
+import { withArticle } from "~/lib/groups";
+import { publishedPhases } from "~/lib/groups.server";
 import { getLeague, minEntriesByLeague } from "~/lib/leagues.server";
+import { extendableRound, extensionOptions, extensionSummary, planExtension } from "~/lib/round-extension";
+import { extendRunningRound } from "~/lib/round-extension.server";
 import {
   FIXED_START_LOCKED,
   isWaiting,
@@ -57,6 +62,7 @@ import { SITE_NAME } from "~/lib/site";
 // a live preview of the 4 phases (issue #22). The calendar: packages/rules.
 // A league's first season may instead start at the minimum entries (D124,
 // #335): no registration deadline or start date, only a name and breaks.
+// While a round runs, its deadline can be extended here (#356, D151).
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Szezonok – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -72,7 +78,8 @@ async function leagueScope(request: Request, slug: string) {
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { league } = await leagueScope(request, params.league);
   const seasons = await listSeasons(league.id);
-  const [counts, minimums] = await Promise.all([entryCounts(seasons.map((s) => s.id)), minEntriesByLeague([league.id])]);
+  const [counts, minimums, published] = await Promise.all([entryCounts(seasons.map((s) => s.id)), minEntriesByLeague([league.id]), publishedPhases()]);
+  const now = new Date();
   return {
     league: { name: league.name, minEntries: minimums.get(league.id) ?? 0 },
     seasons: await Promise.all(
@@ -84,12 +91,32 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         // The form's days, as the organizer typed them.
         registrationOpens: budapestDay(s.registrationOpensAt),
         registrationCloses: s.registrationClosesAt ? budapestDay(s.registrationClosesAt) : "",
+        extension: extensionOf(s, published.get(s.id) ?? [], now),
       })),
     ),
   };
 }
 
-type ActionData = { errors: Partial<Record<SeasonField, string>> };
+// The running round's extension (#356): the new deadlines on offer, each
+// with the confirmation's lines; null when no round can be extended.
+function extensionOf(season: Awaited<ReturnType<typeof listSeasons>>[number], published: readonly number[], now: Date) {
+  const round = extendableRound(season.phases, published, now);
+  if (!round) return null;
+  return {
+    phase: round.number,
+    deadline: round.deadline,
+    options: extensionOptions(round.deadline).map((o) => {
+      const plan = planExtension(season, round.number, o.day);
+      return {
+        day: o.day,
+        label: `${formatDeadline(plan.phases.find((p) => p.number === round.number)!.deadline)} (+${o.weeks} hét)`,
+        summary: extensionSummary(round.number, round.deadline, plan),
+      };
+    }),
+  };
+}
+
+type ActionData = { errors: Partial<Record<SeasonField, string>>; extendError?: string; notice?: string };
 
 export async function action({ request, params }: Route.ActionArgs): Promise<ActionData | Response> {
   const { league, actor, base } = await leagueScope(request, params.league);
@@ -99,6 +126,17 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Act
   // Another league's season can't be touched by posting its id.
   if (id && !(await seasonInLeague(id, league.id))) throw data("Nincs ilyen szezon.", { status: 404 });
   const allowed = id ? seasonActions(await seasonState(id)) : null;
+
+  // The running round's deadline (#356): also once the groups are out.
+  if (form.get("intent") === "extend") {
+    if (!id) throw new Response("Hibás azonosító.", { status: 400 });
+    const phase = Number(form.get("phase"));
+    const result = await extendRunningRound(actor, id, phase, form.get("deadline"));
+    if (!result.ok) return { errors: {}, extendError: result.error };
+    const season = await getSeason(id);
+    const deadline = season?.phases.find((p) => p.number === phase)?.deadline;
+    return { errors: {}, notice: `Meghosszabbítottad a kört. Új határidő: ${deadline ? formatDeadline(deadline) : ""}. A játékosok értesítést kapnak.` };
+  }
 
   if (form.get("intent") === "delete") {
     if (!id) throw new Response("Hibás azonosító.", { status: 400 });
@@ -330,6 +368,65 @@ function SeasonForm({
   );
 }
 
+// The running round's extension (#356): pick a later Sunday, see the old and
+// new deadline and how much later the later rounds start, then confirm.
+function ExtendRound({ season }: { season: SeasonRow }) {
+  const extension = season.extension!;
+  const [day, setDay] = useState(extension.options[0]!.day);
+  const chosen = extension.options.find((o) => o.day === day) ?? extension.options[0]!;
+  const busy = useNavigation().state !== "idle";
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <CalendarPlus />
+          {extension.phase}. kör meghosszabbítása
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <Form method="post" className="grid gap-4">
+          <input type="hidden" name="intent" value="extend" />
+          <input type="hidden" name="id" value={season.id} />
+          <input type="hidden" name="phase" value={extension.phase} />
+          <AlertDialogHeader>
+            <AlertDialogTitle>Meghosszabbítod {withArticle(extension.phase)} kört?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A kör meccsei az új határidőig játszhatók, a le nem játszottakról csak utána döntünk. A kör minden játékosa
+              értesítést és e-mailt kap az új határidővel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`deadline-${season.id}`}>Új határidő</Label>
+            <Select name="deadline" value={day} onValueChange={setDay}>
+              <SelectTrigger id={`deadline-${season.id}`} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {extension.options.map((o) => (
+                  <SelectItem key={o.day} value={o.day}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1 rounded-md bg-muted/50 p-3 text-sm" aria-live="polite">
+            {chosen.summary.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Mégse</AlertDialogCancel>
+            <AlertDialogAction type="submit" disabled={busy}>
+              Meghosszabbítom
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </Form>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function DeleteSeason({ season }: { season: SeasonRow }) {
   return (
     <AlertDialog>
@@ -366,6 +463,16 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
 
   return (
     <AppPage title="Szezonok" description={<>{league.name}: egy szezon 4 körből áll, egy kör 3 hét.</>}>
+      {actionData?.notice && (
+        <p role="status" className="rounded-md border border-nav-active bg-nav-active-bg p-3 text-sm font-medium">
+          {actionData.notice}
+        </p>
+      )}
+      {actionData?.extendError && (
+        <p role="alert" className="text-sm font-semibold text-destructive">
+          {actionData.extendError}
+        </p>
+      )}
       {seasons.length === 0 ? (
         <p className="py-6 text-center text-muted-foreground">Még nincs szezon.</p>
       ) : (
@@ -429,6 +536,22 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* The running round, outside the table so the button fits a phone. */}
+      {seasons.map(
+        (s) =>
+          s.extension && (
+            <section key={s.id} aria-label={`${s.name}: futó kör`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+              <p>
+                <span className="font-medium">
+                  {s.name}, {s.extension.phase}. kör
+                </span>{" "}
+                határideje: {formatDeadline(s.extension.deadline)}
+              </p>
+              <ExtendRound season={s} />
+            </section>
+          ),
       )}
 
       {/* Keyed by season (and a new one by the count), so switching seasons or saving resets the fields. */}

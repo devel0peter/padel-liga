@@ -30,6 +30,7 @@ export const AUDIT_ACTIONS = {
   "groups.draft": "Csoporttervezet",
   "groups.move": "Pár áthelyezése a tervezetben",
   "groups.publish": "Csoportok közzététele",
+  "phase.extend": "Kör meghosszabbítása",
   // Pairs and entries
   "pair.create": "Pár létrehozása",
   "pair.dissolve": "Pár felbontása",

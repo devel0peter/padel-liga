@@ -100,8 +100,10 @@ describe("the email log on the Admin's player profile (#242)", () => {
     expect(mail.suppression).toBeNull();
   });
 
-  it("shows no other person's address: subjects and failure reasons are hidden", async () => {
+  it("shows no other person's address: subjects and failure reasons are hidden; no login code either", async () => {
+    h.raw.exec("insert into email_messages (id, kind, to_email, subject, status, provider_id, sent_at) values (6, 'login_code', 'anna@x.hu', '216 950 a belépőkódod', 'sent', 're_6', 1)");
     const { mail } = await profile(await admin());
+    expect(mail.rows.find((r: any) => r.id === 6)?.subject).toBe("••• ••• a belépőkódod");
     const text = JSON.stringify(mail);
     expect(text).not.toContain("bela@x.hu");
     expect(text).not.toContain("@");

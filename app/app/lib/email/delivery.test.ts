@@ -93,6 +93,11 @@ describe("the log's header and subjects", () => {
   });
 
   it("hides another person's address in a subject", () => {
-    expect(shownSubject("Párod: Béla (bela@x.hu)")).not.toContain("bela@x.hu");
+    expect(shownSubject("pair_created", "Párod: Béla (bela@x.hu)")).not.toContain("bela@x.hu");
+  });
+
+  it("never shows a login code, only that one was sent", () => {
+    expect(shownSubject("login_code", "216 950 a belépőkódod – Padelpárbaj")).toBe("••• ••• a belépőkódod – Padelpárbaj");
+    expect(shownSubject("match_proposal", "3 időpont")).toBe("3 időpont");
   });
 });

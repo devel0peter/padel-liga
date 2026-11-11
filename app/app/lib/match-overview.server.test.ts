@@ -235,9 +235,39 @@ describe("results on the overview (#28, #29)", () => {
     const { played, waiting, disputed } = await results();
     const [phase] = await O.runningPhases(1, NOW);
     const { filterMatches } = await import("~/lib/match-overview");
-    const ids = (status: "final" | "result_pending" | "disputed") => filterMatches(phase!.matches, { stuck: false, group: null, status }).shown.map((m) => m.id);
+    const ids = (status: "final" | "result_pending" | "disputed") => filterMatches(phase!.matches, { stuck: false, group: null, week: null, status }).shown.map((m) => m.id);
     expect([ids("final"), ids("result_pending"), ids("disputed")]).toEqual([[played], [waiting], [disputed]]);
-    expect(filterMatches(phase!.matches, { stuck: true, group: null, status: null }).shown.map((m) => m.id).sort()).toEqual([waiting, disputed].sort());
+    expect(filterMatches(phase!.matches, { stuck: true, group: null, week: null, status: null }).shown.map((m) => m.id).sort()).toEqual([waiting, disputed].sort());
+  });
+
+  it("the round's numbers (#350) come from the same read: totals, played, fixed, withdrawn apart", async () => {
+    const { played } = await results();
+    // Pair 5 withdraws: its two group 2 matches don't count (D87).
+    h.raw.prepare("update group_pairs set withdrawn_at = ? where pair_id = 5").run(sec(hours(NOW, -0.2).toISOString()));
+    const [phase] = await O.runningPhases(1, NOW);
+    const round = phase!.round;
+    expect(round.total).toBe(9 - 2);
+    expect(round.voided).toBe(2);
+    expect(round.total).toBe(phase!.matches.length);
+    expect(Object.fromEntries(round.counts.map((c) => [c.status, c.count]))).toEqual({
+      to_schedule: 3,
+      proposed: 0,
+      agreed_time: 1,
+      scheduled: 0,
+      result_pending: 1,
+      disputed: 1,
+      final: 1,
+    });
+    expect(round.played).toBe(1);
+    expect(round.fixed).toBe(3);
+    expect(round.stuck).toBe(phase!.matches.filter((m) => m.stuck).length);
+    expect(round.series).toHaveLength(21);
+    // Wednesday: the series runs to today; 2–4 was confirmed today.
+    expect(round.series.slice(0, 4).map((d) => d.remaining)).toEqual([7, 7, 6, null]);
+    expect(round.weeks.map((w) => w.week)).toEqual([1, 2, 3]);
+    expect(round.groups.map((g) => g.group)).toEqual([1, 2]);
+    expect(round.verdict).toBe("early");
+    expect(phase!.matches.find((m) => m.id === played)!.status).toBe("final");
   });
 
   it("one match's log has the result steps and the organizer's decision, with who and when", async () => {

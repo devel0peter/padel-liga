@@ -367,6 +367,7 @@ The ladder (decision log (`docs/decisions.md`), 2026-11-02, #30), for logged-in 
   - After steps 27 and 28, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.
   - A player opening `/admin/leagues/minta/matches` gets "Ehhez nincs jogod" (403).
+  - The group, week and status selects narrow the list; "A kör állása" on top is step 38.
 
 ### 24. The booking pair records the venue; a pair cancels, in time and late
 
@@ -561,6 +562,21 @@ The pair is a section of Profil, and Profil lists the pairs that ended (decision
   - Neither the sidebar nor the bottom bar has Párom; Profil stays.
   - A player in two leagues sees one card per league under "Párod", each named after its league.
   - "Korábbi párjaid" is under Párod only once a pair of the player ended after playing in a published group (a Szervező's dissolve or partner change between rounds, or a partner's account deletion; the seed has none): the former partner (a link to the pair's page; "Törölt játékos" without a link for a deleted account), the league, the seasons and rounds ("Teszt szezon, 1. kör"), "Felbontva" or "Partnercsere" and the day it ended ("2026. 11. 30."), the newest first. No email address or phone number of a former partner.
+
+### 38. The Szervező sees how the round stands (after step 23)
+
+"A kör állása" on top of Meccsek, and one line on the league's Áttekintés (decision log (`docs/decisions.md`) D153, D154; `app/e2e/32-round-status.spec.ts`). Best seen on the running round seed below.
+
+- Page: `/admin/leagues/minta` (Áttekintés), then `/admin/leagues/minta/matches`
+- Account: the Szervező (or the Admin)
+- Do: click the "A futó kör" line; click a status tile, a week and a group.
+- Expect:
+  - Áttekintés: "A futó kör" with "Teszt szezon, 1. kör: Lejátszva <n>/<total> (<p>%) · még <d> nap · Jó ütemben" (or "Lemaradás", "Még korai becsülni"); it opens Meccsek at "A kör állása".
+  - "A kör állása": played and "Fixálva vagy lejátszva" out of the total, the deadline with "még <d> nap"; the verdict ("Még korai becsülni." before the round's 4th day or while nothing is played) and "naponta X meccs kellene, eddig Y/nap"; the seven status tiles adding up to the list below, "Elakadt" and "Nem számít (visszalépés)" (step 21's withdrawn pair) beside them.
+  - "Napról napra": the lines Hátralévő meccsek, Még nincs fix időpont, Ideális and, from the 4th day with a played match, a dashed Előrejelzés to the deadline; "1. hét", "2. hét", "3. hét" on the axis. Before the round's first day only the ideal line is drawn, with "A kör még nem kezdődött el: a vonalak az első napjától töltődnek." At 390px the legend wraps under the chart.
+  - "Hetente" (played/total, not fixed) and "Csoportonként" (played/total, "lemaradt" more than 25 points behind the ideal line). A tile, a week or a group opens the list below filtered (`?status=`, `?week=`, `?group=`).
+  - On the running round seed (today in week 2): Lejátszva 4/15, "Fixálva vagy lejátszva" 8/15, Egyeztetésre vár 3, Ajánlat 3, Megbeszélt időpont 1, Lefixálva 2, Eredmény 1, Vitatott 1, Lejátszva 4, Elakadt 2; week 1 4/5, week 2 0/5 (2 not fixed), week 3 0/5.
+  - A player gets 403 on both pages.
 
 ## A running round instead
 

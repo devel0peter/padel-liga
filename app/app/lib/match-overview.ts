@@ -145,28 +145,38 @@ export function stuckReason(input: {
 
 // --- Filters ------------------------------------------------------------------
 
-export type OverviewFilter = { stuck: boolean; group: number | null; status: OverviewStatus | null };
+export type OverviewFilter = { stuck: boolean; group: number | null; week: number | null; status: OverviewStatus | null };
 
-// The filters from the URL (?stuck=1&group=2&status=proposed); anything
-// unreadable is ignored.
+const positive = (v: string | null): number | null => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+// The filters from the URL (?stuck=1&group=2&week=1&status=proposed);
+// anything unreadable is ignored.
 export function parseFilter(params: URLSearchParams): OverviewFilter {
-  const group = Number(params.get("group"));
   const status = params.get("status") ?? "";
   return {
     stuck: params.get("stuck") === "1",
-    group: Number.isInteger(group) && group > 0 ? group : null,
+    group: positive(params.get("group")),
+    week: positive(params.get("week")),
     status: isOverviewStatus(status) ? status : null,
   };
 }
 
-type Filterable = { groupNumber: number; status: OverviewStatus; stuck: StuckReason | null };
+type Filterable = { groupNumber: number; week: number; status: OverviewStatus; stuck: StuckReason | null };
 
 /**
- * The matches the filters show, and the stuck count under the group and
- * status filters (so the count is what the stuck switch would show).
+ * The matches the filters show, and the stuck count under the group, week
+ * and status filters (so the count is what the stuck switch would show).
  */
 export function filterMatches<T extends Filterable>(matches: readonly T[], filter: OverviewFilter): { shown: T[]; stuckCount: number } {
-  const base = matches.filter((m) => (filter.group === null || m.groupNumber === filter.group) && (filter.status === null || m.status === filter.status));
+  const base = matches.filter(
+    (m) =>
+      (filter.group === null || m.groupNumber === filter.group) &&
+      (filter.week === null || m.week === filter.week) &&
+      (filter.status === null || m.status === filter.status),
+  );
   const stuck = base.filter((m) => m.stuck !== null);
   return { shown: filter.stuck ? stuck : base, stuckCount: stuck.length };
 }

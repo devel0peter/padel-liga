@@ -20,6 +20,7 @@ const row = (id: string, name: string, o: Partial<LeaguePlayerRow> = {}): League
   level: "kezdo",
   phone: "+36 30 123 4567",
   seeking: false,
+  seekingSince: null,
   pair: null,
   entered: false,
   entryChip: null,
@@ -32,7 +33,7 @@ const ROWS: LeaguePlayerRow[] = [
   row("b", "Nagy Béla", { pair: { id: 1, partnerId: "a", partner: "Kovács Anna" }, entered: true }),
   row("c", "Szabó Cecil", { pair: { id: 2, partnerId: "d", partner: "Tóth Dóra" } }),
   row("g", "Ákos Sándor"),
-  row("k", "Pál Boglárka", { seeking: true, missing: [NO_LEVEL], level: null }),
+  row("k", "Pál Boglárka", { seeking: true, seekingSince: new Date(5_000), missing: [NO_LEVEL], level: null }),
 ];
 
 const q = (filter: string | null, search = "") => parsePlayersQuery(new URLSearchParams({ ...(filter ? { filter } : {}), q: search }));
@@ -62,6 +63,18 @@ describe("filterPlayers", () => {
     expect(ids(filterPlayers(ROWS, q("entered")))).toEqual(["a", "b"]);
     expect(ids(filterPlayers(ROWS, q("not_entered")))).toEqual(["c", "g", "k"]);
     expect(ids(filterPlayers(ROWS, q("missing")))).toEqual(["k"]);
+  });
+
+  it("lists Párt keres by level, then the longest waiting first, as Párkeresők did", () => {
+    const seekers = [
+      row("x", "Xénia", { seeking: true, seekingSince: new Date(3_000), level: "halado" }),
+      row("y", "Yvett", { seeking: true, seekingSince: new Date(2_000), level: "kezdo" }),
+      row("z", "Zoé", { seeking: true, seekingSince: new Date(1_000), level: "kezdo" }),
+      row("w", "Vilma", { seeking: true, seekingSince: new Date(1_000), level: null }),
+    ];
+    expect(ids(filterPlayers(seekers, q("seeking")))).toEqual(["z", "y", "x", "w"]);
+    // Any other list stays by name (the rows' order).
+    expect(ids(filterPlayers(seekers, q("no_pair")))).toEqual(["x", "y", "z", "w"]);
   });
 
   it("searches the player's and the partner's name, ignoring case and accents", () => {

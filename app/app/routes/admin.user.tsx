@@ -45,9 +45,9 @@ import { SITE_NAME } from "~/lib/site";
 // player's name here. Name, email, phone, level, sex, role, login; the pair
 // per league with Párok's actions (they post to Párok, so the same server
 // functions run); "Párt keresek"; every pair with its entries; every email
-// sent to them and what became of it (#242); the Napló entries about them. Admin only: it shows the email address, and only the
-// Admin edits someone else's account. An anonymized or deleted account has
-// no profile (404).
+// sent to them and what became of it (#242); the Napló entries about them.
+// Admin only: it shows the email address, and only the Admin edits someone
+// else's account. An anonymized or deleted account has no profile (404).
 
 export function meta({ loaderData: d }: Route.MetaArgs) {
   return [{ title: `${d?.profile.name || "Játékos"} – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
@@ -452,7 +452,7 @@ function Log({ log, id }: { log: Route.ComponentProps["loaderData"]["log"]; id: 
           {log.rows.map((r) => (
             <li key={r.id} className="grid gap-0.5 rounded-lg border p-3">
               <span className="text-xs text-muted-foreground tabular-nums">
-                {formatDateTime(new Date(r.at))} · {r.actor}
+                {formatDateTime(new Date(r.at))} · <PersonLink id={r.actorId} name={r.actor} />
                 {r.league && ` · ${r.league}`}
               </span>
               <span>

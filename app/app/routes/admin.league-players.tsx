@@ -36,6 +36,7 @@ import {
   type PlayersFilter,
 } from "~/lib/league-players";
 import { leaguePlayerRows, pairUp } from "~/lib/league-players.server";
+import { formatDateTime } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
 import { levelLabel } from "~/lib/signups-admin";
 import { SITE_NAME } from "~/lib/site";
@@ -204,6 +205,9 @@ function PlayerRow({ row, selected, onToggle }: { row: Row; selected: boolean; o
           <Badge variant="outline" className="ml-2">
             Párt keres
           </Badge>
+        )}
+        {row.seekingSince && (
+          <div className="text-xs text-muted-foreground">Párt keres: {formatDateTime(new Date(row.seekingSince))} óta</div>
         )}
         <div>
           <PhoneLink phone={row.phone} />

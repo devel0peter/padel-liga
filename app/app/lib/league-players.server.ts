@@ -37,7 +37,7 @@ export async function leaguePlayerRows(league: { id: number }, now = new Date())
     pairOf.set(p.a, { id: p.id, partnerId: p.b });
     pairOf.set(p.b, { id: p.id, partnerId: p.a });
   }
-  const seekers = new Set(seeking.map((s) => s.id));
+  const seekers = new Map(seeking.map((s) => [s.id, s.since]));
   return (
     members
       .map((m): LeaguePlayerRow => {
@@ -50,6 +50,7 @@ export async function leaguePlayerRows(league: { id: number }, now = new Date())
           level: m.level,
           phone: formatPhone(m.phone),
           seeking: !pair && seekers.has(m.id),
+          seekingSince: pair ? null : (seekers.get(m.id) ?? null),
           pair: pair ? { ...pair, partner: names.get(pair.partnerId) ?? brief?.partner ?? "" } : null,
           entered: brief?.entry?.status === "approved",
           entryChip: brief ? entryChip(brief) : null,

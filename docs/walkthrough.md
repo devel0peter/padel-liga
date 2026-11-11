@@ -20,6 +20,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
 | 15, the second league's player (#331) | [`28-league-members.spec.ts`](../app/e2e/28-league-members.spec.ts) |
 | 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
+| 33b, 33c, the Admin's player profile and email log (D156, D157) | [`33-player-profile.spec.ts`](../app/e2e/33-player-profile.spec.ts) |
 
 ## Set up
 
@@ -227,7 +228,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" in Párod (Profil) (off by default, #333).
 - Page: `/admin/leagues/minta/players` ("Játékosok", #301); the old `/admin/leagues/minta/solos` opens it with "Párt keres".
 - Account: `szervezo@example.test`
-- Expect: every registered player of Mintaváros once, with level, phone, pair, entry and what's missing; "Párt keres (2)": the two, with their phone numbers. No address. Idegen Ilona, who looks for a partner in Példaváros, is not listed. The names are plain text for the Szervező.
+- Expect: every registered player of Mintaváros once, with level, phone, pair, entry and what's missing; "Párt keres (2)": the two, by level, each with "Párt keres: <date> óta" and the phone number. No address. Idegen Ilona, who looks for a partner in Példaváros, is not listed. The names are plain text for the Szervező.
 - Do: under "Párt keres", tick both, press "Párba teszem (2/2)", confirm.
 - Expect:
   - "Párt keres (0)"; on Párok the pair reads "párkeresésből" and can be dissolved there.

@@ -43,6 +43,9 @@ test("the Admin opens a player's profile from Játékosok and fixes the name", a
   await expect(log.getByText("Játékos adatainak módosítása")).toHaveCount(2);
   await expect(log).toContainText("Módosítva: név");
   await expect(log).not.toContainText("(javítva)");
+  // Other admin pages link her name too: Párok and Napló.
+  await visit(page, "/admin/leagues/minta/pairs");
+  await expect(content(page).getByRole("link", { name: anna.name, exact: true }).first()).toHaveAttribute("href", /\/admin\/users\//);
   expect(d1(`select name from users where email = '${anna.email}'`)).toEqual([{ name: anna.name }]);
   await context.close();
 });
@@ -54,6 +57,10 @@ test("a Szervező sees the names without a link, and gets 403 on a profile", asy
   await visit(page, `${PLAYERS}?q=${encodeURIComponent(anna.name)}`);
   await expect(playersTable(page)).toContainText(anna.name);
   await expect(playersTable(page).getByRole("link", { name: anna.name, exact: true })).toHaveCount(0);
+  await visit(page, "/admin/leagues/minta/pairs");
+  await expect(content(page)).toContainText(anna.name);
+  await expect(content(page).getByRole("link", { name: anna.name, exact: true })).toHaveCount(0);
+  await visit(page, `${PLAYERS}?q=${encodeURIComponent(anna.name)}`);
   await expect(content(page)).not.toContainText("@example.test");
   await page.goto(`/admin/users/${String(id)}`);
   await expect(page.getByText("Ehhez nincs jogod")).toBeVisible();

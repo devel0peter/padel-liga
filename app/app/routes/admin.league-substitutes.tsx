@@ -2,6 +2,7 @@ import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.league-substitutes";
 import { AppPage } from "~/components/app-page";
+import { PairNames, PersonLink } from "~/components/person-link";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
@@ -61,12 +62,16 @@ function Players({ r }: { r: SubstituteRequest }) {
       <dl className="grid grid-cols-2 gap-2" aria-label="Elo">
         <div className="rounded-md bg-muted p-2">
           <dt className="text-xs text-muted-foreground">Hiányzó</dt>
-          <dd className="font-medium break-words">{r.absent.name}</dd>
+          <dd className="font-medium break-words">
+            <PersonLink id={r.absent.id} name={r.absent.name} />
+          </dd>
           <dd className="tabular-nums">Elo {elo(r.absent.elo)}</dd>
         </div>
         <div className="rounded-md bg-muted p-2">
           <dt className="text-xs text-muted-foreground">Helyettes</dt>
-          <dd className="font-medium break-words">{r.substitute.name}</dd>
+          <dd className="font-medium break-words">
+            <PersonLink id={r.substitute.id} name={r.substitute.name} />
+          </dd>
           <dd className="tabular-nums">Elo {elo(r.substitute.elo)}</dd>
         </div>
       </dl>

@@ -68,8 +68,8 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 // --- Sidebar ----------------------------------------------------------------
 
 export type NavIcon = "home" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
-// `hint`: one line on what the page is for, as the link's tooltip (#301:
-// the people pages say what each lists).
+// `hint`: one short line under the label on what the page lists (#301: the
+// people pages say what each is for).
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
@@ -83,7 +83,7 @@ const PLATFORM_ITEMS: NavItem[] = [
     to: "/admin/users",
     icon: "users",
     permission: { kind: "users.view" },
-    hint: "Minden fiók, ligától függetlenül; a névre kattintva a játékos adatlapja",
+    hint: "Minden fiók, adatlappal",
   },
   { label: "Körlevelek", to: "/admin/broadcasts", icon: "broadcasts", permission: { kind: "broadcasts.send" } },
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
@@ -104,14 +104,14 @@ function leagueItems(league: LeagueRef): NavItem[] {
       to: `${base}/players`,
       icon: "players",
       permission: { kind: "league.manage", league: league.slug },
-      hint: "A liga minden játékosa egyszer: pár, párkeresés, nevezés",
+      hint: "Mindenki egyszer, párral",
     },
     {
       label: "Párok",
       to: `${base}/pairs`,
       icon: "pairs",
       permission: { kind: "league.manage", league: league.slug },
-      hint: "A liga párjai: nevezés, felbontás, partnercsere",
+      hint: "A párok és nevezésük",
     },
     { label: "Emlékeztetők", to: `${base}/reminders`, icon: "reminders", permission: { kind: "league.manage", league: league.slug } },
     { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },

@@ -3,6 +3,7 @@ import { data, Form, Link, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/admin.season-groups";
 import { AppPage } from "~/components/app-page";
+import { PairNames, PersonLink } from "~/components/person-link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,6 +104,8 @@ function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, orig
       return {
         id: p.pairId,
         name: pairName(p.players),
+        // Ids for the Admin's links to the profiles (#301); never the email.
+        players: p.players.map((x) => ({ id: x.id, name: x.name })),
         elo: formatElo(p.averageElo),
         active: p.active,
         withdrawn: p.withdrawn,
@@ -287,7 +290,7 @@ function GroupCard({ group, groups, editable, phase }: { group: Group; groups: G
                 <span className="w-5 text-muted-foreground tabular-nums">{i + 1}.</span>
                 <div className="grid min-w-0 flex-1 basis-40">
                   <span className="font-medium">
-                    {p.name}
+                    <PairNames players={p.players} />
                     {!p.active && (
                       <Badge variant="outline" className="ml-2">
                         megszűnt

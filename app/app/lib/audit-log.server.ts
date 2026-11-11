@@ -27,6 +27,10 @@ export type LogRow = {
   id: number;
   at: Date;
   actor: string;
+  // The accounts behind the actor and a "user:<id>" target, for the Admin's
+  // links to their profiles (#301); null for the system or a deleted account.
+  actorId: string | null;
+  targetUserId: string | null;
   action: string;
   actionLabel: string;
   target: string;
@@ -118,6 +122,8 @@ export async function auditLogPage(f: LogFilters): Promise<LogPage> {
       id: r.id,
       at: r.at,
       actor: actorLabel(r.actorId ? { name: r.actorName ?? "", deleted: !!r.actorDeleted } : null, r.action),
+      actorId: r.actorId && !r.actorDeleted ? r.actorId : null,
+      targetUserId: liveUser(r.target, names),
       action: r.action,
       actionLabel: actionLabel(r.action),
       target: renderTarget(r.target, names),
@@ -156,6 +162,13 @@ function renderTarget(target: string, names: ReadonlyMap<string, string>): strin
   // An address no account has (an invite never accepted): not shown.
   if (EMAIL.test(target)) return names.get(`email:${target.toLowerCase()}`) ?? NO_ACCOUNT;
   return renderRefs(target, names);
+}
+
+// The account a "user:<id>" target names, unless it is deleted.
+function liveUser(target: string, names: ReadonlyMap<string, string>): string | null {
+  const m = /^user:(.+)$/.exec(target);
+  const name = m ? names.get(target) : undefined;
+  return m && name !== undefined && name !== DELETED_NAME ? m[1]! : null;
 }
 
 const playerA = alias(users, "player_a");

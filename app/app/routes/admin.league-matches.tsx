@@ -3,6 +3,7 @@ import { data, Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.league-matches";
 import { AppPage } from "~/components/app-page";
+import { PairNames, PersonLink } from "~/components/person-link";
 import { StatusPill } from "~/components/my-group";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -14,7 +15,7 @@ import { filterMatches, OVERVIEW_STATUSES, parseFilter, STUCK_TEXT } from "~/lib
 import { runningPhases, type OverviewMatch } from "~/lib/match-overview.server";
 import { getLeague } from "~/lib/leagues.server";
 import { groupLine } from "~/lib/matches";
-import { versusText } from "~/lib/results";
+import { article } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Every match of the league's running phase for its Szervező and the Admin
@@ -97,7 +98,9 @@ function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number 
 function MatchRow({ m, slug }: { m: OverviewMatch; slug: string }) {
   return (
     <li className="grid gap-1.5 rounded-md border p-3 text-sm" aria-label={`${m.names.a} – ${m.names.b}`}>
-      <p className="font-medium break-words">{versusText(m.names.a, m.names.b)}</p>
+      <p className="font-medium break-words">
+        <PairNames players={m.players.a} /> {article(m.names.b)} <PairNames players={m.players.b} /> ellen
+      </p>
       <div className="flex flex-wrap gap-1.5">
         <StatusPill label={m.label} tone={m.tone} />
         {m.stuck && <Badge variant="destructive">{STUCK_TEXT[m.stuck]}</Badge>}

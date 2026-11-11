@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 
 import { can, type Actor } from "~/lib/auth/permissions";
@@ -16,4 +17,14 @@ export function PersonLink({ id, name, className }: { id: string | null | undefi
       {name}
     </Link>
   );
+}
+
+// A pair's two players, "Kiss Anna – Nagy Béla", each a PersonLink.
+export function PairNames({ players }: { players: readonly { id: string | null; name: string }[] }) {
+  return players.map((p, i) => (
+    <Fragment key={p.id ?? i}>
+      {i > 0 && " – "}
+      <PersonLink id={p.id} name={p.name || "Névtelen"} />
+    </Fragment>
+  ));
 }

@@ -113,8 +113,9 @@ describe("the profile (#301)", () => {
     // Nothing changed: no entry.
     expect(await edit(admin, { name: "Kovács Anna", level: "halado", phone: "+36201112222" })).toEqual({ intent: "edit", ok: true, changed: 0 });
     expect(one("select count(*) as n from audit_log where action = 'user.update'").n).toBe(1);
-    // The profile's Napló lists the edit.
-    expect((await load(admin)).log.rows.map((r: any) => r.action)).toContain("user.update");
+    // The profile's Napló lists the edit, with the accounts for the links (#301).
+    const entry = (await load(admin)).log.rows.find((r: any) => r.action === "user.update");
+    expect(entry).toMatchObject({ actorId: "admin", targetUserId: "a" });
     expect(h.sent).toEqual([]);
   });
 

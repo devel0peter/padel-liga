@@ -5,6 +5,7 @@
 // in the address (?filter=, ?q=), so a reload or a shared link shows the same
 // list.
 
+import { LEVELS } from "./interest";
 import type { StatusChip } from "./player-status";
 import { matchesSearch } from "./search";
 
@@ -27,8 +28,10 @@ export type LeaguePlayerRow = {
   // Formatted ("+36 30 123 4567"), "" when none: the organizer calls players
   // from here (D126). Never an email address.
   phone: string;
-  // "Párt keresek" is on and they have no active pair in the league (D59).
+  // "Párt keresek" is on and they have no active pair in the league (D59),
+  // and since when (the organizer sees it, as on Párkeresők); null when not.
   seeking: boolean;
+  seekingSince: Date | null;
   // The active pair in the league, if any.
   pair: { id: number; partnerId: string; partner: string } | null;
   // The pair's entry in the league's current or next season: approved.
@@ -73,12 +76,23 @@ export function isPlayersFiltered(query: PlayersQuery): boolean {
   return query.filter !== null || query.q !== "";
 }
 
+const LEVEL_ORDER: string[] = Object.keys(LEVELS);
+const levelRank = (level: string | null) => (level && LEVEL_ORDER.includes(level) ? LEVEL_ORDER.indexOf(level) : LEVEL_ORDER.length);
+
 // The rows the search matches (by the player's or the partner's name,
-// ignoring case and accents), then the filter's.
-export function filterPlayers<R extends FilterFacts & { name: string }>(rows: readonly R[], query: PlayersQuery): R[] {
-  return rows.filter(
+// ignoring case and accents), then the filter's, in the rows' order (by
+// name). "Párt keres" lists them as Párkeresők did: by level, then the
+// longest waiting first, so two of a level are next to each other.
+export function filterPlayers<R extends FilterFacts & { name: string; level: string | null; seekingSince: Date | string | null }>(
+  rows: readonly R[],
+  query: PlayersQuery,
+): R[] {
+  const shown = rows.filter(
     (r) => matchesSearch(query.q, [r.name, r.pair?.partner]) && (!query.filter || playerFilters(r).includes(query.filter)),
   );
+  if (query.filter !== "seeking") return shown;
+  const since = (r: R) => (r.seekingSince ? new Date(r.seekingSince).getTime() : 0);
+  return [...shown].sort((a, b) => levelRank(a.level) - levelRank(b.level) || since(a) - since(b) || a.name.localeCompare(b.name, "hu"));
 }
 
 // How many rows each option lists with the current search.

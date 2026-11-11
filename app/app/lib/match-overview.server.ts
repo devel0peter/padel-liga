@@ -24,6 +24,8 @@ export type OverviewMatch = {
   groupNumber: number;
   week: number;
   names: Record<Side, string>;
+  // The pairs' players, for the Admin's links to their profiles (#301).
+  players: Record<Side, { id: string; name: string }[]>;
   status: OverviewStatus;
   label: string;
   tone: Tone;
@@ -128,6 +130,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       return p ? pairName(p.players) : "Ismeretlen pár";
     };
     const names = { a: name(m.pairA), b: name(m.pairB) };
+    const playersOf = (pairId: number) => (pairsOf.find((x) => x.pairId === pairId)?.players ?? []).map((p) => ({ id: p.id, name: p.name }));
     const log = events.get(m.id) ?? [];
     const state = states.get(m.id)!;
     const sides = activeSides(
@@ -142,6 +145,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       groupNumber: g.number,
       week: m.week,
       names,
+      players: { a: playersOf(m.pairA), b: playersOf(m.pairB) },
       status: statusOf(state, result.state),
       label: status.label,
       tone: status.tone,

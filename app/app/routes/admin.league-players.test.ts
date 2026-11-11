@@ -107,7 +107,11 @@ describe("Játékosok (#301)", () => {
 
   it("the filters cover what Párkeresők and Párok's rows without a pair showed", async () => {
     const cookie = await cookieFor("szervezo", "player", 1);
-    expect(ids((await page("?filter=seeking", cookie)).rows)).toEqual(["m", "k"]);
+    const seekers = (await page("?filter=seeking", cookie)).rows;
+    expect(ids(seekers)).toEqual(["m", "k"]);
+    // Since when they look, as Párkeresők showed it.
+    expect(seekers.every((r: any) => r.seekingSince instanceof Date)).toBe(true);
+    expect((await page("", cookie)).rows.find((r: any) => r.id === "g")?.seekingSince).toBeNull();
     expect(ids((await page("?filter=no_pair", cookie)).rows)).toEqual(["g", "m", "k", "n"]);
     expect(ids((await page("?filter=entered", cookie)).rows)).toEqual(["a", "b"]);
     expect(ids((await page("?filter=not_entered&q=dora", cookie)).rows)).toEqual(["c", "d"]);

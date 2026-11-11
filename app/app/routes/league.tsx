@@ -187,7 +187,9 @@ export default function League({ loaderData: page }: Route.ComponentProps) {
       help={<Explainer />}
       description={
         <>
-          {where} · {page.started ? `${page.phase}. kör, ${page.week}. hét (${page.weekFrom} – ${page.weekTo})` : `${page.phase}. kör, indul ${page.startsOn}`}
+          {where} · {page.started
+            ? `${page.phase}. kör, ${page.extension ? "hosszabbítás" : `${page.week}. hét`} (${page.weekFrom} – ${page.weekTo})`
+            : `${page.phase}. kör, indul ${page.startsOn}`}
         </>
       }
     >

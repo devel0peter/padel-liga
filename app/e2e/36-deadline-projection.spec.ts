@@ -48,7 +48,8 @@ test("39. the deadline projection on Meccsek and the next round's preview on Cso
   await expect(main).not.toContainText("@example.test");
 
   // Csoportok: round 1 is running, so the next round's preview is below its groups.
-  await visit(page, `${await seasonPath(page)}/groups`);
+  const groups = `${await seasonPath(page)}/groups`;
+  await visit(page, groups);
   const preview = content(page).getByRole("region", { name: "Előzetes beosztás: ha most érne véget a kör" });
   await expect(preview).toBeVisible();
   await expect(preview).toContainText("A 2. kör csoportjai, ha az 1. kör most érne véget");
@@ -67,5 +68,6 @@ test("39. the deadline projection on Meccsek and the next round's preview on Cso
   const player = await as(browser, PAIRS.p1[0]);
   expect((await player.page.goto(LIST))?.status()).toBe(403);
   expect((await player.page.goto(`${LIST}?deadline=walkover`))?.status()).toBe(403);
+  expect((await player.page.goto(groups))?.status()).toBe(403);
   await player.context.close();
 });

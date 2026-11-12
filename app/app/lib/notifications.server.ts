@@ -6,19 +6,23 @@ import { db } from "~/db/client.server";
 import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
-  channelEnabled,
   channelKey,
   disputeRecipients,
+  KIND_TOPIC,
   isEnabled,
   resultDisputedMessage,
   substituteRequestedMessage,
   noShowReportedMessage,
   pushPayload,
+  pushWanted,
   TEST_MESSAGE,
+  topicKey,
+  topicOf,
   type Channel,
   type Message,
   type NotificationKind,
   type PlayerKind,
+  type PushTopic,
   type StoredKind,
   type SubscriptionInput,
 } from "./notifications";
@@ -164,7 +168,9 @@ export async function notifyPlayers(kind: PlayerKind, messages: { userId: string
 type NotificationRow = typeof notifications.$inferInsert;
 
 // One row per message, without the users who switched the kind off; the push
-// waits for those who didn't switch push off.
+// waits for those who want it: push on and the kind's topic on (pushWanted,
+// #349). Every push but "Próba" leaves from this queue (D158), so this is
+// where the topic switches apply, for the requests and the cron alike.
 function notificationRows(
   kind: StoredKind,
   messages: { userId: string; message: Message }[],
@@ -178,7 +184,7 @@ function notificationRows(
       kind,
       ...message,
       createdAt: at,
-      pushDueAt: channelEnabled(disabled(userId), "push") ? at : null,
+      pushDueAt: pushWanted(disabled(userId), kind) ? at : null,
     }));
 }
 
@@ -186,13 +192,14 @@ function notificationInserts(rows: NotificationRow[]): BatchItem<"sqlite">[] {
   return chunks(rows, INSERT_CHUNK).map((chunk) => db.insert(notifications).values(chunk));
 }
 
-// The opt-outs of the given kinds and of push, in one query: few people
-// switch anything off, so no list of users is bound.
+// The opt-outs of the given kinds, of push and of their topics, in one query:
+// few people switch anything off, so no list of users is bound.
 async function optOutsOf(kinds: readonly StoredKind[]): Promise<(userId: string) => ReadonlySet<string>> {
+  const topics = [...new Set(kinds.map(topicOf).filter((t) => t !== null))].map(topicKey);
   const rows = await db
     .select()
     .from(notificationOptOuts)
-    .where(inArray(notificationOptOuts.kind, [...kinds, channelKey("push")]));
+    .where(inArray(notificationOptOuts.kind, [...kinds, channelKey("push"), ...topics]));
   const out = new Map<string, Set<string>>();
   for (const r of rows) (out.get(r.userId) ?? out.set(r.userId, new Set()).get(r.userId)!).add(r.kind);
   return (userId) => out.get(userId) ?? NONE;
@@ -410,7 +417,7 @@ export async function sendTestNotification(userId: string): Promise<number> {
     .insert(notifications)
     .values({ userId, kind: "test", ...TEST_MESSAGE })
     .returning({ id: notifications.id });
-  return channelEnabled(await disabledKindsFor(userId), "push") ? pushTo(userId, row.id, TEST_MESSAGE) : 0;
+  return pushWanted(await disabledKindsFor(userId), "test") ? pushTo(userId, row.id, TEST_MESSAGE) : 0;
 }
 
 // --- Inbox ------------------------------------------------------------------
@@ -475,6 +482,32 @@ export async function setKindEnabled(userId: string, kind: NotificationKind, ena
 // The email and push switches (#115), stored like the kinds.
 export async function setChannelEnabled(userId: string, channel: Channel, enabled: boolean): Promise<void> {
   await setOptOut(userId, channelKey(channel), enabled);
+  if (channel === "push" && !enabled) await unqueuePushes(userId);
+}
+
+// A player's push topic (#349), stored like the channels.
+export async function setTopicEnabled(userId: string, topic: PushTopic, enabled: boolean): Promise<void> {
+  await setOptOut(userId, topicKey(topic), enabled);
+  if (!enabled)
+    await unqueuePushes(
+      userId,
+      (Object.keys(KIND_TOPIC) as PlayerKind[]).filter((kind) => KIND_TOPIC[kind] === topic),
+    );
+}
+
+// A switch turned off also takes the user's pushes still waiting in the queue
+// (of these kinds; all without) off it: the items stay in the app.
+async function unqueuePushes(userId: string, kinds?: readonly StoredKind[]): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ pushDueAt: null })
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        isNotNull(notifications.pushDueAt),
+        kinds ? inArray(notifications.kind, [...kinds]) : undefined,
+      ),
+    );
 }
 
 // A browser subscribed: store it for this user (a shared device moves over).

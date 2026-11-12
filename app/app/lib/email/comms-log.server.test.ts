@@ -46,6 +46,13 @@ describe("recordOpen (#243)", () => {
     expect(opens().every((r: any) => r.opened_at === null && r.open_count === 0)).toBe(true);
   });
 
+  it("a malformed token never reaches the database", async () => {
+    h.raw.exec("drop table email_messages");
+    for (const token of ["' or 1=1 --", "1", "anna@x.hu", `${ANNA}0`, ANNA.toUpperCase()]) expect(await recordOpen(token)).toBe(false);
+    // A well-shaped one does query (and fails here, the table is gone).
+    await expect(recordOpen(BELA)).rejects.toThrow();
+  });
+
   it("an email deleted with its account takes its open data with it", async () => {
     await recordOpen(ANNA);
     h.raw.prepare("delete from email_messages where lower(to_email) = 'anna@x.hu'").run();

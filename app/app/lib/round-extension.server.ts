@@ -157,14 +157,12 @@ async function announceExtension(seasonId: number, phase: number, deadline: Date
     if (!season) return;
     const input = { league: season.league, season: season.name, phase, deadline };
     await queueRoundExtended(players.map((p) => ({ toEmail: p.email, input: { ...input, to: p.name || "Játékos", nextStart } })));
-    // The pushes wait for the cron (queuePush, D150), so they leave the
+    // The pushes wait for the cron (D150, D158), so they leave the
     // invocation's subrequests to the emails.
     const message = roundExtendedMessage(input);
     await notifyPlayers(
       "round_extended",
       players.map((p) => ({ userId: p.id, message })),
-      undefined,
-      true,
     );
   } catch (error) {
     logError("round extension notice failed", { seasonId, phase, error });

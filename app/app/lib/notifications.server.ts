@@ -6,28 +6,34 @@ import { db } from "~/db/client.server";
 import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
-  channelEnabled,
   channelKey,
   disputeRecipients,
+  KIND_TOPIC,
   isEnabled,
   resultDisputedMessage,
   substituteRequestedMessage,
   noShowReportedMessage,
   pushPayload,
+  pushWanted,
   TEST_MESSAGE,
+  topicKey,
+  topicOf,
   type Channel,
   type Message,
   type NotificationKind,
   type PlayerKind,
+  type PushTopic,
   type StoredKind,
   type SubscriptionInput,
 } from "./notifications";
 import { pushOutcome, pushRequest, type VapidKeys } from "./push/webpush";
 import { countCall, type RunBudget, type Usage } from "./run-usage";
-import { logError, logInfo, logWarn } from "~/lib/log";
+import { currentInvocation, logError, logInfo, logWarn } from "~/lib/log";
 
-// Notifications are stored first (the /notifications list), then pushed to
-// every device the user subscribed. A push failure never fails the caller.
+// Notifications are stored (the /notifications list) with their push queued;
+// a request pushes the first ones itself, up to INLINE_PUSH_CALLS, and the
+// cron pushes the rest (pushQueued, D158). A push failure never fails the
+// caller.
 
 const INBOX_SIZE = 50;
 
@@ -114,68 +120,85 @@ async function sendPushes(list: { s: Subscription; id: number; message: Message 
     }),
   );
   const sent = results.filter(Boolean).length;
-  if (list.length > 0) logInfo("push", { sent, failed: list.length - sent, gone: new Set(gone).size });
+  const failed = list.length - sent;
+  // A push that didn't go out is not retried: the count is logged, as a
+  // warning when any failed (#126). Gone devices count as failed here.
+  if (list.length > 0) (failed > 0 ? logWarn : logInfo)("push", { sent, failed, gone: new Set(gone).size });
   return { sent, gone: [...new Set(gone)] };
 }
 
 const NONE: ReadonlySet<string> = new Set();
 
-// Stores one message per user, skipping users who switched the kind off, and
-// pushes it to those who didn't switch push off (#115). D1 queries: one
-// opt-out lookup, one insert per INSERT_CHUNK messages, one subscription
-// lookup (per ID_CHUNK users each). With `queuePush` (the cron, #183)
-// the pushes wait in the queue for pushQueued() instead of going out here.
-async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date, queuePush = false): Promise<void> {
-  const disabled = await disabledKinds(messages.map((m) => m.userId));
-  if (queuePush) {
-    const at = createdAt ?? new Date();
-    const rows = notificationRows(kind, messages, at, (userId) => disabled.get(userId) ?? NONE);
-    const [first, ...rest] = notificationInserts(rows);
-    if (first) await db.batch([first, ...rest]);
-    return;
-  }
-  const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? NONE, kind));
-  // Each returned row carries its own message: RETURNING has no set order.
-  const stored: ({ id: number; userId: string } & Message)[] = [];
-  for (const chunk of chunks(wanted, INSERT_CHUNK))
-    stored.push(
-      ...(await db
-        .insert(notifications)
-        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message, ...(createdAt ? { createdAt } : {}) })))
-        .returning({
-          id: notifications.id,
-          userId: notifications.userId,
-          title: notifications.title,
-          body: notifications.body,
-          url: notifications.url,
-        })),
-    );
-  const pushing = stored.filter((n) => channelEnabled(disabled.get(n.userId) ?? NONE, "push"));
-  if (pushing.length === 0) return;
-  const vapid = vapidKeys();
-  if (!vapid) {
-    if (import.meta.env.DEV) console.log(`[push disabled] ${pushing.length} × ${kind}`);
-    return;
-  }
-  const subs = await subscriptionsOf(pushing.map((n) => n.userId));
-  await Promise.all(pushing.map((n) => pushToDevices(subs.get(n.userId) ?? [], n.id, n, vapid)));
+// Pushes a request may send itself (#126, D158): the first ones go at once,
+// up to this many push calls per request; the rest wait in the queue for the
+// cron (pushQueued). A request may make 50 outgoing calls (Workers Free);
+// this leaves 30 for its emails, sent after the response (D150, at most
+// SEND_CHUNK per call), so a proposal or a result to confirm still pushes at
+// once and a group publish pushes its first devices and queues the rest.
+export const INLINE_PUSH_CALLS = 20;
+
+// The running request and what it may still push itself: none in a cron run
+// (its pushes keep to the run's budget, pushQueued), and none when the
+// isolate serves more than one invocation at once (no way to tell whose calls
+// are whose): then everything waits for the cron.
+function inlinePushRoom(): { invocation: NonNullable<ReturnType<typeof currentInvocation>>; room: number } | null {
+  const invocation = currentInvocation();
+  if (!invocation || invocation.kind !== "request") return null;
+  return { invocation, room: Math.max(0, INLINE_PUSH_CALLS - invocation.pushCalls) };
 }
 
-// A player notification (#115): always in the in-app list, pushed unless the
-// player switched push off. The email goes through the outbox, which checks
-// the email switch. A push failure never fails the caller; neither does a
-// failure here, since the decision it reports is already saved.
-// `createdAt`: the time of a scheduled job (the reminders, #31), so the daily
-// digest reads the same clock; the database time otherwise. `queuePush`: the
-// cron, whose pushes go out within its run limits (#183, pushQueued).
-export async function notifyPlayers(
-  kind: PlayerKind,
-  messages: { userId: string; message: Message }[],
-  createdAt?: Date,
-  queuePush = false,
-): Promise<void> {
+// Stores one message per user, skipping users who switched the kind off, with
+// the push queued for those who want it (push and the kind's topic on,
+// pushWanted, #115, #349). Then a request pushes what fits its
+// INLINE_PUSH_CALLS at once, in the order of the messages; the rest stays in
+// the queue (notifications.push_due_at) for the cron (#126, D158). D1
+// queries: one opt-out lookup (per ID_CHUNK users) and one batch of inserts;
+// pushing at once adds the stored items, their devices, the claim and maybe
+// forgetting gone devices.
+async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
+  const disabled = await disabledKinds(messages.map((m) => m.userId));
+  const at = createdAt ?? new Date();
+  const rows = notificationRows(kind, messages, at, (userId) => disabled.get(userId) ?? NONE);
+  const [first, ...rest] = notificationInserts(rows);
+  if (!first) return;
+  await db.batch([first, ...rest]);
+  if (rows.some((r) => r.pushDueAt)) await pushNow(kind, at);
+}
+
+// The request's own queued items, pushed while they fit its room. Found by
+// kind and time: an item of another request stored in the same second is
+// queued too, so pushing it here is no harm, and the claim keeps it once.
+// The room is reserved on the request's own record before any await and the
+// unused part given back after, on that same record: another invocation
+// starting meanwhile (no current one then) or a parallel notice of the same
+// request can't make the request push past its budget.
+async function pushNow(kind: StoredKind, at: Date): Promise<void> {
+  const own = inlinePushRoom();
+  const vapid = vapidKeys();
+  if (!own || own.room === 0 || !vapid) return;
+  const { invocation, room } = own;
+  // A failure keeps the whole reservation: how many went out is unknown.
+  invocation.pushCalls += room;
+  const queue = await db
+    .select({ id: notifications.id, userId: notifications.userId, title: notifications.title, body: notifications.body, url: notifications.url })
+    .from(notifications)
+    .where(and(eq(notifications.kind, kind), eq(notifications.pushDueAt, at)))
+    .orderBy(asc(notifications.id))
+    .limit(PUSH_ROUND);
+  const { calls } = await pushRound(queue, room, vapid, new Set());
+  invocation.pushCalls -= room - calls;
+}
+
+// A player notification (#115): always in the in-app list, pushed (at once
+// within the request's room, else from the queue) unless the player switched
+// push or the kind's topic off. The email goes through the outbox,
+// which checks the email switch. A failure here never fails the caller,
+// since the decision it reports is already saved. `createdAt`: the time of a
+// scheduled job (the reminders, #31), so the daily digest reads the same
+// clock; now otherwise.
+export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
   try {
-    await notify(kind, messages, createdAt, queuePush);
+    await notify(kind, messages, createdAt);
   } catch (error) {
     logError("notification failed", { kind, error });
   }
@@ -190,7 +213,10 @@ export async function notifyPlayers(
 type NotificationRow = typeof notifications.$inferInsert;
 
 // One row per message, without the users who switched the kind off; the push
-// waits for those who didn't switch push off.
+// waits for those who want it: push on and the kind's topic on (pushWanted,
+// #349). Every push but "Próba" is queued here first, whether a request then
+// pushes it at once or the cron does (D158), so this is where the topic
+// switches apply, for the requests and the cron alike.
 function notificationRows(
   kind: StoredKind,
   messages: { userId: string; message: Message }[],
@@ -204,7 +230,7 @@ function notificationRows(
       kind,
       ...message,
       createdAt: at,
-      pushDueAt: channelEnabled(disabled(userId), "push") ? at : null,
+      pushDueAt: pushWanted(disabled(userId), kind) ? at : null,
     }));
 }
 
@@ -212,13 +238,14 @@ function notificationInserts(rows: NotificationRow[]): BatchItem<"sqlite">[] {
   return chunks(rows, INSERT_CHUNK).map((chunk) => db.insert(notifications).values(chunk));
 }
 
-// The opt-outs of the given kinds and of push, in one query: few people
-// switch anything off, so no list of users is bound.
+// The opt-outs of the given kinds, of push and of their topics, in one query:
+// few people switch anything off, so no list of users is bound.
 async function optOutsOf(kinds: readonly StoredKind[]): Promise<(userId: string) => ReadonlySet<string>> {
+  const topics = [...new Set(kinds.map(topicOf).filter((t) => t !== null))].map(topicKey);
   const rows = await db
     .select()
     .from(notificationOptOuts)
-    .where(inArray(notificationOptOuts.kind, [...kinds, channelKey("push")]));
+    .where(inArray(notificationOptOuts.kind, [...kinds, channelKey("push"), ...topics]));
   const out = new Map<string, Set<string>>();
   for (const r of rows) (out.get(r.userId) ?? out.set(r.userId, new Set()).get(r.userId)!).add(r.kind);
   return (userId) => out.get(userId) ?? NONE;
@@ -259,6 +286,73 @@ const PUSH_ROUND_QUERIES = 4;
 // devices past the cap that don't fit wait for the player's next push.
 const MAX_FORGET = 100;
 
+type QueueItem = { id: number; userId: string } & Message;
+
+/**
+ * Pushes `queue`'s items in order while their devices fit `calls`: each is
+ * taken off the queue (claimed) before its push goes out, so an overlapping
+ * run or request can't push it twice; an item goes only when all its devices
+ * fit (its player's newest MAX_PUSH_DEVICES, #222). The player's other
+ * devices are forgotten in the same query as the devices the push service
+ * no longer knows, logged once per player in `capped` (#279, D116). Returns
+ * how many items it took, how many it pushed and the calls it made.
+ */
+async function pushRound(
+  queue: QueueItem[],
+  calls: number,
+  vapid: VapidKeys | null,
+  capped: Set<string>,
+): Promise<{ taken: number; sent: number; calls: number }> {
+  if (queue.length === 0) return { taken: 0, sent: 0, calls: 0 };
+  const all = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
+  const sorted = new Map([...all].map(([userId, list]) => [userId, byNewest(list)]));
+  const subs = new Map([...sorted].map(([userId, list]) => [userId, list.slice(0, MAX_PUSH_DEVICES)]));
+  let left = calls;
+  const taken: QueueItem[] = [];
+  for (const n of queue) {
+    const devices = subs.get(n.userId)?.length ?? 0;
+    if (devices > left) break;
+    left -= devices;
+    taken.push(n);
+  }
+  if (taken.length === 0) return { taken: 0, sent: 0, calls: 0 };
+  const claimed = new Set(
+    (
+      await db
+        .update(notifications)
+        .set({ pushDueAt: null })
+        .where(
+          and(
+            isNotNull(notifications.pushDueAt),
+            inArray(
+              notifications.id,
+              taken.map((n) => n.id),
+            ),
+          ),
+        )
+        .returning({ id: notifications.id })
+    ).map((r) => r.id),
+  );
+  const sending = taken.filter((n) => claimed.has(n.id));
+  const pushes = sending.flatMap((n) => (subs.get(n.userId) ?? []).map((s) => ({ s, id: n.id, message: n })));
+  if (vapid) {
+    const { gone } = await sendPushes(pushes, vapid);
+    const forget = [...gone];
+    for (const n of sending) {
+      const past = (sorted.get(n.userId) ?? []).slice(MAX_PUSH_DEVICES);
+      if (past.length === 0 || capped.has(n.userId)) continue;
+      const room = Math.max(0, MAX_FORGET - forget.length);
+      if (room === 0) break;
+      const endpoints = past.slice(0, room).map((s) => s.endpoint);
+      forget.push(...endpoints);
+      capped.add(n.userId);
+      logWarn("push devices forgotten", { userId: n.userId, notificationId: n.id, devices: past.length + MAX_PUSH_DEVICES, kept: MAX_PUSH_DEVICES, forgotten: endpoints.length });
+    }
+    if (forget.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, forget));
+  } else if (import.meta.env.DEV && sending.length > 0) console.log(`[push disabled] ${sending.length} queued pushes`);
+  return { taken: taken.length, sent: sending.length, calls: vapid ? pushes.length : 0 };
+}
+
 /**
  * Pushes the queued items, oldest first, as many as fit the run (`budget`)
  * while keeping `keep` for the steps after it. Each item is taken off the
@@ -284,56 +378,10 @@ export async function pushQueued(budget: RunBudget, keep: Usage = { queries: 0, 
       .orderBy(asc(notifications.pushDueAt), asc(notifications.id))
       .limit(PUSH_ROUND);
     if (queue.length === 0) break;
-    const all = vapid ? await subscriptionsOf(queue.map((n) => n.userId)) : new Map<string, Subscription[]>();
-    const sorted = new Map([...all].map(([userId, list]) => [userId, byNewest(list)]));
-    const subs = new Map([...sorted].map(([userId, list]) => [userId, list.slice(0, MAX_PUSH_DEVICES)]));
-    let calls = budget.left().calls - keep.calls;
-    const taken: typeof queue = [];
-    for (const n of queue) {
-      const devices = subs.get(n.userId)?.length ?? 0;
-      if (devices > calls) break;
-      calls -= devices;
-      taken.push(n);
-    }
-    if (taken.length === 0) break;
-    const claimed = new Set(
-      (
-        await db
-          .update(notifications)
-          .set({ pushDueAt: null })
-          .where(
-            and(
-              isNotNull(notifications.pushDueAt),
-              inArray(
-                notifications.id,
-                taken.map((n) => n.id),
-              ),
-            ),
-          )
-          .returning({ id: notifications.id })
-      ).map((r) => r.id),
-    );
-    const sending = taken.filter((n) => claimed.has(n.id));
-    if (vapid) {
-      const { gone } = await sendPushes(
-        sending.flatMap((n) => (subs.get(n.userId) ?? []).map((s) => ({ s, id: n.id, message: n }))),
-        vapid,
-      );
-      const forget = [...gone];
-      for (const n of sending) {
-        const past = (sorted.get(n.userId) ?? []).slice(MAX_PUSH_DEVICES);
-        if (past.length === 0 || capped.has(n.userId)) continue;
-        const room = Math.max(0, MAX_FORGET - forget.length);
-        if (room === 0) break;
-        const endpoints = past.slice(0, room).map((s) => s.endpoint);
-        forget.push(...endpoints);
-        capped.add(n.userId);
-        logWarn("push devices forgotten", { userId: n.userId, notificationId: n.id, devices: past.length + MAX_PUSH_DEVICES, kept: MAX_PUSH_DEVICES, forgotten: endpoints.length });
-      }
-      if (forget.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.endpoint, forget));
-    } else if (import.meta.env.DEV && sending.length > 0) console.log(`[push disabled] ${sending.length} queued pushes`);
-    pushed += sending.length;
-    if (taken.length < queue.length) break;
+    const { taken, sent } = await pushRound(queue, budget.left().calls - keep.calls, vapid, capped);
+    if (taken === 0) break;
+    pushed += sent;
+    if (taken < queue.length) break;
   }
   const [{ n }] = await db.select({ n: count() }).from(notifications).where(isNotNull(notifications.pushDueAt));
   return { pushed, left: n };
@@ -436,7 +484,7 @@ export async function sendTestNotification(userId: string): Promise<number> {
     .insert(notifications)
     .values({ userId, kind: "test", ...TEST_MESSAGE })
     .returning({ id: notifications.id });
-  return channelEnabled(await disabledKindsFor(userId), "push") ? pushTo(userId, row.id, TEST_MESSAGE) : 0;
+  return pushWanted(await disabledKindsFor(userId), "test") ? pushTo(userId, row.id, TEST_MESSAGE) : 0;
 }
 
 // --- Inbox ------------------------------------------------------------------
@@ -501,6 +549,32 @@ export async function setKindEnabled(userId: string, kind: NotificationKind, ena
 // The email and push switches (#115), stored like the kinds.
 export async function setChannelEnabled(userId: string, channel: Channel, enabled: boolean): Promise<void> {
   await setOptOut(userId, channelKey(channel), enabled);
+  if (channel === "push" && !enabled) await unqueuePushes(userId);
+}
+
+// A player's push topic (#349), stored like the channels.
+export async function setTopicEnabled(userId: string, topic: PushTopic, enabled: boolean): Promise<void> {
+  await setOptOut(userId, topicKey(topic), enabled);
+  if (!enabled)
+    await unqueuePushes(
+      userId,
+      (Object.keys(KIND_TOPIC) as PlayerKind[]).filter((kind) => KIND_TOPIC[kind] === topic),
+    );
+}
+
+// A switch turned off also takes the user's pushes still waiting in the queue
+// (of these kinds; all without) off it: the items stay in the app.
+async function unqueuePushes(userId: string, kinds?: readonly StoredKind[]): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ pushDueAt: null })
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        isNotNull(notifications.pushDueAt),
+        kinds ? inArray(notifications.kind, [...kinds]) : undefined,
+      ),
+    );
 }
 
 // A browser subscribed: store it for this user (a shared device moves over).

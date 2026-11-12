@@ -53,6 +53,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
 | H6 | The season card opens the left column as the season's summary: under its title the round being played and its deadline; its rounds listed with their dates, the round being played highlighted; entry button and strikes count. | D103a, #23, D136, D139, D143 |
 | H7 | Before the groups are out: pair link, "Párt keresek", entry, as today. | D55, D59, #23 |
+| H8 | Below the main content, at most one "Tipp" card about a feature the player may not know, first the push tip ("Kapj értesítést a telefonodra", "Bekapcsolom", "Most nem"): never a pop-up, never on another page. | D160, #262, spec 13 |
 
 ## 5. Match page
 

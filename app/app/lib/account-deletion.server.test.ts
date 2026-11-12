@@ -63,7 +63,8 @@ function freshDb() {
   h.raw.exec(`insert into oauth_accounts (provider, provider_user_id, user_id) values ('google', 'g-a', 'a')`);
   h.raw.exec(`insert into push_subscriptions (endpoint, user_id, p256dh, auth) values ('https://push/a', 'a', 'k', 'x')`);
   h.raw.exec(`insert into notifications (user_id, kind, title, body, url) values ('a', 'test', 't', 'b', '/')`);
-  h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('a', 'channel:email')`);
+  h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('a', 'channel:email'), ('a', 'topic:reminders')`);
+  h.raw.exec(`insert into tip_dismissals (user_id, tip, count, dismissed_at) values ('a', 'push', 1, 1)`);
   h.raw.exec(`insert into pair_links (league_id, owner_id, token) values (1, 'a', 'tok-a')`);
   h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'a', 1)`);
   h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'a')`);
@@ -126,6 +127,7 @@ function personalRowsLeft() {
     push: n("select count(*) from push_subscriptions where user_id = 'a'"),
     notifications: n("select count(*) from notifications where user_id = 'a'"),
     optOuts: n("select count(*) from notification_opt_outs where user_id = 'a'"),
+    tips: n("select count(*) from tip_dismissals where user_id = 'a'"),
     pairLinks: n("select count(*) from pair_links where owner_id = 'a'"),
     partnerSearch: n("select count(*) from partner_searches where user_id = 'a'"),
     leagues: n("select count(*) from league_members where user_id = 'a'"),
@@ -145,6 +147,7 @@ const NONE = {
   push: 0,
   notifications: 0,
   optOuts: 0,
+  tips: 0,
   pairLinks: 0,
   partnerSearch: 0,
   leagues: 0,

@@ -184,6 +184,11 @@ describe("logPath", () => {
   it("hides the pair link token", () => {
     expect(logPath("https://padelparbaj.hu/pair/join/AbCdEfGhIjKlMnOpQrStUvWx")).toBe("/pair/join/[token]");
   });
+
+  it("hides an email's tracking image token (#243), also one without a digit", () => {
+    expect(logPath("https://padelparbaj.hu/email/open/0123456789abcdef0123456789abcdef")).toBe("/email/open/[token]");
+    expect(logPath("https://padelparbaj.hu/email/open/abcdefabcdefabcdefabcdefabcdefab")).toBe("/email/open/[token]");
+  });
 });
 
 describe("logLine", () => {

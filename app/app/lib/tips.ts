@@ -4,7 +4,7 @@
 // The dismissals are stored per account (tips.server.ts), the card is
 // components/tip-card.tsx.
 
-import type { PushDeviceState } from "./push/device";
+import { PUSH_NOTICES, type PushDeviceState } from "./push/device";
 
 // What the server knows about the player.
 export type TipAccount = {
@@ -74,6 +74,14 @@ export function offeredTips(tips: readonly Tip[], account: TipAccount, dismissal
 // applies; none while the browser checks are running.
 export function tipToShow(offered: readonly Tip[], device: TipDevice): Tip | null {
   return offered.find((t) => t.applies(device)) ?? null;
+}
+
+// What the card shows for the tip on this device: its button, or instead a
+// line. A browser that blocked notifications gets how to allow them, never
+// the button (it would only ask again, and the browser says no at once).
+export function tipCardParts(tip: Tip, device: TipDevice): { button: boolean; notice: string | null } {
+  if (tip.action.kind === "push" && device.push === "denied") return { button: false, notice: PUSH_NOTICES.denied ?? null };
+  return { button: true, notice: null };
 }
 
 export function tipById(id: string, tips: readonly Tip[] = TIPS): Tip | undefined {

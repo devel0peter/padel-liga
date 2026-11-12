@@ -5,8 +5,7 @@ import { Lightbulb } from "lucide-react";
 import { usePushDevice } from "~/components/use-push-device";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
-import { PUSH_NOTICES } from "~/lib/push/device";
-import { tipById, tipToShow, type Tip } from "~/lib/tips";
+import { tipById, tipCardParts, tipToShow, type Tip } from "~/lib/tips";
 
 // The Kezdőlap's tip (#262, D160): at most one, the first of the offered
 // tips (the server's list: not dismissed, offered to this account) that
@@ -26,7 +25,8 @@ export function TipCard({ offered, vapidPublicKey }: { offered: string[]; vapidP
     dismiss.submit({ intent: "dismiss_tip", tip: t.id }, { method: "post", action: "/home" });
   }
 
-  const blocked = tip.action.kind === "push" && push.state === "denied";
+  // The button, or the how-to-allow line instead (tipCardParts).
+  const parts = tipCardParts(tip, { push: push.state });
   return (
     <Card role="region" aria-label="Tipp" size="sm" className="max-w-2xl">
       <CardHeader>
@@ -39,24 +39,23 @@ export function TipCard({ offered, vapidPublicKey }: { offered: string[]; vapidP
         </CardTitle>
         <CardDescription>{tip.text}</CardDescription>
       </CardHeader>
-      {(blocked || push.error) && (
+      {(parts.notice || push.error) && (
         <CardContent className="grid gap-2 text-sm">
-          {blocked && <p>{PUSH_NOTICES.denied}</p>}
+          {parts.notice && <p>{parts.notice}</p>}
           {push.error && <p className="text-destructive">{push.error}</p>}
         </CardContent>
       )}
       <CardFooter className="flex flex-wrap gap-2">
-        {tip.action.kind === "push" ? (
-          !blocked && (
+        {parts.button &&
+          (tip.action.kind === "push" ? (
             <Button type="button" disabled={push.busy} onClick={() => void push.subscribe()}>
               {tip.button}
             </Button>
-          )
-        ) : (
-          <Button asChild>
-            <Link to={tip.action.to}>{tip.button}</Link>
-          </Button>
-        )}
+          ) : (
+            <Button asChild>
+              <Link to={tip.action.to}>{tip.button}</Link>
+            </Button>
+          ))}
         <Button type="button" variant="ghost" onClick={() => later(tip)}>
           Most nem
         </Button>

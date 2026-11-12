@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PushDeviceState } from "./push/device";
-import { isDismissed, offeredTips, tipById, tipToShow, TIPS, type Tip } from "./tips";
+import { isDismissed, offeredTips, tipById, tipCardParts, tipToShow, TIPS, type Tip } from "./tips";
 
 const NOW = new Date("2026-11-20T10:00:00Z");
 const DAY = 86_400_000;
@@ -38,6 +38,21 @@ describe("the push tip", () => {
     expect(push.applies(device("unsupported"))).toBe(false);
     expect(push.applies(device("ios-browser"))).toBe(false);
     expect(push.applies(device("checking"))).toBe(false);
+  });
+});
+
+describe("the card's parts", () => {
+  it("a blocked browser gets how to allow notifications, not the button (no new prompt)", () => {
+    expect(tipCardParts(push, device("denied"))).toEqual({ button: false, notice: expect.stringContaining("beállításaiban engedélyezheted") });
+  });
+
+  it("a browser that can still ask gets the button and no line", () => {
+    expect(tipCardParts(push, device("off"))).toEqual({ button: true, notice: null });
+  });
+
+  it("a link tip always has its button", () => {
+    const link: Tip = { ...push, id: "link", action: { kind: "link", to: "/rules" } };
+    expect(tipCardParts(link, device("denied"))).toEqual({ button: true, notice: null });
   });
 });
 

@@ -1,6 +1,7 @@
 import { deleteStaleLoginCodes, STALE_CODE_BATCH } from "~/lib/auth/login-code.server";
 import { resolveDeadlines } from "~/lib/deadline.server";
 import { DELIVER_MIN, deliver } from "~/lib/email/outbox.server";
+import { deleteOldFeedback } from "~/lib/feedback-retention.server";
 import { PURGE_MIN, purgeInterestList } from "~/lib/interest-list-purge.server";
 import { beginInvocation, logError, logInfo, logWarn } from "~/lib/log";
 import { runMatchReminders } from "~/lib/match-reminders.server";
@@ -24,9 +25,10 @@ import { RunBudget, type Usage } from "~/lib/run-usage";
 // before entering (#155), the one-time deletion of the interest list until it
 // is done (#334, interest-list-purge.server.ts; before the delivery, so none
 // of its waiting mail goes out), then the queued pushes and whatever email waits,
-// and last the day's push count (push-stats.server.ts, D100) when the run has
-// a query left. A step that fails is logged under its own name and the next
-// one runs anyway.
+// the day's push count (push-stats.server.ts, D100) when the run has a query
+// left, and last, once a Budapest day, the deletion of feedback older than a
+// year (#249, feedback-retention.server.ts). A step that fails is logged
+// under its own name and the next one runs anyway.
 //
 // One run may make 50 D1 queries and 50 outgoing calls (Workers Free,
 // lib/run-usage.ts). The steps share one budget; each keeps enough of it for
@@ -134,7 +136,7 @@ export const CRON_STEPS: readonly CronStep[] = [
     },
   },
   {
-    // Last, so it never takes room from a delivery; a skipped run is fine,
+    // After the deliveries, so it never takes their room; a skipped run is fine,
     // the next one of the day writes the same row.
     name: "push stats",
     run: async (now, run) => {
@@ -142,6 +144,12 @@ export const CRON_STEPS: readonly CronStep[] = [
       await recordPushStats(now);
       return null;
     },
+  },
+  {
+    // One query once a Budapest day (#249), after the deliveries so it
+    // never takes their room; a run without room leaves it for the next.
+    name: "feedback retention",
+    run: (now, run) => deleteOldFeedback(now, run),
   },
 ];
 

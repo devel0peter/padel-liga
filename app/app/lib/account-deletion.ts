@@ -112,7 +112,7 @@ export function deletionPlan(c: DeletionCheck, by: DeletionBy = "admin"): Deleti
 export const DELETION_EFFECTS: Record<DeletionMode, string> = {
   remove:
     "Nincs lejátszott múltja, ezért minden adata törlődik: a fiók, a párjai, a nevezései, a párkeresése, az értesítései és a címéhez tartozó minden tárolt adat, a leiratkozás vagy visszapattanás nyoma is. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. Ha volt párja, ő pár nélkül marad. Senki nem kap róla e-mailt.",
-  anonymize: `Volt már kihirdetett csoportban, ezért a fiók névtelen lesz: a neve „${DELETED_NAME}” lesz, az e-mail-címe, a telefonszáma, a belépései, az eszközei és a címéhez tartozó minden tárolt adat (a leiratkozás vagy visszapattanás nyoma is) törlődik, a régi eredményekben csak a névtelen neve marad. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. A csoportok és az eredmények nem változnak. Az aktív párja felbomlik. Senki nem kap róla e-mailt.`,
+  anonymize: `Volt már kihirdetett csoportban, ezért a fiók névtelen lesz: a neve „${DELETED_NAME}” lesz, az e-mail-címe, a telefonszáma, a belépései, az eszközei, a visszajelzései és a címéhez tartozó minden tárolt adat (a leiratkozás vagy visszapattanás nyoma is) törlődik, a régi eredményekben csak a névtelen neve marad. Ha újra regisztrál ezzel a címmel, tiszta lappal indul. A csoportok és az eredmények nem változnak. Az aktív párja felbomlik. Senki nem kap róla e-mailt.`,
 };
 
 export const DELETED = { remove: "A fiók törölve.", anonymize: "A fiók névtelen lett." } as const;
@@ -121,7 +121,7 @@ export const DELETED = { remove: "A fiók törölve.", anonymize: "A fiók névt
 export const OWN_DELETION_EFFECTS: Record<DeletionMode, string> = {
   remove:
     "Még nem szerepeltél a ligában, ezért minden adatod törlődik: a fiókod, a párosaid, a nevezéseid, a párkeresésed és az értesítéseid. Ha van párod, ő pár nélkül marad.",
-  anonymize: `Már szerepeltél a ligában, ezért a fiókod névtelen lesz: a neved helyén „${DELETED_NAME}” áll, az e-mail-címed, a telefonszámod és a belépéseid törlődnek. Az eredmények és a tabellák nem változnak. Ha van párod, a párosotok felbomlik.`,
+  anonymize: `Már szerepeltél a ligában, ezért a fiókod névtelen lesz: a neved helyén „${DELETED_NAME}” áll, az e-mail-címed, a telefonszámod, a belépéseid és a visszajelzéseid törlődnek. Az eredmények és a tabellák nem változnak. Ha van párod, a párosotok felbomlik.`,
 };
 
 // Said after either effect: the Szervező rights, the login, no way back.

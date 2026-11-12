@@ -7,6 +7,7 @@ import {
   auditLog,
   emailMessages,
   emailSuppressions,
+  feedback,
   groups,
   leagueAdminInvites,
   leagueAdmins,
@@ -164,6 +165,10 @@ function personalDataStatements(userId: string, email: string, mail: MailContext
     db.delete(notifications).where(mine(eq(notifications.userId, userId))),
     db.delete(notificationOptOuts).where(mine(eq(notificationOptOuts.userId, userId))),
     db.delete(tipDismissals).where(mine(eq(tipDismissals.userId, userId))),
+    // Their feedback, ratings too (#249, spec 19): a message may name its
+    // sender, so the anonymizing delete takes it as well. Visitors' and
+    // other accounts' messages stay.
+    db.delete(feedback).where(mine(eq(feedback.userId, userId))),
     db.delete(pairLinks).where(mine(eq(pairLinks.ownerId, userId))),
     db.delete(partnerSearches).where(mine(eq(partnerSearches.userId, userId))),
     db.delete(leagueMembers).where(mine(eq(leagueMembers.userId, userId))),

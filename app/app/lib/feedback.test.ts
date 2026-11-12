@@ -5,8 +5,12 @@ import {
   browserFamily,
   deviceClass,
   ERRORS,
+  excerpt,
+  feedbackCounts,
+  filterHref,
   MESSAGE_MAX,
   pagePath,
+  parseFeedbackFilters,
   rateLimits,
   validateFeedback,
   VISITOR_LIMITS,
@@ -123,5 +127,50 @@ describe("rate limits (#239 requirement 4, #240 requirement 6)", () => {
     expect(withinLimits(ACCOUNT_LIMITS, [0, 20])).toBe(false);
     expect(withinLimits(VISITOR_LIMITS, [29])).toBe(true);
     expect(withinLimits(VISITOR_LIMITS, [30])).toBe(false);
+  });
+});
+
+describe("Visszajelzések filters (#241)", () => {
+  it("reads type, state and page from the address, ignoring anything malformed", () => {
+    expect(parseFeedbackFilters(new URLSearchParams("type=bug&state=done&page=3"))).toEqual({ kind: "bug", state: "done", page: 3 });
+    expect(parseFeedbackFilters(new URLSearchParams("type=rating&state=open"))).toEqual({ kind: "rating", state: "open", page: 1 });
+    expect(parseFeedbackFilters(new URLSearchParams("type=x&state=maybe&page=-1"))).toEqual({ kind: null, state: null, page: 1 });
+    expect(parseFeedbackFilters(new URLSearchParams(""))).toEqual({ kind: null, state: null, page: 1 });
+  });
+
+  it("builds the address with one filter changed, from page 1", () => {
+    const filters = { kind: "bug" as const, state: "open" as const, page: 3 };
+    expect(filterHref(filters, { kind: null })).toBe("/admin/feedback?state=open");
+    expect(filterHref(filters, { state: "done" })).toBe("/admin/feedback?type=bug&state=done");
+    expect(filterHref(filters, { page: 2 })).toBe("/admin/feedback?type=bug&state=open&page=2");
+    expect(filterHref({ kind: null, state: null, page: 1 }, {})).toBe("/admin/feedback");
+  });
+
+  it("counts each type within the chosen state and each state within the chosen type", () => {
+    const groups = [
+      { kind: "bug" as const, done: false, count: 3 },
+      { kind: "bug" as const, done: true, count: 2 },
+      { kind: "idea" as const, done: false, count: 1 },
+      { kind: "rating" as const, done: true, count: 4 },
+    ];
+    expect(feedbackCounts(groups, { kind: null, state: null })).toEqual({
+      kinds: { bug: 5, idea: 1, other: 0, rating: 4 },
+      states: { open: 4, done: 6 },
+    });
+    expect(feedbackCounts(groups, { kind: "bug", state: "open" })).toEqual({
+      kinds: { bug: 3, idea: 1, other: 0, rating: 0 },
+      states: { open: 3, done: 2 },
+    });
+    expect(feedbackCounts(groups, { kind: null, state: "done" })).toEqual({
+      kinds: { bug: 2, idea: 0, other: 0, rating: 4 },
+      states: { open: 4, done: 6 },
+    });
+  });
+
+  it("shows the first words of a long message", () => {
+    expect(excerpt("Rövid üzenet")).toBe("Rövid üzenet");
+    expect(excerpt("egy  kettő\nhárom", 80)).toBe("egy kettő három");
+    expect(excerpt("alma körte szilva barack", 16)).toBe("alma körte…");
+    expect(excerpt("a".repeat(30), 10)).toBe(`${"a".repeat(10)}…`);
   });
 });

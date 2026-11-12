@@ -603,15 +603,20 @@ The pair is a section of Profil, and Profil lists the pairs that ended (decision
   - On the running round seed (today in week 2): Lejátszva 4/15, "Fixálva vagy lejátszva" 8/15, Egyeztetésre vár 3, Ajánlat 3, Megbeszélt időpont 1, Lefixálva 2, Eredmény 1, Vitatott 1, Lejátszva 4, Elakadt 2; week 1 4/5, week 2 0/5 (2 not fixed), week 3 0/5.
   - A player gets 403 on both pages.
 
-### 39. Anyone sends feedback (side path)
+### 39. Anyone sends feedback; the Admin reads it on Visszajelzések (side path)
 
-The Visszajelzés form (#240; spec section 19, decision log (`docs/decisions.md`) D94; `app/e2e/37-feedback.spec.ts`).
+The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decision log (`docs/decisions.md`) D94; `app/e2e/37-feedback.spec.ts`).
 
 - Page: any logged-in page, then "Visszajelzés" at the bottom of the sidebar; logged out, "Visszajelzés" in the footer of `/`, `/rules` or `/privacy`
 - Account: any player, or none
 - Expect: `/feedback?from=<the page>`: "Miről szól?" (Hiba / Ötlet / Egyéb), "Üzenet" (at most 2000 characters), the warning about passwords and other people's data, and "Ezt küldjük el veled:" with the page (path only: no query string, ids as `:id`), the time, the device ("mobil" or "számítógép"), the browser, the version and, logged in, the account's name. Under the button: "E-mailben nem válaszolunk" with the contact address. Logged out, the Turnstile check above the button (locally with the test keys from `.dev.vars.example` it always passes).
 - Do: pick "Hiba", write a line, "Küldés".
 - Expect: "Köszi, megkaptuk!" in place of the form and "Vissza oda, ahonnan jöttél", which opens the page you came from. No email in the terminal, no notification. An empty message, a failed bot check or the limit (an account 5 an hour and 20 a day, visitors together 30 an hour) gives a short error and keeps the text.
+- Then, as `admin@example.test`: Platform > "Visszajelzések" (`/admin/feedback`).
+- Expect: every message, newest first: the type, "Kész" when done, the time, the first words and the sender's name ("Vendég" for a visitor), never an email or phone number. "Típus" (Mind / Hiba / Ötlet / Egyéb / Értékelés) and "Állapot" (Mind / Nyitott / Kész) with their counts, in the address (`?type=`, `?state=`). At 390px the rows stack.
+- Do: open a message, "Kész", then "Újranyitom".
+- Expect: the full text, the stars for a rating, the sender, time, page, device, browser and version; after "Kész" the badge and "Kész: <time>, Admin", after "Újranyitom" "Újranyitva: <time>, Admin". Both in Napló ("Visszajelzés kész", "Visszajelzés újranyitása").
+- As `szervezo@example.test` or a player: no "Visszajelzések" in the sidebar, and `/admin/feedback` shows "Ehhez nincs jogod".
 
 ## A running round instead
 

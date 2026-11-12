@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -92,6 +92,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   cities: Building2,
   users: UserCog,
   log: ScrollText,
+  feedback: MessageSquareText,
 };
 
 const isCurrent = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);

@@ -162,3 +162,73 @@ describe("the form's send (#240)", () => {
     expect(rows()).toHaveLength(5);
   });
 });
+
+describe("Visszajelzések (#241)", () => {
+  async function seed() {
+    await store("u1", minutes(1), "bug");
+    await store(null, minutes(2), "idea");
+    await store("u2", minutes(3), "rating");
+    await store("u1", minutes(4), "bug");
+    await F.setFeedbackDone(1, true, "adm", minutes(10));
+  }
+
+  it("lists newest first with the sender's name or none for a visitor, never an email or phone", async () => {
+    await seed();
+    const page = await F.feedbackPage({ kind: null, state: null, page: 1 });
+    expect(page.rows.map((r) => [r.id, r.kind, r.sender?.name ?? null, r.done])).toEqual([
+      [4, "bug", "Kiss Anna", false],
+      [3, "rating", "Nagy Béla", false],
+      [2, "idea", null, false],
+      [1, "bug", "Kiss Anna", true],
+    ]);
+    expect(page.total).toBe(4);
+    expect(JSON.stringify(page)).not.toMatch(/@|\+36/);
+  });
+
+  it("the type and state filters narrow the list and the counts match it", async () => {
+    await seed();
+    const bugs = await F.feedbackPage({ kind: "bug", state: null, page: 1 });
+    expect(bugs.rows.map((r) => r.id)).toEqual([4, 1]);
+    expect(bugs.counts.kinds.bug).toBe(2);
+    expect(bugs.total).toBe(2);
+    const openBugs = await F.feedbackPage({ kind: "bug", state: "open", page: 1 });
+    expect(openBugs.rows.map((r) => r.id)).toEqual([4]);
+    expect(openBugs.counts).toEqual({ kinds: { bug: 1, idea: 1, other: 0, rating: 1 }, states: { open: 1, done: 1 } });
+    const done = await F.feedbackPage({ kind: null, state: "done", page: 1 });
+    expect(done.rows.map((r) => r.id)).toEqual([1]);
+    expect(done.total).toBe(done.counts.states.done);
+    const ratings = await F.feedbackPage({ kind: "rating", state: null, page: 1 });
+    expect(ratings.rows).toMatchObject([{ id: 3, rating: 4 }]);
+  });
+
+  it("opens one message with its context", async () => {
+    await seed();
+    expect(await F.feedbackItem(3)).toMatchObject({
+      kind: "rating",
+      rating: 4,
+      page: "/home",
+      device: "desktop",
+      browser: "Chrome",
+      appVersion: "abc1234",
+      sender: { id: "u2", name: "Nagy Béla" },
+      done: false,
+    });
+    expect((await F.feedbackItem(2))!.sender).toBeNull();
+    expect(await F.feedbackItem(99)).toBeNull();
+  });
+
+  it("marking done and open again keeps who and when, audited once each", async () => {
+    await store("u1", NOW);
+    await F.setFeedbackDone(1, true, "adm", minutes(5));
+    expect(await F.feedbackItem(1)).toMatchObject({ done: true, doneAt: minutes(5), doneBy: { id: "adm", name: "Admin" } });
+    // Done again: nothing changes, nothing logged.
+    await F.setFeedbackDone(1, true, "adm", minutes(6));
+    await F.setFeedbackDone(1, false, "adm", minutes(7));
+    expect(await F.feedbackItem(1)).toMatchObject({ done: false, doneAt: null, reopenedAt: minutes(7), reopenedBy: { id: "adm", name: "Admin" } });
+    await F.setFeedbackDone(1, false, "adm", minutes(8));
+    expect(audit()).toEqual([
+      { actor_id: "adm", action: "feedback.done", target: "feedback:1" },
+      { actor_id: "adm", action: "feedback.reopen", target: "feedback:1" },
+    ]);
+  });
+});

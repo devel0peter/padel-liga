@@ -32,6 +32,7 @@ const platformOnly: Permission[] = [
   { kind: "users.edit" },
   { kind: "users.delete" },
   { kind: "log.view" },
+  { kind: "feedback.view" },
   { kind: "clubs.manage" },
 ];
 
@@ -116,6 +117,7 @@ describe("sidebar", () => {
       "/admin/outbox",
       "/admin/traffic",
       "/admin/log",
+      "/admin/feedback",
     ]);
     expect(adminHome(superadmin)).toBe("/admin/leagues");
   });

@@ -116,3 +116,65 @@ export const rateLimits = (userId: string | null): readonly RateWindow[] => (use
 export function withinLimits(windows: readonly RateWindow[], counts: readonly number[]): boolean {
   return windows.every((w, i) => (counts[i] ?? 0) < w.max);
 }
+
+// --- Admin list (Visszajelzések) ------------------------------------------------
+
+export const FEEDBACK_PAGE_SIZE = 50;
+
+export type FeedbackState = "open" | "done";
+export const STATE_LABELS: Record<FeedbackState, string> = { open: "Nyitott", done: "Kész" };
+
+export type FeedbackFilters = { kind: FeedbackKind | null; state: FeedbackState | null; page: number };
+
+// From the address (?type=bug&state=open&page=2). Anything malformed is ignored.
+export function parseFeedbackFilters(params: URLSearchParams): FeedbackFilters {
+  const kind = params.get("type");
+  const state = params.get("state");
+  const page = Number(params.get("page"));
+  return {
+    kind: isFeedbackKind(kind) ? kind : null,
+    state: state === "open" || state === "done" ? state : null,
+    page: Number.isInteger(page) && page > 1 ? page : 1,
+  };
+}
+
+// The address of the list with one filter changed (null: all); the page
+// starts again from 1.
+export function filterHref(filters: FeedbackFilters, change: Partial<Pick<FeedbackFilters, "kind" | "state" | "page">>): string {
+  const next = { ...filters, page: 1, ...change };
+  const params = new URLSearchParams();
+  if (next.kind) params.set("type", next.kind);
+  if (next.state) params.set("state", next.state);
+  if (next.page > 1) params.set("page", String(next.page));
+  const query = params.toString();
+  return `/admin/feedback${query ? `?${query}` : ""}`;
+}
+
+export type FeedbackCounts = { kinds: Record<FeedbackKind, number>; states: Record<FeedbackState, number> };
+
+// The counts beside the filters, from (kind, done, count) groups: each type
+// counted within the chosen state, each state within the chosen type, so the
+// number next to the chosen filter is what the list shows.
+export function feedbackCounts(groups: readonly { kind: FeedbackKind; done: boolean; count: number }[], filters: Pick<FeedbackFilters, "kind" | "state">): FeedbackCounts {
+  const kinds: Record<FeedbackKind, number> = { bug: 0, idea: 0, other: 0, rating: 0 };
+  const states: Record<FeedbackState, number> = { open: 0, done: 0 };
+  for (const g of groups) {
+    const state: FeedbackState = g.done ? "done" : "open";
+    if (!filters.state || filters.state === state) kinds[g.kind] += g.count;
+    if (!filters.kind || filters.kind === g.kind) states[state] += g.count;
+  }
+  return { kinds, states };
+}
+
+// The first words of a message for the list: whole words up to `max`
+// characters, with an ellipsis when cut.
+export function excerpt(message: string, max = 80): string {
+  const text = message.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+// A visitor's message has no account.
+export const VISITOR_NAME = "Vendég";

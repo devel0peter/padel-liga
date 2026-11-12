@@ -49,6 +49,9 @@ export default [
       route("admin/users", "routes/admin.users.tsx"),
       route("admin/users/:id", "routes/admin.user.tsx"),
       route("admin/log", "routes/admin.log.tsx"),
+      // Visszajelzések (#241, spec 19): Admin only.
+      route("admin/feedback", "routes/admin.feedback.tsx"),
+      route("admin/feedback/:id", "routes/admin.feedback-item.tsx"),
       route("admin/leagues/:league", "routes/admin.league.tsx"),
       route("admin/leagues/:league/seasons", "routes/admin.league-seasons.tsx"),
       route("admin/leagues/:league/seasons/:season/entries", "routes/admin.season-entries.tsx"),

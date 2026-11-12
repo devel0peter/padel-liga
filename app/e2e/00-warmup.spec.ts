@@ -28,6 +28,7 @@ test("warm up the dev server", async ({ browser }) => {
     "/admin/leagues/minta/matches",
     "/admin/outbox",
     "/admin/users",
+    "/admin/feedback",
   ]) {
     await visit(page, path);
     await expect(page.locator("body")).toBeVisible();

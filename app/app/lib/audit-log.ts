@@ -109,6 +109,7 @@ const KIND_WORDS: Record<string, string> = {
   match: "Meccs",
   signup: "Jelentkezés",
   broadcast: "Körlevél",
+  feedback: "Visszajelzés",
 };
 
 // Text with every reference replaced by what it names ("pair:12" -> "Anna –

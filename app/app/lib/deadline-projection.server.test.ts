@@ -27,6 +27,7 @@ const E = await import("~/lib/season-entries.server");
 const S = await import("~/lib/strikes.server");
 const { resolveDeadlines } = await import("~/lib/deadline.server");
 const { phaseProjection } = await import("~/lib/deadline-projection.server");
+const RS = await import("~/lib/round-switch.server");
 const { projectionKind, projectionLine, projectionView } = await import("~/lib/deadline-projection");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -82,7 +83,8 @@ const strike = (userId: string) =>
 
 async function propose(pair: number, other: number, slots = SLOTS) {
   const id = matchOf(pair, other);
-  expect(await M.matchStep(`p${pair}a`, id, { kind: "propose", ranges: hour(slots), clubId: null }, NOW)).toMatchObject({ ok: true });
+  const r = await M.matchStep(`p${pair}a`, id, { kind: "propose", ranges: hour(slots), clubId: null }, NOW);
+  expect([pair, other, r]).toMatchObject([pair, other, { ok: true }]);
   return id;
 }
 
@@ -181,6 +183,56 @@ describe("phaseProjection (#362)", () => {
     expect(await phaseProjection(1, 1)).not.toBeNull();
     expect(changes()).toBe(before);
     expect(counts()).toEqual(rows);
+  });
+
+  // The preview now, then the deadline run and the cron's draft: the same groups, leavers and origins.
+  async function previewEqualsDraft() {
+    const preview = (await RS.roundSwitchPreview(1, 2, NOW))!;
+    await resolveDeadlines(MONDAY_6, undefined, 25);
+    expect(await RS.generateRoundSwitchDraft(1, 2, null, MONDAY_6)).toEqual({ ok: true });
+    const stored = all(
+      "select g.number, gp.pair_id from groups g join group_pairs gp on gp.group_id = g.id where g.season_id = 1 and g.phase = 2 order by g.number, gp.seed",
+    );
+    const real: number[][] = [];
+    for (const r of stored) (real[r.number - 1] ??= []).push(r.pair_id);
+    expect(preview.draft.map((g) => g.map((p) => p.pairId))).toEqual(real);
+    const after = (await RS.roundSwitch(1, 2, MONDAY_6))!;
+    expect(preview.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual(after.leaving.map((l) => [l.pair.pairId, l.reason]));
+    expect([...preview.origins]).toEqual([...after.origins]);
+    return preview;
+  }
+
+  it("the next round's preview (#363) equals the draft the system makes after the deadline run", async () => {
+    await scenario();
+    const preview = await previewEqualsDraft();
+    // First switch of the first season, next to a group of 3: 1 pair swaps.
+    expect(preview.fast).toBe(true);
+    expect(preview.leaving.map((l) => [l.pair.pairId, l.reason]).sort()).toEqual([
+      [3, "strikes"],
+      [7, "withdrawn"],
+    ]);
+  });
+
+  it("the preview's tables count the projected outcomes: who goes down changes with them", async () => {
+    // Group 1: pair 4 is active on all its matches (3 walkovers), 1 and 2 on 1–3
+    // and 2–3 and both on 1–2 (unplayed); pair 3 does nothing (3 strikes, leaves).
+    // Group 2: 5 active on 5–6; 5–7 and 6–7 nobody.
+    // Three different days from the given one, at `hour`.
+    const later = (day: string, hour = 18) => [0, 1, 2].map((d) => new Date(at(day, hour).getTime() + d * 86_400_000));
+    await propose(4, 1, later("2026-11-12"));
+    await propose(4, 2, later("2026-11-13"));
+    await propose(4, 3, later("2026-11-14"));
+    await propose(1, 3, later("2026-11-15"));
+    await propose(2, 3, later("2026-11-16"));
+    await propose(1, 2, later("2026-11-17"));
+    await propose(2, 1, later("2026-11-18"));
+    await propose(5, 6, later("2026-11-19"));
+    const preview = await previewEqualsDraft();
+    // By seed alone 4 would be last and go down; with the walkovers it tops the group.
+    expect(preview.tables[0]!.rows.map((r) => r.pair.pairId)).toEqual([4, 1, 2, 3]);
+    expect(preview.tables[1]!.rows.map((r) => r.pair.pairId)).toEqual([5, 6, 7]);
+    expect(preview.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual([[3, "strikes"]]);
+    expect(preview.origins.get(4)).toEqual({ kind: "continuing", group: 1, place: 1 });
   });
 
   it("is null for a phase without published groups", async () => {

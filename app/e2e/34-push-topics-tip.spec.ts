@@ -53,3 +53,16 @@ test("Profil: push topics, all on; one off is saved; with push off they are disa
   await expect.poll(optOuts).toEqual([]);
   await context.close();
 });
+
+// The Kezdőlap tip (#262, D160): the suite's server has no push keys (no
+// real push from a test), so no device could subscribe and the push tip is
+// not offered. The tip's conditions, "Most nem" and the shared subscribe are
+// in tips.test.ts, app.home-tips.test.ts and push/device.test.ts.
+test("Kezdőlap: no push tip while the site can't push", async ({ browser }) => {
+  const { context, page } = await as(browser, PAIRS.p1[0]);
+  await visit(page, "/home");
+  await expect(page).toHaveTitle(/^Kezdőlap/);
+  await expect(content(page).getByRole("region", { name: "Tipp" })).toHaveCount(0);
+  await expect(content(page).getByRole("button", { name: "Bekapcsolom" })).toHaveCount(0);
+  await context.close();
+});

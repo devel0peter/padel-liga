@@ -97,7 +97,8 @@ export default function Privacy() {
                 az értesítéseid listája, és hogy e-mailben, push értesítésben
                 vagy mindkettőben kéred-e őket, és mely témákról kérsz push
                 értesítést (alapból minden be van kapcsolva, a profilodban
-                bármikor átállíthatod),
+                bármikor átállíthatod), és ha a Kezdőlapon egy tippre azt
+                mondod, „Most nem”, hogy mikor és hányszor,
               </li>
               <li>
                 ha egy eszközön bekapcsolod a push értesítést, a böngésződ

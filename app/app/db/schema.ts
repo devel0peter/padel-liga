@@ -522,6 +522,23 @@ export const notificationOptOuts = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 );
 
+// The Kezdőlap tips a player dismissed ("Most nem", #262, D160): per
+// account, so it holds on every device. The first dismissal hides the tip
+// for 14 days, the second for good (lib/tips.ts).
+export const tipDismissals = sqliteTable(
+  "tip_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // An id of lib/tips.ts TIPS.
+    tip: text("tip").notNull(),
+    count: integer("count").notNull().default(1),
+    dismissedAt: integer("dismissed_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tip] })],
+);
+
 // Two players who play a league together (spec section 4). Formed by a pair
 // link, on Párkeresők or by a Szervező on the Párok page (#97; from the
 // interest signup, #89, until #333); a player is in at most one active pair

@@ -27,7 +27,7 @@
 	"triggers": { "crons": ["* * * * *"] },
 	"vars": {
 		// The address the watchdog opens. Point it at a local server to try a
-		// failure: `npm run dev -w watchdog -- --var HEALTH_URL:http://localhost:8788/`.
+		// failure: `npm run dev -w watchdog -- --var HEALTH_URL:http://localhost:8788/health`.
 		"HEALTH_URL": "https://padelparbaj.hu/health"
 	}
 }

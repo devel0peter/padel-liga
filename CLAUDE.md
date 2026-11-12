@@ -33,6 +33,7 @@
 - Auth: **Better Auth** (email + password, Google, Facebook). Not installed yet.
 - Email: **Resend** (EU), called with plain `fetch`, no SDK. All mail goes through the outbox in `app/app/lib/email/outbox.server.ts`; templates are pure functions in `templates.ts`. Secrets: `RESEND_API_KEY`, `EMAIL_SECRET` (local: `app/.dev.vars`; without a key, dev logs emails to the console).
 - Scheduled jobs (deadlines, reminders, auto-confirm): Cloudflare **Cron Triggers**.
+- `watchdog/`: a separate Worker that opens `/health` every minute and logs the result (D169); own `wrangler.jsonc`, no bindings, deployed by CI after the app.
 - `packages/rules/`: the rules engine. Pure TypeScript, no I/O and no Cloudflare imports, tested with **Vitest**.
 
 ## Commands (from the repo root)

@@ -11,6 +11,7 @@ The first Győr season is set up and round 1 starts on 9 Nov 2026. Open work is 
 ## Stack
 
 - `app/`: React Router (framework mode, server-rendered) on Cloudflare Workers, Tailwind CSS + shadcn/ui, Cloudflare D1 with Drizzle ORM, own small auth module (Google or an emailed one-time code), email via Google Workspace SMTP with Resend as fallback.
+- `watchdog/`: a small separate Worker that checks `https://padelparbaj.hu/health` every minute for the alerts (see `docs/operations.md`, "Monitoring").
 - `packages/rules/`: the rules engine (standings, tiebreakers, walkovers, promotion and relegation, Elo, fixtures). Pure TypeScript, no I/O, tested with Vitest.
 - TypeScript everywhere, npm workspaces. Scheduled jobs run as Cloudflare Cron Triggers.
 

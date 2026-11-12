@@ -1,0 +1,33 @@
+/**
+ * The watchdog (#318, D169): a second Worker, separate from the app, that opens
+ * the public health address once a minute and writes one "watchdog check" log
+ * line per check. Cloudflare alerts react to those lines (docs/operations.md,
+ * "Monitoring"). Deployed by CI after the app on a release (push to main).
+ *
+ * No bindings on purpose: no D1, no R2, no secrets. It reaches the app only
+ * the way a visitor does, over the internet (domain, DNS, zone rules, the app's
+ * Worker, the database), so a broken app deploy can't stop it.
+ */
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "padel-liga-watchdog",
+	"compatibility_date": "2026-09-26",
+	"main": "./src/index.ts",
+	// The check lines are the whole point: Workers Logs must keep them.
+	"observability": {
+		"enabled": true
+	},
+	// No public address: no workers.dev URL, no preview URLs, no routes. It only
+	// runs on its schedule. (Cron Triggers still need the account's workers.dev
+	// subdomain to exist, which it does for the app.)
+	"workers_dev": false,
+	"preview_urls": false,
+	// Every minute: about 1,440 runs a day, inside the Workers Free limits
+	// (100,000 requests a day; the run waits on the network, not the CPU).
+	"triggers": { "crons": ["* * * * *"] },
+	"vars": {
+		// The address the watchdog opens. Point it at a local server to try a
+		// failure: `npm run dev -w watchdog -- --var HEALTH_URL:http://localhost:8788/health`.
+		"HEALTH_URL": "https://padelparbaj.hu/health"
+	}
+}

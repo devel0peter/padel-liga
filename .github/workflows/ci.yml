@@ -94,7 +94,9 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The suite alone took 14.6 min on the 2026-11-12 release PR (#373); with
+    # setup that hit a 15-min limit after every test had passed.
+    timeout-minutes: 25
     env:
       RUN: ${{ needs.changes.outputs.code == 'true' && (github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'e2e')) }}
     # Read-only token, no `secrets`: nothing of Cloudflare or Resend reaches this job.

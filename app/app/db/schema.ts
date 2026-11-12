@@ -102,6 +102,13 @@ export const emailMessages = sqliteTable(
     // Null: nothing reported (the relay reports nothing back).
     delivery: text("delivery", { enum: ["delivered", "bounced", "soft_bounced", "complained"] }),
     deliveryAt: integer("delivery_at", { mode: "timestamp" }),
+    // Open tracking (#243, D161): the random token in the email's tracking
+    // image (null: not tracked, a login code or an email from before), the
+    // first time the image was loaded and how many times. Nothing else about
+    // an open is kept; the open data goes with the row.
+    openToken: text("open_token"),
+    openedAt: integer("opened_at", { mode: "timestamp" }),
+    openCount: integer("open_count").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -112,6 +119,8 @@ export const emailMessages = sqliteTable(
     index("email_messages_to_idx").on(t.toEmail),
     // A Resend event names the email by its id (#242).
     index("email_messages_provider_idx").on(t.providerId),
+    // The tracking image names the email by its token (#243).
+    uniqueIndex("email_messages_open_token_idx").on(t.openToken),
   ],
 );
 

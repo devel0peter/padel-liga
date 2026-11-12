@@ -21,6 +21,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 15, the second league's player (#331) | [`28-league-members.spec.ts`](../app/e2e/28-league-members.spec.ts) |
 | 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
 | 33b, 33c, the Admin's player profile and email log (D156, D157) | [`33-player-profile.spec.ts`](../app/e2e/33-player-profile.spec.ts) |
+| 33c, email opens in the email log (D161) | [`35-email-opens.spec.ts`](../app/e2e/35-email-opens.spec.ts) |
 
 ## Set up
 
@@ -534,6 +535,9 @@ Which emails a player got, when, and what became of them (#242, decision log (`d
 - Account: `admin@example.test`
 - Expect: every email made for the address, newest first: the kind as on Kimenő levelek (e.g. "Belépőkód", "Kihirdetett csoportok"), the subject, when it was made and when it went out, and the state. Locally every email went to the console: "Elküldve", "Konzol (fejlesztés)". In production an email through the Google relay reads "Elküldve" with "A Google-relé nem jelzi vissza a kézbesítést."; one through Resend turns "Kézbesítve" (or "Visszapattant", "Spamnek jelölte") when Resend reports it. A failed one shows the reason with addresses hidden. No other person's address anywhere.
 - Expect, for a blocked address: a line at the top, "Letiltott cím: …, <date> óta."
+- Expect, open tracking (#243, D161): above the list "A megnyitás csak becslés: …"; under each sent email that isn't a login code "Nem ismert, hogy megnyitotta"; a login code shows nothing about opening.
+- Do: open an email's tracking image as a mail app would. Get a token with `npx wrangler d1 execute DB --local --command "select open_token from email_messages where open_token is not null and status = 'sent' order by id desc limit 1"` (in `app/`), then open `http://localhost:5173/email/open/<token>` twice (an empty page with an invisible image). Reload the profile of that email's recipient.
+- Expect: that email reads "Megnyitva: <date and time> · 2 megnyitás". A made-up token gives the same image and changes nothing.
 - As `szervezo@example.test`: the profile, so the log too, is "Ehhez nincs jogod".
 
 ### 34. A player gets strikes; the Szervező cancels one (side path)

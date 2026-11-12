@@ -95,6 +95,34 @@ describe("handleError", () => {
     expect(lines[0].error.stack).toContain("request-log.test.ts");
   });
 
+  // The shape React Router hands to handleError for its own 404/405 and for thrown data().
+  const routeError = (status: number, statusText: string, data: string) => ({ status, statusText, internal: true, data });
+  const call = (error: unknown) => handleError(error, { request: request(), params: {}, context: {} as any });
+
+  it("logs nothing for an address that does not exist (404 route error)", () => {
+    call(routeError(404, "Not Found", 'Error: No route matches URL "/getcmd"'));
+    expect(lines).toHaveLength(0);
+  });
+
+  it("logs nothing for a method the site does not serve (405 route error)", () => {
+    call(routeError(405, "Method Not Allowed", 'Error: Invalid request method "OPTIONS"'));
+    expect(lines).toHaveLength(0);
+  });
+
+  it("logs nothing for a thrown 404 or 405 Response either", () => {
+    call(new Response(null, { status: 404 }));
+    call(new Response(null, { status: 405 }));
+    expect(lines).toHaveLength(0);
+  });
+
+  it("keeps the error line for other error responses and plain errors", () => {
+    call(routeError(403, "Forbidden", "no"));
+    call(routeError(500, "Internal Server Error", "bad"));
+    call(new Response(null, { status: 500 }));
+    call(new Error("loader broke"));
+    expect(lines.map((l) => l.event)).toEqual(["unhandled error", "unhandled error", "unhandled error", "unhandled error"]);
+  });
+
   it("logs nothing for a request the browser gave up on", () => {
     const aborted = new AbortController();
     aborted.abort();

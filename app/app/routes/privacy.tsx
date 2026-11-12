@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 08.";
+const EFFECTIVE_FROM = "2026. 11. 12.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -150,6 +150,15 @@ export default function Privacy() {
               szezonban kaptál; a fiókod törlésével ezt is töröljük. Benne lehet
               a párod neve, de más e-mail-címe vagy telefonszáma soha. Ha
               kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
+            </p>
+            <p>
+              A leveleinkben (a belépési kódot kivéve) van egy apró, láthatatlan
+              kép. Ha a levelezőprogramod betölti, feljegyezzük, hogy azt a
+              levelet megnyitottad: az első megnyitás idejét és azt, hányszor
+              nyitottad meg. Az IP-címedet, az eszközödet és a böngésződet nem
+              tároljuk. Ebből látja az admin, hogy a liga hírei eljutnak-e
+              hozzád. Ha nem szeretnéd, kapcsold ki a képek automatikus
+              betöltését a levelezőprogramodban.
             </p>
             <p>
               A körlevelek alján mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
@@ -349,7 +358,9 @@ export default function Privacy() {
                 őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
                 azt, hogy kinek, mikor és milyen tárggyal ment, és ha a Resend
                 visszajelzi, azt is, hogy megérkezett-e, visszapattant-e vagy
-                spamnek jelölted-e. Ezt csak az admin látja.
+                spamnek jelölted-e, és hogy megnyitottad-e (mikor először és
+                hányszor). Ezt csak az admin látja, és a levéllel együtt
+                töröljük.
               </li>
               <li>
                 <strong>Belépési kód:</strong> magát a kódot nem tároljuk,

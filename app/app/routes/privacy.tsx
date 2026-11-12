@@ -95,8 +95,13 @@ export default function Privacy() {
               </li>
               <li>
                 az értesítéseid listája, és hogy e-mailben, push értesítésben
-                vagy mindkettőben kéred-e őket (alapból mindkettő be van
-                kapcsolva, a profilodban bármikor átállíthatod),
+                vagy mindkettőben kéred-e őket, és mely témákról kérsz push
+                értesítést (alapból minden be van kapcsolva, a profilodban
+                bármikor átállíthatod),
+              </li>
+              <li>
+                ha a Kezdőlapon egy tippre azt mondod, „Most nem”: mikor és
+                hányszor,
               </li>
               <li>
                 ha egy eszközön bekapcsolod a push értesítést, a böngésződ

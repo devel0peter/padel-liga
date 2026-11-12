@@ -485,9 +485,9 @@ export const notifications = sqliteTable(
     // When the daily digest (#31) took this item, whether or not it went into
     // an email; each item is taken once.
     digestedAt: integer("digested_at", { mode: "timestamp" }),
-    // Set while the push of an item the cron made waits to go out
-    // (#183): the job pushes as many as fit its run and the next run goes on.
-    // Null: pushed, nothing to push, or pushed at once (any other item).
+    // Set while the push of an item waits to go out (#183; every item's
+    // since D158, #126): the cron pushes as many as fit its run and the next
+    // run goes on. Null: pushed, or nothing to push (push or its topic off).
     pushDueAt: integer("push_due_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -529,6 +529,23 @@ export const notificationOptOuts = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
+);
+
+// The Kezdőlap tips a player dismissed ("Most nem", #262, D160): per
+// account, so it holds on every device. The first dismissal hides the tip
+// for 14 days, the second for good (lib/tips.ts).
+export const tipDismissals = sqliteTable(
+  "tip_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // An id of lib/tips.ts TIPS.
+    tip: text("tip").notNull(),
+    count: integer("count").notNull().default(1),
+    dismissedAt: integer("dismissed_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tip] })],
 );
 
 // Two players who play a league together (spec section 4). Formed by a pair

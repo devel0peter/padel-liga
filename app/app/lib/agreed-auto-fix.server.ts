@@ -128,7 +128,7 @@ async function tellFixed(list: { m: { id: number; pairA: number; pairB: number }
       for (const pairId of [m.pairA, m.pairB])
         for (const userId of players.get(pairId) ?? [])
           messages.push({ userId, message: matchScheduledMessage({ matchId: m.id, slot: fix.slot, confirmed: false, auto: true }) });
-    await notifyPlayers("match_scheduled", messages, now, true);
+    await notifyPlayers("match_scheduled", messages, now);
   } catch (error) {
     logError("agreed auto-fix notification failed", { error });
   }

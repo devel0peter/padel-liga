@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -92,6 +92,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   cities: Building2,
   users: UserCog,
   log: ScrollText,
+  feedback: MessageSquareText,
 };
 
 const isCurrent = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);
@@ -266,7 +267,7 @@ function TabBar({ tableHref, unread, initials, imageUrl }: { tableHref: string |
 
 export default function AppShell({ loaderData }: Route.ComponentProps) {
   const { actor, leagues, sidebarOpen, unread, tableHref, ...profile } = loaderData;
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const base = appNav(actor, leagues, leagueFromPath(pathname));
   // The player's league table, after Kezdőlap (D133, D134): one tap away.
   const nav = tableHref
@@ -313,6 +314,15 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
                   <Link to="/" className="no-underline">
                     <Globe />
                     <span>Padelpárbaj főoldal</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Feedback from any page (#240, spec 19): the form gets this page. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild size="sm" className="text-muted-foreground" tooltip="Visszajelzés">
+                  <Link to={`/feedback?from=${encodeURIComponent(pathname + search)}`} className="no-underline">
+                    <MessageSquarePlus />
+                    <span>Visszajelzés</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

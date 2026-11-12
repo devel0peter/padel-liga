@@ -1127,3 +1127,36 @@ export const noShowReports = sqliteTable(
     index("no_show_reports_status_idx").on(t.status),
   ],
 );
+
+// Feedback (spec 19, D94, #239): one row per message from the Visszajelzés
+// form (bug / idea / other) or a prompt answer (rating). Stored with its
+// context: the page (path only, ids replaced, lib/feedback.ts pagePath), the
+// device class and browser family worked out from the request (never the
+// full browser string or the IP address), the app version and, when logged
+// in, the account (null: a visitor). The rate limits count these rows
+// (feedback.server.ts). Nothing here sends mail, push or a notification.
+export const feedback = sqliteTable(
+  "feedback",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    kind: text("kind", { enum: ["bug", "idea", "other", "rating"] }).notNull(),
+    // Required for bug / idea / other; a rating's optional comment ("" without).
+    message: text("message").notNull().default(""),
+    // 1–5, ratings only.
+    rating: integer("rating"),
+    page: text("page").notNull(),
+    device: text("device", { enum: ["mobile", "desktop"] }).notNull(),
+    browser: text("browser").notNull(),
+    appVersion: text("app_version").notNull(),
+    // Deleting an account removes its feedback with it (spec 19).
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    // Marked done on Visszajelzések; null while open. Reopening clears it and
+    // keeps who reopened it and when.
+    doneAt: integer("done_at", { mode: "timestamp" }),
+    doneBy: text("done_by").references(() => users.id, { onDelete: "set null" }),
+    reopenedAt: integer("reopened_at", { mode: "timestamp" }),
+    reopenedBy: text("reopened_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("feedback_created_idx").on(t.createdAt), index("feedback_user_idx").on(t.userId, t.createdAt)],
+);

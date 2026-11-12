@@ -73,6 +73,8 @@ export function SiteHeader({ cta = true }: { cta?: boolean }) {
 }
 
 export function SiteFooter() {
+  // The feedback form gets the page it was opened from (#240, spec 19).
+  const { pathname, search } = useLocation();
   return (
     <footer className="py-10 text-sm text-muted-foreground">
       <Wrap className="flex flex-wrap justify-between gap-4">
@@ -80,10 +82,11 @@ export function SiteFooter() {
         <span>
           Kapcsolat: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </span>
-        <span className="flex gap-4">
+        <span className="flex flex-wrap gap-x-4 gap-y-2">
           <a href={FACEBOOK_URL}>Facebook</a>
           <Link to="/rules">Szabályzat</Link>
           <Link to="/privacy">Adatkezelési tájékoztató</Link>
+          {pathname !== "/feedback" && <Link to={`/feedback?from=${encodeURIComponent(pathname + search)}`}>Visszajelzés</Link>}
         </span>
       </Wrap>
     </footer>

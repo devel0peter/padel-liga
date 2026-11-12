@@ -51,6 +51,7 @@ const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
 const PURGE = await import("~/lib/interest-list-purge.server");
 const PLAYER_ADMIN = await import("~/lib/player-admin.server");
 const EXTENSION = await import("~/lib/round-extension.server");
+const FEEDBACK = await import("~/lib/feedback.server");
 const { RunBudget } = await import("~/lib/run-usage");
 
 // Node built-ins: this runs in Vitest (Node) but is type-checked with the
@@ -230,6 +231,16 @@ const STEPS: Step[] = [
   },
   { action: "partner_search.on", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, true).then((ok) => expect(ok).toBe(true)) },
   { action: "partner_search.off", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, false).then((ok) => expect(ok).toBe(true)) },
+  // Visszajelzések (#241): a player's message marked done and reopened.
+  {
+    action: "feedback.done",
+    actor: ADMIN,
+    run: async () => {
+      const id = await FEEDBACK.storeFeedback({ kind: "bug", message: "Hiba", rating: null, page: "/home", device: "mobile", browser: "Safari", appVersion: "dev", userId: "q1" }, IN_PHASE);
+      await FEEDBACK.setFeedbackDone(id!, true, ADMIN, IN_PHASE);
+    },
+  },
+  { action: "feedback.reopen", actor: ADMIN, run: () => FEEDBACK.setFeedbackDone(one("select max(id) as id from feedback").id, false, ADMIN, IN_PHASE) },
   { action: "account.delete", actor: ADMIN, run: () => DELETION.deleteAccount(ADMIN, "gone", IN_PHASE).then((r) => expect(r).toEqual({ ok: true, mode: "remove" })) },
   {
     action: "account.anonymize",
@@ -295,6 +306,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
   "admin.user.tsx": ["user.update", "partner_search.on", "partner_search.off"],
+  "admin.feedback-item.tsx": ["feedback.done", "feedback.reopen"],
 };
 
 describe("every organizer and system change leaves one audit entry (#225)", () => {

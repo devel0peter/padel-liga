@@ -56,7 +56,7 @@ The release that first deploys the watchdog (#318) needs these changes through t
 
 1. **Zone rule, so zone security never challenges the watchdog.** In the zone `padelparbaj.hu`, phase `http_request_firewall_custom` (WAF custom rules; the Free plan allows 5, one is used by the scanner-path block), add as the **first** rule:
    - description: `Watchdog: GET /health skips security (#318)`
-   - expression: `(http.request.method eq "GET" and http.request.uri.path eq "/health" and starts_with(http.user_agent, "padelparbaj-watchdog/"))`
+   - expression: `(http.request.method eq "GET" and http.request.uri.path eq "/health" and http.user_agent contains "padelparbaj-watchdog/")`
    - action: `skip`, `action_parameters`: `{"ruleset": "current", "phases": ["http_ratelimit", "http_request_firewall_managed"], "products": ["bic", "securityLevel", "uaBlock", "zoneLockdown", "hot"]}`, logging on.
 
    It skips the other custom rules, rate limiting, managed rules, Browser Integrity Check and the security level for this one request only; every other path and method keeps its protection. The User-Agent can be copied, but the rule only opens `GET /health`, which answers `ok` or `unavailable` and nothing else (the rate-limit rule only covers POSTs anyway). Once the security events show the watchdog's requests, `cf.worker.upstream_zone` can tighten it if it holds a value for them. **Bot Fight Mode can't be skipped by any rule** (Free plan). If the security events show it challenging the watchdog (`watchdog check` failures with "challenged by Cloudflare"), ask Peter whether to switch Bot Fight Mode off.

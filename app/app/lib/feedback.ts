@@ -117,6 +117,17 @@ export function withinLimits(windows: readonly RateWindow[], counts: readonly nu
   return windows.every((w, i) => (counts[i] ?? 0) < w.max);
 }
 
+// --- Retention (#249) -----------------------------------------------------------
+
+// Spec 17 and 19: a message is kept 1 year. The instant before which a
+// message is deleted: the same date and time a year earlier (29 February
+// counts from 1 March).
+export function feedbackRetentionCutoff(now: Date): Date {
+  const cutoff = new Date(now);
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1);
+  return cutoff;
+}
+
 // --- Admin list (Visszajelzések) ------------------------------------------------
 
 export const FEEDBACK_PAGE_SIZE = 50;

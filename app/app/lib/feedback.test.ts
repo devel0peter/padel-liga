@@ -7,6 +7,7 @@ import {
   ERRORS,
   excerpt,
   feedbackCounts,
+  feedbackRetentionCutoff,
   filterHref,
   MESSAGE_MAX,
   pagePath,
@@ -172,5 +173,15 @@ describe("Visszajelzések filters (#241)", () => {
     expect(excerpt("egy  kettő\nhárom", 80)).toBe("egy kettő három");
     expect(excerpt("alma körte szilva barack", 16)).toBe("alma körte…");
     expect(excerpt("a".repeat(30), 10)).toBe(`${"a".repeat(10)}…`);
+  });
+});
+
+describe("feedback retention (#249)", () => {
+  it("deletes from the same instant a year earlier", () => {
+    expect(feedbackRetentionCutoff(new Date("2026-11-12T05:00:00Z"))).toEqual(new Date("2025-11-12T05:00:00Z"));
+  });
+
+  it("counts 29 February from 1 March of the year before", () => {
+    expect(feedbackRetentionCutoff(new Date("2028-02-29T12:00:00Z"))).toEqual(new Date("2027-03-01T12:00:00Z"));
   });
 });

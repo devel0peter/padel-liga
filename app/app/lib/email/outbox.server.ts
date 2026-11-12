@@ -17,7 +17,6 @@ import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import type { Recipient } from "./audience";
 import { BULK_KINDS, effectiveDailyLimit, SEND_NOW_MAX, sendBudget, type MessageKind } from "./budget";
-import { newOpenToken, openImageUrl, tracksOpens, withOpenImage } from "./opens";
 import { hideAddresses } from "./outbox-view";
 import { MAX_BATCH, relayConfigured, sendEmails, type SendResult } from "./send.server";
 import { SITE_URL } from "~/lib/site";
@@ -65,9 +64,9 @@ const MAX_BATCHES_PER_RUN = 10;
 // mid-send, at most this many are left "sending" (unknown, never resent by
 // themselves); the rest are still pending and go with the next run.
 export const SEND_CHUNK = 10;
-// D1 allows 100 bound parameters per statement; a message row binds 11
-// (with the open token and the attempts and open count defaults, #243).
-const INSERT_CHUNK = 8;
+// D1 allows 100 bound parameters per statement; a message row binds 9
+// (its 8 values and the attempts default), so 11 rows fit.
+const INSERT_CHUNK = 11;
 
 type NewMessage = Email & {
   kind: MessageKind;
@@ -98,8 +97,6 @@ function messageValues(m: NewMessage) {
     html: m.html,
     text: m.text,
     headers: m.headers ? JSON.stringify(m.headers) : null,
-    // Every email but a login code gets its tracking image's token (#243, D161).
-    openToken: tracksOpens(m.kind) ? newOpenToken() : null,
   };
 }
 
@@ -490,8 +487,7 @@ async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boole
     rows.map((r) => ({
       to: r.toEmail,
       subject: r.subject,
-      // The tracking image goes in only now, so the stored HTML stays the template's (#243).
-      html: r.openToken && tracksOpens(r.kind) ? withOpenImage(r.html ?? "", openImageUrl(SITE_URL, r.openToken)) : (r.html ?? ""),
+      html: r.html ?? "",
       text: r.text ?? "",
       headers: r.headers ? (JSON.parse(r.headers) as Record<string, string>) : undefined,
     })),

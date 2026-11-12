@@ -51,8 +51,8 @@ const SIX_DIGITS = /(?<![\d.:-])\d{6}(?![\d.:-])/g;
 // safety net only: a token without a digit (rare) gets through, and harmless
 // long words with digits get masked. Callers never pass tokens.
 const TOKEN = /(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g;
-// Paths that carry a token (the pair link, #55; an email's tracking image, #243).
-const TOKEN_PATHS = /^(\/(?:pair\/join|email\/open)\/)[^/?#]+/;
+// Paths that carry a token (the pair link, #55).
+const TOKEN_PATHS = /^(\/pair\/join\/)[^/?#]+/;
 
 // An account id (a UUID, accounts.server.ts) is not a secret: it stays.
 const UUID_SOURCE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";

@@ -4,7 +4,6 @@ import { db } from "~/db/client.server";
 import { emailMessages, emailSuppressions } from "~/db/schema";
 
 import { COMMS_LOG_LIMIT, commsStatus, nextDelivery, sentVia, shownSubject, type CommsTone, type Delivery, type Via } from "./delivery";
-import { isOpenToken, openStatus } from "./opens";
 import { kindLabel } from "./outbox-view";
 
 // A person's email log (#242, D157), a section of the Admin's player profile
@@ -26,9 +25,6 @@ export type CommsRow = {
   note: string | null;
   // When Resend reported the delivery state, if it did.
   deliveryAt: Date | null;
-  // Whether it was opened (#243): the first open and the count, that nobody
-  // knows, or null for an email that isn't tracked or hasn't gone out.
-  opened: string | null;
 };
 
 export type CommsLog = {
@@ -54,10 +50,6 @@ export async function personCommsLog(email: string): Promise<CommsLog> {
         providerId: emailMessages.providerId,
         delivery: emailMessages.delivery,
         deliveryAt: emailMessages.deliveryAt,
-        // Whether it carries a tracking image; the token itself never leaves the server.
-        tracked: sql<number>`${emailMessages.openToken} is not null`,
-        openedAt: emailMessages.openedAt,
-        openCount: emailMessages.openCount,
         sentAt: emailMessages.sentAt,
         createdAt: emailMessages.createdAt,
       })
@@ -86,7 +78,6 @@ export async function personCommsLog(email: string): Promise<CommsLog> {
         tone: s.tone,
         note: s.note,
         deliveryAt: r.delivery ? r.deliveryAt : null,
-        opened: openStatus({ tracked: !!r.tracked, status: r.status, openedAt: r.openedAt, openCount: r.openCount }),
       };
     }),
     total: n,
@@ -116,19 +107,4 @@ export async function recordDelivery(event: { providerId: string; delivery: Deli
     .where(and(eq(emailMessages.id, row.id), same))
     .returning({ id: emailMessages.id });
   return changed.length > 0;
-}
-
-// The tracking image of one email was loaded (#243, D161): that email gets
-// its first open time (kept) and one more open. Only the time is recorded:
-// no address, device or IP. A token of the wrong shape or one no stored
-// email has (deleted with its account, or made up) changes nothing; the
-// caller answers the same either way. True when an email was marked.
-export async function recordOpen(token: string, at = new Date()): Promise<boolean> {
-  if (!isOpenToken(token)) return false;
-  const rows = await db
-    .update(emailMessages)
-    .set({ openedAt: sql`coalesce(${emailMessages.openedAt}, ${Math.floor(at.getTime() / 1000)})`, openCount: sql`${emailMessages.openCount} + 1` })
-    .where(eq(emailMessages.openToken, token))
-    .returning({ id: emailMessages.id });
-  return rows.length > 0;
 }

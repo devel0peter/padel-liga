@@ -160,15 +160,6 @@ export default function Privacy() {
               kikapcsolod az e-mailt vagy leiratkozol, nem kapsz ilyet.
             </p>
             <p>
-              A leveleinkben (a belépési kódot kivéve) van egy apró, láthatatlan
-              kép. Ha a levelezőprogramod betölti, feljegyezzük, hogy azt a
-              levelet megnyitottad: az első megnyitás idejét és azt, hányszor
-              nyitottad meg. Az IP-címedet, az eszközödet és a böngésződet nem
-              tároljuk. Ebből látja az admin, hogy a liga hírei eljutnak-e
-              hozzád. Ha nem szeretnéd, kapcsold ki a képek automatikus
-              betöltését a levelezőprogramodban.
-            </p>
-            <p>
               A körlevelek alján mindig van leiratkozó link; ha leiratkozol, a címedet csak azért
               őrizzük meg, hogy ne írjunk rá többet.
             </p>
@@ -376,9 +367,7 @@ export default function Privacy() {
                 őrizzük (ha a napi limit miatt várnia kell, addig), utána csak
                 azt, hogy kinek, mikor és milyen tárggyal ment, és ha a Resend
                 visszajelzi, azt is, hogy megérkezett-e, visszapattant-e vagy
-                spamnek jelölted-e, és hogy megnyitottad-e (mikor először és
-                hányszor). Ezt csak az admin látja, és a levéllel együtt
-                töröljük.
+                spamnek jelölted-e. Ezt csak az admin látja.
               </li>
               <li>
                 <strong>Visszajelzések:</strong> egy évig őrizzük, utána

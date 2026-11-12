@@ -365,6 +365,13 @@
       "when": 1794507805630,
       "tag": "0062_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1794516558951,
+      "tag": "0063_drop_email_opens",
+      "breakpoints": true
     }
   ]
 }

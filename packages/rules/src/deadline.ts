@@ -8,6 +8,7 @@ import { addDays, budapestDay, budapestTime } from "./calendar";
 import type { Side } from "./results";
 import { activeSides, lateCancellers, other, schedulingState, type SchedulingEvent } from "./scheduling";
 import type { MatchOutcome } from "./standings";
+import { applyStrikes, pairsLeaving, strikeNotice } from "./strikes";
 
 export type DeadlineResolution = {
   outcome: MatchOutcome;
@@ -75,4 +76,89 @@ export function resolveAtDeadline(events: readonly SchedulingEvent[], deadline: 
     return { outcome: { kind: "walkover", winner }, inactive: [other(winner)] };
   }
   return { outcome: { kind: "both-inactive" }, inactive: ["a", "b"] };
+}
+
+/** A match's status (the `matches.status` column). */
+export type MatchStatus = "open" | "scheduled" | "result_pending" | "disputed" | "final";
+
+/**
+ * Why the deadline resolution leaves a match alone (spec 8, D103, D108):
+ * already final; a withdrawn pair's match (it doesn't count); a result
+ * waiting for confirmation (auto-accept settles it) or disputed (the
+ * organizer decides); a no-show report waiting for the organizer.
+ */
+export type DeadlineSkip = "final" | "withdrawn" | "result_pending" | "disputed" | "no_show";
+
+export type DeadlineMatch = {
+  status: MatchStatus;
+  // A pair of the match withdrew mid-phase (D87).
+  withdrawn: boolean;
+  // A no-show report waits for the organizer (#33).
+  openNoShow: boolean;
+  events: readonly SchedulingEvent[];
+  deadline: Date;
+};
+
+export type DeadlineDecision = { kind: "resolve"; resolution: DeadlineResolution } | { kind: "leave"; reason: DeadlineSkip };
+
+/**
+ * What the deadline resolution does with one match (spec 8, D103): resolve
+ * it from its scheduling log (resolveAtDeadline), or leave it alone and why.
+ * The one rule of the real run (deadline.server.ts) and of the organizer's
+ * projection of it ("Ha most lenne a határidő", #362), so the two can't drift.
+ */
+export function deadlineDecision(m: DeadlineMatch): DeadlineDecision {
+  if (m.withdrawn) return { kind: "leave", reason: "withdrawn" };
+  if (m.status === "final" || m.status === "result_pending" || m.status === "disputed") return { kind: "leave", reason: m.status };
+  if (m.openNoShow) return { kind: "leave", reason: "no_show" };
+  return { kind: "resolve", resolution: resolveAtDeadline(m.events, m.deadline) };
+}
+
+export type ProjectedMatch = DeadlineMatch & { id: number; pairA: number; pairB: number };
+
+export type DeadlineProjection = {
+  // Every match given, by id.
+  decisions: Map<number, DeadlineDecision>;
+  // Each player of the pairs given: live strikes now, and after the
+  // projection's strikes (spec 8: a strike belongs to the player).
+  strikes: Map<string, { now: number; after: number }>;
+  // The players the projection's strikes would bring to their 2nd strike
+  // with the warning email (strikeNotice "warning"), in the run's order.
+  warned: { pairId: number; userId: string }[];
+  // The pairs with a player at STRIKE_LIMIT or more after the projection:
+  // they would leave at the round switch (pairsLeaving).
+  leaving: number[];
+};
+
+/**
+ * What the deadline resolution would do if it ran now with the activity
+ * recorded so far (#362): each match's decision, and the strikes it would
+ * give on top of `counts` (each player's live strikes this season), counted
+ * in the run's order (by match id), as the run counts them. `pairs`: the
+ * round's pairs that count (not withdrawn) with their two players; a
+ * substitute is never among them, so never gets a strike (spec 8).
+ */
+export function projectDeadline(
+  matches: readonly ProjectedMatch[],
+  pairs: readonly { id: number; players: readonly string[] }[],
+  counts: ReadonlyMap<string, number>,
+): DeadlineProjection {
+  const playersOf = new Map(pairs.map((p) => [p.id, p.players]));
+  const running = new Map(pairs.flatMap((p) => p.players.map((id) => [id, counts.get(id) ?? 0] as const)));
+  const decisions = new Map<number, DeadlineDecision>();
+  const warned: DeadlineProjection["warned"] = [];
+  for (const m of [...matches].sort((x, y) => x.id - y.id)) {
+    const decision = deadlineDecision(m);
+    decisions.set(m.id, decision);
+    if (decision.kind !== "resolve") continue;
+    const grants = decision.resolution.inactive.map((s) => {
+      const pairId = s === "a" ? m.pairA : m.pairB;
+      return { pairId, players: playersOf.get(pairId) ?? [] };
+    });
+    for (const step of applyStrikes(running, grants))
+      if (strikeNotice(step.count, step.pairCount) === "warning") warned.push({ pairId: step.pairId, userId: step.player });
+  }
+  const strikes = new Map([...running].map(([id, after]) => [id, { now: counts.get(id) ?? 0, after }]));
+  const leaving = pairsLeaving(pairs, running).map((p) => p.id);
+  return { decisions, strikes, warned, leaving };
 }

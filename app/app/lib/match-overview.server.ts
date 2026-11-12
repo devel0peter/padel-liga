@@ -38,6 +38,7 @@ export type OverviewMatch = {
 };
 
 export type OverviewPhase = {
+  seasonId: number;
   season: string;
   phase: number;
   phaseStartsAt: Date;
@@ -114,6 +115,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     const key = `${g.seasonId}:${g.phase}`;
     if (!phases.has(key))
       phases.set(key, {
+        seasonId: g.seasonId,
         season: g.season,
         phase: g.phase,
         phaseStartsAt: g.startsAt,

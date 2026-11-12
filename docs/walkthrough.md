@@ -22,6 +22,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
 | 33b, 33c, the Admin's player profile and email log (D156, D157) | [`33-player-profile.spec.ts`](../app/e2e/33-player-profile.spec.ts) |
 | 33c, email opens in the email log (D161) | [`35-email-opens.spec.ts`](../app/e2e/35-email-opens.spec.ts) |
+| 40, the deadline projection and the next round's preview (D162, D163) | [`36-deadline-projection.spec.ts`](../app/e2e/36-deadline-projection.spec.ts) |
 
 ## Set up
 
@@ -622,6 +623,21 @@ The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decisi
 - Do: open a message, "Kész", then "Újranyitom".
 - Expect: the full text, the stars for a rating, the sender, time, page, device, browser and version; after "Kész" the badge and "Kész: <time>, Admin", after "Újranyitom" "Újranyitva: <time>, Admin". Both in Napló ("Visszajelzés kész", "Visszajelzés újranyitása").
 - As `szervezo@example.test` or a player: no "Visszajelzések" in the sidebar, and `/admin/feedback` shows "Ehhez nincs jogod".
+
+### 40. The Szervező sees what the deadline would decide, and the next round's groups (after step 11)
+
+"Ha most lenne a határidő" on Meccsek and "Előzetes beosztás: ha most érne véget a kör" on Csoportok (decision log (`docs/decisions.md`) D162, D163; `app/e2e/36-deadline-projection.spec.ts`). Best seen on the running round seed below. Read only: nothing is stored or sent.
+
+- Page: `/admin/leagues/minta/matches`, then the season's Csoportok (`/admin/leagues/minta/seasons/<id>/groups`)
+- Account: the Szervező (or the Admin)
+- Do: click a tile of "Ha most lenne a határidő"; pick a value in the "Határidő most" select; open Csoportok.
+- Expect:
+  - Below "A kör állása": "Ezt döntené a rendszer a még le nem játszott meccsekről, ha a határidő (<the round's deadline, an extended one too>) most lenne." and that it changes until the deadline and can still be overridden. Five tiles: Játék nélküli győzelem, Mindkét pár veszít, Elmarad, Nem dönt róla a határidő, Már lejátszva vagy eldöntve, adding up to the list below; a tile opens the list filtered (`?deadline=`).
+  - Each match not final has one line: "Ha most lenne a határidő: Játék nélküli győzelem: <pár> (4:0, 4:0)" (or "Mindkét pár vereséget kap", "Elmaradt"), or "Nem dönt róla a határidő: …" for a result waiting for confirmation, a dispute or a waiting no-show report. A withdrawn pair's matches are not listed.
+  - "Fekete pontok": how many the deadline would give; "2. fekete pont (figyelmeztető e-mail)" names each player (and pair) reaching 2 with "<now> → <after>"; "Kiesnének a körváltáskor (3. fekete pont)" names the pairs where either player reaches 3. Names only.
+  - Csoportok, on the running round's page: below its groups, "Előzetes beosztás: ha most érne véget a kör" with the next round's groups, each pair with its group and place now and an arrow up, down or level ("Új pár" for a new one), the pairs that would leave and why, and "<n> meccs még nem dőlt el". No select, no button. Not shown in the season's last round or once the real draft exists.
+  - Right after step 11 (nothing played): every match "Mindkét pár veszít", every player "0 → 2" in the 2nd strike list, nobody leaving; the preview swaps the 1st of group 2 with the last of group 1.
+  - A player gets 403.
 
 ## A running round instead
 

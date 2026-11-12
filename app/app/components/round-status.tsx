@@ -22,7 +22,7 @@ const VERDICT_BADGE: Record<Verdict, "default" | "destructive" | "secondary"> = 
 const TILE = "flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm";
 
 // `to` null: the same tile without a link.
-function CountLink({ to, label, count }: { to: string | null; label: string; count: number }) {
+export function CountLink({ to, label, count }: { to: string | null; label: string; count: number }) {
   const inner = (
     <>
       <span>{label}</span>

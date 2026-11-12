@@ -55,6 +55,17 @@ export function shownPhase(
   return latest.published && hasNext && deadline && deadline < now ? latest.phase + 1 : latest.phase;
 }
 
+// The next round's preview on Csoportok (#363, D163).
+export const PREVIEW_TITLE = "Előzetes beosztás: ha most érne véget a kör";
+
+export function previewText(nextPhase: number, endingPhase: number): string {
+  return `${withArticle(nextPhase).replace(/^a/, "A")} kör csoportjai, ha ${withArticle(endingPhase)} kör most érne véget: a le nem játszott meccsek azzal az eredménnyel számítanak, amit most a határidő adna nekik. Minden eredménnyel változik a határidőig; az igazi tervezet a határidő utáni reggel készül el.`;
+}
+
+export function undecidedText(count: number): string {
+  return count === 0 ? "Minden meccs eldőlt." : `${count} meccs még nem dőlt el, ezek eredménye még változtathat rajta.`;
+}
+
 export const DISPUTES_BLOCK = "Közzététel előtt döntsd el ezeket:";
 export const DISPUTES_FIRST = "Előbb döntsd el a vitatott eredményeket és a meg nem jelenés bejelentéseket.";
 export const BLOCKER_KINDS = { disputed: "vitatott eredmény", no_show: "meg nem jelenés bejelentése" } as const;

@@ -215,7 +215,7 @@ describe("a fan-out in a request reaches every device (#126)", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("publishing the groups with 100 devices on: all 100 get the push from the cron, and every group email goes out", async () => {
+  it("publishing the groups with 100 devices on: all 100 get the push, the first at once and the rest from the cron, and every group email goes out", async () => {
     await enteredLeague();
     h.sent = [];
     h.pushes = [];

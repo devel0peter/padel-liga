@@ -83,7 +83,7 @@ export function actorLabel(actor: { name: string; deleted: boolean } | null, act
 
 // "kind:id" references in a target or detail, and bare account ids (older
 // pair entries list the two players' ids).
-const REF = /\b(user|pair|league|season|season_entry|club|city|match|signup|broadcast):([A-Za-z0-9_-]+)/g;
+const REF = /\b(user|pair|league|season|season_entry|club|city|match|signup|broadcast|feedback):([A-Za-z0-9_-]+)/g;
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
 
 export type Ref = { kind: string; id: string };

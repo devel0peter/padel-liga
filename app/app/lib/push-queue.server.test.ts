@@ -16,6 +16,7 @@ vi.mock("~/lib/push/webpush", async (original) => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const N = await import("~/lib/notifications.server");
 const { RunBudget } = await import("~/lib/run-usage");
+const { beginInvocation } = await import("~/lib/log");
 
 const AT = new Date("2026-11-18T06:00:00Z");
 const message = (n: number) => ({ title: `Hír ${n}`, body: "x", url: `/matches/${n}` });
@@ -217,5 +218,93 @@ describe("pushQueued (#183)", () => {
     await queue("u2");
     await Promise.all([N.pushQueued(new RunBudget()), N.pushQueued(new RunBudget())]);
     expect(h.pushes).toHaveLength(1);
+  });
+});
+
+// #126, D158 (Peter, 2026-11-12): a request pushes its first items itself, up
+// to INLINE_PUSH_CALLS push calls; the rest wait for the cron.
+describe("pushes at once from a request, within its budget (#126)", () => {
+  const inRequest = async (task: () => Promise<unknown>, kind: "request" | "cron" = "request") => {
+    const end = beginInvocation(`test-${kind}`, kind);
+    try {
+      await task();
+    } finally {
+      end();
+    }
+  };
+  const notify = (users: string[], kind: "match_proposal" | "groups_published" = "match_proposal") =>
+    N.notifyPlayers(
+      kind,
+      users.map((userId, i) => ({ userId, message: message(i + 1) })),
+    );
+  // `n` more players with one device each: x0, x1, ...
+  const players = (n: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const id = `x${i}`;
+      h.raw.prepare("insert into users (id, email, name, level, consent_at) values (?, ?, ?, 'halado', 1)").run(id, `${id}@x.hu`, id);
+      h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'a')").run(`https://push.example/${id}`, id);
+      return id;
+    });
+
+  it("a small event (a proposal to the other pair) pushes at once; nothing waits", async () => {
+    await inRequest(() => notify(["u1", "u2"]));
+    expect(h.pushes.map((p) => p.split(" ")[0]).sort()).toEqual([
+      "https://push.example/u1-a",
+      "https://push.example/u1-b",
+      "https://push.example/u1-c",
+      "https://push.example/u2",
+    ]);
+    expect(queued()).toEqual([]);
+    // The cron finds nothing to push again.
+    expect(await N.pushQueued(new RunBudget())).toEqual({ pushed: 0, left: 0 });
+    expect(h.pushes).toHaveLength(4);
+  });
+
+  it("an event over the budget pushes the budget at once and queues the rest; the cron sends those, each once", async () => {
+    const ids = players(30);
+    await inRequest(async () => {
+      await notify(ids, "groups_published");
+      // A second notice in the same request: the budget is spent.
+      await notify(["u2"]);
+    });
+    expect(h.pushes).toHaveLength(N.INLINE_PUSH_CALLS);
+    expect(queued().map((n: any) => n.user)).toEqual([...ids.slice(N.INLINE_PUSH_CALLS), "u2"]);
+    expect(await N.pushQueued(new RunBudget())).toEqual({ pushed: 11, left: 0 });
+    expect(h.pushes).toHaveLength(31);
+    expect(new Set(h.pushes).size).toBe(31);
+  });
+
+  it("an item goes at once only when all its devices fit: the rest of the order waits", async () => {
+    const ids = players(19);
+    // 19 single devices, then u1's three: 22 calls, over the budget of 20.
+    await inRequest(() => notify([...ids, "u1", "u2"]));
+    expect(h.pushes).toHaveLength(19);
+    expect(queued().map((n: any) => n.user)).toEqual(["u1", "u2"]);
+  });
+
+  it("a cron run pushes nothing at once: its pushes keep to the run's budget", async () => {
+    await inRequest(() => notify(["u1", "u2"]), "cron");
+    expect(h.pushes).toEqual([]);
+    expect(queued()).toHaveLength(2);
+  });
+
+  it("with two invocations at once nothing is pushed at once (whose calls?); the cron sends it", async () => {
+    const other = beginInvocation("other");
+    try {
+      await inRequest(() => notify(["u2"]));
+    } finally {
+      other();
+    }
+    expect(h.pushes).toEqual([]);
+    expect(queued()).toHaveLength(1);
+  });
+
+  it("the topic switch applies at once too: a topic off, no push now or later", async () => {
+    h.raw.prepare("insert into notification_opt_outs (user_id, kind) values ('u2', 'topic:scheduling')").run();
+    await inRequest(() => notify(["u1", "u2"]));
+    expect(h.pushes.map((p) => p.split(" ")[0])).not.toContain("https://push.example/u2");
+    expect(h.pushes).toHaveLength(3);
+    expect(queued()).toEqual([]);
+    expect(h.raw.prepare("select count(*) as n from notifications where user_id = 'u2'").get().n).toBe(1);
   });
 });

@@ -153,7 +153,7 @@ const DEFERRED = /left for the next/;
 // per failed step, all with the run's request id.
 export async function runCron(now: Date, steps: readonly CronStep[] = CRON_STEPS): Promise<void> {
   const requestId = `cron-${crypto.randomUUID()}`;
-  const end = beginInvocation(requestId);
+  const end = beginInvocation(requestId, "cron");
   const started = Date.now();
   const budget = new RunBudget();
   let failed = 0;

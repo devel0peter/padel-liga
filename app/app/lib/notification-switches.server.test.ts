@@ -87,7 +87,8 @@ async function approve() {
   expect(await E.applyToSeason({ id: "a", email: "a@x.hu", name: "Anna", level: "halado" } as any, 1, DURING_REGISTRATION)).toMatchObject({
     ok: true,
   });
-  // The emails go after the response (D150), the pushes with the cron (D158).
+  // The emails go after the response (D150). Outside a request (no running
+  // invocation) every push waits for the cron (D158).
   await settleBackground();
   expect(h.pushed).toEqual([]);
   await cronPushes();

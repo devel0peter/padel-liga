@@ -42,7 +42,8 @@ const { migratedDatabase } = await import("~/test/sqlite");
 const { settleBackground } = await import("~/test/background");
 const { RunBudget, RUN_LIMITS } = await import("~/lib/run-usage");
 const G = await import("~/lib/groups.server");
-const { MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
+const { INLINE_PUSH_CALLS, MAX_PUSH_DEVICES } = await import("~/lib/notifications.server");
+const { beginInvocation } = await import("~/lib/log");
 const { DELIVER_MIN } = await import("~/lib/email/outbox.server");
 const { runCron } = await import("~/lib/hourly-job.server");
 const { forgetMorningDone } = await import("~/lib/match-reminders.server");
@@ -202,9 +203,9 @@ describe("the cron within the run limits (#183)", () => {
   });
 });
 
-// #126: a fan-out in a request (the group publish) pushes nothing itself; its
-// pushes wait in the queue and the cron delivers every one of them, over as
-// many runs as it takes, while the request's emails go out as before (D158).
+// #126: a fan-out in a request (the group publish) pushes its first devices
+// itself (INLINE_PUSH_CALLS); the rest wait in the queue and the cron delivers
+// every one of them, over as many runs as it takes; the emails as before (D158).
 describe("a fan-out in a request reaches every device (#126)", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", async (req: Request) => {
@@ -228,15 +229,24 @@ describe("a fan-out in a request reaches every device (#126)", () => {
     expect(count("select count(*) as n from push_subscriptions")).toBe(100);
 
     expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
+    // The publish as a request (workers/app.ts marks it so).
     const request = new RunBudget();
-    expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
-    // The emails go after the response (D150), within the invocation's calls.
-    await settleBackground();
+    const end = beginInvocation("publish");
+    try {
+      expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+      // The emails go after the response (D150), within the invocation's calls.
+      await settleBackground();
+    } finally {
+      end();
+    }
     expect(request.used().calls).toBeLessThanOrEqual(RUN_LIMITS.calls);
-    // Not a single push from the request; every one waits in the queue.
-    expect(h.pushes).toEqual([]);
+    // The request pushed its first devices itself, at most its budget; the
+    // rest waits in the queue.
+    const inline = h.pushes.length;
+    expect(inline).toBeGreaterThan(0);
+    expect(inline).toBeLessThanOrEqual(INLINE_PUSH_CALLS);
     expect(count("select count(*) as n from notifications where kind = 'groups_published'")).toBe(200);
-    expect(count("select count(*) as n from notifications where push_due_at is not null")).toBe(200);
+    expect(count("select count(*) as n from notifications where push_due_at is not null")).toBeGreaterThan(100);
     // The group emails as before: one per player, stored by the request, the
     // first ones sent right after the response.
     expect(count("select count(*) as n from email_messages where kind = 'groups_published'")).toBe(200);

@@ -32,7 +32,6 @@ import { SEXES } from "~/lib/auth/rules";
 import { auditLogPage } from "~/lib/audit-log.server";
 import { personCommsLog } from "~/lib/email/comms-log.server";
 import { COMMS_LOG_LIMIT, suppressionNote, VIA_LABELS } from "~/lib/email/delivery";
-import { OPENS_NOTE } from "~/lib/email/opens";
 import { formatDate, formatDateTime } from "~/lib/format";
 import { LEVELS } from "~/lib/interest";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
@@ -367,8 +366,7 @@ function PairHistory({ profile }: { profile: Profile }) {
 const TONE = { ok: "secondary", todo: "outline", bad: "destructive", muted: "outline" } as const;
 
 // Every email made for their address, newest first (#242, D157): made and
-// sent (Budapest time), kind, subject, how it went out and what became of it,
-// and whether it was opened (#243, D161).
+// sent (Budapest time), kind, subject, how it went out and what became of it.
 // Only this person's address is on the page (in Adatok); subjects and
 // failure reasons have every address hidden.
 function MailLog({ mail }: { mail: Route.ComponentProps["loaderData"]["mail"] }) {
@@ -392,7 +390,6 @@ function MailLog({ mail }: { mail: Route.ComponentProps["loaderData"]["mail"] })
               A legújabb {COMMS_LOG_LIMIT} a {mail.total} levélből.
             </p>
           )}
-          <p className="text-sm text-muted-foreground">{OPENS_NOTE}</p>
           <div className="rounded-lg border">
             <Table aria-label="Levelei">
               <TableHeader>
@@ -423,7 +420,6 @@ function MailLog({ mail }: { mail: Route.ComponentProps["loaderData"]["mail"] })
                       <Badge variant={TONE[r.tone]}>{r.status}</Badge>
                       {r.deliveryAt && <div className="text-xs text-muted-foreground tabular-nums">{formatDateTime(new Date(r.deliveryAt))}</div>}
                       {r.note && <div className="text-xs break-words text-muted-foreground">{r.note}</div>}
-                      {r.opened && <div className="text-xs text-muted-foreground tabular-nums">{r.opened}</div>}
                     </TableCell>
                   </TableRow>
                 ))}

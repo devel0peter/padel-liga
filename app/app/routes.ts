@@ -10,7 +10,6 @@ export default [
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
-  route("email/open/:token", "routes/email-open.ts"),
   route("login", "routes/login.tsx"),
   route("register", "routes/register.tsx"),
   route("welcome", "routes/welcome.tsx"),

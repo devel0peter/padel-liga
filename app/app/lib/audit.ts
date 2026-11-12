@@ -69,6 +69,9 @@ export const AUDIT_ACTIONS = {
   "account.delete": "Fiók törlése",
   "account.anonymize": "Fiók anonimizálása",
   "user.update": "Játékos adatainak módosítása",
+  // Feedback (#241, spec 19)
+  "feedback.done": "Visszajelzés kész",
+  "feedback.reopen": "Visszajelzés újranyitása",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

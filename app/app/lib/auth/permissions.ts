@@ -34,6 +34,8 @@ export type Permission =
   | { kind: "users.edit" }
   // Napló, the audit log (#226): read-only.
   | { kind: "log.view" }
+  // Visszajelzések (#241, spec 19): read feedback and mark it done.
+  | { kind: "feedback.view" }
   // Delete or anonymize an account (#152). Which accounts: account-deletion.ts.
   | { kind: "users.delete" }
   // A city's clubs (venues): its Szervezők. Without a city: every city's.
@@ -67,7 +69,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log";
+export type NavIcon = "home" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "substitutes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
 // `hint`: one short line under the label on what the page lists (#301: the
 // people pages say what each is for).
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string };
@@ -89,6 +91,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Kimenő levelek", to: "/admin/outbox", icon: "outbox", permission: { kind: "outbox.manage" } },
   { label: "Forgalom", to: "/admin/traffic", icon: "traffic", permission: { kind: "traffic.view" } },
   { label: "Napló", to: "/admin/log", icon: "log", permission: { kind: "log.view" } },
+  { label: "Visszajelzések", to: "/admin/feedback", icon: "feedback", permission: { kind: "feedback.view" } },
 ];
 
 function leagueItems(league: LeagueRef): NavItem[] {

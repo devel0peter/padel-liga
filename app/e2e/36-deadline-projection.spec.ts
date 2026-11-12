@@ -1,4 +1,4 @@
-// Walkthrough step 39 (#362, #363; D162, D163): "Ha most lenne a határidő"
+// Walkthrough step 40 (#362, #363; D162, D163): "Ha most lenne a határidő"
 // on the Szervező's Meccsek and "Előzetes beosztás" on Csoportok. The totals
 // add up to the list, a count opens the list filtered to those matches, each
 // projected match has its line, and Csoportok shows the next round's groups
@@ -13,7 +13,7 @@ async function tileCount(tile: Locator): Promise<number> {
   return Number((await tile.innerText()).match(/(\d+)\s*$/)![1]);
 }
 
-test("39. the deadline projection on Meccsek and the next round's preview on Csoportok; players refused", async ({ browser }) => {
+test("40. the deadline projection on Meccsek and the next round's preview on Csoportok; players refused", async ({ browser }) => {
   const rowsBefore = d1("select (select count(*) from match_decisions) + (select count(*) from strikes) + (select count(*) from audit_log) as n")[0]!.n;
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, LIST);

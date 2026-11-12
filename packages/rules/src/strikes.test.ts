@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest";
 
-import { pairsLeaving, STRIKE_LIMIT, STRIKE_WARNING, strikeCount, strikeCounts, strikeNotice, type StrikeRecord } from "./strikes";
+import { applyStrikes, pairsLeaving, STRIKE_LIMIT, STRIKE_WARNING, strikeCount, strikeCounts, strikeNotice, type StrikeRecord } from "./strikes";
+
+describe("applyStrikes (spec 8, 13)", () => {
+  it("adds one per player in order, updating the counts, with the pair's highest count after each grant", () => {
+    const counts = new Map([["x", 2]]);
+    expect(
+      applyStrikes(counts, [
+        { pairId: 1, players: ["x", "y"] },
+        { pairId: 2, players: ["z", "w"] },
+        { pairId: 1, players: ["x", "y"] },
+      ]),
+    ).toEqual([
+      { pairId: 1, player: "x", count: 3, pairCount: 3 },
+      { pairId: 1, player: "y", count: 1, pairCount: 3 },
+      { pairId: 2, player: "z", count: 1, pairCount: 1 },
+      { pairId: 2, player: "w", count: 1, pairCount: 1 },
+      { pairId: 1, player: "x", count: 4, pairCount: 4 },
+      { pairId: 1, player: "y", count: 2, pairCount: 4 },
+    ]);
+    expect(counts).toEqual(
+      new Map([
+        ["x", 4],
+        ["y", 2],
+        ["z", 1],
+        ["w", 1],
+      ]),
+    );
+  });
+
+  it("a grant without players gives nothing", () => {
+    expect(applyStrikes(new Map(), [{ pairId: 1, players: [] }])).toEqual([]);
+  });
+});
 
 const s = (userId: string, seasonId = 1, cancelled = false): StrikeRecord => ({ userId, seasonId, cancelled });
 

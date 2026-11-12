@@ -1,4 +1,4 @@
-import { resolutionCutoff, resolveAtDeadline, type Side } from "@padel-liga/rules";
+import { applyStrikes, deadlineDecision, type MatchStatus, resolutionCutoff, type Side } from "@padel-liga/rules";
 import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
@@ -20,7 +20,7 @@ import { liveCounts, strikeInserts, strikeNotices } from "./strikes.server";
 // The deadline resolution (spec 8, #11, D103): the cron step that, from
 // 06:00 Budapest the morning after a phase's deadline, settles each match
 // that has no result yet from its scheduling log (packages/rules
-// resolveAtDeadline): a walkover, both losing, or unplayed. Like the 48-hour
+// deadlineDecision): a walkover, both losing, or unplayed. Like the 48-hour
 // auto-accept it writes a ruling (match_decisions, kind "deadline") and makes
 // the match final in one batch with its audit entry, the strikes of the
 // inactive side (#294), and the players' notices (pushes queued, the 2nd
@@ -48,6 +48,7 @@ type Due = {
   pairA: number;
   pairB: number;
   revision: number;
+  status: MatchStatus;
   deadline: Date;
   seasonId: number;
   leagueId: number;
@@ -73,6 +74,7 @@ export async function resolveDeadlines(
       pairA: matches.pairA,
       pairB: matches.pairB,
       revision: matches.revision,
+      status: matches.status,
       deadline: matches.deadline,
       seasonId: seasons.id,
       leagueId: leagues.id,
@@ -100,12 +102,18 @@ export async function resolveDeadlines(
   const more = due.length > limit;
 
   const [events, players] = await Promise.all([eventsOf(list.map((m) => m.id)), playersOf(list.flatMap((m) => [m.pairA, m.pairB]))]);
-  const plans = list.map((m) => {
-    const r = resolveAtDeadline(
-      (events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)),
-      m.deadline,
-    );
-    return { m, outcome: r.outcome, inactive: r.inactive };
+  // The one rule of the run and of the organizer's projection (#362). The
+  // query already left out what it leaves alone (a withdrawn pair's match,
+  // one with a waiting no-show report), so both flags are false here.
+  const plans = list.flatMap((m) => {
+    const d = deadlineDecision({
+      status: m.status,
+      withdrawn: false,
+      openNoShow: false,
+      events: (events.get(m.id) ?? []).map((e) => toSchedulingEvent(e, m.pairA)),
+      deadline: m.deadline,
+    });
+    return d.kind === "resolve" ? [{ m, outcome: d.resolution.outcome, inactive: d.resolution.inactive }] : [];
   });
   const struck = plans.flatMap((p) => p.inactive.map((s) => players.get(side(p.m, s))?.map((u) => ({ ...u, seasonId: p.m.seasonId })) ?? []).flat());
   // The counts before this run; each strike below adds one in order.
@@ -124,19 +132,17 @@ export async function resolveDeadlines(
     const messages: { userId: string; message: Message }[] = [];
     for (const s of ["a", "b"] as const)
       for (const u of players.get(side(m, s)) ?? []) messages.push({ userId: u.id, message: matchResolvedMessage({ matchId: m.id, outcome: outcomeText(outcome, s) }) });
-    const given = inactive.flatMap((s) =>
-      (players.get(side(m, s)) ?? []).map((u) => {
-        const key = `${m.seasonId}:${u.id}`;
-        const count = (counts.get(key) ?? 0) + 1;
-        counts.set(key, count);
-        return { ...u, key, count, pairId: side(m, s) };
-      }),
-    );
+    // Each struck player's count after this strike, by `${seasonId}:${userId}`,
+    // and the pair's highest: the pair leaves when either of its players has 3
+    // (spec 13), so both are told.
+    const people = new Map(inactive.flatMap((s) => (players.get(side(m, s)) ?? []).map((u): [string, Player] => [`${m.seasonId}:${u.id}`, u])));
+    const given = applyStrikes(
+      counts,
+      inactive.map((s) => ({ pairId: side(m, s), players: (players.get(side(m, s)) ?? []).map((u) => `${m.seasonId}:${u.id}`) })),
+    ).map((step) => ({ ...people.get(step.player)!, key: step.player, count: step.count, pairCount: step.pairCount, pairId: step.pairId }));
     struckKeys.push(given.map((u) => u.key));
-    // The pair leaves when either of its players has 3 (spec 13): both are told.
-    const pairCount = (pairId: number) => Math.max(...given.filter((u) => u.pairId === pairId).map((u) => u.count));
     const { messages: strikeMessages, warnings } = strikeNotices(
-      given.map((u) => ({ userId: u.id, email: u.email, name: u.name, count: u.count, pairCount: pairCount(u.pairId), source: "deadline" as const, matchId: m.id })),
+      given.map((u) => ({ userId: u.id, email: u.email, name: u.name, count: u.count, pairCount: u.pairCount, source: "deadline" as const, matchId: m.id })),
       () => ({ league: m.league, season: m.season }),
     );
     notices.push([

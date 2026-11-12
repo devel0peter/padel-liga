@@ -202,10 +202,10 @@ describe("filters (#158 requirement 3)", () => {
   const ids = (r: { shown: { id: number }[] }) => r.shown.map((x) => x.id);
 
   it("reads the URL and ignores what it can't read", () => {
-    expect(parseFilter(new URLSearchParams("stuck=1&group=2&week=3&status=proposed"))).toEqual({ stuck: true, group: 2, week: 3, status: "proposed" });
-    expect(parseFilter(new URLSearchParams("stuck=yes&group=-1&week=1.5&status=played"))).toEqual({ stuck: false, group: null, week: null, status: null });
+    expect(parseFilter(new URLSearchParams("stuck=1&group=2&week=3&status=proposed"))).toEqual({ stuck: true, group: 2, week: 3, status: "proposed", deadline: null });
+    expect(parseFilter(new URLSearchParams("stuck=yes&group=-1&week=1.5&status=played"))).toEqual({ stuck: false, group: null, week: null, status: null, deadline: null });
     expect(parseFilter(new URLSearchParams("week=0")).week).toBeNull();
-    expect(parseFilter(new URLSearchParams(""))).toEqual({ stuck: false, group: null, week: null, status: null });
+    expect(parseFilter(new URLSearchParams(""))).toEqual({ stuck: false, group: null, week: null, status: null, deadline: null });
     expect(parseFilter(new URLSearchParams("status=disputed")).status).toBe("disputed");
     expect(parseFilter(new URLSearchParams("status=final")).status).toBe("final");
   });

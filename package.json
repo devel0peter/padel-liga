@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "app",
-    "packages/*"
+    "packages/*",
+    "watchdog"
   ],
   "scripts": {
     "dev": "npm run dev -w app",

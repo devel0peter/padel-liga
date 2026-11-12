@@ -1,0 +1,15 @@
+{
+  "name": "@padel-liga/watchdog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "wrangler types && tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev --test-scheduled"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.156.1"
+  }
+}

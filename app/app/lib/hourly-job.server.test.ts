@@ -54,13 +54,16 @@ vi.mock("~/lib/push-stats.server", () => ({
   PUSH_STATS_QUERIES: 1,
   recordPushStats: async (now?: Date) => step("push stats", now),
 }));
+vi.mock("~/lib/feedback-retention.server", () => ({
+  deleteOldFeedback: async (now?: Date) => (step("feedback retention", now), h.result["feedback retention"] ?? null),
+}));
 
 const { runCron } = await import("~/lib/hourly-job.server");
 
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "auto-fix", "match", "stuck", "interest list", "push", "deliver", "push stats"];
+const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "auto-fix", "match", "stuck", "interest list", "push", "deliver", "push stats", "feedback retention"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -80,7 +83,7 @@ const errorLines = () => lines.filter((l) => l.level === "error").map((l) => `${
 const stepResults = () => lines.filter((l) => l.event === "cron step").map((l) => l.result);
 
 describe("runCron", () => {
-  it("runs the steps in order: login code cleanup, auto-accept, deadline resolution, round switch draft, agreed time auto-fix, match reminders, stuck reminders, interest list deletion, pushes, email delivery, push stats", async () => {
+  it("runs the steps in order: login code cleanup, auto-accept, deadline resolution, round switch draft, agreed time auto-fix, match reminders, stuck reminders, interest list deletion, pushes, email delivery, push stats, feedback retention", async () => {
     await runCron(RUN);
     expect(steps()).toEqual(ALL);
     expect(errorLines()).toEqual([]);
@@ -104,6 +107,7 @@ describe("runCron", () => {
       "interest list": "interest list deletion finished: deleted 0 signups, 1 emails, 0 reminder records",
       pushed: 4,
       sent: 5,
+      "feedback retention": "deleted 2 feedback messages older than a year",
     };
     await runCron(RUN);
     expect(stepResults()).toEqual([
@@ -116,6 +120,7 @@ describe("runCron", () => {
       "interest list deletion finished: deleted 0 signups, 1 emails, 0 reminder records",
       "pushed 4 notifications",
       "sent 5 emails",
+      "deleted 2 feedback messages older than a year",
     ]);
   });
 
@@ -176,7 +181,24 @@ describe("runCron", () => {
       "cron step failed: push delivery",
       "cron step failed: email delivery",
       "cron step failed: push stats",
+      "cron step failed: feedback retention",
     ]);
+  });
+
+  it("still deletes old feedback when the push stats fail, and logs it as push stats (#249)", async () => {
+    h.fail.add("push stats");
+    await runCron(RUN);
+    expect(steps()).toEqual(ALL);
+    expect(errorLines()).toEqual(["cron step failed: push stats"]);
+  });
+
+  it("logs a failed feedback deletion under its own name; every other step ran (#249)", async () => {
+    h.fail.add("feedback retention");
+    h.result = { "auto-accept": 0, stuck: 0, sent: 2 };
+    await runCron(RUN);
+    expect(steps()).toEqual(ALL);
+    expect(errorLines()).toEqual(["cron step failed: feedback retention"]);
+    expect(stepResults()).toEqual(["sent 2 emails"]);
   });
 
   it("still writes the push stats when the email delivery fails", async () => {

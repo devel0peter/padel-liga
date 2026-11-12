@@ -22,6 +22,7 @@ The page labels below are the Hungarian ones you see on screen.
 | 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
 | 33b, 33c, the Admin's player profile and email log (D156, D157) | [`33-player-profile.spec.ts`](../app/e2e/33-player-profile.spec.ts) |
 | 33c, email opens in the email log (D161) | [`35-email-opens.spec.ts`](../app/e2e/35-email-opens.spec.ts) |
+| 40, the deadline projection and the next round's preview (D162, D163) | [`36-deadline-projection.spec.ts`](../app/e2e/36-deadline-projection.spec.ts) |
 
 ## Set up
 
@@ -340,6 +341,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Do: open Profil; open the "i" next to "Élő-pont"; on "Beállításaim" (`/profile?tab=settings`), as the second player, change "Szinted" and press "Mentés".
 - Expect:
   - Profil has two tabs (D136): "Játékosprofil" (default: the summary Élő-pont, Szezon, Kör, Meccs, Győzelem, Vereség; then Meccsek and Párod once in a published group) and "Beállításaim" (Adataid, Fiók, Értesítések, Fiók törlése).
+  - Értesítések has, under the push switch, "Miről kérsz push értesítést?" with five topic switches, all on (D159): Időpont-egyeztetés, Emlékeztetők, Eredmények, Csoport és szezon, Mulasztások. With the push switch off they are disabled, with the line "… akkor számítanak, ha bekapcsolod", and keep their values when push is switched back on.
   - On "Beállításaim" the player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
   - Both see the Élő-pont with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
@@ -606,6 +608,36 @@ The pair is a section of Profil, and Profil lists the pairs that ended (decision
   - "Hetente" (played/total, not fixed) and "Csoportonként" (played/total, "lemaradt" more than 25 points behind the ideal line). A tile, a week or a group opens the list below filtered (`?status=`, `?week=`, `?group=`).
   - On the running round seed (today in week 2): Lejátszva 4/15, "Fixálva vagy lejátszva" 8/15, Egyeztetésre vár 3, Ajánlat 3, Megbeszélt időpont 1, Lefixálva 2, Eredmény 1, Vitatott 1, Lejátszva 4, Elakadt 2; week 1 4/5, week 2 0/5 (2 not fixed), week 3 0/5.
   - A player gets 403 on both pages.
+
+### 39. Anyone sends feedback; the Admin reads it on Visszajelzések (side path)
+
+The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decision log (`docs/decisions.md`) D94; `app/e2e/37-feedback.spec.ts`).
+
+- Page: any logged-in page, then "Visszajelzés" at the bottom of the sidebar; logged out, "Visszajelzés" in the footer of `/`, `/rules` or `/privacy`
+- Account: any player, or none
+- Expect: `/feedback?from=<the page>`: "Miről szól?" (Hiba / Ötlet / Egyéb), "Üzenet" (at most 2000 characters), the warning about passwords and other people's data, and "Ezt küldjük el veled:" with the page (path only: no query string, ids as `:id`), the time, the device ("mobil" or "számítógép"), the browser, the version and, logged in, the account's name. Under the button: "E-mailben nem válaszolunk" with the contact address. Logged out, the Turnstile check above the button (locally with the test keys from `.dev.vars.example` it always passes).
+- Do: pick "Hiba", write a line, "Küldés".
+- Expect: "Köszi, megkaptuk!" in place of the form and "Vissza oda, ahonnan jöttél", which opens the page you came from. No email in the terminal, no notification. An empty message, a failed bot check or the limit (an account 5 an hour and 20 a day, visitors together 30 an hour) gives a short error and keeps the text.
+- Then, as `admin@example.test`: Platform > "Visszajelzések" (`/admin/feedback`).
+- Expect: every message, newest first: the type, "Kész" when done, the time, the first words and the sender's name ("Vendég" for a visitor), never an email or phone number. "Típus" (Mind / Hiba / Ötlet / Egyéb / Értékelés) and "Állapot" (Mind / Nyitott / Kész) with their counts, in the address (`?type=`, `?state=`). At 390px the rows stack.
+- Do: open a message, "Kész", then "Újranyitom".
+- Expect: the full text, the stars for a rating, the sender, time, page, device, browser and version; after "Kész" the badge and "Kész: <time>, Admin", after "Újranyitom" "Újranyitva: <time>, Admin". Both in Napló ("Visszajelzés kész", "Visszajelzés újranyitása").
+- As `szervezo@example.test` or a player: no "Visszajelzések" in the sidebar, and `/admin/feedback` shows "Ehhez nincs jogod".
+
+### 40. The Szervező sees what the deadline would decide, and the next round's groups (after step 11)
+
+"Ha most lenne a határidő" on Meccsek and "Előzetes beosztás: ha most érne véget a kör" on Csoportok (decision log (`docs/decisions.md`) D162, D163; `app/e2e/36-deadline-projection.spec.ts`). Best seen on the running round seed below. Read only: nothing is stored or sent.
+
+- Page: `/admin/leagues/minta/matches`, then the season's Csoportok (`/admin/leagues/minta/seasons/<id>/groups`)
+- Account: the Szervező (or the Admin)
+- Do: click a tile of "Ha most lenne a határidő"; pick a value in the "Határidő most" select; open Csoportok.
+- Expect:
+  - Below "A kör állása": "Ezt döntené a rendszer a még le nem játszott meccsekről, ha a határidő (<the round's deadline, an extended one too>) most lenne." and that it changes until the deadline and can still be overridden. Five tiles: Játék nélküli győzelem, Mindkét pár veszít, Elmarad, Nem dönt róla a határidő, Már lejátszva vagy eldöntve, adding up to the list below; a tile opens the list filtered (`?deadline=`).
+  - Each match not final has one line: "Ha most lenne a határidő: Játék nélküli győzelem: <pár> (4:0, 4:0)" (or "Mindkét pár vereséget kap", "Elmaradt"), or "Nem dönt róla a határidő: …" for a result waiting for confirmation, a dispute or a waiting no-show report. A withdrawn pair's matches are not listed.
+  - "Fekete pontok": how many the deadline would give; "2. fekete pont (figyelmeztető e-mail)" names each player (and pair) reaching 2 with "<now> → <after>"; "Kiesnének a körváltáskor (3. fekete pont)" names the pairs where either player reaches 3. Names only.
+  - Csoportok, on the running round's page: below its groups, "Előzetes beosztás: ha most érne véget a kör" with the next round's groups, each pair with its group and place now and an arrow up, down or level ("Új pár" for a new one), the pairs that would leave and why, and "<n> meccs még nem dőlt el". No select, no button. Not shown in the season's last round or once the real draft exists.
+  - Right after step 11 (nothing played): every match "Mindkét pár veszít", every player "0 → 2" in the 2nd strike list, nobody leaving; the preview swaps the 1st of group 2 with the last of group 1.
+  - A player gets 403.
 
 ## A running round instead
 

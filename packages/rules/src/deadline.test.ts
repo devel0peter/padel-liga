@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { budapestTime } from "./calendar";
-import { activeAtDeadline, resolutionCutoff, resolutionDue, resolveAtDeadline } from "./deadline";
+import {
+  activeAtDeadline,
+  deadlineDecision,
+  type DeadlineMatch,
+  projectDeadline,
+  resolutionCutoff,
+  resolutionDue,
+  resolveAtDeadline,
+} from "./deadline";
 import type { SchedulingEvent } from "./scheduling";
 import { groupStandings } from "./standings";
 
@@ -178,5 +186,129 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
     expect(by.get("A")).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
     expect(by.get("B")).toMatchObject({ points: 0, matches: 2, setDiff: -4, gameDiff: -16 });
     expect(by.get("C")).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
+  });
+});
+
+describe("deadlineDecision: the one rule of the run and its projection (spec 8, D103, D108, #362)", () => {
+  const match = (over: Partial<DeadlineMatch> = {}): DeadlineMatch => ({
+    status: "open",
+    withdrawn: false,
+    openNoShow: false,
+    events: [],
+    deadline: DEADLINE,
+    ...over,
+  });
+
+  it("resolves an open or scheduled match by the spec 8 table (resolveAtDeadline)", () => {
+    expect(deadlineDecision(match({ events: [proposal("a")] }))).toEqual({
+      kind: "resolve",
+      resolution: { outcome: { kind: "walkover", winner: "a" }, inactive: ["b"] },
+    });
+    expect(deadlineDecision(match())).toEqual({ kind: "resolve", resolution: { outcome: { kind: "both-inactive" }, inactive: ["a", "b"] } });
+    const both = [proposal("a"), proposal("b", at("2026-11-11", 9))];
+    expect(deadlineDecision(match({ events: both }))).toEqual({ kind: "resolve", resolution: { outcome: { kind: "unplayed" }, inactive: [] } });
+    const scheduled = [proposal("a"), accepted("b", at("2026-11-10", 12), SLOTS[0]!)];
+    expect(deadlineDecision(match({ status: "scheduled", events: scheduled }))).toEqual({
+      kind: "resolve",
+      resolution: { outcome: { kind: "unplayed" }, inactive: [] },
+    });
+  });
+
+  it("a late cancellation: walkover for the other side", () => {
+    const log = [proposal("a"), accepted("b", at("2026-11-10", 12), SLOTS[0]!), cancelled("a", at("2026-11-12", 9), SLOTS[0]!)];
+    expect(deadlineDecision(match({ events: log }))).toEqual({
+      kind: "resolve",
+      resolution: { outcome: { kind: "walkover", winner: "b" }, inactive: ["a"] },
+    });
+  });
+
+  it("leaves alone a final match, a result waiting for confirmation, a disputed one and one with a waiting no-show report", () => {
+    expect(deadlineDecision(match({ status: "final" }))).toEqual({ kind: "leave", reason: "final" });
+    expect(deadlineDecision(match({ status: "result_pending" }))).toEqual({ kind: "leave", reason: "result_pending" });
+    expect(deadlineDecision(match({ status: "disputed" }))).toEqual({ kind: "leave", reason: "disputed" });
+    expect(deadlineDecision(match({ status: "scheduled", openNoShow: true }))).toEqual({ kind: "leave", reason: "no_show" });
+  });
+
+  it("never resolves a withdrawn pair's match, whatever its state", () => {
+    for (const status of ["open", "scheduled", "result_pending", "final"] as const)
+      expect(deadlineDecision(match({ status, withdrawn: true, openNoShow: true }))).toEqual({ kind: "leave", reason: "withdrawn" });
+  });
+});
+
+describe("projectDeadline (#362): outcomes and strikes if the deadline came now", () => {
+  // Pairs 1-4, players "1a", "1b", ...
+  const PAIRS = [1, 2, 3, 4].map((id) => ({ id, players: [`${id}a`, `${id}b`] }));
+  const m = (id: number, pairA: number, pairB: number, over: Partial<DeadlineMatch> = {}) => ({
+    id,
+    pairA,
+    pairB,
+    status: "open" as const,
+    withdrawn: false,
+    openNoShow: false,
+    events: [] as SchedulingEvent[],
+    deadline: DEADLINE,
+    ...over,
+  });
+
+  it("gives every match its decision and no strike for both-active or left-alone matches", () => {
+    const p = projectDeadline(
+      [m(1, 1, 2, { events: [proposal("a"), proposal("b", at("2026-11-11", 9))] }), m(2, 3, 4, { status: "disputed" }), m(3, 1, 3, { status: "final" })],
+      PAIRS,
+      new Map(),
+    );
+    expect(p.decisions.get(1)).toEqual({ kind: "resolve", resolution: { outcome: { kind: "unplayed" }, inactive: [] } });
+    expect(p.decisions.get(2)).toEqual({ kind: "leave", reason: "disputed" });
+    expect(p.decisions.get(3)).toEqual({ kind: "leave", reason: "final" });
+    expect([...p.strikes.values()].every((s) => s.now === 0 && s.after === 0)).toBe(true);
+    expect(p.warned).toEqual([]);
+    expect(p.leaving).toEqual([]);
+  });
+
+  it("a pair with 1 strike and one projected inactive match: both players reach their 2nd (the warning)", () => {
+    const p = projectDeadline(
+      [m(1, 1, 2, { events: [proposal("a")] })],
+      PAIRS,
+      new Map([
+        ["2a", 1],
+        ["2b", 1],
+      ]),
+    );
+    expect(p.strikes.get("2a")).toEqual({ now: 1, after: 2 });
+    expect(p.strikes.get("1a")).toEqual({ now: 0, after: 0 });
+    expect(p.warned).toEqual([
+      { pairId: 2, userId: "2a" },
+      { pairId: 2, userId: "2b" },
+    ]);
+    expect(p.leaving).toEqual([]);
+  });
+
+  it("strikes belong to the player: the player at 2 reaches 3 and the pair would leave, the partner at 0 reaches 1", () => {
+    const p = projectDeadline([m(1, 1, 2, { events: [proposal("a")] })], PAIRS, new Map([["2a", 2]]));
+    expect(p.strikes.get("2a")).toEqual({ now: 2, after: 3 });
+    expect(p.strikes.get("2b")).toEqual({ now: 0, after: 1 });
+    expect(p.warned).toEqual([]);
+    expect(p.leaving).toEqual([2]);
+  });
+
+  it("two projected inactive matches count in match order: the warning at 2, then 3 and leaving", () => {
+    const p = projectDeadline([m(2, 2, 3), m(1, 1, 2, { events: [proposal("a")] })], PAIRS, new Map([["2a", 1]]));
+    expect(p.strikes.get("2a")).toEqual({ now: 1, after: 3 });
+    expect(p.strikes.get("3a")).toEqual({ now: 0, after: 1 });
+    // Match 1 first: 2a reaches 2 (the warning), then match 2 brings 2a to 3.
+    expect(p.warned).toEqual([{ pairId: 2, userId: "2a" }]);
+    expect(p.leaving).toEqual([2]);
+  });
+
+  it("a pair already at 3 is on the leaving list; a withdrawn pair's match gives no strike", () => {
+    const p = projectDeadline([m(1, 1, 4, { withdrawn: true })], PAIRS, new Map([["3b", 3]]));
+    expect(p.decisions.get(1)).toEqual({ kind: "leave", reason: "withdrawn" });
+    expect(p.strikes.get("1a")!.after).toBe(0);
+    expect(p.leaving).toEqual([3]);
+  });
+
+  it("only the given pairs' own players are counted: anyone else (a substitute) never gets a strike", () => {
+    const p = projectDeadline([m(1, 1, 2, { events: [proposal("a")] })], PAIRS, new Map([["sub", 2]]));
+    expect(p.strikes.has("sub")).toBe(false);
+    expect([...p.strikes.entries()].filter(([, s]) => s.after > s.now).map(([id]) => id)).toEqual(["2a", "2b"]);
   });
 });

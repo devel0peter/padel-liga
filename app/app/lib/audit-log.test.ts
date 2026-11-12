@@ -70,6 +70,8 @@ describe("Napló wording (#226)", () => {
     expect(renderRefs("pair:12", names)).toBe("Anna – Béla");
     expect(renderRefs("club:3", names)).toBe("Klub #3");
     expect(renderRefs("match:5", names)).toBe("Meccs #5");
+    // A feedback message (#241) has no name: its kind in Hungarian and its number.
+    expect(renderRefs("feedback:12", names)).toBe("Visszajelzés #12");
     expect(renderRefs("user:gone", names)).toBe("Törölt játékos");
   });
 

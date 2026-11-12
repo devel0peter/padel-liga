@@ -485,9 +485,9 @@ export const notifications = sqliteTable(
     // When the daily digest (#31) took this item, whether or not it went into
     // an email; each item is taken once.
     digestedAt: integer("digested_at", { mode: "timestamp" }),
-    // Set while the push of an item the cron made waits to go out
-    // (#183): the job pushes as many as fit its run and the next run goes on.
-    // Null: pushed, nothing to push, or pushed at once (any other item).
+    // Set while the push of an item waits to go out (#183; every item's
+    // since D158, #126): the cron pushes as many as fit its run and the next
+    // run goes on. Null: pushed, or nothing to push (push or its topic off).
     pushDueAt: integer("push_due_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -529,6 +529,23 @@ export const notificationOptOuts = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
+);
+
+// The Kezdőlap tips a player dismissed ("Most nem", #262, D160): per
+// account, so it holds on every device. The first dismissal hides the tip
+// for 14 days, the second for good (lib/tips.ts).
+export const tipDismissals = sqliteTable(
+  "tip_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // An id of lib/tips.ts TIPS.
+    tip: text("tip").notNull(),
+    count: integer("count").notNull().default(1),
+    dismissedAt: integer("dismissed_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tip] })],
 );
 
 // Two players who play a league together (spec section 4). Formed by a pair
@@ -1109,4 +1126,37 @@ export const noShowReports = sqliteTable(
     index("no_show_reports_match_idx").on(t.matchId),
     index("no_show_reports_status_idx").on(t.status),
   ],
+);
+
+// Feedback (spec 19, D94, #239): one row per message from the Visszajelzés
+// form (bug / idea / other) or a prompt answer (rating). Stored with its
+// context: the page (path only, ids replaced, lib/feedback.ts pagePath), the
+// device class and browser family worked out from the request (never the
+// full browser string or the IP address), the app version and, when logged
+// in, the account (null: a visitor). The rate limits count these rows
+// (feedback.server.ts). Nothing here sends mail, push or a notification.
+export const feedback = sqliteTable(
+  "feedback",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    kind: text("kind", { enum: ["bug", "idea", "other", "rating"] }).notNull(),
+    // Required for bug / idea / other; a rating's optional comment ("" without).
+    message: text("message").notNull().default(""),
+    // 1–5, ratings only.
+    rating: integer("rating"),
+    page: text("page").notNull(),
+    device: text("device", { enum: ["mobile", "desktop"] }).notNull(),
+    browser: text("browser").notNull(),
+    appVersion: text("app_version").notNull(),
+    // Deleting an account removes its feedback with it (spec 19).
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    // Marked done on Visszajelzések; null while open. Reopening clears it and
+    // keeps who reopened it and when.
+    doneAt: integer("done_at", { mode: "timestamp" }),
+    doneBy: text("done_by").references(() => users.id, { onDelete: "set null" }),
+    reopenedAt: integer("reopened_at", { mode: "timestamp" }),
+    reopenedBy: text("reopened_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("feedback_created_idx").on(t.createdAt), index("feedback_user_idx").on(t.userId, t.createdAt)],
 );

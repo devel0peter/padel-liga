@@ -95,8 +95,13 @@ export default function Privacy() {
               </li>
               <li>
                 az értesítéseid listája, és hogy e-mailben, push értesítésben
-                vagy mindkettőben kéred-e őket (alapból mindkettő be van
-                kapcsolva, a profilodban bármikor átállíthatod),
+                vagy mindkettőben kéred-e őket, és mely témákról kérsz push
+                értesítést (alapból minden be van kapcsolva, a profilodban
+                bármikor átállíthatod),
+              </li>
+              <li>
+                ha a Kezdőlapon egy tippre azt mondod, „Most nem”: mikor és
+                hányszor,
               </li>
               <li>
                 ha egy eszközön bekapcsolod a push értesítést, a böngésződ
@@ -113,11 +118,19 @@ export default function Privacy() {
               szervező látja; ha törlöd a fiókodat, a törlések indokát is
               töröljük.
             </p>
+            <p>
+              Ha visszajelzést küldesz (a Visszajelzés oldalon, belépve vagy
+              anélkül): az üzenetedet, a típusát (hiba, ötlet vagy egyéb), az
+              oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil
+              vagy számítógép) és a böngésződ nevét, az oldal verzióját, és ha
+              be vagy lépve, a fiókodat. A teljes böngészőazonosítót és az
+              IP-címedet nem tároljuk.
+            </p>
           </Section>
 
           <Section title="Mire használjuk?">
             <p>
-              Csak a liga szervezésére: csoportok összeállítására, párkeresésre,
+              A liga szervezésére: csoportok összeállítására, párkeresésre,
               és arra, hogy értesítsünk az indulásról és a liga ügyeiről. Nem
               küldünk reklámot, és senkinek nem adjuk el vagy adjuk át az
               adataidat marketingcélra.
@@ -160,6 +173,11 @@ export default function Privacy() {
               őrizzük meg, hogy ne írjunk rá többet.
             </p>
             <p>
+              A visszajelzést te küldöd el, önként. Arra használjuk, hogy
+              kijavítsuk a hibákat és jobbá tegyük az oldalt. E-mailben nem
+              válaszolunk rá; ha kérdésed van, írj a {mail} címre.
+            </p>
+            <p>
               Az adatkezelés alapja a hozzájárulásod, amit az első belépéskor
               adsz meg, és bármikor visszavonhatsz.
             </p>
@@ -182,6 +200,11 @@ export default function Privacy() {
               <li>
                 <strong>Soha nem nyilvános:</strong> az e-mail-címed és a
                 telefonszámod.
+              </li>
+              <li>
+                <strong>A visszajelzésedet</strong> csak az oldal adminja
+                látja, ha belépve küldted, a neveddel együtt. A szervezők és a
+                többi játékos nem.
               </li>
               <li>
                 <strong>A párod</strong> látja az e-mail-címedet és a
@@ -330,7 +353,7 @@ export default function Privacy() {
               (adatfeldolgozók):
             </p>
             <ul className={list}>
-              <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika és a belépési kód kérésének robotszűrője (Turnstile),</li>
+              <li>Cloudflare, Inc. – tárhely, adatbázis, látogatási statisztika, és a belépési kód kérésének meg a belépés nélkül küldött visszajelzésnek a robotszűrője (Turnstile),</li>
               <li>Google (Google Workspace) – a {CONTACT_EMAIL} postafiók és a liga e-mailjeinek kiküldése,</li>
               <li>Resend – a liga e-mailjeinek kiküldése, ha a Google épp nem tudja.</li>
             </ul>
@@ -356,6 +379,12 @@ export default function Privacy() {
                 spamnek jelölted-e, és hogy megnyitottad-e (mikor először és
                 hányszor). Ezt csak az admin látja, és a levéllel együtt
                 töröljük.
+              </li>
+              <li>
+                <strong>Visszajelzések:</strong> egy évig őrizzük, utána
+                magától törlődik. Ha előbb törlöd a fiókodat, a belépve küldött
+                visszajelzéseidet vele együtt töröljük (akkor is, ha a fiókod
+                csak névtelen lesz).
               </li>
               <li>
                 <strong>Belépési kód:</strong> magát a kódot nem tároljuk,

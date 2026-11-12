@@ -63,7 +63,16 @@ function freshDb() {
   h.raw.exec(`insert into oauth_accounts (provider, provider_user_id, user_id) values ('google', 'g-a', 'a')`);
   h.raw.exec(`insert into push_subscriptions (endpoint, user_id, p256dh, auth) values ('https://push/a', 'a', 'k', 'x')`);
   h.raw.exec(`insert into notifications (user_id, kind, title, body, url) values ('a', 'test', 't', 'b', '/')`);
-  h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('a', 'channel:email')`);
+  h.raw.exec(`insert into notification_opt_outs (user_id, kind) values ('a', 'channel:email'), ('a', 'topic:reminders')`);
+  h.raw.exec(`insert into tip_dismissals (user_id, tip, count, dismissed_at) values ('a', 'push', 1, 1)`);
+  // Feedback (#249): a's message and rating, b's message and a visitor's.
+  const fb = h.raw.prepare(
+    "insert into feedback (id, kind, message, rating, page, device, browser, app_version, user_id, created_at) values (?, ?, ?, ?, '/home', 'mobile', 'Safari', 'abc', ?, 1)",
+  );
+  fb.run(1, "bug", "Anna Teszt vagyok, nem megy a gomb", null, "a");
+  fb.run(2, "rating", "", 4, "a");
+  fb.run(3, "idea", "B ötlete", null, "b");
+  fb.run(4, "other", "Látogató", null, null);
   h.raw.exec(`insert into pair_links (league_id, owner_id, token) values (1, 'a', 'tok-a')`);
   h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'a', 1)`);
   h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'a')`);
@@ -126,6 +135,8 @@ function personalRowsLeft() {
     push: n("select count(*) from push_subscriptions where user_id = 'a'"),
     notifications: n("select count(*) from notifications where user_id = 'a'"),
     optOuts: n("select count(*) from notification_opt_outs where user_id = 'a'"),
+    tips: n("select count(*) from tip_dismissals where user_id = 'a'"),
+    feedback: n("select count(*) from feedback where user_id = 'a'"),
     pairLinks: n("select count(*) from pair_links where owner_id = 'a'"),
     partnerSearch: n("select count(*) from partner_searches where user_id = 'a'"),
     leagues: n("select count(*) from league_members where user_id = 'a'"),
@@ -145,6 +156,8 @@ const NONE = {
   push: 0,
   notifications: 0,
   optOuts: 0,
+  tips: 0,
+  feedback: 0,
   pairLinks: 0,
   partnerSearch: 0,
   leagues: 0,
@@ -208,6 +221,29 @@ describe("deleting an account (#152)", () => {
     publishPairOne();
     expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.playing });
     expect(n("select count(*) from email_suppressions where email = 'a@x.hu'")).toBe(1);
+  });
+
+  const feedbackLeft = () => all("select id, user_id from feedback order by id");
+  const OTHERS_FEEDBACK = [
+    { id: 3, user_id: "b" },
+    { id: 4, user_id: null },
+  ];
+
+  it("removing an account deletes its feedback and rating; another account's and a visitor's stay (#249)", async () => {
+    expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: true, mode: "remove" });
+    expect(feedbackLeft()).toEqual(OTHERS_FEEDBACK);
+  });
+
+  it("anonymizing an account deletes its feedback and rating too; the others stay (#249)", async () => {
+    publishPairOne();
+    expect(await D.deleteAccount("admin", "a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
+    expect(feedbackLeft()).toEqual(OTHERS_FEEDBACK);
+  });
+
+  it("keeps the feedback when the deletion is refused (#249)", async () => {
+    publishPairOne();
+    expect(await D.deleteAccount("admin", "a", DURING)).toEqual({ ok: false, error: DELETION_REFUSALS.playing });
+    expect(feedbackLeft()).toHaveLength(4);
   });
 
   it.each(["unsubscribed", "bounced", "complained"])(

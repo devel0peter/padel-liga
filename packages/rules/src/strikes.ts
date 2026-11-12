@@ -49,6 +49,28 @@ export function strikeNotice(count: number, pairCount = count): StrikeNotice | n
 }
 
 /**
+ * Gives one strike to each player of each grant (a pair's players for one
+ * match), in order, on top of `counts` (by the caller's player key, updated
+ * in place): each player's new count, and the pair's highest count after
+ * the grant, which decides the notice (strikeNotice). The deadline run
+ * (deadline.server.ts) and its projection (#362) count with it.
+ */
+export function applyStrikes(
+  counts: Map<string, number>,
+  grants: readonly { pairId: number; players: readonly string[] }[],
+): { pairId: number; player: string; count: number; pairCount: number }[] {
+  return grants.flatMap((g) => {
+    const steps = g.players.map((player) => {
+      const count = (counts.get(player) ?? 0) + 1;
+      counts.set(player, count);
+      return { pairId: g.pairId, player, count };
+    });
+    const pairCount = Math.max(...steps.map((s) => s.count));
+    return steps.map((s) => ({ ...s, pairCount }));
+  });
+}
+
+/**
  * The pairs that leave at the round switch (spec 8 and 10, removed by #35
  * after promotion and relegation): those with a player at STRIKE_LIMIT or
  * more strikes this season. Recomputed from the counts, so a cancelled

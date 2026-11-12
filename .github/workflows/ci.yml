@@ -1,4 +1,4 @@
-# Checks every ready PR (typecheck, tests, build, commitlint) and push to main; on main, applies D1 migrations and deploys. The browser suite runs only on release PRs (into main) or a PR labelled `e2e` (D149). Drafts skip the expensive jobs; docs-only PRs pass them without running their steps (D117, D125).
+# Checks every ready PR (typecheck, tests, build, commitlint) and push to main; on main, applies D1 migrations and deploys the app, then the watchdog (watchdog/, D169). The browser suite runs only on release PRs (into main) or a PR labelled `e2e` (D149). Drafts skip the expensive jobs; docs-only PRs pass them without running their steps (D117, D125).
 # Secrets (repo settings → Secrets → Actions): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
 name: CI
 
@@ -206,4 +206,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: app
+          command: deploy
+      # The watchdog (#318, D169): its own Worker in watchdog/, deployed after
+      # the app so a release starts both. A failed deploy fails the run.
+      - name: Deploy the watchdog
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: watchdog
           command: deploy

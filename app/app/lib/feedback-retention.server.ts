@@ -41,7 +41,8 @@ export async function deleteOldFeedback(now: Date, run: RunBudget): Promise<stri
     db
       .insert(jobRuns)
       .values({ key: RETENTION_KEY, doneAt: now })
-      .onConflictDoUpdate({ target: jobRuns.key, set: { doneAt: sql`excluded.done_at` } }),
+      // A day already marked keeps its mark: a rerun writes nothing.
+      .onConflictDoUpdate({ target: jobRuns.key, set: { doneAt: sql`excluded.done_at` }, setWhere: sql`${jobRuns.doneAt} < ${dayStart}` }),
   ]);
   doneDay = day;
   return deleted.length ? `deleted ${deleted.length} feedback messages older than a year` : null;

@@ -74,10 +74,14 @@ describe("deleting feedback older than a year (#249)", () => {
       expect(await run(new Date(at))).toBeNull();
     }
     expect(ids()).toEqual([1]);
+    // The reruns left the day's mark as the first run wrote it.
+    const mark = () => h.raw.prepare("select done_at from job_runs where key = ?").get(R.RETENTION_KEY).done_at;
+    expect(mark()).toBe(sec(NOW));
     // 00:00 on 13 November in Budapest is 23:00 UTC on the 12th.
     R.forgetRetentionDay();
     expect(await run(new Date("2026-11-12T23:00:00Z"))).toBe("deleted 1 feedback messages older than a year");
     expect(ids()).toEqual([]);
+    expect(mark()).toBe(sec(new Date("2026-11-12T23:00:00Z")));
   });
 
   it("leaves the work for the next run when the run has no query left", async () => {

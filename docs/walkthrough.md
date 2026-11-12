@@ -339,6 +339,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Do: open Profil; open the "i" next to "Élő-pont"; on "Beállításaim" (`/profile?tab=settings`), as the second player, change "Szinted" and press "Mentés".
 - Expect:
   - Profil has two tabs (D136): "Játékosprofil" (default: the summary Élő-pont, Szezon, Kör, Meccs, Győzelem, Vereség; then Meccsek and Párod once in a published group) and "Beállításaim" (Adataid, Fiók, Értesítések, Fiók törlése).
+  - Értesítések has, under the push switch, "Miről kérsz push értesítést?" with five topic switches, all on (D159): Időpont-egyeztetés, Emlékeztetők, Eredmények, Csoport és szezon, Mulasztások. With the push switch off they are disabled, with the line "… akkor számítanak, ha bekapcsolod", and keep their values when push is switched back on.
   - On "Beállításaim" the player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
   - Both see the Élő-pont with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.

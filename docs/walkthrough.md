@@ -603,6 +603,16 @@ The pair is a section of Profil, and Profil lists the pairs that ended (decision
   - On the running round seed (today in week 2): Lejátszva 4/15, "Fixálva vagy lejátszva" 8/15, Egyeztetésre vár 3, Ajánlat 3, Megbeszélt időpont 1, Lefixálva 2, Eredmény 1, Vitatott 1, Lejátszva 4, Elakadt 2; week 1 4/5, week 2 0/5 (2 not fixed), week 3 0/5.
   - A player gets 403 on both pages.
 
+### 39. Anyone sends feedback (side path)
+
+The Visszajelzés form (#240; spec section 19, decision log (`docs/decisions.md`) D94; `app/e2e/37-feedback.spec.ts`).
+
+- Page: any logged-in page, then "Visszajelzés" at the bottom of the sidebar; logged out, "Visszajelzés" in the footer of `/`, `/rules` or `/privacy`
+- Account: any player, or none
+- Expect: `/feedback?from=<the page>`: "Miről szól?" (Hiba / Ötlet / Egyéb), "Üzenet" (at most 2000 characters), the warning about passwords and other people's data, and "Ezt küldjük el veled:" with the page (path only: no query string, ids as `:id`), the time, the device ("mobil" or "számítógép"), the browser, the version and, logged in, the account's name. Under the button: "E-mailben nem válaszolunk" with the contact address. Logged out, the Turnstile check above the button (locally with the test keys from `.dev.vars.example` it always passes).
+- Do: pick "Hiba", write a line, "Küldés".
+- Expect: "Köszi, megkaptuk!" in place of the form and "Vissza oda, ahonnan jöttél", which opens the page you came from. No email in the terminal, no notification. An empty message, a failed bot check or the limit (an account 5 an hour and 20 a day, visitors together 30 an hour) gives a short error and keeps the text.
+
 ## A running round instead
 
 `npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every pair-to-be above and Varga Dóra and Kiss Miklós have a finished account in Mintaváros, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.

@@ -5,6 +5,8 @@ export default [
   index("routes/home.tsx"),
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  // Visszajelzés: public, for visitors too (#240, spec 19).
+  route("feedback", "routes/feedback.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),

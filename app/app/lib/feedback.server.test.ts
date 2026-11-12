@@ -115,3 +115,50 @@ describe("storing feedback (#239)", () => {
     expect(rows().map((r: any) => r.user_id)).toEqual(["u2", null]);
   });
 });
+
+describe("the form's send (#240)", () => {
+  it("a logged-in player's message: stored with the context from the request, no bot check", async () => {
+    const out = await F.submitFeedback(form({ kind: "bug", message: " Nem megy a gomb ", from: "/matches/12?tab=log" }), request(), "u1", NOW);
+    expect(out).toEqual({ ok: true });
+    expect(h.botCalls).toBe(0);
+    const [row] = rows();
+    expect(row).toMatchObject({ kind: "bug", message: "Nem megy a gomb", rating: null, page: "/matches/:id", device: "mobile", browser: "Safari", user_id: "u1" });
+    expect(row.app_version).toBe("dev");
+    // Neither the full browser string nor the IP address is anywhere in the row.
+    const stored = JSON.stringify(row);
+    expect(stored).not.toContain("Mozilla");
+    expect(stored).not.toContain("203.0.113.9");
+    expect(stored).not.toContain("tab=log");
+  });
+
+  it("a visitor passes the bot check first, and is stored without an account", async () => {
+    expect(await F.submitFeedback(form({ kind: "idea", message: "Legyen sötét mód", from: "/rules" }), request(), null, NOW)).toEqual({ ok: true });
+    expect(h.botCalls).toBe(1);
+    expect(rows()).toMatchObject([{ kind: "idea", page: "/rules", user_id: null }]);
+  });
+
+  it("a visitor who fails the bot check gets its Hungarian error and nothing is stored", async () => {
+    for (const bot of ["missing", "rejected"] as const) {
+      h.bot = bot;
+      expect(await F.submitFeedback(form({ kind: "idea", message: "Hello", from: "/" }), request(), null, NOW)).toEqual({ ok: false, error: turnstileError(bot) });
+    }
+    expect(rows()).toEqual([]);
+  });
+
+  it("refuses an empty or too long message, a rating or an unknown type from the form, and stores nothing", async () => {
+    expect(await F.submitFeedback(form({ kind: "bug", message: "  " }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.empty });
+    expect(await F.submitFeedback(form({ kind: "bug", message: "a".repeat(2001) }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.tooLong });
+    expect(await F.submitFeedback(form({ kind: "rating", message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.kind });
+    expect(await F.submitFeedback(form({ message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.kind });
+    // Checked before the bot check, which a visitor's empty message never reaches.
+    expect(await F.submitFeedback(form({ kind: "other", message: "" }), request(), null, NOW)).toEqual({ ok: false, error: ERRORS.empty });
+    expect(h.botCalls).toBe(0);
+    expect(rows()).toEqual([]);
+  });
+
+  it("over the limit: the Hungarian error, and nothing more is stored", async () => {
+    for (let i = 0; i < 5; i++) await F.submitFeedback(form({ kind: "other", message: `m${i}` }), request(), "u1", minutes(i));
+    expect(await F.submitFeedback(form({ kind: "other", message: "m6" }), request(), "u1", minutes(6))).toEqual({ ok: false, error: ERRORS.limit });
+    expect(rows()).toHaveLength(5);
+  });
+});

@@ -137,14 +137,14 @@ const NONE: ReadonlySet<string> = new Set();
 // once and a group publish pushes its first devices and queues the rest.
 export const INLINE_PUSH_CALLS = 20;
 
-// What the running request may still push itself: none in a cron run (its
-// pushes keep to the run's budget, pushQueued), and none when the isolate
-// serves more than one invocation at once (no way to tell whose calls are
-// whose): then everything waits for the cron.
-function inlinePushRoom(): number {
+// The running request and what it may still push itself: none in a cron run
+// (its pushes keep to the run's budget, pushQueued), and none when the
+// isolate serves more than one invocation at once (no way to tell whose calls
+// are whose): then everything waits for the cron.
+function inlinePushRoom(): { invocation: NonNullable<ReturnType<typeof currentInvocation>>; room: number } | null {
   const invocation = currentInvocation();
-  if (!invocation || invocation.kind !== "request") return 0;
-  return Math.max(0, INLINE_PUSH_CALLS - invocation.pushCalls);
+  if (!invocation || invocation.kind !== "request") return null;
+  return { invocation, room: Math.max(0, INLINE_PUSH_CALLS - invocation.pushCalls) };
 }
 
 // Stores one message per user, skipping users who switched the kind off, with
@@ -168,10 +168,17 @@ async function notify(kind: StoredKind, messages: { userId: string; message: Mes
 // The request's own queued items, pushed while they fit its room. Found by
 // kind and time: an item of another request stored in the same second is
 // queued too, so pushing it here is no harm, and the claim keeps it once.
+// The room is reserved on the request's own record before any await and the
+// unused part given back after, on that same record: another invocation
+// starting meanwhile (no current one then) or a parallel notice of the same
+// request can't make the request push past its budget.
 async function pushNow(kind: StoredKind, at: Date): Promise<void> {
-  const room = inlinePushRoom();
+  const own = inlinePushRoom();
   const vapid = vapidKeys();
-  if (room === 0 || !vapid) return;
+  if (!own || own.room === 0 || !vapid) return;
+  const { invocation, room } = own;
+  // A failure keeps the whole reservation: how many went out is unknown.
+  invocation.pushCalls += room;
   const queue = await db
     .select({ id: notifications.id, userId: notifications.userId, title: notifications.title, body: notifications.body, url: notifications.url })
     .from(notifications)
@@ -179,8 +186,7 @@ async function pushNow(kind: StoredKind, at: Date): Promise<void> {
     .orderBy(asc(notifications.id))
     .limit(PUSH_ROUND);
   const { calls } = await pushRound(queue, room, vapid, new Set());
-  const invocation = currentInvocation();
-  if (invocation) invocation.pushCalls += calls;
+  invocation.pushCalls -= room - calls;
 }
 
 // A player notification (#115): always in the in-app list, pushed (at once

@@ -282,6 +282,25 @@ describe("pushes at once from a request, within its budget (#126)", () => {
     expect(queued().map((n: any) => n.user)).toEqual(["u1", "u2"]);
   });
 
+  it("another request starting while the pushes are out doesn't lose their count: the budget still holds", async () => {
+    const first = players(N.INLINE_PUSH_CALLS);
+    let other: (() => void) | null = null;
+    // The isolate takes another request while the first push is in flight.
+    vi.stubGlobal("fetch", async (req: Request) => {
+      other ??= beginInvocation("other");
+      h.pushes.push(`${req.url} ${JSON.parse(await req.text()).url}`);
+      return new Response(null, { status: 201 });
+    });
+    await inRequest(async () => {
+      await notify(first, "groups_published");
+      other?.();
+      // The budget is spent: this one waits for the cron.
+      await notify(["u2"]);
+    });
+    expect(h.pushes).toHaveLength(N.INLINE_PUSH_CALLS);
+    expect(queued().map((n: any) => n.user)).toEqual(["u2"]);
+  });
+
   it("a cron run pushes nothing at once: its pushes keep to the run's budget", async () => {
     await inRequest(() => notify(["u1", "u2"]), "cron");
     expect(h.pushes).toEqual([]);

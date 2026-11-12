@@ -43,6 +43,10 @@ const E = await import("~/lib/season-entries.server");
 const N = await import("~/lib/notifications.server");
 const O = await import("~/lib/email/outbox.server");
 const L = await import("~/lib/auth/login-code.server");
+const { RunBudget } = await import("~/lib/run-usage");
+
+// The cron's push step (#183): every push waits in the queue (D158).
+const cronPushes = () => N.pushQueued(new RunBudget());
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const DURING_REGISTRATION = new Date("2026-11-03T12:00:00Z");
@@ -83,8 +87,10 @@ async function approve() {
   expect(await E.applyToSeason({ id: "a", email: "a@x.hu", name: "Anna", level: "halado" } as any, 1, DURING_REGISTRATION)).toMatchObject({
     ok: true,
   });
-  // The emails go after the response (D150).
+  // The emails go after the response (D150), the pushes with the cron (D158).
   await settleBackground();
+  expect(h.pushed).toEqual([]);
+  await cronPushes();
 }
 
 const inbox = (userId: string) =>
@@ -207,12 +213,14 @@ describe("notification switches (#115)", () => {
     await N.notifyPlayers("groups_published", ids.map((userId) => ({ userId, message })));
     h.raw = raw;
 
-    // One opt-out lookup, 3 inserts of at most 15 rows, one subscription lookup.
+    // One opt-out lookup and 3 inserts of at most 14 rows (one D1 batch);
+    // no subscription lookup and no push: the pushes wait for the cron (D158).
     expect(queries.filter((q) => /^select .* from "notification_opt_outs"/.test(q))).toHaveLength(1);
     expect(queries.filter((q) => /^insert into "notifications"/.test(q))).toHaveLength(3);
-    expect(queries.filter((q) => /from "push_subscriptions"/.test(q))).toHaveLength(1);
-    expect(queries).toHaveLength(5);
+    expect(queries).toHaveLength(4);
     expect(all("select count(*) n from notifications")[0].n).toBe(40);
+    expect(h.pushed).toEqual([]);
+    await cronPushes();
     // Each push carries its own notification's id.
     expect(h.pushed).toHaveLength(39);
     expect(new Set(h.pushed).size).toBe(39);
@@ -225,17 +233,20 @@ describe("notification switches (#115)", () => {
     const dispute = () => N.notifyResultDisputed({ matchId: 1, leagueId: 1, leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 1, disputedBy: "a" });
 
     await dispute();
+    await cronPushes();
     expect(inbox("o")).toEqual([expect.objectContaining({ kind: "result_disputed" })]);
     expect(h.pushed).toEqual([endpoint("o")]);
 
     await N.setChannelEnabled("o", "push", false);
     await dispute();
+    await cronPushes();
     expect(inbox("o")).toHaveLength(2);
     expect(h.pushed).toEqual([endpoint("o")]);
 
     await N.setChannelEnabled("o", "push", true);
     await N.setKindEnabled("o", "result_disputed", false);
     await dispute();
+    await cronPushes();
     expect(inbox("o")).toHaveLength(2);
     expect(h.pushed).toEqual([endpoint("o")]);
   });

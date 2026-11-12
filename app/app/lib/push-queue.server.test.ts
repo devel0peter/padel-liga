@@ -43,13 +43,12 @@ const devicesOf = (user: string) =>
   (h.raw.prepare("select endpoint from push_subscriptions where user_id = ? order by endpoint").all(user) as { endpoint: string }[]).map((r) => r.endpoint);
 const queued = () => h.raw.prepare("select user_id as user, title from notifications where push_due_at is not null order by id").all();
 
-// The queue as the cron fills it (notifyPlayers with queuePush).
+// The queue as the cron or a request fills it (notifyPlayers, D158).
 async function queue(...users: string[]) {
   await N.notifyPlayers(
     "match_no_proposal",
     users.map((userId, i) => ({ userId, message: message(i + 1) })),
     AT,
-    true,
   );
 }
 
@@ -111,6 +110,18 @@ describe("pushQueued (#183)", () => {
     ]);
     // The queue, the devices, the claim, the forgetting, the queue again (empty), what's left.
     expect(budget.used()).toEqual({ queries: 6, calls: 3 });
+  });
+
+  it("a push service error is logged with how many pushes failed (#126)", async () => {
+    h.status.set("https://push.example/u1-a", 500);
+    h.status.set("https://push.example/u1-b", 503);
+    const warnings: any[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: any) => void warnings.push(line));
+    await queue("u1", "u2");
+    expect(await N.pushQueued(new RunBudget())).toEqual({ pushed: 2, left: 0 });
+    vi.restoreAllMocks();
+    expect(warnings.filter((w) => w.event === "push")).toEqual([expect.objectContaining({ level: "warn", sent: 2, failed: 2, gone: 0 })]);
+    expect(warnings.filter((w) => w.event === "push failed")).toHaveLength(2);
   });
 
   it("without push keys the queue is emptied without pushing", async () => {

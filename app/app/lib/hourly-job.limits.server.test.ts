@@ -57,6 +57,21 @@ const PHASES = ["2026-11-08T23:00:00Z", "2026-11-29T23:00:00Z", "2027-01-03T23:0
 // matches due a reminder: its week-1 match, still not scheduled ("pótoljátok
 // a kör végéig"), and its week-2 match, with no proposal yet.
 async function bigLeague() {
+  await enteredLeague();
+  expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
+  expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+  await settleBackground();
+  h.raw.exec("delete from notifications");
+  h.raw.exec("delete from email_messages");
+  const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'a')");
+  const players = h.raw.prepare("select id from users where id != 'o' order by id").all() as { id: string }[];
+  players.slice(0, DEVICES).forEach((p, i) => device.run(`https://push.example/${i}`, p.id));
+  h.sent = [];
+  h.pushes = [];
+}
+
+// The league's 100 pairs entered for the season, no groups yet.
+async function enteredLeague() {
   forgetMorningDone();
   h.raw = migratedDatabase();
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
@@ -80,16 +95,6 @@ async function bigLeague() {
     pair.run(id, `p${id}a`, `p${id}b`);
     entry.run(id, sec("2026-11-06T10:00:00Z") + id);
   }
-  expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
-  expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
-  await settleBackground();
-  h.raw.exec("delete from notifications");
-  h.raw.exec("delete from email_messages");
-  const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'a')");
-  const players = h.raw.prepare("select id from users where id != 'o' order by id").all() as { id: string }[];
-  players.slice(0, DEVICES).forEach((p, i) => device.run(`https://push.example/${i}`, p.id));
-  h.sent = [];
-  h.pushes = [];
 }
 
 const count = (q: string) => (h.raw.prepare(q).get() as { n: number }).n;
@@ -194,5 +199,73 @@ describe("the cron within the run limits (#183)", () => {
     expect(count("select count(*) as n from notifications")).toBe(items);
     expect(count("select count(*) as n from match_reminders")).toBe(claims);
     expect(count("select count(*) as n from email_messages where kind = 'match_digest'")).toBe(200);
+  });
+});
+
+// #126: a fan-out in a request (the group publish) pushes nothing itself; its
+// pushes wait in the queue and the cron delivers every one of them, over as
+// many runs as it takes, while the request's emails go out as before (D158).
+describe("a fan-out in a request reaches every device (#126)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", async (req: Request) => {
+      h.pushes.push(`${req.url} ${JSON.parse(await req.text()).url}`);
+      return new Response(null, { status: 201 });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("publishing the groups with 100 devices on: all 100 get the push from the cron, and every group email goes out", async () => {
+    await enteredLeague();
+    h.sent = [];
+    h.pushes = [];
+    // 100 devices: 50 players with one each, 25 with two.
+    const device = h.raw.prepare("insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (?, ?, 'k', 'a')");
+    const players = h.raw.prepare("select id from users where id != 'o' order by id").all() as { id: string }[];
+    players.slice(0, 75).forEach((p, i) => {
+      device.run(`https://push.example/${i}`, p.id);
+      if (i >= 50) device.run(`https://push.example/${i}-2`, p.id);
+    });
+    expect(count("select count(*) as n from push_subscriptions")).toBe(100);
+
+    expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
+    const request = new RunBudget();
+    expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+    // The emails go after the response (D150), within the invocation's calls.
+    await settleBackground();
+    expect(request.used().calls).toBeLessThanOrEqual(RUN_LIMITS.calls);
+    // Not a single push from the request; every one waits in the queue.
+    expect(h.pushes).toEqual([]);
+    expect(count("select count(*) as n from notifications where kind = 'groups_published'")).toBe(200);
+    expect(count("select count(*) as n from notifications where push_due_at is not null")).toBe(200);
+    // The group emails as before: one per player, stored by the request, the
+    // first ones sent right after the response.
+    expect(count("select count(*) as n from email_messages where kind = 'groups_published'")).toBe(200);
+    expect(h.sent.length).toBeGreaterThan(0);
+
+    // The cron's runs, every 10 minutes, until nothing is left.
+    const left = () =>
+      count("select count(*) as n from notifications where push_due_at is not null") +
+      count("select count(*) as n from email_messages where status = 'pending'");
+    const runs: { queries: number; calls: number }[] = [];
+    for (let minutes = 0; minutes < 60 && left() > 0; minutes += 10) {
+      const budget = new RunBudget();
+      await runCron(budapestTime("2026-11-08", 9, minutes));
+      runs.push(budget.used());
+    }
+    for (const r of runs) {
+      expect(r.queries).toBeLessThanOrEqual(RUN_LIMITS.queries);
+      expect(r.calls).toBeLessThanOrEqual(RUN_LIMITS.calls);
+    }
+    // More than one run: one run alone could not have pushed to 100 devices.
+    expect(runs.length).toBeGreaterThan(1);
+    expect(count("select count(*) as n from notifications where push_due_at is not null")).toBe(0);
+    const groupPushes = h.pushes.filter((p) => / \/notifications\/\d+$/.test(p));
+    expect(groupPushes).toHaveLength(100);
+    expect(new Set(groupPushes.map((p) => p.split(" ")[0])).size).toBe(100);
+    // And every group email went out, once.
+    const groupMails = h.sent.filter((m) => m.subject.includes("csoport"));
+    expect(groupMails).toHaveLength(200);
+    expect(new Set(groupMails.map((m) => m.to)).size).toBe(200);
+    expect(count("select count(*) as n from email_messages where status != 'sent'")).toBe(0);
   });
 });

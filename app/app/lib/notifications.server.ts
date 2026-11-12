@@ -26,8 +26,10 @@ import { pushOutcome, pushRequest, type VapidKeys } from "./push/webpush";
 import { countCall, type RunBudget, type Usage } from "./run-usage";
 import { logError, logInfo, logWarn } from "~/lib/log";
 
-// Notifications are stored first (the /notifications list), then pushed to
-// every device the user subscribed. A push failure never fails the caller.
+// Notifications are stored (the /notifications list) with their push queued;
+// the cron pushes them to every device the user subscribed (pushQueued, D158).
+// Only the profile's "Próba" is pushed at once. A push failure never fails
+// the caller.
 
 const INBOX_SIZE = 50;
 
@@ -114,68 +116,40 @@ async function sendPushes(list: { s: Subscription; id: number; message: Message 
     }),
   );
   const sent = results.filter(Boolean).length;
-  if (list.length > 0) logInfo("push", { sent, failed: list.length - sent, gone: new Set(gone).size });
+  const failed = list.length - sent;
+  // A push that didn't go out is not retried: the count is logged, as a
+  // warning when any failed (#126). Gone devices count as failed here.
+  if (list.length > 0) (failed > 0 ? logWarn : logInfo)("push", { sent, failed, gone: new Set(gone).size });
   return { sent, gone: [...new Set(gone)] };
 }
 
 const NONE: ReadonlySet<string> = new Set();
 
-// Stores one message per user, skipping users who switched the kind off, and
-// pushes it to those who didn't switch push off (#115). D1 queries: one
-// opt-out lookup, one insert per INSERT_CHUNK messages, one subscription
-// lookup (per ID_CHUNK users each). With `queuePush` (the cron, #183)
-// the pushes wait in the queue for pushQueued() instead of going out here.
-async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date, queuePush = false): Promise<void> {
+// Stores one message per user, skipping users who switched the kind off, with
+// the push queued for those who didn't switch push off (#115). Nothing is
+// pushed here: every push but the profile's "Próba" goes from the queue
+// (notifications.push_due_at), which the cron empties within its run limits
+// (pushQueued, #183, D84, D97). So a fan-out (a group publish, an entry
+// decision, a match step to both pairs) never spends a request's outgoing
+// calls, which the request's emails, sent after the response, still need
+// (#126, D150, D158). D1 queries: one opt-out lookup (per ID_CHUNK users) and
+// one batch of inserts.
+async function notify(kind: StoredKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
   const disabled = await disabledKinds(messages.map((m) => m.userId));
-  if (queuePush) {
-    const at = createdAt ?? new Date();
-    const rows = notificationRows(kind, messages, at, (userId) => disabled.get(userId) ?? NONE);
-    const [first, ...rest] = notificationInserts(rows);
-    if (first) await db.batch([first, ...rest]);
-    return;
-  }
-  const wanted = messages.filter((m) => isEnabled(disabled.get(m.userId) ?? NONE, kind));
-  // Each returned row carries its own message: RETURNING has no set order.
-  const stored: ({ id: number; userId: string } & Message)[] = [];
-  for (const chunk of chunks(wanted, INSERT_CHUNK))
-    stored.push(
-      ...(await db
-        .insert(notifications)
-        .values(chunk.map(({ userId, message }) => ({ userId, kind, ...message, ...(createdAt ? { createdAt } : {}) })))
-        .returning({
-          id: notifications.id,
-          userId: notifications.userId,
-          title: notifications.title,
-          body: notifications.body,
-          url: notifications.url,
-        })),
-    );
-  const pushing = stored.filter((n) => channelEnabled(disabled.get(n.userId) ?? NONE, "push"));
-  if (pushing.length === 0) return;
-  const vapid = vapidKeys();
-  if (!vapid) {
-    if (import.meta.env.DEV) console.log(`[push disabled] ${pushing.length} × ${kind}`);
-    return;
-  }
-  const subs = await subscriptionsOf(pushing.map((n) => n.userId));
-  await Promise.all(pushing.map((n) => pushToDevices(subs.get(n.userId) ?? [], n.id, n, vapid)));
+  const rows = notificationRows(kind, messages, createdAt ?? new Date(), (userId) => disabled.get(userId) ?? NONE);
+  const [first, ...rest] = notificationInserts(rows);
+  if (first) await db.batch([first, ...rest]);
 }
 
-// A player notification (#115): always in the in-app list, pushed unless the
-// player switched push off. The email goes through the outbox, which checks
-// the email switch. A push failure never fails the caller; neither does a
-// failure here, since the decision it reports is already saved.
-// `createdAt`: the time of a scheduled job (the reminders, #31), so the daily
-// digest reads the same clock; the database time otherwise. `queuePush`: the
-// cron, whose pushes go out within its run limits (#183, pushQueued).
-export async function notifyPlayers(
-  kind: PlayerKind,
-  messages: { userId: string; message: Message }[],
-  createdAt?: Date,
-  queuePush = false,
-): Promise<void> {
+// A player notification (#115): always in the in-app list, its push queued
+// unless the player switched push off. The email goes through the outbox,
+// which checks the email switch. A failure here never fails the caller,
+// since the decision it reports is already saved. `createdAt`: the time of a
+// scheduled job (the reminders, #31), so the daily digest reads the same
+// clock; now otherwise.
+export async function notifyPlayers(kind: PlayerKind, messages: { userId: string; message: Message }[], createdAt?: Date): Promise<void> {
   try {
-    await notify(kind, messages, createdAt, queuePush);
+    await notify(kind, messages, createdAt);
   } catch (error) {
     logError("notification failed", { kind, error });
   }

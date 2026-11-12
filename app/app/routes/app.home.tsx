@@ -7,6 +7,7 @@ import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
+import { TipCard } from "~/components/tip-card";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
@@ -33,6 +34,8 @@ import { listSeasons } from "~/lib/seasons.server";
 import { withArticle } from "~/lib/groups";
 import { SITE_NAME } from "~/lib/site";
 import { myStrikes } from "~/lib/strikes.server";
+import { vapidPublicKey } from "~/lib/notifications.server";
+import { dismissTip, offeredTipIds } from "~/lib/tips.server";
 
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. Once the
 // groups are out it is "your group and your matches" (#25): the Teendők, the
@@ -111,15 +114,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     })),
     multiLeague: leagueName.size > 1,
     seasons,
+    // The tips offered now (#262), in order; the browser shows the first
+    // that applies on the device.
+    tips: await offeredTipIds(user.id, now),
+    vapidPublicKey: vapidPublicKey(),
     shortcuts: nav.filter((s) => s.label).map((s) => ({ label: s.label, role: s.role, items: s.items.map(({ label, to }) => ({ label, to })) })),
   };
 }
 
-// "Nevezünk" on a season card, and "Csatlakozom" (#331).
-// `season` 0: not about a season card.
+// "Nevezünk" on a season card, "Csatlakozom" (#331), and a tip's "Most
+// nem" (#262). `season` 0: not about a season card.
 export async function action({ request }: Route.ActionArgs): Promise<{ season: number; error?: string; notice?: string; ok?: true }> {
   const user = await requireUser(request);
   const form = await request.formData();
+  if (form.get("intent") === "dismiss_tip") {
+    if (!(await dismissTip(user.id, String(form.get("tip") ?? "")))) throw new Response("Hibás kérés.", { status: 400 });
+    return { season: 0, ok: true };
+  }
   // "Csatlakozom" on "Melyik ligában játszol?" (#331), audited.
   if (form.get("intent") === "join_league") {
     if (!(await chooseLeague(user.id, Number(form.get("league"))))) throw new Response("Hibás kérés.", { status: 400 });
@@ -295,6 +306,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </p>
         </section>
       )}
+      {d.tips.length > 0 && <TipCard offered={d.tips} vapidPublicKey={d.vapidPublicKey} />}
       {d.shortcuts.map((s) => (
         <section key={s.label} className="grid gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">

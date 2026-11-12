@@ -27,7 +27,7 @@ export function runScheduled(controller: Controller, ctx: { waitUntil(promise: P
 // and still fails, so the cron run shows as failed too.
 async function runBackup(backup: Jobs["backup"]): Promise<void> {
   const requestId = `backup-${crypto.randomUUID()}`;
-  const end = beginInvocation(requestId);
+  const end = beginInvocation(requestId, "cron");
   try {
     const r = await backup();
     if (r.status === "progress") logInfo("backup step", { requestId, pieces: r.parts, table: r.table, calls: r.ops });

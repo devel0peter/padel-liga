@@ -344,6 +344,20 @@
       "when": 1794435785248,
       "tag": "0057_email_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1794502950858,
+      "tag": "0060_email_opens",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1794506776756,
+      "tag": "0061_tip_dismissals",
+      "breakpoints": true
     }
   ]
 }

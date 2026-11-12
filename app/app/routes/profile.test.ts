@@ -78,6 +78,29 @@ describe("Profil: level lock and Élő-pont", () => {
     const nolevel = (await createSession("nolevel")).split(";")[0]!;
     expect(await P.loader(args(get(nolevel)))).toMatchObject({ rating: null });
   });
+
+  // Push topics (#349): five switches, all on for a new player; saved per
+  // account, so every device shows the same.
+  it("shows the five push topics on, and saves one switched off", async () => {
+    const topics = async () => ((await P.loader(args(get(free)))) as any).topics.map((t: any) => [t.topic, t.enabled]);
+    expect(await topics()).toEqual([
+      ["scheduling", true],
+      ["reminders", true],
+      ["results", true],
+      ["season", true],
+      ["absences", true],
+    ]);
+    const topic = (fields: Record<string, string>) =>
+      new Request("http://localhost/profile", { method: "POST", headers: { Cookie: free }, body: new URLSearchParams({ intent: "topic", ...fields }) });
+    expect(await P.action(args(topic({ topic: "reminders", enabled: "0" })))).toEqual({ ok: true });
+    expect((await topics()).find(([t]: [string]) => t === "reminders")).toEqual(["reminders", false]);
+    expect(await P.action(args(topic({ topic: "reminders", enabled: "1" })))).toEqual({ ok: true });
+    expect((await topics()).every(([, on]: [string, boolean]) => on)).toBe(true);
+    // An unknown topic is refused and stores nothing.
+    const bad = await P.action(args(topic({ topic: "channel:push", enabled: "0" })));
+    expect((bad as any).init?.status).toBe(400);
+    expect(h.raw.prepare("select count(*) as n from notification_opt_outs").get().n).toBe(0);
+  });
 });
 
 // Fiók törlése (#38): the dialog's text comes from the loader; the action

@@ -2,15 +2,25 @@
 // plus handleError (#227): every unexpected error of a loader, an action or
 // the render is logged once, with the request id and the stack trace.
 import type { EntryContext, HandleErrorFunction, RouterContextProvider } from "react-router";
-import { ServerRouter } from "react-router";
+import { isRouteErrorResponse, ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 
 import { logError, logPath, requestIdOf } from "~/lib/log";
 
+// An address nothing answers (404, "No route matches") and a method the site
+// doesn't serve (405, "Invalid request method") are expected traffic (bot
+// scans, old release files), not unexpected errors (#314). The Worker's
+// request line still records the status.
+export const isExpectedRequestError = (error: unknown): boolean => {
+  const status = isRouteErrorResponse(error) || error instanceof Response ? error.status : undefined;
+  return status === 404 || status === 405;
+};
+
 export const handleError: HandleErrorFunction = (error, { request }) => {
   // A request the browser gave up on (navigated away) is not an error.
   if (request.signal.aborted) return;
+  if (isExpectedRequestError(error)) return;
   logError("unhandled error", { requestId: requestIdOf(request), path: logPath(request.url), error });
 };
 

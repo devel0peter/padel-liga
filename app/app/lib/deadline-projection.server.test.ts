@@ -175,6 +175,21 @@ describe("phaseProjection (#362)", () => {
     expect((await S.pairsLeavingAfterPhase(1, 1)).map((x) => x.pairId)).toEqual(p.leaving);
   });
 
+  it("an approved substitute (#37) on a projected match never gets a strike: the pair's two players do, as in the run", async () => {
+    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('sub', 'sub@x.hu', 'Helyettes', 'halado', 1)`);
+    const id = matchOf(1, 3);
+    h.raw
+      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at) values (?, 3, 'p3a', 'sub', 'approved', 'p3b', ?)")
+      .run(id, sec(NOW.toISOString()));
+    const p = (await phaseProjection(1, 1))!;
+    expect(p.matches.find((m) => m.id === id)!.decision).toEqual({ kind: "resolve", resolution: { outcome: { kind: "both-inactive" }, inactive: ["a", "b"] } });
+    expect(p.strikes.has("sub")).toBe(false);
+    expect(p.strikes.get("p3a")!.after).toBeGreaterThan(0);
+    await resolveDeadlines(MONDAY_6, undefined, 25);
+    expect(all("select user_id from strikes where match_id = ? order by user_id", id).map((r: any) => r.user_id)).toEqual(["p1a", "p1b", "p3a", "p3b"]);
+    expect(all("select * from strikes where user_id = 'sub'")).toEqual([]);
+  });
+
   it("reads only: nothing is stored, sent or audited", async () => {
     await scenario();
     const before = changes();

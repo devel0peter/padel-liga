@@ -306,7 +306,7 @@ describe("projectDeadline (#362): outcomes and strikes if the deadline came now"
     expect(p.leaving).toEqual([3]);
   });
 
-  it("a substitute never gets a strike: only the pair's two players are counted", () => {
+  it("only the given pairs' own players are counted: anyone else (a substitute) never gets a strike", () => {
     const p = projectDeadline([m(1, 1, 2, { events: [proposal("a")] })], PAIRS, new Map([["sub", 2]]));
     expect(p.strikes.has("sub")).toBe(false);
     expect([...p.strikes.entries()].filter(([, s]) => s.after > s.now).map(([id]) => id)).toEqual(["2a", "2b"]);

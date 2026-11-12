@@ -3,7 +3,8 @@
 // has no Turnstile key, so the bot check passes); the visitors' hourly limit
 // refuses the 31st message and keeps the text. The Admin lists, filters,
 // opens, marks done and reopens on Visszajelzések; a Szervező and a player
-// are refused (#241). Runs after the walkthrough; removes the rows it made.
+// are refused (#241). Runs after the walkthrough; leaves its bug report, idea
+// and rating for e2e:shots (--data walked) and removes the filler rows.
 import { expect, test, type Page } from "@playwright/test";
 
 import { ORGANIZER, ADMIN, PAIRS, as, content, d1, d1Delete, d1Insert, visit } from "./support";
@@ -18,10 +19,6 @@ async function send(page: Page, kind: string, message: string) {
   await page.getByLabel("Üzenet").fill(message);
   await page.getByRole("button", { name: "Küldés" }).click();
 }
-
-test.afterAll(() => {
-  d1Delete(`delete from feedback where message like 'E2E:%'`);
-});
 
 test("a logged-in player sends a bug report from the sidebar", async ({ browser }) => {
   const player = PAIRS.p1[0];
@@ -68,6 +65,7 @@ test("a visitor sends an idea from a public page's footer; the 31st in an hour i
   await expect(page.getByRole("alert")).toContainText("Most túl sok üzenet jött");
   await expect(page.getByLabel("Üzenet")).toHaveValue("E2E: harmincegyedik");
   expect(d1(`select count(*) as n from feedback where message = 'E2E: harmincegyedik'`)).toEqual([{ n: 0 }]);
+  d1Delete(`delete from feedback where message like 'E2E: kitöltés%'`);
   await context.close();
 });
 

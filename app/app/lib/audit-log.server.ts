@@ -27,6 +27,10 @@ export type LogRow = {
   id: number;
   at: Date;
   actor: string;
+  // The accounts behind the actor and a "user:<id>" target, for the Admin's
+  // links to their profiles (#301); null for the system or a deleted account.
+  actorId: string | null;
+  targetUserId: string | null;
   action: string;
   actionLabel: string;
   target: string;
@@ -45,6 +49,20 @@ export type LogPage = {
 
 const actorUser = alias(users, "actor_user");
 
+// The entries about one account (#301, the profile's Napló): written by it,
+// naming it (target or detail), or about one of its pairs or their entries.
+// Subqueries, not a list of ids (D1: at most 100 bound parameters).
+function about(userId: string): SQL {
+  const theirPairs = sql`select ${pairs.id} from ${pairs} where ${pairs.playerA} = ${userId} or ${pairs.playerB} = ${userId}`;
+  return or(
+    eq(auditLog.actorId, userId),
+    eq(auditLog.target, `user:${userId}`),
+    sql`instr(coalesce(${auditLog.detail}, ''), ${`user:${userId}`}) > 0`,
+    sql`${auditLog.target} in (select 'pair:' || id from (${theirPairs}))`,
+    sql`${auditLog.target} in (select 'season_entry:' || ${seasonEntries.id} from ${seasonEntries} where ${seasonEntries.pairId} in (${theirPairs}))`,
+  )!;
+}
+
 function where(f: LogFilters): SQL | undefined {
   const { since, before } = logBounds(f);
   const system = SYSTEM_ACTIONS as string[];
@@ -59,6 +77,7 @@ function where(f: LogFilters): SQL | undefined {
   return and(
     f.action ? eq(auditLog.action, f.action) : undefined,
     actor,
+    f.person ? about(f.person) : undefined,
     f.league ? eq(auditLog.leagueId, f.league) : undefined,
     since ? gte(auditLog.at, since) : undefined,
     before ? lt(auditLog.at, before) : undefined,
@@ -103,6 +122,8 @@ export async function auditLogPage(f: LogFilters): Promise<LogPage> {
       id: r.id,
       at: r.at,
       actor: actorLabel(r.actorId ? { name: r.actorName ?? "", deleted: !!r.actorDeleted } : null, r.action),
+      actorId: r.actorId && !r.actorDeleted ? r.actorId : null,
+      targetUserId: liveUser(r.target, names),
       action: r.action,
       actionLabel: actionLabel(r.action),
       target: renderTarget(r.target, names),
@@ -141,6 +162,13 @@ function renderTarget(target: string, names: ReadonlyMap<string, string>): strin
   // An address no account has (an invite never accepted): not shown.
   if (EMAIL.test(target)) return names.get(`email:${target.toLowerCase()}`) ?? NO_ACCOUNT;
   return renderRefs(target, names);
+}
+
+// The account a "user:<id>" target names, unless it is deleted.
+function liveUser(target: string, names: ReadonlyMap<string, string>): string | null {
+  const m = /^user:(.+)$/.exec(target);
+  const name = m ? names.get(target) : undefined;
+  return m && name !== undefined && name !== DELETED_NAME ? m[1]! : null;
 }
 
 const playerA = alias(users, "player_a");

@@ -9,8 +9,9 @@ import { activityLine, overviewStatus, resultStatus, statusOf, stuckReason, type
 import { type Tone } from "./matches";
 import { clubNames, eventWho, eventsOf, groupCount, groupMembers, isSystemEvent, loadMatch, stateOf, storedEventText, toSchedulingEvent } from "./matches.server";
 import { formatPhone } from "./phone";
-import { resultOf, resultsOf, type MatchResults } from "./result-log.server";
+import { resultOf, resultsOf, toResultEvent, toRuling, type MatchResults } from "./result-log.server";
 import { neutralDecisionText, resultEventText } from "./results";
+import { roundStatus, type RoundMatch, type RoundStatus } from "./round-status";
 
 // The organizer's overview of the running phase's matches and one match's
 // log (#158, D76), for the league's Szervező and the Admin (the routes check
@@ -24,6 +25,8 @@ export type OverviewMatch = {
   groupNumber: number;
   week: number;
   names: Record<Side, string>;
+  // The pairs' players, for the Admin's links to their profiles (#301).
+  players: Record<Side, { id: string; name: string }[]>;
   status: OverviewStatus;
   label: string;
   tone: Tone;
@@ -35,6 +38,7 @@ export type OverviewMatch = {
 };
 
 export type OverviewPhase = {
+  seasonId: number;
   season: string;
   phase: number;
   phaseStartsAt: Date;
@@ -42,6 +46,8 @@ export type OverviewPhase = {
   groupCount: number;
   groups: number[];
   matches: OverviewMatch[];
+  // How the round stands (#350): totals, burn-down and forecast.
+  round: RoundStatus;
 };
 
 const ID_CHUNK = 90;
@@ -65,8 +71,8 @@ const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.
 /**
  * Every match of the league's running phases (groups published, deadline not
  * passed), by group and week; not those of a pair withdrawn mid-phase (#34),
- * which don't count. Normally one phase; a league running two
- * seasons at once gets one each.
+ * which don't count (the round's numbers count them as "Nem számít" only).
+ * Normally one phase; a league running two seasons at once gets one each.
  */
 export async function runningPhases(leagueId: number, now = new Date()): Promise<OverviewPhase[]> {
   const groupRows = await db
@@ -103,11 +109,13 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
   const results = await resultsOf(matchRows);
   const groupById = new Map(groupRows.map((g) => [g.id, g]));
 
-  const phases = new Map<string, OverviewPhase>();
+  type Building = Omit<OverviewPhase, "round"> & { history: RoundMatch[]; voided: number };
+  const phases = new Map<string, Building>();
   for (const g of groupRows) {
     const key = `${g.seasonId}:${g.phase}`;
     if (!phases.has(key))
       phases.set(key, {
+        seasonId: g.seasonId,
         season: g.season,
         phase: g.phase,
         phaseStartsAt: g.startsAt,
@@ -115,6 +123,8 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
         groupCount: await groupCount(g.seasonId, g.phase),
         groups: [],
         matches: [],
+        history: [],
+        voided: 0,
       });
     phases.get(key)!.groups.push(g.number);
   }
@@ -122,12 +132,17 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
   for (const m of matchRows) {
     const g = groupById.get(m.groupId)!;
     const pairsOf = members.get(m.groupId) ?? [];
-    if (pairsOf.some((p) => p.withdrawn && (p.pairId === m.pairA || p.pairId === m.pairB))) continue;
+    const phase = phases.get(`${g.seasonId}:${g.phase}`)!;
+    if (pairsOf.some((p) => p.withdrawn && (p.pairId === m.pairA || p.pairId === m.pairB))) {
+      phase.voided++;
+      continue;
+    }
     const name = (pairId: number) => {
       const p = pairsOf.find((x) => x.pairId === pairId);
       return p ? pairName(p.players) : "Ismeretlen pár";
     };
     const names = { a: name(m.pairA), b: name(m.pairB) };
+    const playersOf = (pairId: number) => (pairsOf.find((x) => x.pairId === pairId)?.players ?? []).map((p) => ({ id: p.id, name: p.name }));
     const log = events.get(m.id) ?? [];
     const state = states.get(m.id)!;
     const sides = activeSides(
@@ -137,21 +152,36 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     const active = { a: sides.includes("a"), b: sides.includes("b") };
     const result = results.get(m.id) ?? EMPTY_RESULT;
     const status = resultStatus(result.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
-    phases.get(`${g.seasonId}:${g.phase}`)!.matches.push({
+    const overview = statusOf(state, result.state);
+    const stuck = stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now });
+    phase.history.push({
+      groupNumber: g.number,
+      week: m.week,
+      status: overview,
+      stuck: stuck !== null,
+      scheduling: log.map((e) => toSchedulingEvent(e, m.pairA)),
+      results: result.events.map((e) => toResultEvent(e, m.pairA)),
+      rulings: result.decisions.map(toRuling),
+    });
+    phase.matches.push({
       id: m.id,
       groupNumber: g.number,
       week: m.week,
       names,
-      status: statusOf(state, result.state),
+      players: { a: playersOf(m.pairA), b: playersOf(m.pairB) },
+      status: overview,
       label: status.label,
       tone: status.tone,
       lastActivity: newest([log.at(-1)?.at, result.events.at(-1)?.at, result.decisions.at(-1)?.at]),
       active,
       activity: activityLine(active, names),
-      stuck: stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now }),
+      stuck,
     });
   }
-  return [...phases.values()];
+  return [...phases.values()].map(({ history, voided, ...p }) => ({
+    ...p,
+    round: roundStatus({ phaseStartsAt: p.phaseStartsAt, deadline: p.deadline, groups: p.groups, matches: history, voided, now }),
+  }));
 }
 
 // --- One match ----------------------------------------------------------------
@@ -174,8 +204,9 @@ export type OrganizerMatch = {
   stuck: StuckReason | null;
   activity: string;
   // Both pairs with their players; phones only while the phase runs.
-  pairs: { side: Side; name: string; active: boolean; players: { name: string; phone: string | null }[] }[];
-  log: { id: number; at: Date; who: string; pair: string; text: string }[];
+  // id: for the Admin's link to the player's profile (#301).
+  pairs: { side: Side; name: string; active: boolean; players: { id: string; name: string; phone: string | null }[] }[];
+  log: { id: number; at: Date; who: string; whoId: string | null; pair: string; text: string }[];
 };
 
 /**
@@ -228,7 +259,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
       side,
       name: names[side],
       active: active[side],
-      players: ctx.pairs[side].players.map((p) => ({ name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
+      players: ctx.pairs[side].players.map((p) => ({ id: p.id, name: p.name, phone: running ? formatPhone(p.phone) || null : null })),
     })),
     // Scheduling and result steps in order, then the rulings by time; a
     // ruling's id is negative so it can't clash with a step's.
@@ -237,6 +268,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: eventWho(e),
+        whoId: isSystemEvent(e) ? null : e.userId,
         pair: isSystemEvent(e) ? "automatikus" : pairOf(e.pairId),
         text: storedEventText(e, venues),
       })),
@@ -244,6 +276,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: e.id,
         at: e.at,
         who: e.userName || "Törölt játékos",
+        whoId: e.userId,
         pair: pairOf(e.pairId),
         // The score from the 1st pair's side, as the status line.
         text: resultEventText(e, "a"),
@@ -252,6 +285,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         id: -d.id,
         at: d.at,
         who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
+        whoId: d.kind === "organizer" ? d.userId : null,
         pair: d.kind === "organizer" ? "szervező" : "automatikus",
         text: neutralDecisionText(d, names),
       })),

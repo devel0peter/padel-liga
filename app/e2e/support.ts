@@ -33,7 +33,7 @@ export const PAIRS = {
   p3: pair(2),
   p4: pair(3),
   p5: pair(4),
-  // Two players without a partner the Szervező pairs on Párkeresők (step 6).
+  // Two players without a partner the Szervező pairs on Játékosok (step 6).
   solo: [solo(0), solo(1)] as [Player, Player],
   // Kept out until the groups are published: it joins round 2.
   late: pair(5),
@@ -179,16 +179,19 @@ export async function seekPartner(browser: Browser, who: Player): Promise<void> 
   await context.close();
 }
 
-// The Szervező pairs two players who look for a partner on Párkeresők.
+// Játékosok with the "Párt keres" filter (#301; Párkeresők until then).
+export const SEEKERS = "/admin/leagues/minta/players?filter=seeking";
+export const playersTable = (page: Page) => page.getByRole("table", { name: "Játékosok listája" });
+
+// The Szervező pairs two players who look for a partner on Játékosok.
 export async function pairSeekers(browser: Browser, [a, b]: [Player, Player]): Promise<void> {
   const { context, page } = await as(browser, ORGANIZER.email);
-  await visit(page, "/admin/leagues/minta/solos");
-  const registered = page.getByRole("region", { name: "Regisztráltak", exact: true });
-  await registered.getByRole("checkbox", { name: `${a.name} kijelölése` }).check();
-  await registered.getByRole("checkbox", { name: `${b.name} kijelölése` }).check();
-  await registered.getByRole("button", { name: "Párba teszem (2/2)" }).click();
+  await visit(page, SEEKERS);
+  await page.getByRole("checkbox", { name: `${a.name} kijelölése` }).check();
+  await page.getByRole("checkbox", { name: `${b.name} kijelölése` }).check();
+  await content(page).getByRole("button", { name: "Párba teszem (2/2)" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Párba teszem" }).click();
-  await expect(registered).not.toContainText(a.name);
+  await expect(page.getByRole("checkbox", { name: `${a.name} kijelölése` })).toHaveCount(0);
   await context.close();
 }
 

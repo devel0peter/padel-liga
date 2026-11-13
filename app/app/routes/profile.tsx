@@ -1,4 +1,4 @@
-import { data, Form, Link, redirect, useFetcher, useNavigation, useSearchParams } from "react-router";
+import { data, Form, Link, redirect, useFetcher, useFetchers, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/profile";
 import { AppPage } from "~/components/app-page";
@@ -30,8 +30,21 @@ import { initials, validateProfile, type ProfileErrors } from "~/lib/auth/rules"
 import { destroySession, requireUser } from "~/lib/auth/session.server";
 import { DELETION_REFUSALS, OWN_DELETION_EFFECTS, ownDeletionNote } from "~/lib/account-deletion";
 import { deleteOwnAccount, planOwnDeletion } from "~/lib/account-deletion.server";
-import { channelEnabled, CHANNELS, isChannel, isEnabled, isNotificationKind, kindsFor, NOTIFICATION_KINDS } from "~/lib/notifications";
-import { disabledKindsFor, setChannelEnabled, setKindEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import {
+  channelEnabled,
+  CHANNELS,
+  isChannel,
+  isEnabled,
+  isNotificationKind,
+  isPushTopic,
+  kindsFor,
+  NOTIFICATION_KINDS,
+  PUSH_TOPICS,
+  pushTopic,
+  topicEnabled,
+  type PushTopic,
+} from "~/lib/notifications";
+import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
@@ -90,12 +103,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     vapidPublicKey: vapidPublicKey(),
     emailOn: channelEnabled(disabled, "email"),
     pushOn: channelEnabled(disabled, "push"),
+    // One push switch per topic (#349), for every account: anyone may play.
+    topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...pushTopic(topic), enabled: topicEnabled(disabled, topic) })),
     kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
   };
 }
 
-// Saves the profile form, or switches email or push (#115) or one
-// notification kind on or off (Értesítések section). Párod's "Nevezünk" and
+// Saves the profile form, or switches email or push (#115), one push topic
+// (#349) or one notification kind on or off (Értesítések section). Párod's "Nevezünk" and
 // "Párt keresek" (D141) too; Kezdőlap's "Párt keresek" posts here as well.
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireUser(request);
@@ -135,6 +150,12 @@ export async function action({ request }: Route.ActionArgs) {
     await setChannelEnabled(user.id, channel, enabled);
     return { ok: true };
   }
+  if (form.get("intent") === "topic") {
+    const topic = form.get("topic");
+    if (!isPushTopic(topic)) return data({ ok: false }, { status: 400 });
+    await setTopicEnabled(user.id, topic, enabled);
+    return { ok: true };
+  }
   const kind = form.get("kind");
   if (!isNotificationKind(kind) || !kindsFor(actor).includes(kind)) return data({ ok: false }, { status: 400 });
   await setKindEnabled(user.id, kind, enabled);
@@ -148,12 +169,14 @@ function SettingSwitch({
   description,
   enabled,
   fields,
+  disabled = false,
 }: {
   id: string;
   label: string;
   description: string;
   enabled: boolean;
   fields: Record<string, string>;
+  disabled?: boolean;
 }) {
   const fetcher = useFetcher();
   // Optimistic: show the new value while it saves.
@@ -164,6 +187,7 @@ function SettingSwitch({
       <Switch
         id={id}
         checked={checked}
+        disabled={disabled}
         onCheckedChange={(on) => fetcher.submit({ ...fields, enabled: on ? "1" : "0" }, { method: "post" })}
         className="mt-0.5"
       />
@@ -171,6 +195,32 @@ function SettingSwitch({
         <Label htmlFor={id}>{label}</Label>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
+    </div>
+  );
+}
+
+// The push topics (#349), under the push switch. With push off they are
+// disabled and keep their values. The push switch saves through its own
+// fetcher (push-settings.tsx): its pending value counts at once.
+function PushTopics({ topics, pushOn }: { topics: { topic: string; label: string; description: string; enabled: boolean }[]; pushOn: boolean }) {
+  const pending = useFetchers().find((f) => f.formData?.get("intent") === "channel" && f.formData.get("channel") === "push");
+  const on = pending?.formData ? pending.formData.get("enabled") === "1" : pushOn;
+  return (
+    <div role="group" aria-label="Push témák" className="grid gap-4 border-t pt-4">
+      <p className="text-sm text-muted-foreground">
+        {on ? "Miről kérsz push értesítést?" : "Ezek a push értesítésre vonatkoznak: akkor számítanak, ha bekapcsolod."}
+      </p>
+      {topics.map((t) => (
+        <SettingSwitch
+          key={t.topic}
+          id={`topic-${t.topic}`}
+          label={t.label}
+          description={t.description}
+          enabled={t.enabled}
+          disabled={!on}
+          fields={{ intent: "topic", topic: t.topic }}
+        />
+      ))}
     </div>
   );
 }
@@ -306,6 +356,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
               fields={{ intent: "channel", channel: "email" }}
             />
             <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
+            <PushTopics topics={d.topics} pushOn={d.pushOn} />
             {d.kinds.length > 0 && (
               <div className="grid gap-4 border-t pt-4">
                 <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>

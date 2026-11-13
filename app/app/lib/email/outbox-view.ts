@@ -11,7 +11,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   signup_confirmation: "Jelentkezés visszaigazolása",
   partner_notice: "Szólunk a megadott párnak",
   broadcast: "Körlevél",
-  pair_intro: "Párkeresők bemutatása",
+  pair_intro: "Párbemutatás (régi)",
   registration_invite: "Regisztrációs meghívó",
   pair_invite: "Pármeghívó",
   pair_answer: "Válasz a pármeghívóra",
@@ -27,6 +27,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   match_result: "Eredmény megerősítése",
   strike_warning: "Figyelmeztetés: 2. fekete pont",
   season_start: "Indul a szezon",
+  round_extended: "Meghosszabbított kör",
 };
 
 export function kindLabel(kind: string): string {

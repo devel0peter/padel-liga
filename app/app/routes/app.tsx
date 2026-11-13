@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -79,8 +79,8 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard,
   seasons: CalendarDays,
   matches: Swords,
-  pairs: UsersRound,
-  solos: HeartHandshake,
+  pairs: HeartHandshake,
+  players: UsersRound,
   disputes: Scale,
   substitutes: ArrowLeftRight,
   reminders: BellRing,
@@ -92,6 +92,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   cities: Building2,
   users: UserCog,
   log: ScrollText,
+  feedback: MessageSquareText,
 };
 
 const isCurrent = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);
@@ -193,10 +194,18 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
           const Icon = ICONS[item.icon];
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label}>
+              <SidebarMenuButton asChild isActive={item.to === active} tooltip={item.label} size={item.hint ? "lg" : "default"}>
                 <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
-                  <span>{item.label}</span>
+                  {item.hint ? (
+                    // The people pages say in one line what they list (#301).
+                    <span className="grid min-w-0 leading-tight">
+                      <span className="truncate">{item.label}</span>
+                      <span className="truncate text-xs text-muted-foreground">{item.hint}</span>
+                    </span>
+                  ) : (
+                    <span>{item.label}</span>
+                  )}
                 </NavLink>
               </SidebarMenuButton>
               {item.to === "/notifications" && unread > 0 && (
@@ -258,7 +267,7 @@ function TabBar({ tableHref, unread, initials, imageUrl }: { tableHref: string |
 
 export default function AppShell({ loaderData }: Route.ComponentProps) {
   const { actor, leagues, sidebarOpen, unread, tableHref, ...profile } = loaderData;
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const base = appNav(actor, leagues, leagueFromPath(pathname));
   // The player's league table, after Kezdőlap (D133, D134): one tap away.
   const nav = tableHref
@@ -305,6 +314,15 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
                   <Link to="/" className="no-underline">
                     <Globe />
                     <span>Padelpárbaj főoldal</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Feedback from any page (#240, spec 19): the form gets this page. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild size="sm" className="text-muted-foreground" tooltip="Visszajelzés">
+                  <Link to={`/feedback?from=${encodeURIComponent(pathname + search)}`} className="no-underline">
+                    <MessageSquarePlus />
+                    <span>Visszajelzés</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

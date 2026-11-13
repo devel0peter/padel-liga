@@ -4,6 +4,7 @@
 // in what is stored. Names only: nothing here can carry an email or phone.
 
 import {
+  addDays,
   type Day,
   type Division,
   DIVISIONS,
@@ -231,4 +232,22 @@ export function phaseWeek(phaseStart: Day, today: Day): { week: number; started:
   const days = dayNumber(today) - dayNumber(phaseStart);
   if (days < 0) return { week: 1, started: false };
   return { week: Math.min(3, Math.floor(days / 7) + 1), started: true };
+}
+
+/**
+ * What a round's header shows on `today`: its current week, or, once its
+ * three weeks are over in an extended round (#356, D151), also after its deadline, the
+ * extension from the Monday after week 3 to the deadline's Sunday. No week is
+ * current during an extension. Days are Budapest's.
+ */
+export function phaseSpan(
+  phaseStart: Day,
+  deadlineDay: Day,
+  today: Day,
+): { week: number; started: boolean; extension: boolean; from: Day; to: Day } {
+  const { week, started } = phaseWeek(phaseStart, today);
+  const extraFrom = addDays(phaseStart, 21);
+  if (started && today >= extraFrom && deadlineDay >= extraFrom)
+    return { week, started, extension: true, from: extraFrom, to: deadlineDay };
+  return { week, started, extension: false, from: addDays(phaseStart, (week - 1) * 7), to: addDays(phaseStart, (week - 1) * 7 + 6) };
 }

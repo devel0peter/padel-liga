@@ -155,21 +155,28 @@ function scrubNamedCounts(value: Fields, depth: number): Fields {
 
 // ---- The running invocation ------------------------------------------------
 
-type Invocation = { requestId: string; userId?: string };
+// `pushCalls`: the pushes a request sent itself (notifications.server.ts,
+// INLINE_PUSH_CALLS, D158).
+type Invocation = { requestId: string; userId?: string; kind: "request" | "cron"; pushCalls: number };
 const running = new Map<string, Invocation>();
 
 /** Marks an invocation (a request or a cron run) as running; returns its end. */
-export function beginInvocation(requestId: string): () => void {
-  running.set(requestId, { requestId });
+export function beginInvocation(requestId: string, kind: Invocation["kind"] = "request"): () => void {
+  running.set(requestId, { requestId, kind, pushCalls: 0 });
   return () => {
     running.delete(requestId);
   };
 }
 
+/** The one invocation running now, if exactly one is. */
+export function currentInvocation(): Invocation | undefined {
+  if (running.size !== 1) return undefined;
+  return running.values().next().value;
+}
+
 /** The id of the one invocation running now, if exactly one is. */
 export function currentRequestId(): string | undefined {
-  if (running.size !== 1) return undefined;
-  return running.keys().next().value;
+  return currentInvocation()?.requestId;
 }
 
 export function requestIdOf(request: Request): string | undefined {

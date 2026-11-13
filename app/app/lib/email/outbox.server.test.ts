@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 
-const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], gate: null as Promise<void> | null }));
+const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], gate: null as Promise<void> | null, failAfter: Infinity }));
 
 // The quota tests count against a limit of 100 a day.
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
@@ -15,6 +15,8 @@ vi.mock("~/lib/email/send.server", () => ({
   relayConfigured: () => false,
   sendEmails: async (emails: any[]) => {
     if (h.gate) await h.gate;
+    // A Worker stopped mid-send: the call never returns a result.
+    if (h.sent.length >= h.failAfter) throw new Error("the Worker stopped");
     h.sent.push(...emails);
     return emails.map((_, i) => ({ ok: true, id: `id-${i}` }));
   },
@@ -42,8 +44,9 @@ describe("queueSeasonEntered", () => {
     h.sent = [];
   });
 
-  it("sends the email right away, without an Admin (#112)", async () => {
+  it("sends the email right after the response, without an Admin (#112, D150)", async () => {
     await O.queueSeasonEntered("bela@x.hu", input);
+    await settleBackground();
     expect(messages()).toEqual([
       { kind: "season_entry_decision", to_email: "bela@x.hu", subject: "Beneveztetek – Padelpárbaj", status: "sent" },
     ]);
@@ -76,11 +79,15 @@ describe("queueGroupsPublished", () => {
     h.sent = [];
   });
 
-  it("sends one email per player right away (#112)", async () => {
+  it("sends one email per player right after the response (#112, D150)", async () => {
     await O.queueGroupsPublished([
       { toEmail: "anna@x.hu", input: input("Anna") },
       { toEmail: "bela@x.hu", input: input("Béla") },
     ]);
+    // The request itself sent nothing: a closed browser tab can't stop it.
+    expect(h.sent).toEqual([]);
+    expect(backgroundPending()).toBe(1);
+    await settleBackground();
     expect(messages()).toEqual([
       { kind: "groups_published", to_email: "anna@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
       { kind: "groups_published", to_email: "bela@x.hu", subject: "Itt a csoportod: 1. csoport – Padelpárbaj", status: "sent" },
@@ -97,9 +104,10 @@ describe("queueGroupsPublished", () => {
     expect(messages().map((m: any) => m.to_email)).toEqual(["anna@x.hu"]);
   });
 
-  it("queues a whole league at once; sends at most 50 in the request, the cron the rest within the day's limit", async () => {
+  it("queues a whole league at once; sends at most 50 after the request, the cron the rest within the day's limit", async () => {
     const many = Array.from({ length: 120 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input: input(`P${i}`) }));
     await O.queueGroupsPublished(many);
+    await settleBackground();
     expect(messages()).toHaveLength(120);
     expect(O.SEND_NOW_MAX).toBe(50);
     expect(h.sent).toHaveLength(50);
@@ -244,6 +252,7 @@ describe("automatic outbox", () => {
       },
     ]);
     await O.queueLoginCode("anna@x.hu", "123456");
+    await settleBackground();
 
     expect(byKind()).toEqual({
       season_entry_decision: "sent",
@@ -395,15 +404,50 @@ describe("bulk mail after the response", () => {
     expect(status()).toEqual([{ status: "sent", n: 60 }]);
   });
 
-  it("a login code is still sent inside its request", async () => {
+  it("a login code, too, answers without waiting for the send (D150)", async () => {
     slowTransport();
-    let answered = false;
-    const request = O.queueLoginCode("anna@x.hu", "123456").then(() => (answered = true));
-    await new Promise((r) => setTimeout(r, 20));
-    expect(answered).toBe(false);
-    expect(backgroundPending()).toBe(0);
+    await O.queueLoginCode("anna@x.hu", "123456");
+    expect(h.sent).toEqual([]);
+    expect(backgroundPending()).toBe(1);
     open();
-    await request;
+    await settleBackground();
     expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu"]);
+  });
+
+  // 2026-11-08: the Worker stopped while one call sent the 50 group emails;
+  // none was marked, so none could be told apart (D150).
+  it("a send stopped midway leaves at most SEND_CHUNK unknown; the rest wait for the cron", async () => {
+    h.failAfter = O.SEND_CHUNK;
+    const input = {
+      to: "x",
+      partnerName: "y",
+      league: "Padelpárbaj Győr",
+      season: "2026/27 tél",
+      phase: 1,
+      group: 1,
+      weeks: [],
+      deadline: new Date("2026-11-29T22:59:00Z"),
+    };
+    try {
+      await O.queueGroupsPublished(Array.from({ length: 40 }, (_, i) => ({ toEmail: `p${i}@x.hu`, input })));
+      // The real runAfterResponse logs the failure; the stand-in passes it on.
+      await expect(settleBackground()).rejects.toThrow("the Worker stopped");
+    } finally {
+      h.failAfter = Infinity;
+    }
+    expect(O.SEND_CHUNK).toBe(10);
+    expect(status()).toEqual([
+      { status: "pending", n: 20 },
+      { status: "sending", n: 10 },
+      { status: "sent", n: 10 },
+    ]);
+    // The next cron run sends the 20 that never left; the 10 unknown stay
+    // for the Admin to check (Újraküldés).
+    await O.deliver();
+    expect(h.sent).toHaveLength(30);
+    expect(status()).toEqual([
+      { status: "sending", n: 10 },
+      { status: "sent", n: 30 },
+    ]);
   });
 });

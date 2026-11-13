@@ -2,6 +2,7 @@ import { data } from "react-router";
 
 import type { Route } from "./+types/admin.league-match";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { Contacts, StatusPill } from "~/components/my-group";
 import { Badge } from "~/components/ui/badge";
 import { requirePermission } from "~/lib/auth/admin.server";
@@ -54,7 +55,14 @@ export default function LeagueMatch({ loaderData }: Route.ComponentProps) {
       <section className="grid max-w-2xl gap-3 sm:grid-cols-2" aria-label="Párok">
         {m.pairs.map((p) => (
           <div key={p.side} className="grid content-start gap-2 rounded-lg border p-4">
-            <p className="font-medium break-words">{p.name}</p>
+            <p className="font-medium break-words">
+              {p.players.map((x, i) => (
+                <span key={x.id}>
+                  {i > 0 && " – "}
+                  <PersonLink id={x.id} name={x.name} />
+                </span>
+              ))}
+            </p>
             <div>
               <Badge variant={p.active ? "secondary" : "outline"}>{p.active ? "Lépett" : "Még nem lépett"}</Badge>
             </div>
@@ -75,7 +83,7 @@ export default function LeagueMatch({ loaderData }: Route.ComponentProps) {
             {m.log.map((e) => (
               <li key={e.id} className="grid gap-0.5 rounded-md border p-3">
                 <span className="text-xs break-words text-muted-foreground">
-                  {formatDateTime(e.at)} · {e.who} ({e.pair})
+                  {formatDateTime(e.at)} · <PersonLink id={e.whoId} name={e.who} /> ({e.pair})
                 </span>
                 <span className="break-words">{e.text}</span>
               </li>

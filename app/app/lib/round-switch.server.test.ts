@@ -16,6 +16,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const G = await import("~/lib/groups.server");
 const R = await import("~/lib/round-switch.server");
+const S = await import("~/lib/strikes.server");
 const { DISPUTES_FIRST, NOT_READY, OUTDATED_DRAFT } = await import("~/lib/round-switch");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -381,5 +382,83 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
     const run = new RunBudget();
     expect(await R.draftRoundSwitches(AFTER, { run, keep: { queries: 0, calls: 0 } })).toBeNull();
     expect(run.used().queries).toBe(1);
+  });
+});
+
+describe("roundSwitchPreview (#363): the next round if the round ended now", () => {
+  beforeEach(freshDb);
+
+  // A proposal by `pair` on a match: valid activity (spec 8).
+  const proposes = (pair: number, matchId: number) =>
+    h.raw
+      .prepare("insert into match_events (match_id, pair_id, user_id, kind, slots, at) values (?, ?, ?, 'proposal', ?, ?)")
+      .run(matchId, pair, `p${pair}a`, JSON.stringify([sec("2026-11-25T17:00:00Z")]), sec(DURING.toISOString()));
+
+  it("counts an open match with the outcome the deadline would give it now (fast calibration: 2 swap)", async () => {
+    // 2–3 open, only pair 3 active: a walkover for 3, so 3 passes 2 and 2 goes down.
+    finishAll([matchOf(2, 3)]);
+    proposes(3, matchOf(2, 3));
+    const p = (await R.roundSwitchPreview(1, 2, DURING))!;
+    expect(p.fast).toBe(true);
+    expect(p.undecided).toBe(1);
+    expect(p.tables[0]!.rows.map((r) => r.pair.pairId)).toEqual([1, 3, 2, 4]);
+    expect(ids(p.draft)).toEqual([
+      [1, 3, 5, 6],
+      [2, 4, 7, 8],
+    ]);
+    expect(p.origins.get(2)).toEqual({ kind: "continuing", group: 1, place: 3 });
+    // Without the projection the open match counts for nothing and 2 stays up.
+    expect(ids((await R.roundSwitch(1, 2, DURING))!.draft)).toEqual([
+      [1, 2, 5, 6],
+      [3, 4, 7, 8],
+    ]);
+  });
+
+  it("a pair reaching its 3rd strike only through a projected outcome leaves, and the groups are re-cut", async () => {
+    // 7–8 open, nobody active: both lose, a strike for all four. p8a has 2 already.
+    finishAll([matchOf(7, 8)]);
+    for (let i = 0; i < 2; i++)
+      h.raw.prepare("insert into strikes (season_id, user_id, pair_id, source, at) values (1, 'p8a', 8, 'no_show', ?)").run(sec("2026-11-15T10:00:00Z"));
+    const p = (await R.roundSwitchPreview(1, 2, DURING))!;
+    expect(p.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual([[8, "strikes"]]);
+    expect(p.draft.flat().map((x) => x.pairId)).not.toContain(8);
+    expect(p.draft.map((g) => g.length)).toEqual([4, 3]);
+    // Today's switch doesn't see that strike yet.
+    expect((await R.roundSwitch(1, 2, DURING))!.leaving).toEqual([]);
+  });
+
+  it("counts a result waiting for confirmation as recorded, and not a disputed one", async () => {
+    finishAll([matchOf(2, 3), matchOf(5, 6)]);
+    const pending = matchOf(2, 3);
+    const pairA = all("select pair_a from matches where id = ?", pending)[0].pair_a;
+    // Pair 3 beat 2 by a recorded result: 3 passes 2.
+    h.raw.prepare("update matches set status = 'result_pending' where id = ?").run(pending);
+    h.raw
+      .prepare("insert into match_events (match_id, pair_id, user_id, kind, score, at) values (?, 3, 'p3a', 'result_recorded', ?, ?)")
+      .run(pending, JSON.stringify({ sets: pairA === 3 ? [[4, 1], [4, 1]] : [[1, 4], [1, 4]] }), sec(DURING.toISOString()));
+    // 5–6 disputed: it counts for nothing, so it is no both-lose either.
+    h.raw.prepare("update matches set status = 'disputed' where id = ?").run(matchOf(5, 6));
+    const p = (await R.roundSwitchPreview(1, 2, DURING))!;
+    expect(p.tables[0]!.rows.map((r) => r.pair.pairId)).toEqual([1, 3, 2, 4]);
+    expect(p.tables[1]!.rows.map((r) => r.pair.pairId)).toEqual([5, 6, 7, 8]);
+    expect(p.undecided).toBe(2);
+    expect(await S.liveCounts(["p5a", "p6a"], [1])).toEqual(new Map());
+  });
+
+  it("is not shown in a season's last round nor once the real draft exists", async () => {
+    expect(await R.roundSwitchPreview(1, 5, DURING)).toBeNull();
+    expect(await R.roundSwitchPreview(1, 2, DURING)).not.toBeNull();
+    finishAll();
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(await R.roundSwitchPreview(1, 2, AFTER)).toBeNull();
+  });
+
+  it("reads only: nothing stored, sent or audited, and the real draft and publishing work as before", async () => {
+    finishAll([matchOf(7, 8)]);
+    const before = all("select total_changes() as n")[0].n;
+    expect(await R.roundSwitchPreview(1, 2, DURING)).not.toBeNull();
+    expect(all("select total_changes() as n")[0].n).toBe(before);
+    expect(groupsOf(2)).toEqual([]);
+    expect(h.mails).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { db } from "~/db/client.server";
 import { groups, jobRuns, leagues, matches, noShowReports, seasonPhases, seasons } from "~/db/schema";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
+import { phaseProjection } from "./deadline-projection.server";
 import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
@@ -56,8 +57,17 @@ export type RoundSwitch = {
  * The switch into `nextPhase` of a season as the current data has it, or
  * null when there is no such switch (phase 1, a phase the season doesn't
  * have, or the ending phase isn't published). Read only.
+ *
+ * `projection` (the preview, #363): the outcomes the deadline would give the
+ * ending phase's unresolved matches now, counted as if stored, and the pairs
+ * its strikes would send off instead of today's (deadline-projection.server.ts).
  */
-export async function roundSwitch(seasonId: number, nextPhase: number, now = new Date()): Promise<RoundSwitch | null> {
+export async function roundSwitch(
+  seasonId: number,
+  nextPhase: number,
+  now = new Date(),
+  projection?: { outcomes: ReadonlyMap<number, MatchOutcome>; leaving: readonly number[] },
+): Promise<RoundSwitch | null> {
   const endingPhase = nextPhase - 1;
   const season = await getSeason(seasonId);
   const ending = season?.phases.find((p) => p.number === endingPhase);
@@ -80,7 +90,7 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
       )
       .orderBy(asc(matches.id)),
     enteredPairs(seasonId),
-    pairsLeavingAfterPhase(seasonId, endingPhase),
+    projection ? projection.leaving.map((pairId) => ({ pairId })) : pairsLeavingAfterPhase(seasonId, endingPhase),
   ]);
 
   const withdrawn = new Set(stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((p) => p.pairId)));
@@ -109,6 +119,8 @@ export async function roundSwitch(seasonId: number, nextPhase: number, now = new
   const noShow = new Set(reported.map((r) => r.matchId));
   const outcomeOf = (m: (typeof rows)[number]): MatchOutcome | null => {
     if (m.status === "final") return m.outcome;
+    const projected = projection?.outcomes.get(m.id);
+    if (projected) return projected;
     const state = recorded.get(m.id)?.state;
     return state?.status === "recorded" ? { kind: "played", score: state.score } : null;
   };
@@ -200,6 +212,34 @@ export function draftBasis(s: RoundSwitch): string {
 /** Whether a stored phase-n draft no longer matches what the switch computes now. */
 export function draftOutdated(stored: readonly { basis: string | null }[], s: RoundSwitch): boolean {
   return stored.length > 0 && stored[0]!.basis !== draftBasis(s);
+}
+
+export type RoundSwitchPreview = RoundSwitch & {
+  // The ending phase's counting matches not final yet: their outcome can
+  // still change the preview.
+  undecided: number;
+};
+
+/**
+ * "Előzetes beosztás: ha most érne véget a kör" on Csoportok (#363, D163):
+ * the next phase's draft as roundSwitch would make it after the deadline
+ * run, if that ran now. The ending phase's unresolved matches count with
+ * the outcome the deadline would give them now and the pairs its strikes
+ * would send off leave (deadline-projection.server.ts); everything else is
+ * the real draft's rule (roundSwitchDraft). Null when there is no such
+ * switch (a season's last phase) or the real draft (or the published
+ * groups) exists already. Read only: no Elo replay, nothing stored.
+ */
+export async function roundSwitchPreview(seasonId: number, nextPhase: number, now = new Date()): Promise<RoundSwitchPreview | null> {
+  if ((await phaseGroups(seasonId, nextPhase)).length > 0) return null;
+  const p = await phaseProjection(seasonId, nextPhase - 1);
+  if (!p) return null;
+  // The outcome each match the projection resolves would get.
+  const outcomes = new Map(p.matches.flatMap((m) => (m.decision.kind === "resolve" ? [[m.id, m.decision.resolution.outcome] as const] : [])));
+  const s = await roundSwitch(seasonId, nextPhase, now, { outcomes, leaving: p.leaving });
+  if (!s) return null;
+  const undecided = p.matches.filter((m) => m.decision.kind !== "leave" || m.decision.reason !== "final").length;
+  return { ...s, undecided };
 }
 
 /**

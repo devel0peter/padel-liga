@@ -19,6 +19,10 @@ export type LogFilters = {
   from: Day | null; // Budapest days, both included
   to: Day | null;
   page: number; // from 1
+  // An account id: the entries about one player (#301, their profile's
+  // Napló): what they did, what was done to their account, their pairs and
+  // their pairs' entries.
+  person: string | null;
 };
 
 // From the address (?action=&actor=&league=&from=&to=&page=). Anything
@@ -38,11 +42,12 @@ export function parseLogFilters(params: URLSearchParams): LogFilters {
     from: day("from"),
     to: day("to"),
     page: Number.isInteger(page) && page > 1 ? page : 1,
+    person: text("person"),
   };
 }
 
 export function hasLogFilters(f: LogFilters): boolean {
-  return !!(f.action || f.actor || f.league || f.from || f.to);
+  return !!(f.action || f.actor || f.league || f.from || f.to || f.person);
 }
 
 // The UTC bounds of the date filter: from 00:00 of `from` until 00:00 after `to`.
@@ -78,7 +83,7 @@ export function actorLabel(actor: { name: string; deleted: boolean } | null, act
 
 // "kind:id" references in a target or detail, and bare account ids (older
 // pair entries list the two players' ids).
-const REF = /\b(user|pair|league|season|season_entry|club|city|match|signup|broadcast):([A-Za-z0-9_-]+)/g;
+const REF = /\b(user|pair|league|season|season_entry|club|city|match|signup|broadcast|feedback):([A-Za-z0-9_-]+)/g;
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
 
 export type Ref = { kind: string; id: string };
@@ -104,6 +109,7 @@ const KIND_WORDS: Record<string, string> = {
   match: "Meccs",
   signup: "Jelentkezés",
   broadcast: "Körlevél",
+  feedback: "Visszajelzés",
 };
 
 // Text with every reference replaced by what it names ("pair:12" -> "Anna –

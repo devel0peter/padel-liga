@@ -7,7 +7,12 @@
 	"compatibility_date": "2026-09-26",
 	"main": "./workers/app.ts",
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		// Workers Issues (#318, D169): groups errors and sends the "új hiba"
+		// alert. It must stay here: a deploy without it switches Issues off.
+		"issues": {
+			"enabled": true
+		}
 	},
 	"upload_source_maps": true,
 	// Only padelparbaj.hu serves the app; www redirects via a zone Redirect Rule.

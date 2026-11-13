@@ -65,7 +65,12 @@ export const MATCH_LOST_BOTH_TEXT = "Mindkét pár vereséget kap (0:4, 0:4)";
  * (#202). The article is "az" before a vowel.
  */
 export function versusText(a: string, b: string): string {
-  return `${a} ${/^[aáeéiíoóöőuúüű]/i.test(b) ? "az" : "a"} ${b} ellen`;
+  return `${a} ${article(b)} ${b} ellen`;
+}
+
+// "az" before a word read with a vowel, else "a".
+export function article(word: string): "a" | "az" {
+  return /^[aáeéiíoóöőuúüű]/i.test(word) ? "az" : "a";
 }
 
 /** An outcome as a player of `side` sees it (#28, #29). */

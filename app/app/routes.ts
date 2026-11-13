@@ -5,6 +5,8 @@ export default [
   index("routes/home.tsx"),
   route("rules", "routes/rules.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  // Visszajelzés: public, for visitors too (#240, spec 19).
+  route("feedback", "routes/feedback.tsx"),
   route("unsubscribe", "routes/unsubscribe.tsx"),
   route("api/landing", "routes/landing-beacon.ts"),
   route("webhooks/resend", "routes/webhooks.resend.ts"),
@@ -45,12 +47,18 @@ export default [
       route("admin/leagues", "routes/admin.leagues.tsx"),
       route("admin/cities", "routes/admin.cities.tsx"),
       route("admin/users", "routes/admin.users.tsx"),
+      route("admin/users/:id", "routes/admin.user.tsx"),
       route("admin/log", "routes/admin.log.tsx"),
+      // Visszajelzések (#241, spec 19): Admin only.
+      route("admin/feedback", "routes/admin.feedback.tsx"),
+      route("admin/feedback/:id", "routes/admin.feedback-item.tsx"),
       route("admin/leagues/:league", "routes/admin.league.tsx"),
       route("admin/leagues/:league/seasons", "routes/admin.league-seasons.tsx"),
       route("admin/leagues/:league/seasons/:season/entries", "routes/admin.season-entries.tsx"),
       route("admin/leagues/:league/seasons/:season/groups", "routes/admin.season-groups.tsx"),
       route("admin/leagues/:league/pairs", "routes/admin.league-pairs.tsx"),
+      route("admin/leagues/:league/players", "routes/admin.league-players.tsx"),
+      // Párkeresők until #301: redirects to Játékosok.
       route("admin/leagues/:league/solos", "routes/admin.league-solos.tsx"),
       route("admin/leagues/:league/reminders", "routes/admin.league-reminders.tsx"),
       route("admin/leagues/:league/clubs", "routes/admin.league-clubs.tsx"),

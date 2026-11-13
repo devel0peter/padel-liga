@@ -1,8 +1,9 @@
-import { ArrowDown, ArrowUp, RefreshCw, Send, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, RefreshCw, Send, Sparkles } from "lucide-react";
 import { data, Form, Link, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/admin.season-groups";
 import { AppPage } from "~/components/app-page";
+import { PairNames } from "~/components/person-link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,16 +48,21 @@ import {
   BLOCKER_KINDS,
   DISPUTES_BLOCK,
   LAST_PHASE,
+  NOTHING_TO_DRAFT,
   LEAVE_REASONS,
+  type LeaveReason,
   movement,
   type Origin,
   originText,
   OUTDATED_DRAFT,
+  PREVIEW_TITLE,
+  previewText,
   RECOMPUTE_HINT,
   shownPhase,
+  undecidedText,
   waitingText,
 } from "~/lib/round-switch";
-import { draftOutdated, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch } from "~/lib/round-switch.server";
+import { draftOutdated, generateRoundSwitchDraft, publishRoundSwitch, roundSwitch, roundSwitchPreview } from "~/lib/round-switch.server";
 import { seasonOfLeague } from "~/lib/season-entries.server";
 import { isWaiting, WAITING_NO_GROUPS } from "~/lib/seasons";
 import { SITE_NAME } from "~/lib/site";
@@ -103,6 +109,8 @@ function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, orig
       return {
         id: p.pairId,
         name: pairName(p.players),
+        // Ids for the Admin's links to the profiles (#301); never the email.
+        players: p.players.map((x) => ({ id: x.id, name: x.name })),
         elo: formatElo(p.averageElo),
         active: p.active,
         withdrawn: p.withdrawn,
@@ -111,6 +119,15 @@ function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, orig
       };
     }),
   };
+}
+
+// The pairs that leave at a switch, with why: names only.
+function leavingView(list: readonly { pair: GroupPair; reason: LeaveReason }[]) {
+  return list.map((l) => ({
+    id: l.pair.pairId,
+    players: l.pair.players.map((x) => ({ id: x.id, name: x.name })),
+    reason: LEAVE_REASONS[l.reason],
+  }));
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -136,6 +153,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const draft = stored.length > 0 && !publishedAt;
   const players = stored.reduce((n, g) => n + 2 * g.pairs.length, 0);
 
+  // The next round's preview (#363): on a published round's page for the
+  // round after it, and on a later round's page before its draft exists.
+  // Read only; null in a season's last round and once the real draft exists.
+  const previewPhase = publishedAt ? number + 1 : stored.length === 0 && number > FIRST_PHASE ? number : null;
+  const p = previewPhase && season.phases.some((x) => x.number === previewPhase) ? await roundSwitchPreview(season.id, previewPhase, now) : null;
+  const preview = p && {
+    nextPhase: p.nextPhase,
+    endingPhase: p.endingPhase,
+    fast: p.fast,
+    undecided: p.undecided,
+    groups: p.draft.map((pairs, i) => groupView({ number: i + 1, pairs }, p.origins)),
+    leaving: leavingView(p.leaving),
+  };
+
   if (number === FIRST_PHASE) {
     const eligible = await eligiblePairs(season.id);
     const stale =
@@ -155,6 +186,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       players,
       groups: stored.map((g) => groupView(g)),
       switch: null,
+      preview,
     };
   }
 
@@ -177,7 +209,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       endingPhase: s.endingPhase,
       state: s.state,
       fast: s.fast,
-      leaving: s.leaving.map((l) => ({ id: l.pair.pairId, name: pairName(l.pair.players), reason: LEAVE_REASONS[l.reason] })),
+      leaving: leavingView(s.leaving),
       disputes: s.disputes.map((d) => ({
         matchId: d.matchId,
         kind: BLOCKER_KINDS[d.kind],
@@ -185,6 +217,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         names: d.pairs.map((p) => pairName(p.players)).join(" – "),
       })),
     },
+    preview,
   };
 }
 
@@ -258,6 +291,7 @@ function OriginBadge({ origin }: { origin: NonNullable<Group["pairs"][number]["o
     <Badge variant={origin.move === "stay" ? "outline" : "secondary"} className="ml-2">
       {origin.move === "up" && <ArrowUp aria-label="feljutott" />}
       {origin.move === "down" && <ArrowDown aria-label="kiesett" />}
+      {origin.move === "stay" && <ArrowRight aria-label="marad" />}
       {origin.text}
     </Badge>
   );
@@ -287,7 +321,7 @@ function GroupCard({ group, groups, editable, phase }: { group: Group; groups: G
                 <span className="w-5 text-muted-foreground tabular-nums">{i + 1}.</span>
                 <div className="grid min-w-0 flex-1 basis-40">
                   <span className="font-medium">
-                    {p.name}
+                    <PairNames players={p.players} />
                     {!p.active && (
                       <Badge variant="outline" className="ml-2">
                         megszűnt
@@ -427,7 +461,9 @@ function SwitchPanel({ d }: { d: LoaderData }) {
             <ul className="grid gap-1.5">
               {s.leaving.map((l) => (
                 <li key={l.id} className="flex flex-wrap gap-x-2">
-                  <span className="font-medium">{l.name}</span>
+                  <span className="font-medium">
+                    <PairNames players={l.players} />
+                  </span>
                   <span className="text-muted-foreground">{l.reason}</span>
                 </li>
               ))}
@@ -436,6 +472,54 @@ function SwitchPanel({ d }: { d: LoaderData }) {
         </Card>
       )}
     </div>
+  );
+}
+
+// The next round's groups as the switch would draft them if the round ended
+// now (#363): read only, no moves, no publishing.
+function PreviewPanel({ d }: { d: LoaderData }) {
+  const p = d.preview;
+  if (!p) return null;
+  return (
+    <section aria-label={PREVIEW_TITLE} className="grid gap-4">
+      <div className="grid gap-1">
+        <h2 className="font-display text-lg font-bold">{PREVIEW_TITLE}</h2>
+        <p className="text-sm text-muted-foreground">
+          {previewText(p.nextPhase, p.endingPhase)}
+        </p>
+        <p className="text-sm font-medium">{undecidedText(p.undecided)}</p>
+        {p.fast && <p className="text-sm text-muted-foreground">Gyors körváltás: két 4 páros csoport között 2-2 pár cserél helyet.</p>}
+      </div>
+      {p.leaving.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Kimaradnának</CardTitle>
+            <CardDescription>Ezek a párok {withArticle(p.endingPhase)} kör után nem játszanának tovább.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-1.5">
+              {p.leaving.map((l) => (
+                <li key={l.id} className="flex flex-wrap gap-x-2">
+                  <span className="font-medium">
+                    <PairNames players={l.players} />
+                  </span>
+                  <span className="text-muted-foreground">{l.reason}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+      {p.groups.length === 0 ? (
+        <p className="text-muted-foreground">{NOTHING_TO_DRAFT}</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {p.groups.map((g) => (
+            <GroupCard key={g.number} group={g} groups={p.groups} editable={false} phase={p.nextPhase} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -520,6 +604,8 @@ export default function SeasonGroups({ loaderData: d, actionData }: Route.Compon
           ))}
         </div>
       )}
+
+      <PreviewPanel d={d} />
     </AppPage>
   );
 }

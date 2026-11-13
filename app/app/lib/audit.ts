@@ -30,6 +30,7 @@ export const AUDIT_ACTIONS = {
   "groups.draft": "Csoporttervezet",
   "groups.move": "Pár áthelyezése a tervezetben",
   "groups.publish": "Csoportok közzététele",
+  "phase.extend": "Kör meghosszabbítása",
   // Pairs and entries
   "pair.create": "Pár létrehozása",
   "pair.dissolve": "Pár felbontása",
@@ -60,12 +61,17 @@ export const AUDIT_ACTIONS = {
   "substitute.revoke": "Helyettes visszavonása",
   // Emails and reminders
   "broadcast.send": "Körlevél küldése",
+  "outbox.retry": "Hibás levelek újraküldése",
   "registration_invites.send": "Regisztrációs meghívók",
   "reminders.on": "Emlékeztetők be",
   "reminders.off": "Emlékeztetők ki",
   // Accounts
   "account.delete": "Fiók törlése",
   "account.anonymize": "Fiók anonimizálása",
+  "user.update": "Játékos adatainak módosítása",
+  // Feedback (#241, spec 19)
+  "feedback.done": "Visszajelzés kész",
+  "feedback.reopen": "Visszajelzés újranyitása",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

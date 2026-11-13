@@ -3,23 +3,31 @@ import { data, Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.league-matches";
 import { AppPage } from "~/components/app-page";
+import { PairNames } from "~/components/person-link";
 import { StatusPill } from "~/components/my-group";
+import { DeadlineProjectionSection } from "~/components/deadline-projection";
+import { RoundStatusSection } from "~/components/round-status";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { requirePermission } from "~/lib/auth/admin.server";
+import { PROJECTION_KINDS, PROJECTION_TITLE, projectionKind, projectionLine, projectionView } from "~/lib/deadline-projection";
+import { phaseProjection } from "~/lib/deadline-projection.server";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { filterMatches, OVERVIEW_STATUSES, parseFilter, STUCK_TEXT } from "~/lib/match-overview";
 import { runningPhases, type OverviewMatch } from "~/lib/match-overview.server";
 import { getLeague } from "~/lib/leagues.server";
+import { LIST_ANCHOR } from "~/lib/round-status";
 import { groupLine } from "~/lib/matches";
-import { versusText } from "~/lib/results";
+import { article, versusText } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
 
 // Every match of the league's running phase for its Szervező and the Admin
 // (#158, D76): status, last step, who has been active, stuck ones first to
-// find. Names only here; phones and the log are on one match's page.
+// find. Names only here; phones and the log are on one match's page. On top,
+// "A kör állása" (#350): totals, burn-down and forecast, linking into the
+// filtered list.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Meccsek – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -29,12 +37,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const league = await getLeague(params.league);
   if (!league) throw data("Nincs ilyen liga.", { status: 404 });
   await requirePermission(request, { kind: "league.manage", league: league.slug });
-  return { league: { name: league.name, slug: league.slug }, phases: await runningPhases(league.id) };
+  const phases = await runningPhases(league.id);
+  // "Ha most lenne a határidő" (#362): read only, a few queries per round.
+  const projections = await Promise.all(phases.map((p) => phaseProjection(p.seasonId, p.phase)));
+  return {
+    league: { name: league.name, slug: league.slug },
+    phases: phases.map((p, i) => {
+      const projection = projections[i] ?? null;
+      const decisions = new Map(projection?.matches.map((m) => [m.id, m.decision]) ?? []);
+      return {
+        ...p,
+        matches: p.matches.map((m) => {
+          const d = decisions.get(m.id);
+          return { ...m, deadline: d ? projectionKind(d) : null, projection: d ? projectionLine(d, m.names) : null };
+        }),
+        projection: projection && projectionView(projection),
+      };
+    }),
+  };
 }
 
 const ALL = "all";
 
-function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number }) {
+function Filters({ groups, weeks, stuckCount }: { groups: number[]; weeks: number[]; stuckCount: number }) {
   const [params, setParams] = useSearchParams();
   const filter = parseFilter(params);
   const set = (key: string, value: string | null) =>
@@ -47,7 +72,7 @@ function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number 
       },
       { preventScrollReset: true },
     );
-  const any = filter.stuck || filter.group !== null || filter.status !== null;
+  const any = filter.stuck || filter.group !== null || filter.week !== null || filter.status !== null || filter.deadline != null;
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Szűrők">
       <Button
@@ -72,6 +97,19 @@ function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number 
           ))}
         </SelectContent>
       </Select>
+      <Select value={filter.week === null ? ALL : String(filter.week)} onValueChange={(v) => set("week", v === ALL ? null : v)}>
+        <SelectTrigger size="sm" aria-label="Hét" className="w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Minden hét</SelectItem>
+          {weeks.map((w) => (
+            <SelectItem key={w} value={String(w)}>
+              {w}. hét
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Select value={filter.status ?? ALL} onValueChange={(v) => set("status", v === ALL ? null : v)}>
         <SelectTrigger size="sm" aria-label="Állapot" className="w-full max-w-72 sm:w-72">
           <SelectValue />
@@ -85,6 +123,19 @@ function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number 
           ))}
         </SelectContent>
       </Select>
+      <Select value={filter.deadline ?? ALL} onValueChange={(v) => set("deadline", v === ALL ? null : v)}>
+        <SelectTrigger size="sm" aria-label="Ha most lenne a határidő" className="w-full max-w-72 sm:w-72">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Határidő most: mind</SelectItem>
+          {PROJECTION_KINDS.map((k) => (
+            <SelectItem key={k.value} value={k.value}>
+              Határidő most: {k.label.toLowerCase()}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {any && (
         <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { preventScrollReset: true })}>
           Szűrők törlése
@@ -94,10 +145,18 @@ function Filters({ groups, stuckCount }: { groups: number[]; stuckCount: number 
   );
 }
 
-function MatchRow({ m, slug }: { m: OverviewMatch; slug: string }) {
+function MatchRow({ m, slug }: { m: OverviewMatch & { projection: string | null }; slug: string }) {
   return (
     <li className="grid gap-1.5 rounded-md border p-3 text-sm" aria-label={`${m.names.a} – ${m.names.b}`}>
-      <p className="font-medium break-words">{versusText(m.names.a, m.names.b)}</p>
+      <p className="font-medium break-words">
+        {m.players.a.length === 0 || m.players.b.length === 0 ? (
+          versusText(m.names.a, m.names.b)
+        ) : (
+          <>
+            <PairNames players={m.players.a} /> {article(m.names.b)} <PairNames players={m.players.b} /> ellen
+          </>
+        )}
+      </p>
       <div className="flex flex-wrap gap-1.5">
         <StatusPill label={m.label} tone={m.tone} />
         {m.stuck && <Badge variant="destructive">{STUCK_TEXT[m.stuck]}</Badge>}
@@ -105,6 +164,7 @@ function MatchRow({ m, slug }: { m: OverviewMatch; slug: string }) {
       <p className="text-muted-foreground">
         {m.lastActivity ? `Utolsó lépés: ${formatDateTime(m.lastActivity)}` : "Még nincs lépés"} · {m.activity}
       </p>
+      {m.projection && <p className="text-muted-foreground italic">{m.projection}</p>}
       <Link to={`/admin/leagues/${slug}/matches/${m.id}`} className="inline-flex w-fit items-center gap-1 font-semibold underline">
         Napló és telefonszámok
         <ChevronRight className="size-4" />
@@ -121,6 +181,7 @@ export default function LeagueMatches({ loaderData }: Route.ComponentProps) {
   const { shown, stuckCount } = filterMatches(everything, filter);
   const visible = new Set(shown.map((m) => m.id));
   const groupNumbers = [...new Set(phases.flatMap((p) => p.groups))].sort((x, y) => x - y);
+  const weekNumbers = [...new Set(everything.map((m) => m.week))].sort((x, y) => x - y);
 
   return (
     <AppPage
@@ -135,7 +196,33 @@ export default function LeagueMatches({ loaderData }: Route.ComponentProps) {
         <p className="text-muted-foreground">Most nincs futó kör. A meccsek a csoportok közzététele után jelennek meg itt.</p>
       ) : (
         <>
-          <Filters groups={groupNumbers} stuckCount={stuckCount} />
+          {phases.map((p, i) => (
+            <RoundStatusSection
+              key={`${p.season}:${p.phase}`}
+              anchor={i === 0}
+              linked={phases.length === 1}
+              round={p.round}
+              groupCount={p.groupCount}
+              title={phases.length > 1 ? `A kör állása: ${p.season}, ${p.phase}. kör` : "A kör állása"}
+            />
+          ))}
+          {phases.map(
+            (p, i) =>
+              p.projection && (
+                <DeadlineProjectionSection
+                  key={`projection:${p.season}:${p.phase}`}
+                  anchor={i === 0}
+                  linked={phases.length === 1}
+                  view={p.projection}
+                  deadline={p.deadline}
+                  title={phases.length > 1 ? `${PROJECTION_TITLE}: ${p.season}, ${p.phase}. kör` : PROJECTION_TITLE}
+                />
+              ),
+          )}
+          <div id={LIST_ANCHOR} className="grid scroll-mt-6 gap-3">
+            <h2 className="font-display text-lg font-bold">A kör meccsei</h2>
+            <Filters groups={groupNumbers} weeks={weekNumbers} stuckCount={stuckCount} />
+          </div>
           {shown.length === 0 && <p className="text-muted-foreground">Nincs ilyen meccs.</p>}
           {phases.map((p) =>
             p.groups.map((g) => {

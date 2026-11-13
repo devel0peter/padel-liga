@@ -31,7 +31,8 @@ export const NOTIFICATION_KINDS = {
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
-// Player notifications have no per-kind switch (#115), only the channels.
+// Player notifications have no per-kind switch (#115): the channels, and for
+// push one switch per topic (KIND_TOPIC, #349).
 export type PlayerKind =
   | "season_entry_decision"
   | "groups_published"
@@ -79,7 +80,105 @@ export type PlayerKind =
   | "no_show_rejected"
   // A league's first season reached its minimum entries (D124, #335): every
   // entered player, in the app and by push, plus one email (season_start).
-  | "season_start";
+  | "season_start"
+  // The organizer extended the running round (#356, D151): every player of
+  // the round, in the app and by push, plus one email (round_extended).
+  | "round_extended";
+
+// --- Push topics (#349, D159) ------------------------------------------------
+// A player chooses by topic which pushes they get, on the profile under the
+// push switch; all on by default. Like a channel, a topic is stored (a
+// notification_opt_outs row "topic:<topic>") only once switched off, so it
+// holds on every device. Topics decide only the push: emails follow the
+// email switch alone, and the in-app list keeps everything.
+
+export const PUSH_TOPICS = {
+  scheduling: {
+    label: "Időpont-egyeztetés",
+    description: "Ha időpontot ajánlanak vagy rögzítenek nektek, és ha elfogadják, nem erősítik meg vagy lemondják.",
+  },
+  reminders: {
+    label: "Emlékeztetők",
+    description: "Ha még nincs időpont-ajánlat, véget ér a hét, közeleg a határidő, vagy holnap meccsetek van.",
+  },
+  results: {
+    label: "Eredmények",
+    description: "Ha eredményt kell megerősítened, és ha egy eredmény végleges, a szervező döntött, vagy vitatják.",
+  },
+  season: {
+    label: "Csoport és szezon",
+    description: "Nevezés, a szezon kezdete, az új csoportod, a párod, egy visszalépett pár a csoportodban, a kör hosszabbítása.",
+  },
+  absences: {
+    label: "Helyettesek és mulasztások",
+    description: "Ha jóváhagyják, elutasítják vagy visszavonják a helyettest, döntés egy „nem jöttek el” bejelentésről, fekete pontok.",
+  },
+} as const;
+
+export type PushTopic = keyof typeof PUSH_TOPICS;
+
+// Every player kind in exactly one topic: a new kind without one doesn't
+// compile, and notifications.test.ts checks every stored kind too.
+export const KIND_TOPIC: Readonly<Record<PlayerKind, PushTopic>> = {
+  match_proposal: "scheduling",
+  match_agreed_time: "scheduling",
+  match_scheduled: "scheduling",
+  match_declined: "scheduling",
+  match_cancelled: "scheduling",
+  match_no_proposal: "reminders",
+  match_week_end: "reminders",
+  match_deadline_soon: "reminders",
+  match_tomorrow: "reminders",
+  match_result: "results",
+  match_result_confirmed: "results",
+  match_decided: "results",
+  match_result_disputed: "results",
+  season_entry_decision: "season",
+  season_start: "season",
+  groups_published: "season",
+  pair_intro: "season",
+  pair_withdrawn: "season",
+  round_extended: "season",
+  substitute_approved: "absences",
+  substitute_rejected: "absences",
+  substitute_revoked: "absences",
+  no_show_confirmed: "absences",
+  no_show_rejected: "absences",
+  strike: "absences",
+};
+
+// The topic's name and text on the profile. No substitutes in the first
+// season (D145): that topic is about no-shows and strikes only.
+export function pushTopic(topic: PushTopic): { label: string; description: string } {
+  if (topic === "absences" && !substitutesEnabled())
+    return { label: "Mulasztások", description: "Döntés egy „nem jöttek el” bejelentésről, fekete pontok." };
+  return PUSH_TOPICS[topic];
+}
+
+export function isPushTopic(value: unknown): value is PushTopic {
+  return typeof value === "string" && Object.hasOwn(PUSH_TOPICS, value);
+}
+
+// The opt-out row of a topic; no notification kind has a colon.
+export const topicKey = (topic: PushTopic) => `topic:${topic}` as const;
+
+export function topicEnabled(disabled: ReadonlySet<string>, topic: PushTopic): boolean {
+  return !disabled.has(topicKey(topic));
+}
+
+// The topic of a stored kind; null for the organizers' kinds (their own
+// switches) and the profile's "Próba".
+export function topicOf(kind: StoredKind): PushTopic | null {
+  return Object.hasOwn(KIND_TOPIC, kind) ? KIND_TOPIC[kind as PlayerKind] : null;
+}
+
+// Whether a notification of this kind is pushed to this user: the push
+// switch on, and the kind's topic on (#349). The one rule every push path
+// applies (notifications.server.ts).
+export function pushWanted(disabled: ReadonlySet<string>, kind: StoredKind): boolean {
+  const topic = topicOf(kind);
+  return channelEnabled(disabled, "push") && (topic === null || topicEnabled(disabled, topic));
+}
 
 // The kinds the daily digest email (#31) collects; push sends them one by one.
 // The digest is built from this list alone, so a kind added here is in it.
@@ -191,6 +290,16 @@ export function seasonStartMessage(input: { league: string; season: string; star
   return {
     title: "Indul a szezon",
     body: `${input.season}, ${input.league}. Az 1. kör kezdete: ${formatWeekdayDate(input.start)}. A csoportbeosztást legkésőbb aznap reggel megkapjátok.`,
+    url: "/home",
+  };
+}
+
+// The organizer extended the running round (#356, D151): to every player of
+// the round, with the new deadline. No names.
+export function roundExtendedMessage(input: { league: string; season: string; phase: number; deadline: Date }): Message {
+  return {
+    title: "Meghosszabbítottuk a kört",
+    body: `Meghosszabbítottuk ${withArticle(input.phase)} kört: új határidő ${formatDeadline(input.deadline)}. ${input.season}, ${input.league}.`,
     url: "/home",
   };
 }

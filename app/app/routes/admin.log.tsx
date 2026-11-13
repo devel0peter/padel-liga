@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.log";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -124,11 +125,15 @@ export default function AdminLog({ loaderData }: Route.ComponentProps) {
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="whitespace-nowrap tabular-nums">{formatDateTime(new Date(r.at))}</TableCell>
-                  <TableCell>{r.actor}</TableCell>
+                  <TableCell>
+                    <PersonLink id={r.actorId} name={r.actor} />
+                  </TableCell>
                   <TableCell className="font-medium" title={r.action}>
                     {r.actionLabel}
                   </TableCell>
-                  <TableCell className="max-w-xs whitespace-normal break-words">{r.target}</TableCell>
+                  <TableCell className="max-w-xs whitespace-normal break-words">
+                    <PersonLink id={r.targetUserId} name={r.target} />
+                  </TableCell>
                   <TableCell className="max-w-sm text-xs whitespace-normal break-words text-muted-foreground">{r.detail || "–"}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.league ?? "–"}</TableCell>
                 </TableRow>

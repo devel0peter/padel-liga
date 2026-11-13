@@ -2,6 +2,7 @@ import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.match-decide";
 import { AppPage } from "~/components/app-page";
+import { PairNames, PersonLink } from "~/components/person-link";
 import { FormFeedback, ScoreFields } from "~/components/match-result";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -99,19 +100,19 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
     >
       <section className="grid max-w-2xl gap-1 rounded-lg border p-4 text-sm sm:p-6" aria-label="Állapot">
         <p>
-          <span className="font-medium">1. pár:</span> {m.a}
+          <span className="font-medium">1. pár:</span> <PairNames players={m.players.a} />
         </p>
         <p>
-          <span className="font-medium">2. pár:</span> {m.b}
+          <span className="font-medium">2. pár:</span> <PairNames players={m.players.b} />
         </p>
         <p className="font-semibold">{m.label}</p>
         {r.status === "disputed" && (
           <>
             <p>
-              {r.by === "a" ? m.a : m.b} szerint: <strong>{neutralScoreText(r.score)}</strong>
+              <PairNames players={m.players[r.by]} /> szerint: <strong>{neutralScoreText(r.score)}</strong>
             </p>
             <p>
-              {r.by === "a" ? m.b : m.a} szerint: <strong>{r.counter ? neutralScoreText(r.counter) : "nem adott meg eredményt"}</strong>
+              <PairNames players={m.players[r.by === "a" ? "b" : "a"]} /> szerint: <strong>{r.counter ? neutralScoreText(r.counter) : "nem adott meg eredményt"}</strong>
             </p>
             {m.note && <p className="break-words">Megjegyzés: {m.note}</p>}
             <p className="text-xs text-muted-foreground">Az eredmények az 1. pár szemszögéből.</p>
@@ -124,7 +125,8 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
           <CardHeader>
             <CardTitle className="font-display text-lg">Nem jöttek el: döntés</CardTitle>
             <CardDescription className="break-words">
-              {noShow.reporting} jelezte, hogy {noShow.absent} nem jött el a lefixált időpontra
+              <PairNames players={noShow.reportingPlayers} /> jelezte, hogy <PairNames players={noShow.absentPlayers} /> nem jött el
+              a lefixált időpontra
               {noShow.slot ? ` (${formatSlot(noShow.slot)})` : ""}. Bejelentve: {formatDateTime(noShow.reportedAt)}.
             </CardDescription>
           </CardHeader>
@@ -209,7 +211,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
             {m.log.map((e) => (
               <li key={e.key} className="grid gap-0.5 rounded-md border p-3">
                 <span className="text-xs text-muted-foreground">
-                  {formatDateTime(e.at)} · {e.who} ({e.role})
+                  {formatDateTime(e.at)} · <PersonLink id={e.whoId} name={e.who} /> ({e.role})
                 </span>
                 <span className="break-words">{e.text}</span>
               </li>

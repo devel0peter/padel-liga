@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[], relay: false 
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => h.relay,
@@ -18,6 +19,7 @@ vi.mock("~/lib/email/send.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const { createSession } = await import("~/lib/auth/session.server");
 const R = await import("~/routes/admin.outbox");
 
@@ -82,7 +84,7 @@ describe("/admin/outbox", () => {
     expect(await status(R.loader(args(get(""))))).toBe(302);
   });
 
-  it("shows the Admin the counts per kind, the newest failure and no address, and has nothing to send or discard", async () => {
+  it("shows the Admin the counts per kind, the newest failure and no address", async () => {
     const cookie = await cookieFor("admin", "superadmin");
     const page = await R.loader(args(get(cookie)));
     expect(page.log.map(({ kind, waiting, sent, failed }) => ({ kind, waiting, sent, failed }))).toEqual([
@@ -92,8 +94,68 @@ describe("/admin/outbox", () => {
     expect(page.log[1].lastError?.reason).toBe("relay: RCPT TO: 550 <[elrejtve]> unknown");
     expect(page.sent).toBe(1);
     expect(JSON.stringify(page)).not.toContain("@x.hu");
-    // No Küldés, no Elvetés (#112).
-    expect("action" in R).toBe(false);
     expect(h.sent).toEqual([]);
+  });
+});
+
+// "Újraküldés" (D150): a kind's failed emails back in the queue, sent after
+// the response, with one audit entry. Only the Admin; never a login code.
+describe("/admin/outbox Újraküldés", () => {
+  const post = (cookie: string, kind: string) => {
+    const body = new FormData();
+    body.set("kind", kind);
+    return new Request("http://localhost/admin/outbox", { method: "POST", body, headers: { Cookie: cookie } });
+  };
+  const statuses = () => h.raw.prepare("select kind, to_email, status, attempts, last_error from email_messages order by id").all();
+
+  beforeEach(() => {
+    h.raw = migratedDatabase();
+    h.sent = [];
+    h.raw.prepare("insert into leagues (city, slug, name) values ('gyor', 'gyor', 'Padelpárbaj Győr')").run();
+    const st = h.raw.prepare("insert into email_messages (kind, to_email, subject, html, text, status, attempts, last_error) values (?, ?, 's', ?, ?, ?, ?, ?)");
+    st.run("groups_published", "anna@x.hu", "<p>t</p>", "t", "failed", 0, "interrupted while sending; not retried, so it can't go out twice");
+    st.run("groups_published", "bela@x.hu", "<p>t</p>", "t", "failed", 5, "relay: 421 try later");
+    // Sent: its text is gone, and it stays sent.
+    st.run("groups_published", "cili@x.hu", null, null, "sent", 0, null);
+    st.run("broadcast", "dora@x.hu", "<p>t</p>", "t", "failed", 1, "relay: 550");
+    st.run("login_code", "ede@x.hu", "<p>t</p>", "t", "failed", 1, "relay: 421");
+  });
+
+  it("puts one kind's failed emails back in the queue and sends them after the response", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    expect(await R.action(args(post(cookie, "groups_published")))).toEqual({ retried: 2, kind: "groups_published" });
+    // The broadcast and the sent one are untouched.
+    expect(statuses().slice(0, 4).map((r: any) => r.status)).toEqual(["pending", "pending", "sent", "failed"]);
+    await settleBackground();
+    expect(h.sent.map((m) => m.to)).toEqual(["anna@x.hu", "bela@x.hu"]);
+    expect(statuses().slice(0, 2)).toEqual([
+      { kind: "groups_published", to_email: "anna@x.hu", status: "sent", attempts: 0, last_error: null },
+      { kind: "groups_published", to_email: "bela@x.hu", status: "sent", attempts: 0, last_error: null },
+    ]);
+    expect(h.raw.prepare("select actor_id, action, target from audit_log").all()).toEqual([
+      { actor_id: "admin", action: "outbox.retry", target: "kind:groups_published" },
+    ]);
+  });
+
+  it("never resends a login code, nor an unknown kind", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    expect(await status(R.action(args(post(cookie, "login_code"))))).toBe(400);
+    expect(await status(R.action(args(post(cookie, "nincs_ilyen"))))).toBe(400);
+    await settleBackground();
+    expect(h.sent).toEqual([]);
+    expect(statuses().find((r: any) => r.kind === "login_code").status).toBe("failed");
+  });
+
+  it("with nothing failed of that kind, says so and writes no audit entry", async () => {
+    const cookie = await cookieFor("admin", "superadmin");
+    h.raw.exec("update email_messages set status = 'sent' where kind = 'broadcast'");
+    expect(await R.action(args(post(cookie, "broadcast")))).toEqual({ retried: 0, kind: "broadcast" });
+    expect(h.raw.prepare("select count(*) as n from audit_log").get().n).toBe(0);
+  });
+
+  it("refuses a Játékos and a Szervező with 403", async () => {
+    for (const cookie of [await cookieFor("jatekos", "player"), await cookieFor("szervezo", "player", true)])
+      expect(await status(R.action(args(post(cookie, "groups_published"))))).toBe(403);
+    expect(statuses()[0].status).toBe("failed");
   });
 });

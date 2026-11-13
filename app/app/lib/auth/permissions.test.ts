@@ -29,8 +29,10 @@ const platformOnly: Permission[] = [
   { kind: "leagues.manage" },
   { kind: "cities.manage" },
   { kind: "users.view" },
+  { kind: "users.edit" },
   { kind: "users.delete" },
   { kind: "log.view" },
+  { kind: "feedback.view" },
   { kind: "clubs.manage" },
 ];
 
@@ -100,8 +102,8 @@ describe("sidebar", () => {
       "/admin/leagues/gyor",
       "/admin/leagues/gyor/seasons",
       "/admin/leagues/gyor/matches",
+      "/admin/leagues/gyor/players",
       "/admin/leagues/gyor/pairs",
-      "/admin/leagues/gyor/solos",
       "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
@@ -115,8 +117,23 @@ describe("sidebar", () => {
       "/admin/outbox",
       "/admin/traffic",
       "/admin/log",
+      "/admin/feedback",
     ]);
     expect(adminHome(superadmin)).toBe("/admin/leagues");
+  });
+
+  it("has two people pages, each with a one-line description (#301)", () => {
+    const nav = appNav(superadmin, [gyor]);
+    const people = nav.flatMap((s) => s.items).filter((i) => i.icon === "players" || i.icon === "users");
+    expect(people.map((i) => i.label)).toEqual(["Játékosok", "Felhasználók"]);
+    for (const i of people) expect(i.hint?.trim()).toBeTruthy();
+    expect(nav.flatMap((s) => s.items).some((i) => i.to.endsWith("/solos"))).toBe(false);
+  });
+
+  it("lets only the Admin edit a player's profile (#301, D156)", () => {
+    expect(can(superadmin, { kind: "users.edit" })).toBe(true);
+    expect(can(organizer, { kind: "users.edit" })).toBe(false);
+    expect(can(player, { kind: "users.edit" })).toBe(false);
   });
 
   it("follows the league in the URL", () => {
@@ -133,7 +150,7 @@ describe("sidebar", () => {
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
-    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Párok", "Párkeresők", "Emlékeztetők", "Klubok", "Viták"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Játékosok", "Párok", "Emlékeztetők", "Klubok", "Viták"]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 

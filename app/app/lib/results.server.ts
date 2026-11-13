@@ -311,7 +311,7 @@ async function tellAutoAccepted(list: { id: number; pairA: number; pairB: number
           messages.push({ userId, message: matchResultConfirmedMessage({ matchId: m.id, score: scoreText(score, side), auto: true }) });
     }
     // From the cron: the pushes wait for its push step (#183).
-    await notifyPlayers("match_result_confirmed", messages, now, true);
+    await notifyPlayers("match_result_confirmed", messages, now);
   } catch (error) {
     logError("auto-accept notification failed", { error });
   }

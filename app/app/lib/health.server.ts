@@ -4,8 +4,9 @@ import { db } from "~/db/client.server";
 import { logWarn } from "~/lib/log";
 
 // The health check (#228, D92): GET /health answers "ok" when the app runs and
-// the database answers one trivial query in time. An outside uptime monitor
-// opens it every 5 minutes and tells Peter when it fails twice in a row.
+// the database answers one trivial query in time. The watchdog Worker
+// (watchdog/, #318, D169) opens it every minute; a Cloudflare alert tells Peter
+// when it fails (docs/operations.md, "Monitoring").
 // Nothing private in the answer: no counts, no versions, no secrets.
 
 export const HEALTH_TIMEOUT_MS = 3000;

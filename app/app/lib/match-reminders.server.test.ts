@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 // No VAPID keys: notifications are stored, not pushed.
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
+vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
   MAX_BATCH: 100,
   relayConfigured: () => false,
@@ -21,6 +22,7 @@ vi.mock("~/lib/email/send.server", () => ({
 vi.mock("~/lib/cities.server", () => ({ listCities: async () => [{ slug: "gyor", name: "Győr" }] }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
+const { settleBackground } = await import("~/test/background");
 const G = await import("~/lib/groups.server");
 const M = await import("~/lib/matches.server");
 const R = await import("~/lib/match-reminders.server");
@@ -67,6 +69,7 @@ async function freshDb() {
   });
   expect(await G.generateDraft(1, "o")).toEqual({ ok: true });
   expect(await G.publishGroups(1, "o", new Date("2026-11-08T08:00:00Z"))).toEqual({ ok: true });
+  await settleBackground();
   h.raw.exec("delete from notifications");
   h.raw.exec("delete from email_messages");
   h.sent = [];
@@ -369,6 +372,53 @@ describe("the emails switched off (#191, D83)", () => {
     expect(h.sent).toEqual([]);
     // Still claimed once: a later evening run tells nobody again.
     await R.runMatchReminders(at("2026-11-11", 19));
+    expect(inbox("match_tomorrow")).toHaveLength(4);
+  });
+});
+
+// Push topics (#349, D159): a topic off stops only that topic's pushes; the
+// in-app list and the emails stay.
+describe("push topics (#349)", () => {
+  beforeEach(freshDb);
+  const N = () => import("~/lib/notifications.server");
+
+  it("with Emlékeztetők off, 'holnap meccs' creates no push for that player, but is on Értesítések", async () => {
+    await schedule14();
+    await (await N()).setTopicEnabled("p4a", "reminders", false);
+    h.raw.exec("delete from notifications");
+    await R.runMatchReminders(at("2026-11-11", 18));
+    expect(inbox("match_tomorrow").map((n: any) => n.user).sort()).toEqual(PLAYERS(1, 4).sort());
+    expect(pushQueue("match_tomorrow").map((n: any) => n.user).sort()).toEqual(["p1a", "p1b", "p4b"]);
+  });
+
+  it("with Időpont-egyeztetés off, a proposal still sends its email (email switch on), with no push", async () => {
+    await (await N()).setTopicEnabled("p4a", "scheduling", false);
+    const id = matchOf(1, 4);
+    expect(await M.matchStep("p1a", id, { kind: "propose", ranges: hour(SLOTS), clubId: null }, at("2026-11-10", 11))).toMatchObject({ ok: true });
+    expect(mails("match_proposal").map((m: any) => m.to).sort()).toEqual(["p4a@x.hu", "p4b@x.hu"]);
+    await settleBackground();
+    expect(h.sent.map((m) => m.to)).toContain("p4a@x.hu");
+    expect(inbox("match_proposal").map((n: any) => n.user).sort()).toEqual(["p4a", "p4b"]);
+    expect(pushQueue("match_proposal").map((n: any) => n.user)).toEqual(["p4b"]);
+  });
+
+  it("switching a topic off takes its waiting pushes off the queue; push off and on keeps the topics", async () => {
+    const { setTopicEnabled, setChannelEnabled, disabledKindsFor } = await N();
+    await schedule14();
+    h.raw.exec("delete from notifications");
+    await R.runMatchReminders(at("2026-11-11", 18));
+    expect(pushQueue("match_tomorrow")).toHaveLength(4);
+    // Another topic leaves it in the queue.
+    await setTopicEnabled("p4a", "scheduling", false);
+    expect(pushQueue("match_tomorrow")).toHaveLength(4);
+    await setTopicEnabled("p4a", "reminders", false);
+    expect(pushQueue("match_tomorrow").map((n: any) => n.user)).not.toContain("p4a");
+    await setChannelEnabled("p1a", "push", false);
+    expect(pushQueue("match_tomorrow").map((n: any) => n.user).sort()).toEqual(["p1b", "p4b"]);
+    // Push off and on again: the topics keep their values.
+    await setChannelEnabled("p4a", "push", false);
+    await setChannelEnabled("p4a", "push", true);
+    expect(await disabledKindsFor("p4a")).toEqual(new Set(["topic:scheduling", "topic:reminders"]));
     expect(inbox("match_tomorrow")).toHaveLength(4);
   });
 });

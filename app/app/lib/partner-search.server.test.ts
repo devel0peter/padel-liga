@@ -101,42 +101,7 @@ describe("Párt keresek on real SQLite (D59)", () => {
   });
 });
 
-describe("Összehozott párok: pairs made from Regisztráltak (#297, D113)", () => {
-  const listed = async (leagueId = 1) =>
-    (await S.searchPairs(leagueId)).map((p) => p.players.map((x) => x.id).join("+"));
-
-  it("lists an active pair made from Regisztráltak, newest first, with name and level", async () => {
-    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'halado', 1)`);
-    h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'd', 'chosen')`);
-    await S.pairSeekers("org", LEAGUE, "b", "c");
-    await S.pairSeekers("org", LEAGUE, "a", "d");
-    expect(await listed()).toEqual(["a+d", "b+c"]);
-    h.raw.exec(`update users set phone = '+36701234567' where id = 'a'`);
-    const [first] = await S.searchPairs(1);
-    expect(first.players[0]).toMatchObject({ name: "Anna", level: "halado", phone: "+36 70 123 4567" });
-    expect(first.players[1].phone).toBe("");
-  });
-
-  it("leaves out a pair dissolved on Párok, and one made on Párok, by link or from a signup", async () => {
-    await S.pairSeekers("org", LEAGUE, "b", "c");
-    h.raw.exec(`update pairs set status = 'dissolved'`);
-    expect(await listed()).toEqual([]);
-    for (const id of ["d", "e", "f"])
-      h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('${id}', '${id}@x.hu', 'X', 'kezdo', 1)`);
-    h.raw.exec(`insert into pairs (league_id, player_a, player_b, source) values
-      (1, 'a', 'b', 'manual'), (1, 'c', 'd', 'link'), (1, 'e', 'f', 'signup')`);
-    expect(h.raw.prepare("select count(*) as n from pairs where status = 'active'").get()).toEqual({ n: 3 });
-    expect(await listed()).toEqual([]);
-  });
-
-  it("keeps to the league", async () => {
-    h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'gyor', 'gyor2', 'Másik')`);
-    h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'b', 'chosen'), (2, 'c', 'chosen')`);
-    await S.pairSeekers("org", { id: 2, name: "Másik" }, "b", "c");
-    expect(await listed(1)).toEqual([]);
-    expect(await listed(2)).toEqual(["b+c"]);
-  });
-
+describe("the league's seekers (D128)", () => {
   it("lists only the league's players (D128): someone who joined another league isn't a seeker here", async () => {
     h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'mmo', 'mmo', 'Óvár')`);
     h.raw.prepare("insert into users (id, email, name, level, consent_at) values ('d', 'd@x.hu', 'Dóra', 'kezdo', 1)").run();

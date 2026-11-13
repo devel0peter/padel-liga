@@ -2,6 +2,7 @@ import { data } from "react-router";
 
 import type { Route } from "./+types/admin.season-entries";
 import { AppPage } from "~/components/app-page";
+import { PersonLink } from "~/components/person-link";
 import { Badge } from "~/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { requirePermission } from "~/lib/auth/admin.server";
@@ -65,7 +66,12 @@ export default function SeasonEntries({ loaderData: d }: Route.ComponentProps) {
               {d.rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">
-                    {r.players.map((p) => p.name || "Névtelen").join(" – ")}
+                    {r.players.map((p, i) => (
+                      <span key={p.id}>
+                        {i > 0 && " – "}
+                        <PersonLink id={p.id} name={p.name || "Névtelen"} />
+                      </span>
+                    ))}
                     {!r.pairActive && (
                       <Badge variant="outline" className="ml-2">
                         megszűnt

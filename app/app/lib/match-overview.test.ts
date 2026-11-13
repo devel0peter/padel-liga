@@ -191,42 +191,51 @@ describe("stuckReason (#158 stuck match)", () => {
 });
 
 describe("filters (#158 requirement 3)", () => {
-  const m = (id: number, groupNumber: number, status: OverviewStatus, stuck: StuckReason | null) => ({ id, groupNumber, status, stuck });
+  const m = (id: number, groupNumber: number, status: OverviewStatus, stuck: StuckReason | null, week = 1) => ({ id, groupNumber, week, status, stuck });
   const all = [
     m(1, 1, "to_schedule", "no_activity"),
-    m(2, 1, "proposed", "unanswered"),
-    m(3, 1, "scheduled", null),
+    m(2, 1, "proposed", "unanswered", 2),
+    m(3, 1, "scheduled", null, 2),
     m(4, 2, "proposed", null),
-    m(5, 2, "to_schedule", "no_activity"),
+    m(5, 2, "to_schedule", "no_activity", 2),
   ];
   const ids = (r: { shown: { id: number }[] }) => r.shown.map((x) => x.id);
 
   it("reads the URL and ignores what it can't read", () => {
-    expect(parseFilter(new URLSearchParams("stuck=1&group=2&status=proposed"))).toEqual({ stuck: true, group: 2, status: "proposed" });
-    expect(parseFilter(new URLSearchParams("stuck=yes&group=-1&status=played"))).toEqual({ stuck: false, group: null, status: null });
-    expect(parseFilter(new URLSearchParams(""))).toEqual({ stuck: false, group: null, status: null });
+    expect(parseFilter(new URLSearchParams("stuck=1&group=2&week=3&status=proposed"))).toEqual({ stuck: true, group: 2, week: 3, status: "proposed", deadline: null });
+    expect(parseFilter(new URLSearchParams("stuck=yes&group=-1&week=1.5&status=played"))).toEqual({ stuck: false, group: null, week: null, status: null, deadline: null });
+    expect(parseFilter(new URLSearchParams("week=0")).week).toBeNull();
+    expect(parseFilter(new URLSearchParams(""))).toEqual({ stuck: false, group: null, week: null, status: null, deadline: null });
     expect(parseFilter(new URLSearchParams("status=disputed")).status).toBe("disputed");
     expect(parseFilter(new URLSearchParams("status=final")).status).toBe("final");
   });
 
   it("no filter: everything, and the stuck count", () => {
-    const r = filterMatches(all, { stuck: false, group: null, status: null });
+    const r = filterMatches(all, { stuck: false, group: null, week: null, status: null });
     expect(ids(r)).toEqual([1, 2, 3, 4, 5]);
     expect(r.stuckCount).toBe(3);
   });
 
   it("the stuck switch shows exactly the stuck matches, as many as its count", () => {
-    const r = filterMatches(all, { stuck: true, group: null, status: null });
+    const r = filterMatches(all, { stuck: true, group: null, week: null, status: null });
     expect(ids(r)).toEqual([1, 2, 5]);
     expect(r.stuckCount).toBe(r.shown.length);
   });
 
   it("group and status narrow the list and the count", () => {
-    expect(ids(filterMatches(all, { stuck: false, group: 2, status: null }))).toEqual([4, 5]);
-    expect(filterMatches(all, { stuck: false, group: 2, status: null }).stuckCount).toBe(1);
-    expect(ids(filterMatches(all, { stuck: false, group: null, status: "proposed" }))).toEqual([2, 4]);
-    expect(ids(filterMatches(all, { stuck: true, group: 1, status: "proposed" }))).toEqual([2]);
-    expect(filterMatches(all, { stuck: true, group: null, status: "scheduled" })).toEqual({ shown: [], stuckCount: 0 });
+    expect(ids(filterMatches(all, { stuck: false, group: 2, week: null, status: null }))).toEqual([4, 5]);
+    expect(filterMatches(all, { stuck: false, group: 2, week: null, status: null }).stuckCount).toBe(1);
+    expect(ids(filterMatches(all, { stuck: false, group: null, week: null, status: "proposed" }))).toEqual([2, 4]);
+    expect(ids(filterMatches(all, { stuck: true, group: 1, week: null, status: "proposed" }))).toEqual([2]);
+    expect(filterMatches(all, { stuck: true, group: null, week: null, status: "scheduled" })).toEqual({ shown: [], stuckCount: 0 });
+  });
+
+  it("the week (#350) narrows the list and the count like the others", () => {
+    expect(ids(filterMatches(all, { stuck: false, group: null, week: 2, status: null }))).toEqual([2, 3, 5]);
+    expect(filterMatches(all, { stuck: false, group: null, week: 2, status: null }).stuckCount).toBe(2);
+    expect(ids(filterMatches(all, { stuck: false, group: 1, week: 1, status: null }))).toEqual([1]);
+    expect(ids(filterMatches(all, { stuck: true, group: 2, week: 2, status: null }))).toEqual([5]);
+    expect(filterMatches(all, { stuck: false, group: null, week: 3, status: null })).toEqual({ shown: [], stuckCount: 0 });
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LEAVE_REASONS, movement, originText, shownPhase, waitingText } from "./round-switch";
+import { LEAVE_REASONS, movement, originText, previewText, shownPhase, undecidedText, waitingText } from "./round-switch";
 
 describe("movement and originText (#35: the draft shows where each pair comes from)", () => {
   it("tells up, down, stay and new", () => {
@@ -56,5 +56,19 @@ describe("shownPhase (#35: which round Csoportok shows)", () => {
   it("follows the round asked for, if the season has it", () => {
     expect(shownPhase(phases, [{ phase: 1, published: true }], 1, after)).toBe(1);
     expect(shownPhase(phases, [{ phase: 1, published: true }], 7, after)).toBe(2);
+  });
+});
+
+describe("the next round's preview wording (#363)", () => {
+  it("names both rounds and says it is provisional", () => {
+    expect(previewText(2, 1)).toBe(
+      "A 2. kör csoportjai, ha az 1. kör most érne véget: a le nem játszott meccsek azzal az eredménnyel számítanak, amit most a határidő adna nekik. Minden eredménnyel változik a határidőig; az igazi tervezet a határidő utáni reggel készül el.",
+    );
+    expect(previewText(6, 5).startsWith("A 6. kör csoportjai, ha az 5. kör")).toBe(true);
+  });
+
+  it("counts the undecided matches", () => {
+    expect(undecidedText(0)).toBe("Minden meccs eldőlt.");
+    expect(undecidedText(7)).toBe("7 meccs még nem dőlt el, ezek eredménye még változtathat rajta.");
   });
 });

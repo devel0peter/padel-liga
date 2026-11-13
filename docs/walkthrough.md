@@ -20,6 +20,8 @@ The page labels below are the Hungarian ones you see on screen.
 | 15 | [`11-open-signup.spec.ts`](../app/e2e/11-open-signup.spec.ts) |
 | 15, the second league's player (#331) | [`28-league-members.spec.ts`](../app/e2e/28-league-members.spec.ts) |
 | 37, Párod and Korábbi párjaid on Profil (D141, D142) | [`30-pair-in-profile.spec.ts`](../app/e2e/30-pair-in-profile.spec.ts) |
+| 33b, 33c, the Admin's player profile and email log (D156, D157) | [`33-player-profile.spec.ts`](../app/e2e/33-player-profile.spec.ts) |
+| 40, the deadline projection and the next round's preview (D162, D163) | [`36-deadline-projection.spec.ts`](../app/e2e/36-deadline-projection.spec.ts) |
 
 ## Set up
 
@@ -119,7 +121,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Account: `admin@example.test`
 - Expect:
   - You land on Kezdőlap with a "Teszt szezon" card (league Padelpárbaj Mintaváros): "Nevezés" dates, the four rounds with their deadlines, "Szezon vége:".
-  - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Párkeresők, Klubok.
+  - The sidebar shows "Platform" with the tag Admin, and a league section "Padelpárbaj Mintaváros" with the tag Szervező: Áttekintés, Szezonok, Játékosok, Párok, Klubok. Hovering Játékosok, Párok or Felhasználók says in one line what the page lists.
   - No "Nevezünk" button: the Admin has no pair, so the card says "Nevezni párban lehet, és még nincs párod." with the link "Párod a Profilban".
 
 ### 2. Admin checks the setup pages
@@ -167,7 +169,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - Párod shows "Mostantól párban vagytok." and the partner's name, email and phone; the first partner sees the same after a reload.
   - A "Nevezés" card with the "Teszt szezon" and a "Nevezünk" button.
-- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" in Párod (Profil), and the Szervező pairs them on Párkeresők (`/admin/leagues/minta/solos`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
+- Varga Dóra and Kiss Miklós have nobody: each switches on "Párt keresek" in Párod (Profil), and the Szervező pairs them on Játékosok (`/admin/leagues/minta/players?filter=seeking`, "Párba teszem", as in step 13). They get the in-app message "Párt találtunk neked" and the "Van párod" email.
 
 ### 7. A pair enters the season
 
@@ -213,6 +215,7 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 - Expect:
   - The terminal prints one email per player: the group, the opponents' names per week (or the rest week), the deadline and a link. No email address of another player is in any of them.
   - The groups are locked: no select, no "Újragenerálás". The "1. kör" link on Szezonok now reads "Közzétéve", and the season can't be edited or deleted.
+  - Szezonok shows "1. kör meghosszabbítása" under the season's rounds until round 1's deadline (#356, D151). It asks for a new deadline (1–4 Sundays later) and shows the old and new deadline and how many weeks later rounds 2–4 start. Don't confirm it here; if you do, every player of the round gets a notice and an email ("Meghosszabbítottuk az 1. kört") and the rounds move.
   - A pair in a published group can't be dissolved or changed ("Felbontás" and "Partner cseréje" on Párok are disabled, with the reason, until the round's deadline).
   - A pair entering after publishing joins round 2 (to see it, keep one pair out of step 7 until now, then let it enter: "Beneveztetek: a 2. körtől játszotok.").
 
@@ -225,13 +228,14 @@ Steps 1 to 12 and 17 to 19 are the main line. Steps 13 to 16 are side paths you 
 ### 13. Szervező pairs two who look for a partner (side path)
 
 - Before: Pál Boglárka and Sándor Ákos register as in step 5 and switch on "Párt keresek" in Párod (Profil) (off by default, #333).
-- Page: `/admin/leagues/minta/solos` ("Párkeresők")
+- Page: `/admin/leagues/minta/players` ("Játékosok", #301); the old `/admin/leagues/minta/solos` opens it with "Párt keres".
 - Account: `szervezo@example.test`
-- Expect: "2 regisztrált játékos keres párt, 1 párt hoztál össze": the two under "Regisztráltak", by level, with their phone numbers. No "Még nem regisztráltak" part and no address. Idegen Ilona, who looks for a partner in Példaváros, is not listed.
-- Do: tick both, press "Párba teszem (2/2)", confirm.
+- Expect: every registered player of Mintaváros once, with level, phone, pair, entry and what's missing; "Párt keres (2)": the two, by level, each with "Párt keres: <date> óta" and the phone number. No address. Idegen Ilona, who looks for a partner in Példaváros, is not listed. The names are plain text for the Szervező.
+- Do: under "Párt keres", tick both, press "Párba teszem (2/2)", confirm.
 - Expect:
-  - "0 regisztrált játékos keres párt, 2 párt hoztál össze"; the pair is under "Összehozott párok" and can be dissolved on Párok.
+  - "Párt keres (0)"; on Párok the pair reads "párkeresésből" and can be dissolved there.
   - Both get the in-app message "Párt találtunk neked" and the "Van párod" email; Párod shows the partner.
+  - The other filters: "Nincs párja", "Van párja", "Nevezett", "Nem nevezett", "Hiányzó adat", each with its count; the name search finds a player by their own or their partner's name.
 
 ### 14. Szervező changes pairs (side path)
 
@@ -239,7 +243,7 @@ Players can't invite a partner or dissolve a pair themselves: the Szervező does
 
 - Page: `/admin/leagues/minta/pairs` ("Párok")
 - Account: `szervezo@example.test`
-- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("kézzel", "linkkel", "Párkeresők"; "jelentkezésből" on pairs from before #333), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
+- Expect: every pair of the league with both names and levels, the average starting Elo, the source ("kézzel", "linkkel", "párkeresésből"; "jelentkezésből" on pairs from before #333). Only pairs: the players without a pair are on Játékosok (`?entry=no_pair` opens it), "Aktív" or "Felbontva", and the entry status in the current season. No email address anywhere.
 - Expect, between the intro text and the filter: nothing (no counts table, #298). The filter options show their counts.
 - Expect, at 390px (#278): each pair is a card with both names, Elo, source, state, entry and its buttons; nothing is cut and nothing scrolls sideways. At desktop width it is the table.
 - Do:
@@ -269,7 +273,7 @@ Anyone can create an account, no invite needed (#113). Logging in on `/register`
   - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párod says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
   - After "Csatlakozom": the card is gone; Kezdőlap and Párod show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párod also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
-  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Párok lists only her, and Mintaváros's Párok, Párkeresők and Helyettes pick never list her.
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok, Játékosok and Helyettes pick never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
@@ -336,6 +340,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Do: open Profil; open the "i" next to "Élő-pont"; on "Beállításaim" (`/profile?tab=settings`), as the second player, change "Szinted" and press "Mentés".
 - Expect:
   - Profil has two tabs (D136): "Játékosprofil" (default: the summary Élő-pont, Szezon, Kör, Meccs, Győzelem, Vereség; then Meccsek and Párod once in a published group) and "Beállításaim" (Adataid, Fiók, Értesítések, Fiók törlése).
+  - Értesítések has, under the push switch, "Miről kérsz push értesítést?" with five topic switches, all on (D159): Időpont-egyeztetés, Emlékeztetők, Eredmények, Csoport és szezon, Mulasztások. With the push switch off they are disabled, with the line "… akkor számítanak, ha bekapcsolod", and keep their values when push is switched back on.
   - On "Beállításaim" the player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
   - Both see the Élő-pont with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
@@ -366,6 +371,7 @@ The ladder (decision log (`docs/decisions.md`), 2026-11-02, #30), for logged-in 
   - After steps 27 and 28, the same page shows the results: "Lejátszva: …" or "Döntés: …" with score and winner (not stuck), and "Napló és telefonszámok" lists the result steps and the decision. A result waiting for confirmation or disputed is stuck ("Elakadt: az eredmény megerősítésre vár", "Elakadt: vitatott eredmény, dönts róla").
   - "Napló és telefonszámok" opens the match: status, both pairs with "Lépett" / "Még nem lépett" and their four phone numbers (tap to call), and "Napló" with every step: time, player, pair, what.
   - A player opening `/admin/leagues/minta/matches` gets "Ehhez nincs jogod" (403).
+  - The group, week and status selects narrow the list; "A kör állása" on top is step 38.
 
 ### 24. The booking pair records the venue; a pair cancels, in time and late
 
@@ -447,7 +453,7 @@ On a deletion request the Admin removes the account (#152, decision log (`docs/d
 - Account: `admin@example.test`
 - Do: "Törlés" on the player of step 15 (`uj.jatekos@example.test`; skip step 16, or their link pair goes with them), read the dialog, press "Törlés".
 - Expect:
-  - The dialog names the account and its address and says everything goes, because it has no history. "A fiók törölve." shows and the row is gone; the account isn't in Párok, Párkeresők or any count either, and logging in with the address starts a new registration.
+  - The dialog names the account and its address and says everything goes, because it has no history. "A fiók törölve." shows and the row is gone; the account isn't in Párok, Játékosok or any count either, and its profile (`/admin/users/<id>`) is gone (404), and logging in with the address starts a new registration.
   - "Törlés" on a player whose pair is in a published group (after step 11): the dialog says it can't be deleted until the pair is withdrawn, with no delete button. On your own row: "A saját fiókodat itt nem törölheted."
   - Nothing new in the terminal or on Kimenő levelek.
   - A Szervező has no Felhasználók page at all.
@@ -508,6 +514,29 @@ The league's players and pairs by Élő-pont (decision log (`docs/decisions.md`)
   - "Párok" (`?view=pairs`) lists the pairs with the pair's Élő-pont, its players' average; the player's pair says "(ti)".
   - No email address or phone number on the page.
 
+### 33b. Admin opens and fixes a player's profile (side path)
+
+Every player's name on the admin pages opens their profile for the Admin (#301, decision log (`docs/decisions.md`) D156).
+
+- Page: `/admin/leagues/minta/players`, then a name
+- Account: `admin@example.test`
+- Expect: `/admin/users/<id>` with the name as title and "Felhasználók" above it; "Adatok": email, phone (tap to call), level ("lezárult" once they played), sex, role, login method, registration, last login, the status chips; "Ligák": the pair with "Benevezés"/"Kivétel a szezonból", "Partner cseréje" and "Felbontás" (as on Párok), or "Nincs párja" with the "Párt keres" switch and "Párba teszem"; "Párok és nevezések": every pair with its dates and entries; "Levelek": every email made for them (step 33c); "Napló": the entries about them, newest first.
+- Do: "Adatok módosítása", fix the name, "Mentés".
+- Expect: the new name in the title; Napló reads "Játékos adatainak módosítása: … Módosítva: név", without the value. A locked level shows as text in the dialog. Emptying a phone number that is there: "A telefonszámot nem törölheted, csak javíthatod." No email or notification to the player.
+- Do: "Levél neki".
+- Expect: the broadcast page with that one player as the recipient.
+- As `szervezo@example.test`: the names on Játékosok and Párok are plain text; `/admin/users/<id>` shows "Ehhez nincs jogod".
+
+### 33c. Admin reads a player's email log (side path, after step 11)
+
+Which emails a player got, when, and what became of them (#242, decision log (`docs/decisions.md`) D157).
+
+- Page: a player's profile (`/admin/users/<id>`, step 33b), section "Levelek"
+- Account: `admin@example.test`
+- Expect: every email made for the address, newest first: the kind as on Kimenő levelek (e.g. "Belépőkód", "Kihirdetett csoportok"), the subject, when it was made and when it went out, and the state. Locally every email went to the console: "Elküldve", "Konzol (fejlesztés)". In production an email through the Google relay reads "Elküldve" with "A Google-relé nem jelzi vissza a kézbesítést."; one through Resend turns "Kézbesítve" (or "Visszapattant", "Spamnek jelölte") when Resend reports it. A failed one shows the reason with addresses hidden. No other person's address anywhere.
+- Expect, for a blocked address: a line at the top, "Letiltott cím: …, <date> óta."
+- As `szervezo@example.test`: the profile, so the log too, is "Ehhez nincs jogod".
+
 ### 34. A player gets strikes; the Szervező cancels one (side path)
 
 The deadline resolution (#11) gives strikes from the cron at 06:00 the morning after a phase's deadline, which local dev doesn't run on its own; the unit tests and `app/e2e/24-strikes.spec.ts` cover it. To see the pages, add strikes by hand to the local D1 for a player in a published group (decision log (`docs/decisions.md`) D103, D103a):
@@ -560,6 +589,51 @@ The pair is a section of Profil, and Profil lists the pairs that ended (decision
   - Neither the sidebar nor the bottom bar has Párom; Profil stays.
   - A player in two leagues sees one card per league under "Párod", each named after its league.
   - "Korábbi párjaid" is under Párod only once a pair of the player ended after playing in a published group (a Szervező's dissolve or partner change between rounds, or a partner's account deletion; the seed has none): the former partner (a link to the pair's page; "Törölt játékos" without a link for a deleted account), the league, the seasons and rounds ("Teszt szezon, 1. kör"), "Felbontva" or "Partnercsere" and the day it ended ("2026. 11. 30."), the newest first. No email address or phone number of a former partner.
+
+### 38. The Szervező sees how the round stands (after step 23)
+
+"A kör állása" on top of Meccsek, and one line on the league's Áttekintés (decision log (`docs/decisions.md`) D153, D154; `app/e2e/32-round-status.spec.ts`). Best seen on the running round seed below.
+
+- Page: `/admin/leagues/minta` (Áttekintés), then `/admin/leagues/minta/matches`
+- Account: the Szervező (or the Admin)
+- Do: click the "A futó kör" line; click a status tile, a week and a group.
+- Expect:
+  - Áttekintés: "A futó kör" with "Teszt szezon, 1. kör: Lejátszva <n>/<total> (<p>%) · még <d> nap · Jó ütemben" (or "Lemaradás", "Még korai becsülni"); it opens Meccsek at "A kör állása".
+  - "A kör állása": played and "Fixálva vagy lejátszva" out of the total, the deadline with "még <d> nap"; the verdict ("Még korai becsülni." before the round's 4th day or while nothing is played) and "naponta X meccs kellene, eddig Y/nap"; the seven status tiles adding up to the list below, "Elakadt" and "Nem számít (visszalépés)" (step 21's withdrawn pair) beside them.
+  - "Napról napra": the lines Hátralévő meccsek, Még nincs fix időpont, Ideális and, from the 4th day with a played match, a dashed Előrejelzés to the deadline; "1. hét", "2. hét", "3. hét" on the axis. Before the round's first day only the ideal line is drawn, with "A kör még nem kezdődött el: a vonalak az első napjától töltődnek." At 390px the legend wraps under the chart.
+  - "Hetente" (played/total, not fixed) and "Csoportonként" (played/total, "lemaradt" more than 25 points behind the ideal line). A tile, a week or a group opens the list below filtered (`?status=`, `?week=`, `?group=`).
+  - On the running round seed (today in week 2): Lejátszva 4/15, "Fixálva vagy lejátszva" 8/15, Egyeztetésre vár 3, Ajánlat 3, Megbeszélt időpont 1, Lefixálva 2, Eredmény 1, Vitatott 1, Lejátszva 4, Elakadt 2; week 1 4/5, week 2 0/5 (2 not fixed), week 3 0/5.
+  - A player gets 403 on both pages.
+
+### 39. Anyone sends feedback; the Admin reads it on Visszajelzések (side path)
+
+The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decision log (`docs/decisions.md`) D94; `app/e2e/37-feedback.spec.ts`).
+
+- Page: any logged-in page, then "Visszajelzés" at the bottom of the sidebar; logged out, "Visszajelzés" in the footer of `/`, `/rules` or `/privacy`
+- Account: any player, or none
+- Expect: `/feedback?from=<the page>`: "Miről szól?" (Hiba / Ötlet / Egyéb), "Üzenet" (at most 2000 characters), the warning about passwords and other people's data, and "Ezt küldjük el veled:" with the page (path only: no query string, ids as `:id`), the time, the device ("mobil" or "számítógép"), the browser, the version and, logged in, the account's name. Under the button: "E-mailben nem válaszolunk" with the contact address. Logged out, the Turnstile check above the button (locally with the test keys from `.dev.vars.example` it always passes).
+- Do: pick "Hiba", write a line, "Küldés".
+- Expect: "Köszi, megkaptuk!" in place of the form and "Vissza oda, ahonnan jöttél", which opens the page you came from. No email in the terminal, no notification. An empty message, a failed bot check or the limit (an account 5 an hour and 20 a day, visitors together 30 an hour) gives a short error and keeps the text.
+- Then, as `admin@example.test`: Platform > "Visszajelzések" (`/admin/feedback`).
+- Expect: every message, newest first: the type, "Kész" when done, the time, the first words and the sender's name ("Vendég" for a visitor), never an email or phone number. "Típus" (Mind / Hiba / Ötlet / Egyéb / Értékelés) and "Állapot" (Mind / Nyitott / Kész) with their counts, in the address (`?type=`, `?state=`). At 390px the rows stack.
+- Do: open a message, "Kész", then "Újranyitom".
+- Expect: the full text, the stars for a rating, the sender, time, page, device, browser and version; after "Kész" the badge and "Kész: <time>, Admin", after "Újranyitom" "Újranyitva: <time>, Admin". Both in Napló ("Visszajelzés kész", "Visszajelzés újranyitása").
+- As `szervezo@example.test` or a player: no "Visszajelzések" in the sidebar, and `/admin/feedback` shows "Ehhez nincs jogod".
+
+### 40. The Szervező sees what the deadline would decide, and the next round's groups (after step 11)
+
+"Ha most lenne a határidő" on Meccsek and "Előzetes beosztás: ha most érne véget a kör" on Csoportok (decision log (`docs/decisions.md`) D162, D163; `app/e2e/36-deadline-projection.spec.ts`). Best seen on the running round seed below. Read only: nothing is stored or sent.
+
+- Page: `/admin/leagues/minta/matches`, then the season's Csoportok (`/admin/leagues/minta/seasons/<id>/groups`)
+- Account: the Szervező (or the Admin)
+- Do: click a tile of "Ha most lenne a határidő"; pick a value in the "Határidő most" select; open Csoportok.
+- Expect:
+  - Below "A kör állása": "Ezt döntené a rendszer a még le nem játszott meccsekről, ha a határidő (<the round's deadline, an extended one too>) most lenne." and that it changes until the deadline and can still be overridden. Five tiles: Játék nélküli győzelem, Mindkét pár veszít, Elmarad, Nem dönt róla a határidő, Már lejátszva vagy eldöntve, adding up to the list below; a tile opens the list filtered (`?deadline=`).
+  - Each match not final has one line: "Ha most lenne a határidő: Játék nélküli győzelem: <pár> (4:0, 4:0)" (or "Mindkét pár vereséget kap", "Elmaradt"), or "Nem dönt róla a határidő: …" for a result waiting for confirmation, a dispute or a waiting no-show report. A withdrawn pair's matches are not listed.
+  - "Fekete pontok": how many the deadline would give; "2. fekete pont (figyelmeztető e-mail)" names each player (and pair) reaching 2 with "<now> → <after>"; "Kiesnének a körváltáskor (3. fekete pont)" names the pairs where either player reaches 3. Names only.
+  - Csoportok, on the running round's page: below its groups, "Előzetes beosztás: ha most érne véget a kör" with the next round's groups, each pair with its group and place now and an arrow up, down or level ("Új pár" for a new one), the pairs that would leave and why, and "<n> meccs még nem dőlt el". No select, no button. Not shown in the season's last round or once the real draft exists.
+  - Right after step 11 (nothing played): every match "Mindkét pár veszít", every player "0 → 2" in the 2nd strike list, nobody leaving; the preview swaps the 1st of group 2 with the last of group 1.
+  - A player gets 403.
 
 ## A running round instead
 

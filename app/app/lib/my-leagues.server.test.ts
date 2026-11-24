@@ -12,7 +12,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { myLeagueCards, myLeaguesAction } = await import("~/lib/my-leagues.server");
+const { myLeagueCard, myLeagueCards, myLeaguesAction } = await import("~/lib/my-leagues.server");
 const { ladderPage, pairIdsOf } = await import("~/lib/ladder.server");
 const { leagueSummary, ownPlace } = await import("~/lib/my-leagues");
 
@@ -113,7 +113,7 @@ describe("myLeagueCards", () => {
       round: { kind: "running", round: 1, from: "nov. 9.", to: "dec. 6.", deadline: "dec. 6., vasárnap 23:59" },
       pair: { partner: "Játékos 1011B" },
       // 1011: a win and a played loss, 4 points; 1013 one win, 3 (spec 9).
-      place: { group: 1, rank: 1 },
+      place: { round: 1, group: 1, rank: 1 },
       joins: null,
       summary: { round: 1, pairs: 6, groups: 2, played: 2, total: 6 },
       own: { matches: 2, wins: 1, elo: expect.any(Number) },
@@ -130,15 +130,15 @@ describe("myLeagueCards", () => {
     const page = await ladderPage("gyor", IN_ROUND_1, await pairIdsOf("u1022b"));
     if (page?.kind !== "ladder") throw new Error("no ladder");
     expect(card!.summary).toEqual(leagueSummary(page.phase, page.bands));
-    expect(card!.place).toEqual(ownPlace(page.bands));
+    expect(card!.place).toEqual(ownPlace(page.phase, page.bands));
     // A pair withdrawn mid-round is out, as in the Tabella's tables (#34).
     expect(card!.summary).toMatchObject({ pairs: 5, groups: 2, played: 1 });
-    expect(card!.place).toEqual({ group: 2, rank: 3 });
+    expect(card!.place).toEqual({ round: 1, group: 2, rank: 3 });
   });
 
   it("before any final result in the group: the group without a place (D85)", async () => {
     const [card] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
-    expect(card!.place).toEqual({ group: 1, rank: null });
+    expect(card!.place).toEqual({ round: 1, group: 1, rank: null });
     expect(card!.own).toMatchObject({ matches: 0, wins: 0 });
   });
 
@@ -185,6 +185,9 @@ describe("myLeagueCards", () => {
     expect(await myLeagueCards(asUser("u1011a"), IN_ROUND_1, "deb")).toEqual([]);
     expect(await myLeagueCards(asUser("u1011a"), IN_ROUND_1, "nincs-ilyen")).toEqual([]);
     expect(await myLeagueCards(asUser("u1011a"), IN_ROUND_1, "gyor")).toHaveLength(1);
+    // /leagues/<slug>: the same card, or null (404); one league, no way back to several.
+    expect(await myLeagueCard(asUser("u1011a"), "deb", IN_ROUND_1)).toBeNull();
+    expect(await myLeagueCard(asUser("u1011a"), "gyor", IN_ROUND_1)).toMatchObject({ card: { league: { slug: "gyor" } }, several: false });
   });
 
   it("one card per league, the newest season first", async () => {
@@ -197,6 +200,7 @@ describe("myLeagueCards", () => {
     h.raw.exec("insert into league_members (league_id, user_id, source) values (2, 'u1011a', 'chosen')");
     const cards = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
     expect(cards.map((c) => c.league.slug)).toEqual(["deb", "gyor"]);
+    expect(await myLeagueCard(asUser("u1011a"), "gyor", IN_ROUND_1)).toMatchObject({ several: true });
     expect(cards[0]).toMatchObject({ pair: null, round: { kind: "next", round: 1 }, summary: null });
   });
 

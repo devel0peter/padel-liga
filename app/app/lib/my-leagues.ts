@@ -66,21 +66,30 @@ export function leagueSummary(round: number, bands: readonly LadderBand[]): Leag
   };
 }
 
-/** The viewer's group in the Tabella's round, and its place there; `rank` null before any final result (D85). */
-export type OwnPlace = { group: number; rank: number | null };
+/** The viewer's group in the Tabella's round (`round`), and its place there; `rank` null before any final result (D85). */
+export type OwnPlace = { round: number; group: number; rank: number | null };
 
-export function ownPlace(bands: readonly LadderBand[]): OwnPlace | null {
+export function ownPlace(round: number, bands: readonly LadderBand[]): OwnPlace | null {
   for (const band of bands)
     for (const group of band.groups) {
       if (!group.mine) continue;
       const row = group.rows.find((r) => r.mine);
-      return { group: group.number, rank: group.ranked && row ? row.rank : null };
+      return { round, group: group.number, rank: group.ranked && row ? row.rank : null };
     }
   return null;
 }
 
-/** "A 3. csoportban vagytok, most 2. helyen"; before any final result only the group. */
-export function placeText(p: OwnPlace): string {
+/**
+ * "A 3. csoportban vagytok, most 2. helyen"; before any final result only
+ * the group. `running`: the round being played; when it is a later one than
+ * the place's (its groups not out yet), the place is the earlier round's:
+ * "Az 1. körben a 3. csoportban voltatok, 2. helyen".
+ */
+export function placeText(p: OwnPlace, running: number | null = null): string {
+  if (running !== null && running !== p.round) {
+    const group = `${capitalize(withArticle(p.round))} körben ${withArticle(p.group)} csoportban voltatok`;
+    return p.rank === null ? group : `${group}, ${p.rank}. helyen`;
+  }
   const group = `${capitalize(withArticle(p.group))} csoportban vagytok`;
   return p.rank === null ? group : `${group}, most ${p.rank}. helyen`;
 }

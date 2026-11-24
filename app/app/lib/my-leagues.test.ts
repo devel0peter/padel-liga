@@ -87,20 +87,27 @@ describe("leagueSummary", () => {
 describe("ownPlace and placeText", () => {
   it("the viewer's group and place", () => {
     const bands = [band([group(1, [row(1, 1), row(2, 2)], []), group(3, [row(8, 1), row(9, 2, true)], [])])];
-    const place = ownPlace(bands)!;
-    expect(place).toEqual({ group: 3, rank: 2 });
+    const place = ownPlace(1, bands)!;
+    expect(place).toEqual({ round: 1, group: 3, rank: 2 });
     expect(placeText(place)).toBe("A 3. csoportban vagytok, most 2. helyen");
+    expect(placeText(place, 1)).toBe("A 3. csoportban vagytok, most 2. helyen");
   });
 
   it("before any final result only the group: the order is the seeding (D85)", () => {
-    const place = ownPlace([band([group(1, [row(1, 1, true), row(2, 2)], [], false)])])!;
-    expect(place).toEqual({ group: 1, rank: null });
+    const place = ownPlace(1, [band([group(1, [row(1, 1, true), row(2, 2)], [], false)])])!;
+    expect(place).toEqual({ round: 1, group: 1, rank: null });
     expect(placeText(place)).toBe("Az 1. csoportban vagytok");
   });
 
+  it("a later round runs before its groups are out: the place is the earlier round's, in the past", () => {
+    const place = ownPlace(1, [band([group(3, [row(8, 1), row(9, 2, true)], [])])])!;
+    expect(placeText(place, 2)).toBe("Az 1. körben a 3. csoportban voltatok, 2. helyen");
+    expect(placeText({ round: 2, group: 1, rank: null }, 3)).toBe("A 2. körben az 1. csoportban voltatok");
+  });
+
   it("not in any group: null", () => {
-    expect(ownPlace([band([group(1, [row(1, 1), row(2, 2)], [])])])).toBeNull();
-    expect(ownPlace([])).toBeNull();
+    expect(ownPlace(1, [band([group(1, [row(1, 1), row(2, 2)], [])])])).toBeNull();
+    expect(ownPlace(1, [])).toBeNull();
   });
 });
 

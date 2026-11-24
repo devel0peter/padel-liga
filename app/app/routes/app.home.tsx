@@ -7,7 +7,7 @@ import { GroupStanding, NextMatch, Todos, todos } from "~/components/my-group";
 import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
-import { enteredNotice, SeasonEntry } from "~/components/season-entry";
+import { SeasonEntry } from "~/components/season-entry";
 import { TipCard } from "~/components/tip-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
@@ -15,13 +15,14 @@ import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "~/lib/format";
 import { LEAGUE_PARAM, parseLeagueParam } from "~/lib/league-members";
-import { chooseLeague, leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
+import { leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
 import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { partnerSearchState } from "~/lib/partner-search.server";
 import { homeSeasons, isWaiting, waitingText } from "~/lib/seasons";
-import { applyToSeason, entryCounts, entryViews } from "~/lib/season-entries.server";
+import { entryCounts, entryViews } from "~/lib/season-entries.server";
+import { myLeaguesAction, type MyLeaguesActionData } from "~/lib/my-leagues.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { withArticle } from "~/lib/groups";
 import { SITE_NAME } from "~/lib/site";
@@ -116,23 +117,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 // "Nevezünk" on a season card, "Csatlakozom" (#331), and a tip's "Most
 // nem" (#262). `season` 0: not about a season card.
-export async function action({ request }: Route.ActionArgs): Promise<{ season: number; error?: string; notice?: string; ok?: true }> {
+export async function action({ request }: Route.ActionArgs): Promise<MyLeaguesActionData> {
   const user = await requireUser(request);
   const form = await request.formData();
   if (form.get("intent") === "dismiss_tip") {
     if (!(await dismissTip(user.id, String(form.get("tip") ?? "")))) throw new Response("Hibás kérés.", { status: 400 });
     return { season: 0, ok: true };
   }
-  // "Csatlakozom" on "Melyik ligában játszol?" (#331), audited.
-  if (form.get("intent") === "join_league") {
-    if (!(await chooseLeague(user.id, Number(form.get("league"))))) throw new Response("Hibás kérés.", { status: 400 });
-    return { season: 0, ok: true };
-  }
-  const season = Number(form.get("season") || 0);
-  if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0)
-    throw new Response("Hibás kérés.", { status: 400 });
-  const result = await applyToSeason(user, season);
-  return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
+  // "Csatlakozom" (#331, audited) and "Nevezünk": the same as on Ligáim (#394).
+  return myLeaguesAction(user, form);
 }
 
 // The player's strikes in the season (#294, spec 8): the count, what the 3rd

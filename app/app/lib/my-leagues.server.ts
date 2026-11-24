@@ -9,7 +9,7 @@ import { pairs, users } from "~/db/schema";
 import type { User } from "./auth/session.server";
 import { listedCities } from "./cities.server";
 import { ladderPage, pairIdsOf } from "./ladder.server";
-import { chooseLeague, playerLeagues } from "./league-members.server";
+import { chooseLeague, playerLeagues, type ListedLeague } from "./league-members.server";
 import { minEntriesByLeague } from "./leagues.server";
 import {
   leagueSummary,
@@ -74,7 +74,24 @@ function joinsOf(season: Season, entry: EntryView | null, now: Date): MyLeagueCa
 
 /** The player's league cards, newest season first; `only`: one league's slug. */
 export async function myLeagueCards(user: User, now = new Date(), only?: string): Promise<MyLeagueCard[]> {
-  const leagues = (await playerLeagues(user.id)).filter((l) => !only || l.slug === only);
+  return cardsFor(user, (await playerLeagues(user.id)).filter((l) => !only || l.slug === only), now);
+}
+
+/**
+ * One league's card (`/leagues/<slug>`), null when the player doesn't belong
+ * to it; `several`: the player has more leagues (the way back to all).
+ */
+export async function myLeagueCard(user: User, slug: string, now = new Date()): Promise<{ card: MyLeagueCard; several: boolean } | null> {
+  const leagues = await playerLeagues(user.id);
+  const [card] = await cardsFor(
+    user,
+    leagues.filter((l) => l.slug === slug),
+    now,
+  );
+  return card ? { card, several: leagues.length > 1 } : null;
+}
+
+async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise<MyLeagueCard[]> {
   if (leagues.length === 0) return [];
   const ids = leagues.map((l) => l.id);
   const [cities, allSeasons, mine, partnerNames] = await Promise.all([
@@ -105,7 +122,7 @@ export async function myLeagueCards(user: User, now = new Date(), only?: string)
     // The Tabella's own page: its round, its groups and our place there.
     const ladder = season ? await ladderPage(league.slug, now, mine) : null;
     const bands = ladder?.kind === "ladder" ? ladder.bands : [];
-    const place = ownPlace(bands);
+    const place = ladder?.kind === "ladder" ? ownPlace(ladder.phase, bands) : null;
     const entry = season ? (views.get(season.id) ?? null) : null;
     const record = season ? records.get(season.id) : undefined;
     cards.push({

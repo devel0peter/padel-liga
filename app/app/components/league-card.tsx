@@ -79,7 +79,7 @@ export function PlaceSection({ card, actionData }: SectionProps) {
   return (
     <CardSection title="Helyetek">
       {card.place ? (
-        <p className="font-medium">{placeText(card.place)}</p>
+        <p className="font-medium">{placeText(card.place, card.round.kind === "running" ? card.round.round : null)}</p>
       ) : card.joins ? (
         <p className="font-medium">{startsText(card.joins.round, card.joins.startsAt ? new Date(card.joins.startsAt) : null)}</p>
       ) : entry?.kind === "status" ? null : (

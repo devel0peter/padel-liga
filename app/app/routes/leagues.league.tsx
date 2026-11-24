@@ -2,8 +2,7 @@ import type { Route } from "./+types/leagues.league";
 import { AppPage } from "~/components/app-page";
 import { LeagueCard } from "~/components/league-card";
 import { requireUser } from "~/lib/auth/session.server";
-import { playerLeagues } from "~/lib/league-members.server";
-import { myLeagueCards, myLeaguesAction } from "~/lib/my-leagues.server";
+import { myLeagueCard, myLeaguesAction } from "~/lib/my-leagues.server";
 import { SITE_NAME } from "~/lib/site";
 
 // One league's card on Ligáim (#394): /leagues/<league slug>, the slug as on
@@ -12,10 +11,10 @@ import { SITE_NAME } from "~/lib/site";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request);
-  const [card] = await myLeagueCards(user, new Date(), params.league);
-  if (!card) throw new Response("Nincs ilyen liga.", { status: 404 });
-  // With several leagues, the way back to all of them.
-  return { card, several: (await playerLeagues(user.id)).length > 1 };
+  // With several leagues, `several` gives the way back to all of them.
+  const found = await myLeagueCard(user, params.league);
+  if (!found) throw new Response("Nincs ilyen liga.", { status: 404 });
+  return found;
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {

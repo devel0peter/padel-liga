@@ -123,6 +123,8 @@ export type PartnerFinder =
   | { kind: "paired" }
   | {
       kind: "single";
+      /** For the switch-on button, which posts to Profil's action. */
+      leagueId: number;
       /** The viewer's own switch; only `listed` makes them a seeker the others see (D177). */
       search: SearchState;
       /** The other listed seekers, newest first; with phone and email only when `search.listed`. */
@@ -168,6 +170,7 @@ export async function partnerFinder(user: Pick<User, "id" | "consentAt">, league
     : await db.select(base).from(users).innerJoin(partnerSearches, listedSeekers).where(who);
   return {
     kind: "single",
+    leagueId,
     search,
     seekers: finderEntries(rows, { id: user.id, listed: search.listed }, now),
     link: pairLinkPath(await pairLinkFor(user.id, leagueId)),

@@ -1,5 +1,6 @@
 import { budapestDay, daysBetween } from "@padel-liga/rules";
 
+import { dialable } from "./matches";
 import { levelLabel } from "./signups-admin";
 
 // "Párt keresek" (decision log, 2026-11-02, D59): a registered player without
@@ -11,13 +12,17 @@ import { levelLabel } from "./signups-admin";
 // The switch on Kezdőlap and Párod, while the player has no pair in the league.
 export const PARTNER_SEARCH_TITLE = "Párt keresel?";
 export const PARTNER_SEARCH_LABEL = "Párt keresek";
-// What the switch shares, and with whom (#398, requirement 7).
-const SHARED = "a szervező és a liga többi párkeresője látja a neved, a szinted, a telefonszámod és az e-mail-címed";
-export const PARTNER_SEARCH_ON = `Bekapcsolva: ${SHARED}, a Párkeresőben. Bármikor kikapcsolhatod.`;
-export const PARTNER_SEARCH_OFF = `Ha bekapcsolod, ${SHARED}, így a Párkeresőben megtaláljátok egymást, a szervező pedig párba tehet valakivel. Bármikor kikapcsolhatod.`;
+// What the switch shares, and with whom (#398, requirement 7): the league's
+// players without a pair see the list too, without contact data.
+const SHARED =
+  "a szervező és a liga többi párkeresője látja a neved, a szinted, a telefonszámod és az e-mail-címed, a liga többi pár nélküli játékosa a neved és a szinted";
+export const PARTNER_SEARCH_ON = `Bekapcsolva: ${SHARED}. Bármikor kikapcsolhatod.`;
+// Over "Bekapcsolom a párkeresést": what the button shares.
+export const FINDER_SHARES = `Ha bekapcsolod, ${SHARED}. Bármikor kikapcsolhatod.`;
+export const PARTNER_SEARCH_OFF =`Kapcsold be, és megtaláljátok egymást a Párkeresőben: ${SHARED}. A szervező is párba tehet valakivel. Bármikor kikapcsolhatod.`;
 // On from before #398: the organizer sees it, the other seekers don't (D177).
 export const PARTNER_SEARCH_ORGANIZER_ONLY =
-  "Most csak a szervező látja, hogy párt keresel. Ha a liga többi párkeresője is lásson a Párkeresőben (név, szint, telefonszám, e-mail-cím), kapcsold be újra.";
+  "Most csak a szervező látja, hogy párt keresel. Ha a Párkeresőben a liga többi párkeresője is lásson (név, szint, telefonszám, e-mail-cím), kapcsold be újra:";
 
 // Párkereső, the section of the league's Ligáim card (#398).
 export const FINDER_TITLE = "Párkereső";
@@ -72,6 +77,12 @@ export type FinderEntry = {
   looking: string;
   contact: { phone: string | null; email: string } | null;
 };
+
+/** Tap to call, send an SMS or write, in the player's own apps; null without a phone. */
+export function contactLinks(contact: { phone: string | null; email: string }): { tel: string | null; sms: string | null; mailto: string } {
+  const number = contact.phone ? dialable(contact.phone) : "";
+  return { tel: number ? `tel:${number}` : null, sms: number ? `sms:${number}` : null, mailto: `mailto:${contact.email}` };
+}
 
 /** How long they have been looking, in Budapest calendar days. */
 export function lookingText(since: Date, now: Date): string {

@@ -37,7 +37,20 @@ export function SwitchOnButton({ leagueId }: { leagueId: number }) {
   );
 }
 
-export function PartnerSearchBox({ leagueId, search, finder, bare = false }: { leagueId: number; search: SearchState; finder?: string; bare?: boolean }) {
+export function PartnerSearchBox({
+  leagueId,
+  search,
+  finder,
+  bare = false,
+  inline = false,
+}: {
+  leagueId: number;
+  search: SearchState;
+  finder?: string;
+  bare?: boolean;
+  /** Párkereső's own section (#398): the switch and its text, no title. */
+  inline?: boolean;
+}) {
   const fetcher = useFetcher();
   // Shown as switched while the request runs; the player's own switch-on lists them.
   const pending = fetcher.formData?.get("seeking");
@@ -63,6 +76,14 @@ export function PartnerSearchBox({ leagueId, search, finder, bare = false }: { l
       )}
     </>
   );
+  if (inline)
+    return (
+      <div className="grid content-start gap-2">
+        {control}
+        <p className="text-muted-foreground">{text}</p>
+        {more}
+      </div>
+    );
   if (bare)
     return (
       <div className="grid content-start gap-3">

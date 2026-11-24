@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { finderEntries, finderPath, isSeeking, lookingText, searchState, type FinderRow } from "./partner-search";
+import { contactLinks, finderEntries, finderPath, isSeeking, lookingText, searchState, type FinderRow } from "./partner-search";
 
 describe("Párt keresek (D59, #333)", () => {
   it("is what the player set, and off until they switch it on", () => {
@@ -61,6 +61,15 @@ describe("Párkereső (#398)", () => {
     expect(lookingText(new Date("2026-11-20T10:00:00Z"), NOW)).toBe("4 napja keres");
     // A clock a bit ahead never gives a negative count.
     expect(lookingText(new Date("2026-11-25T10:00:00Z"), NOW)).toBe("ma óta keres");
+  });
+
+  it("contacts through the player's own apps: call, SMS, email", () => {
+    expect(contactLinks({ phone: "+36 30 123 4567", email: "a@x.hu" })).toEqual({
+      tel: "tel:+36301234567",
+      sms: "sms:+36301234567",
+      mailto: "mailto:a@x.hu",
+    });
+    expect(contactLinks({ phone: null, email: "a@x.hu" })).toEqual({ tel: null, sms: null, mailto: "mailto:a@x.hu" });
   });
 
   it("links the league's Párkereső on its Ligáim card", () => {

@@ -216,7 +216,7 @@ describe("entryView", () => {
 
   it("shows the entry's status and the organizer's note, also after the window", () => {
     const entry = { status: "rejected" as const, joinsPhase: null, note: "Tele vagyunk." };
-    expect(entryView({ ...base, entry })).toEqual({ kind: "status", status: "rejected", text: entryStatusText(entry), note: "Tele vagyunk." });
+    expect(entryView({ ...base, entry })).toEqual({ kind: "status", status: "rejected", text: entryStatusText(entry), note: "Tele vagyunk.", joinsPhase: null });
     expect(entryView({ ...base, entry, now: at("2027-01-30T12:00:00Z") })).toMatchObject({ kind: "status" });
   });
 });

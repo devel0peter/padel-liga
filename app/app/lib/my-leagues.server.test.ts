@@ -19,7 +19,7 @@ const { leagueSummary, ownPlace } = await import("~/lib/my-leagues");
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
 
-// Phases from Monday 9 Nov 2026 (Budapest, UTC+1), 21 days each.
+// Phases from Monday 9 Nov 2026 (Budapest, UTC+1), 21 days each; sets to 6 (D173).
 const STARTS = ["2026-11-08T23:00:00Z", "2026-12-06T23:00:00Z", "2027-01-03T23:00:00Z", "2027-01-24T23:00:00Z"];
 const IN_ROUND_1 = at("2026-11-24T12:00:00Z");
 
@@ -94,16 +94,16 @@ describe("myLeagueCards", () => {
   it("a player in a running round: round and deadline, partner, group and place, summary, own season", async () => {
     // Group 1: 1011 beat 1012, 1013 beat 1011; group 2: one result waiting for the other pair.
     played(1011, 1012, [
-      [4, 1],
-      [4, 2],
+      [6, 1],
+      [6, 2],
     ]);
     played(1011, 1013, [
-      [1, 4],
-      [2, 4],
+      [1, 6],
+      [2, 6],
     ]);
     played(1021, 1022, [
-      [4, 0],
-      [4, 0],
+      [6, 0],
+      [6, 0],
     ], "result_pending");
     const [card, ...rest] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
     expect(rest).toEqual([]);
@@ -122,8 +122,8 @@ describe("myLeagueCards", () => {
 
   it("the summary and the place equal the Tabella's for the same round", async () => {
     played(1021, 1023, [
-      [4, 2],
-      [4, 2],
+      [6, 2],
+      [6, 2],
     ]);
     h.raw.exec("update group_pairs set withdrawn_at = 1 where pair_id = 1012");
     const [card] = await myLeagueCards(asUser("u1022b"), IN_ROUND_1);
@@ -206,8 +206,8 @@ describe("myLeagueCards", () => {
 
   it("carries no email or phone, the partner's or anyone else's", async () => {
     played(1011, 1012, [
-      [4, 1],
-      [4, 2],
+      [6, 1],
+      [6, 2],
     ]);
     member("solo");
     for (const id of ["u1011a", "solo"]) {

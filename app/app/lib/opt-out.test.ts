@@ -11,6 +11,7 @@ import {
   optOutMessage,
   optOutRefusal,
   optOutState,
+  optOutView,
   optOutWindow,
   stayInText,
 } from "./opt-out";
@@ -102,6 +103,21 @@ describe("optOutState: what the Ligáim card shows (#395)", () => {
 
   it("nothing in the season's last round", () => {
     expect(optOutState(optOutWindow(PHASES, [4], IN_LAST), none, "me", IN_LAST, PHASES)).toBeNull();
+  });
+});
+
+describe("optOutView: the card's section (#395)", () => {
+  const window = optOutWindow(PHASES, [1], DURING)!;
+
+  it("offers 'Nem folytatom' with a confirmation while in, 'Mégis folytatom' only to the one who opted out", () => {
+    expect(optOutView({ kind: "in", window })).toEqual({
+      text: stayInText(window),
+      action: "opt_out",
+      confirm: { title: confirmTitle(window), text: confirmText(window) },
+    });
+    expect(optOutView({ kind: "out", window, mine: true })).toMatchObject({ action: "undo", confirm: null });
+    expect(optOutView({ kind: "out", window, mine: false })).toMatchObject({ action: null });
+    expect(optOutView({ kind: "left", round: 1 })).toEqual({ text: leftText(1), action: null, confirm: null });
   });
 });
 

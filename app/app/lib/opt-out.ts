@@ -95,6 +95,28 @@ export function leftText(round: number): string {
   return `${capitalize(withArticle(round))} kör után nem folytatjátok a szezont.`;
 }
 
+/**
+ * The card's section, as text for the page: the line, and the button the
+ * state offers ("Nem folytatom" with its confirmation, or "Mégis folytatom"
+ * for the one who opted out), or none.
+ */
+export type OptOutView = {
+  text: string;
+  action: "opt_out" | "undo" | null;
+  confirm: { title: string; text: string } | null;
+};
+
+export function optOutView(state: OptOutState): OptOutView {
+  switch (state.kind) {
+    case "in":
+      return { text: stayInText(state.window), action: "opt_out", confirm: { title: confirmTitle(state.window), text: confirmText(state.window) } };
+    case "out":
+      return { text: optedOutText(state.window, state.mine), action: state.mine ? "undo" : null, confirm: null };
+    case "left":
+      return { text: leftText(state.round), action: null, confirm: null };
+  }
+}
+
 /** Párok's entry state for the organizer (#395 requirement 9): "Kilép a kör végén", then that it left. */
 export function optOutEntryText(o: { round: number; ended: boolean }): string {
   return o.ended ? `Kilépett ${withArticle(o.round)} kör után` : "Kilép a kör végén";

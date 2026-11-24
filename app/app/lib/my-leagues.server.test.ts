@@ -217,6 +217,51 @@ describe("myLeagueCards", () => {
   });
 });
 
+describe("Nem folytatom on the card (#395)", () => {
+  const AFTER_ROUND_1 = at("2026-12-06T23:30:00Z");
+
+  it("says default in with the deadline, then the opt-out to both players; only the one who did can take it back", async () => {
+    const [card] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
+    expect(card!.optOut).toMatchObject({
+      text: "Benne vagytok a 2. körben (dec. 7-től). Ha nem folytatnád, jelezd dec. 6., 23:59-ig.",
+      action: "opt_out",
+      confirm: { title: "Nem folytatod a 2. körben?" },
+    });
+    expect(await myLeaguesAction(asUser("u1011a"), formOf({ intent: "opt_out", season: "1" }), IN_ROUND_1)).toEqual({ season: 1, ok: true });
+    const [mine] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
+    expect(mine!.optOut).toMatchObject({ action: "undo" });
+    const [partners] = await myLeagueCards(asUser("u1011b"), IN_ROUND_1);
+    expect(partners!.optOut).toEqual({
+      text: "A párod jelezte, hogy nem folytatja: az 1. kör után kiléptek a szezonból.",
+      action: null,
+      confirm: null,
+    });
+    expect(await myLeaguesAction(asUser("u1011b"), formOf({ intent: "undo_opt_out", season: "1" }), IN_ROUND_1)).toMatchObject({
+      season: 1,
+      error: "Ezt csak az vonhatja vissza, aki jelezte.",
+    });
+    expect(await myLeaguesAction(asUser("u1011a"), formOf({ intent: "undo_opt_out", season: "1" }), IN_ROUND_1)).toEqual({ season: 1, ok: true });
+    const [back] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
+    expect(back!.optOut).toMatchObject({ action: "opt_out" });
+  });
+
+  it("has no button after the deadline, and a forced request is refused in Hungarian", async () => {
+    const [card] = await myLeagueCards(asUser("u1011a"), AFTER_ROUND_1);
+    expect(card!.optOut).toBeNull();
+    expect(await myLeaguesAction(asUser("u1011a"), formOf({ intent: "opt_out", season: "1" }), AFTER_ROUND_1)).toEqual({
+      season: 1,
+      error: "Lejárt a kör határideje, ezt már nem tudod módosítani.",
+    });
+    await expect(myLeaguesAction(asUser("u1011a"), formOf({ intent: "opt_out", season: "99" }), IN_ROUND_1)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("has no section in the season's last round", async () => {
+    h.raw.exec("update groups set phase = 4");
+    const [card] = await myLeagueCards(asUser("u1011a"), at("2027-01-30T12:00:00Z"));
+    expect(card!.optOut).toBeNull();
+  });
+});
+
 describe("myLeaguesAction", () => {
   it("Csatlakozom joins a listed league; a bad request is 400", async () => {
     h.raw.exec("insert into users (id, email, name, level, consent_at) values ('n', 'n@titkos.example', 'Senki', 'halado', 1)");

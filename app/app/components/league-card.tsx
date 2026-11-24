@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 
+import { OptOutForm } from "~/components/opt-out-section";
 import { SeasonEntry } from "~/components/season-entry";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -158,8 +159,26 @@ export function LinksSection({ card }: SectionProps) {
   );
 }
 
+/** Default in, and "Nem folytatom" / "Mégis folytatom" until the deadline (#395); nothing when there's nothing to say. */
+export function NextRoundSection({ card }: SectionProps) {
+  if (!card.season || !card.optOut) return null;
+  return (
+    <CardSection title="Következő kör">
+      <OptOutForm seasonId={card.season.id} view={card.optOut} />
+    </CardSection>
+  );
+}
+
 /** The card's sections, in order. A later item adds its section here. */
-export const SECTIONS: React.ComponentType<SectionProps>[] = [RoundSection, PairSection, PlaceSection, SummarySection, OwnSeasonSection, LinksSection];
+export const SECTIONS: React.ComponentType<SectionProps>[] = [
+  RoundSection,
+  PairSection,
+  PlaceSection,
+  NextRoundSection,
+  SummarySection,
+  OwnSeasonSection,
+  LinksSection,
+];
 
 /** `link`: the league's own address, on the title, when the page lists several. */
 export function LeagueCard({ card, actionData, link }: SectionProps & { link?: string }) {

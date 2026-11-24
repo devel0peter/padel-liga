@@ -67,7 +67,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
+export type NavIcon = "home" | "myLeagues" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
 // `hint`: one short line under the label on what the page lists (#301: the
 // people pages say what each is for).
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string };
@@ -132,13 +132,14 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 // section with nothing in it isn't shown.
 export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
-  // First, unlabelled: the app home and the notifications, for everyone (the
-  // pair is a section of Profil, D141).
+  // First, unlabelled: the app home, Ligáim (#394) and the notifications, for
+  // everyone (the pair is a section of Profil, D141).
   const sections: NavSection[] = [
     {
       label: "",
       items: [
         { label: "Kezdőlap", to: "/home", icon: "home", permission: { kind: "app.enter" } },
+        { label: "Ligáim", to: "/leagues", icon: "myLeagues", permission: { kind: "app.enter" } },
         { label: "Értesítések", to: "/notifications", icon: "notifications", permission: { kind: "app.enter" } },
       ],
     },

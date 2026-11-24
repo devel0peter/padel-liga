@@ -633,6 +633,19 @@ The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decisi
   - Right after step 11 (nothing played): every match "Mindkét pár veszít", every player "0 → 2" in the 2nd strike list, nobody leaving; the preview swaps the 1st of group 2 with the last of group 1.
   - A player gets 403.
 
+### 41. A player opens Ligáim (after step 11)
+
+The player's leagues, one card each (#394, decision log (`docs/decisions.md`) D174; `app/e2e/40-ligaim.spec.ts`). Best seen on the running round seed below.
+
+- Page: `/leagues`, then `/leagues/minta` and `/leagues/pelda`
+- Account: `kovacs.anna@example.test`; then `idegen.ilona@example.test`; then a new account in no league
+- Do: open "Ligáim" in the sidebar and, at 390px, in the bottom bar.
+- Expect:
+  - The bottom bar reads Kezdőlap, Tabella, Ligáim, Értesítések, Profil; the sidebar has Ligáim after Ranglista.
+  - Anna (one league): the Mintaváros card alone, with the city and season; "Kör": "1. kör: <start> – <end>" and "Határidő: <deadline>"; "Párod": her partner's name; "Helyetek": "Az 1. csoportban vagytok, most <n>. helyen"; "A liga": "1. kör: <pairs> pár, <groups> csoport" and "Lejátszott meccsek: <final> / <all>", the same as the Tabella; "A szezonod": Meccs, Győzelem, Élő-pontod; Tabella and Szabályzat buttons. No email address or phone number.
+  - Ilona (Példaváros, no pair): "Nincs párod. Hívd meg a párodat" (it opens Profil's Párod).
+  - `/leagues/pelda` as Anna: 404. In no league: "Melyik ligában játszol?" with "Csatlakozom".
+
 ## A running round instead
 
 `npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every pair-to-be above and Varga Dóra and Kiss Miklós have a finished account in Mintaváros, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.

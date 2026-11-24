@@ -33,6 +33,9 @@ export default [
     route("league/:league", "routes/league.tsx"),
     // The Ranglista: players and pairs by Élő-pont (D137).
     route("league/:league/rankings", "routes/rankings.tsx"),
+    // Ligáim: the player's leagues, one card each (#394).
+    route("leagues", "routes/leagues.tsx"),
+    route("leagues/:league", "routes/leagues.league.tsx"),
     // Pair and player profiles: for logged-in members only (D112).
     route("players/:id", "routes/player-profile.tsx"),
     route("pairs/:id", "routes/pair-profile.tsx"),

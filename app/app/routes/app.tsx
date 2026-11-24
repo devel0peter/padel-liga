@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Shield, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { Shield, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -83,7 +83,6 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   pairs: HeartHandshake,
   players: UsersRound,
   disputes: Scale,
-  substitutes: ArrowLeftRight,
   reminders: BellRing,
   broadcasts: Mail,
   outbox: Send,

@@ -462,10 +462,7 @@ export const notifications = sqliteTable(
         "season_start",
         "round_extended",
         "strike",
-        "substitute_requested",
-        "substitute_approved",
-        "substitute_rejected",
-        "substitute_revoked",
+        "absence_marked",
         "no_show_reported",
         "no_show_confirmed",
         "no_show_rejected",
@@ -1087,6 +1084,36 @@ export const matchSubstitutes = sqliteTable(
     index("match_substitutes_match_idx").on(t.matchId),
     index("match_substitutes_status_idx").on(t.status),
   ],
+);
+
+// Temporary substitutes (#400, spec 4, D175; replaces match_substitutes'
+// named and approved substitute of D109): a pair marks which of its players
+// didn't play a match, and anyone played instead; no name, no approval. A
+// row is a mark: made before the match on the match page (taken back by
+// deleting it, until the start), or with the result on the result form
+// (`after_match`). The absent player's Elo doesn't change for that match
+// (elo.server.ts). One mark per player per match; both of a pair may be.
+export const matchAbsences = sqliteTable(
+  "match_absences",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    // The absent player's pair, one of the match's two.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    // A player of that pair; history like the pair itself (account deletion
+    // anonymizes such an account, never removes it).
+    absentId: text("absent_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    markedBy: text("marked_by").references(() => users.id, { onDelete: "set null" }),
+    markedAt: integer("marked_at", { mode: "timestamp" }).notNull(),
+    afterMatch: integer("after_match", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [uniqueIndex("match_absences_player_idx").on(t.matchId, t.absentId)],
 );
 
 // No-show reports (#33, spec 8, D108): a player of the pair that showed up

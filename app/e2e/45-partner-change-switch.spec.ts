@@ -39,10 +39,10 @@ test("45. Előzetes beosztás: the new pair of a partner change in the old pair'
     await visit(page, `${await seasonPath(page)}/groups`);
     const preview = content(page).getByRole("region", { name: "Előzetes beosztás: ha most érne véget a kör" });
     await expect(preview).toBeVisible();
-    const line = preview.getByText(`Partnercsere: ${p!.b_name} helyett ${OUTSIDER.name}`);
-    await expect(line).toBeVisible();
+    const text = `Partnercsere: ${p!.b_name} helyett ${OUTSIDER.name}`;
+    await expect(preview.getByText(text)).toBeVisible();
     // The new pair's players, and where the old pair comes from.
-    const row = preview.getByRole("listitem").filter({ has: line });
+    const row = preview.getByRole("listitem").filter({ hasText: text });
     await expect(row).toContainText(p!.a_name);
     await expect(row).toContainText(OUTSIDER.name);
     await expect(row).not.toContainText(p!.b_name + " –");

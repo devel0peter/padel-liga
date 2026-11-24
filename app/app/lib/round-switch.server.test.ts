@@ -496,6 +496,18 @@ describe("permanent partner changes at the round switch (#403, D179)", () => {
     expect(s.leaving).toEqual([]);
   });
 
+  it("an old pair that opted out (#395) but has a final change: the new pair keeps the spot, not listed as leaving", async () => {
+    finishAll();
+    finalChange(5, "q");
+    h.raw.exec("update season_entries set opt_out_phase = 1 where pair_id = 5");
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(ids(s.draft)[0]).toContain(5);
+    expect(s.leaving).toEqual([]);
+    // Without the change it would leave as "Nem folytatja".
+    h.raw.exec("update partner_changes set status = 'undone'");
+    expect((await R.roundSwitch(1, 2, AFTER))!.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual([[5, "opted_out"]]);
+  });
+
   it("an old pair that finished last: the new pair starts one group lower", async () => {
     finishAll();
     finalChange(4, "q");

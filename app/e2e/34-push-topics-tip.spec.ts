@@ -6,9 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { PAIRS, as, content, d1, visit } from "./support";
 
-// Substitutes are hidden in the first season (D145): the last topic is
-// "Mulasztások".
-const TOPICS = ["Időpont-egyeztetés", "Emlékeztetők", "Eredmények", "Csoport és szezon", "Mulasztások"];
+const TOPICS = ["Időpont-egyeztetés", "Emlékeztetők", "Eredmények", "Csoport és szezon", "Helyettesek és mulasztások"];
 
 test("Profil: push topics, all on; one off is saved; with push off they are disabled and keep their values", async ({ browser }) => {
   const anna = PAIRS.p1[0];

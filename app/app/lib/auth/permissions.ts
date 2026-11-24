@@ -1,7 +1,6 @@
 // Who may do what (docs/admin-plan.md, spec section 2). Pure: the guard in
 // admin.server.ts loads the actor and asks can(); every rule is unit tested.
 
-
 export type PlatformRole = "player" | "superadmin";
 
 export type LeagueRef = { id: number; slug: string; city: string; name: string };

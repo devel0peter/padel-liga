@@ -545,7 +545,6 @@ function AbsenceTicks({ players }: { players: NonNullable<AbsencePanel["resultFo
   );
 }
 
-
 // Nem jöttek el (#33, spec 8, D108): after the agreed slot's start a player
 // of the pair that showed up reports it; the organizer confirms (a walkover and
 // a strike for the other pair) or rejects it. Both pairs see a waiting

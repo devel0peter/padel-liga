@@ -68,7 +68,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
   - **Elo** (section 11): the absent player's Elo doesn't change; the match is rated for the other three as usual, with the absent player's Elo (and K) standing in for the substitute's in the calculation, and it doesn't count as a rated match of the absent player.
   - **Prize eligibility** (section 10): the match doesn't count towards the absent player's eligibility.
   - **Notices** (section 13): the match's other three players, at each mark and each mark taken back.
-  - **Organizer:** nothing to approve. The Helyettesek page, its menu item and the Szervezők' "Helyettes kérés" switch went with D109's approval; a substitute approved under D109 became a mark of the absent player (migration 0067). A permanent partner change (#402) marks the leaving player on each remaining match of the round, with the new partner shown by name.
+  - **Organizer:** nothing to approve; the organizer's match page (Meccsek) and decision page (Viták → Döntés) show the marks too, so a dispute is decided knowing who didn't play. The Helyettesek page, its menu item and the Szervezők' "Helyettes kérés" switch went with D109's approval; a substitute approved under D109 became a mark of the absent player (migration 0067). (Planned in #402: a permanent partner change will mark the leaving player on each remaining match of the round, with the new partner shown by name.)
 - **Match:** 2 pairs, a scheduled week, a deadline, a status, proposals, a result, and a venue (one of the city's clubs).
 - **Proposal:** concrete time slots from one pair to the other.
 - **Rating:** individual Elo per player.

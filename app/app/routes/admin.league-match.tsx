@@ -1,6 +1,7 @@
 import { data } from "react-router";
 
 import type { Route } from "./+types/admin.league-match";
+import { OrganizerAbsences } from "~/components/absences";
 import { AppPage } from "~/components/app-page";
 import { PersonLink } from "~/components/person-link";
 import { Contacts, StatusPill } from "~/components/my-group";
@@ -10,6 +11,7 @@ import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { STUCK_TEXT } from "~/lib/match-overview";
 import { organizerMatch } from "~/lib/match-overview.server";
+import { absencesOf } from "~/lib/substitutes.server";
 import { getLeague } from "~/lib/leagues.server";
 import { groupLine } from "~/lib/matches";
 import { SITE_NAME } from "~/lib/site";
@@ -33,11 +35,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Another league's match can't be reached through this league's URL.
   const match = Number.isInteger(id) && id > 0 ? await organizerMatch(league.id, id) : null;
   if (!match) throw data(NOT_FOUND, { status: 404 });
-  return { league: { slug: league.slug }, match };
+  // Who doesn't (or didn't) play (#400).
+  const absent = ((await absencesOf([id])).get(id) ?? []).map((a) => ({ id: a.absentId, name: a.name, afterMatch: a.afterMatch }));
+  return { league: { slug: league.slug }, match, absent };
 }
 
 export default function LeagueMatch({ loaderData }: Route.ComponentProps) {
-  const { league, match: m } = loaderData;
+  const { league, match: m, absent } = loaderData;
   return (
     <AppPage
       title={`${groupLine(m.groupNumber, m.groupCount)}, ${m.week}. hét`}
@@ -50,6 +54,9 @@ export default function LeagueMatch({ loaderData }: Route.ComponentProps) {
           {m.stuck && <Badge variant="destructive">{STUCK_TEXT[m.stuck]}</Badge>}
         </div>
         <p className="text-sm">{m.activity}</p>
+        <div className="grid gap-1 text-sm">
+          <OrganizerAbsences absent={absent} />
+        </div>
       </section>
 
       <section className="grid max-w-2xl gap-3 sm:grid-cols-2" aria-label="Párok">

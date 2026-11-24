@@ -22,7 +22,7 @@ import { CANCEL_REASON_MAX } from "./strikes";
 export type StrikeGrant = {
   seasonId: number;
   pairId: number;
-  // The pair's two players: a substitute (#37) never gets one (spec 8).
+  // The pair's two players, also one marked absent (#400); a substitute never gets one (spec 8).
   players: readonly string[];
   matchId: number | null;
   source: StrikeSource;
@@ -89,8 +89,8 @@ export function strikeNotices(list: readonly StrikeNoticeInput[], season: (userI
  * (deadline.server.ts).
  *
  * Contract: `players` is the pair's two players (`pairs.player_a/player_b`),
- * also for a no-show where a substitute (#37) was named: the absent player
- * and the partner get the strike, never the substitute (spec 8). As a guard,
+ * also for a no-show where a player was marked absent (#400): the absent
+ * player and the partner get the strike, never a substitute (spec 8). As a guard,
  * anyone in `players` who isn't one of the pair's two is dropped (and logged).
  */
 export async function giveStrikes(input: StrikeGrant): Promise<Map<string, number>> {
@@ -135,8 +135,8 @@ export async function tellStruck(grant: StrikeGrant, stored: ReadonlySet<string>
   return out;
 }
 
-// The players of `pairId` among `players`: a substitute (#37) never gets a
-// strike, the pair's two players do (spec 8).
+// The players of `pairId` among `players`: anyone else (a substitute) never
+// gets a strike, the pair's two players do (spec 8).
 async function pairPlayersOnly(pairId: number, players: readonly string[]): Promise<string[]> {
   const [pair] = await db.select({ a: pairs.playerA, b: pairs.playerB }).from(pairs).where(eq(pairs.id, pairId));
   const own = new Set(pair ? [pair.a, pair.b] : []);

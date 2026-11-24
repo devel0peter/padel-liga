@@ -1,6 +1,7 @@
 import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.match-decide";
+import { OrganizerAbsences } from "~/components/absences";
 import { AppPage } from "~/components/app-page";
 import { PairNames, PersonLink } from "~/components/person-link";
 import { FormFeedback, ScoreFields } from "~/components/match-result";
@@ -18,6 +19,7 @@ import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
 import { bothLostText, neutralScoreText, parseOutcome, versusText, walkoverScoreText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
+import { organizerAbsences } from "~/lib/substitutes.server";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
 // the league, played or not, with a required reason; and a waiting no-show
@@ -46,7 +48,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!page) throw data(NOT_FOUND, { status: 404 });
   // A waiting no-show report on this match (#33), if any.
   const [noShow] = await leagueNoShows(league.id, id);
-  return { slug: league.slug, page, noShow: noShow ?? null };
+  // Who didn't play (#400): the opponents confirmed or disputed the result with it.
+  const absent = await organizerAbsences(id);
+  return { slug: league.slug, page, noShow: noShow ?? null, absent };
 }
 
 type ActionResult = { intent: string; ok: boolean; message: string };
@@ -76,7 +80,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function MatchDecide({ loaderData, actionData }: Route.ComponentProps) {
-  const { slug, page: m, noShow } = loaderData;
+  const { slug, page: m, noShow, absent } = loaderData;
   const busy = useNavigation().state !== "idle";
   const r = m.result;
   const choices: { value: OutcomeChoice; label: string }[] = [
@@ -106,6 +110,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
           <span className="font-medium">2. pár:</span> <PairNames players={m.players.b} />
         </p>
         <p className="font-semibold">{m.label}</p>
+        <OrganizerAbsences absent={absent} />
         {r.status === "disputed" && (
           <>
             <p>

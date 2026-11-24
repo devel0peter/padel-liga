@@ -59,6 +59,7 @@ export const AUDIT_ACTIONS = {
   "match.no_show_confirm": "Nem jöttek el: jóváhagyás",
   "match.no_show_reject": "Nem jöttek el: elutasítás",
   "strike.cancel": "Fekete pont törlése",
+  // The organizer's approval of a named substitute (D109), retired by #400: older entries only.
   "substitute.approve": "Helyettes jóváhagyása",
   "substitute.reject": "Helyettes elutasítása",
   "substitute.revoke": "Helyettes visszavonása",

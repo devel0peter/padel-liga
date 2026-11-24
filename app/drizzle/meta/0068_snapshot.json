@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fc382dfd-8be8-46bc-8db0-eb44203b4649",
-  "prevId": "f34910e4-452e-4fae-b004-451e31420146",
+  "id": "f3267273-e2df-48e9-a6da-3a00e119fa28",
+  "prevId": "3b6a1553-e61e-4920-837c-efd009f452b6",
   "tables": {
     "account_invites": {
       "name": "account_invites",
@@ -1574,6 +1574,128 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "match_absences": {
+      "name": "match_absences",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "match_id": {
+          "name": "match_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pair_id": {
+          "name": "pair_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "absent_id": {
+          "name": "absent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "marked_by": {
+          "name": "marked_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "marked_at": {
+          "name": "marked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "after_match": {
+          "name": "after_match",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {
+        "match_absences_player_idx": {
+          "name": "match_absences_player_idx",
+          "columns": [
+            "match_id",
+            "absent_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "match_absences_match_id_matches_id_fk": {
+          "name": "match_absences_match_id_matches_id_fk",
+          "tableFrom": "match_absences",
+          "tableTo": "matches",
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "match_absences_pair_id_pairs_id_fk": {
+          "name": "match_absences_pair_id_pairs_id_fk",
+          "tableFrom": "match_absences",
+          "tableTo": "pairs",
+          "columnsFrom": [
+            "pair_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "match_absences_absent_id_users_id_fk": {
+          "name": "match_absences_absent_id_users_id_fk",
+          "tableFrom": "match_absences",
+          "tableTo": "users",
+          "columnsFrom": [
+            "absent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "match_absences_marked_by_users_id_fk": {
+          "name": "match_absences_marked_by_users_id_fk",
+          "tableFrom": "match_absences",
+          "tableTo": "users",
+          "columnsFrom": [
+            "marked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

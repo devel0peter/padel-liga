@@ -287,8 +287,9 @@ export default function Privacy() {
             </p>
             <p>
               A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét,
-              telefonszámát és e-mail-címét. A liga többi pár nélküli játékosa
-              csak a nevüket és a szintjüket látja, elérhetőséget nem. Ha
+              Élő-pontját, azt, hogy mióta keres párt, valamint a
+              telefonszámát és az e-mail-címét. A liga többi pár nélküli
+              játékosa ugyanezt látja róluk, telefonszám és e-mail-cím nélkül. Ha
               felhívod vagy írsz valakinek, az a saját telefonodról vagy
               levelezésedből megy: mi nem küldünk és nem tárolunk róla semmit.
             </p>

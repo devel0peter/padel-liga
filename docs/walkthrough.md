@@ -657,7 +657,7 @@ The league's seekers see each other, with phone and email only between two seeke
 - Account: two or three new accounts registered through Mintaváros's register button (as in step 5), without a pair; `kovacs.anna@example.test`; `idegen.ilona@example.test`
 - Do: as the first, tap "Nézd meg a Párkeresőt" under "Párt keresek" on Kezdőlap, then "Bekapcsolom a párkeresést". As the second, open Párkereső, then tap the same button. As the first, open the second's pair link (Párkereső shows it under "Hívd meg a párodat") as the second and accept.
 - Expect:
-  - Kezdőlap's and Párod's "Párt keresek" text says that the organizer and the league's other seekers see the name, level, phone and email (players without a pair the name and level), and that it can be switched off at any time.
+  - Kezdőlap's and Párod's "Párt keresek" text says that the organizer and the league's other seekers see the name, level, Élő-pont, since when they look, phone and email (players without a pair the same without phone and email), and that it can be switched off at any time.
   - The second, before switching on: the first in the list (name, level, "ma óta keres"), no phone or email, "Az elérhetőségüket akkor látod, ha te is bekapcsolod a párkeresést". After: the first's phone (call, SMS) and email (write); the first sees the second's too. Nobody sees themselves.
   - A switch from before this change (`listed` = 0 in `partner_searches`, e.g. Ilona's in Példaváros): not listed for others; Párod says "Most csak a szervező látja, hogy párt keresel." with "Bekapcsolom a párkeresést".
   - Once paired: "Neked már van párod." on both cards, and they are gone from the others' list. Anna (with a pair) sees only that line.

@@ -2,7 +2,7 @@ import { Mail, MessageSquare, Phone } from "lucide-react";
 
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox, SwitchOnButton } from "~/components/partner-search";
-import { contactLinks, FINDER_EMPTY, FINDER_LOCKED, FINDER_PAIRED, FINDER_SHARES, type FinderEntry } from "~/lib/partner-search";
+import { contactLinks, FINDER_EMPTY, FINDER_LOCKED, FINDER_PAIRED, FINDER_SHARES, PARTNER_SEARCH_ORGANIZER_ONLY, type FinderEntry } from "~/lib/partner-search";
 import type { PartnerFinder } from "~/lib/partner-search.server";
 
 // Párkereső (#398, D177): the body of its section on the league's Ligáim
@@ -66,7 +66,8 @@ export function PartnerFinderView({ finder }: { finder: PartnerFinder }) {
       ) : (
         <div className="grid content-start gap-2">
           {finder.seekers.length > 0 && <p>{FINDER_LOCKED}</p>}
-          <p className="text-muted-foreground">{FINDER_SHARES}</p>
+          {/* On from before (D177): only the organizer sees it so far. */}
+          <p className="text-muted-foreground">{finder.search.seeking ? PARTNER_SEARCH_ORGANIZER_ONLY : FINDER_SHARES}</p>
           <SwitchOnButton leagueId={finder.leagueId} />
         </div>
       )}

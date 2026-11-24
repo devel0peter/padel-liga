@@ -703,7 +703,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const subs = m.substitutes;
   const substitutesShown = subs.marked.length > 0;
   // Who didn't play, ticked on the result form (#400).
-  const ticks = subs.resultForm ? <AbsenceTicks players={subs.resultForm} /> : null;
+  // Keyed by the marks, so a mark made or taken back above shows at once.
+  const ticks = subs.resultForm ? <AbsenceTicks key={subs.resultForm.map((p) => `${p.id}:${p.marked}`).join()} players={subs.resultForm} /> : null;
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
 
   return (

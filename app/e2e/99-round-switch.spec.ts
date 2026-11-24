@@ -4,7 +4,8 @@
 // round-1 result is disputed, and then publishes round 2 (the matches and
 // the new-round emails, on real D1). The suite can't wait three weeks, so
 // the spec moves round 1's deadline into the past and settles its matches
-// in the suite's D1 (d1Update). Runs LAST and leaves round 2 published and
+// in the suite's D1 (d1Update). Then a round-2 result in sets to 6 (#396).
+// Runs LAST and leaves round 2 published (one result recorded) and
 // round 1 settled: a later spec must take a lower number.
 import { expect, test } from "@playwright/test";
 
@@ -85,5 +86,43 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
   // Round 1 stays as it was, one link away.
   await page.getByRole("link", { name: "1. kör" }).click();
   await expect(content(page)).toContainText("az 1. kör csoportjai");
+  await context.close();
+});
+
+// Round 2 plays sets to 6 (#396, D173): its result form says so, refuses a
+// short-set score and takes 6:4 7:6. Round 1 (above) kept short sets.
+test("round 2: sets to 6 on the result form", async ({ browser }) => {
+  const [match] = d1(`select m.id, ua.email from matches m join groups g on g.id = m.group_id
+      join pairs pa on pa.id = m.pair_a join users ua on ua.id = pa.player_a
+      where g.phase = 2 and g.published_at is not null order by m.id limit 1`) as { id: number; email: string }[];
+  const { context, page } = await as(browser, match!.email);
+  await visit(page, `/matches/${match!.id}`);
+  const form = content(page).locator("form").filter({ has: page.getByRole("button", { name: "Rögzítem az eredményt" }) });
+  // Folded until a fixed time has started (D133); the venue is asked while the match has none (D146).
+  const fill = async (sets: [string, string][]) => {
+    const fold = content(page).getByText("Már lejátszottátok? Írjátok be az eredményt");
+    if (!(await form.isVisible())) await fold.click();
+    await expect(form).toContainText("egy szett 6 nyert játékig (7:5, vagy tie-break után 7:6)");
+    const venue = form.getByRole("combobox", { name: "Hol játszottatok?" });
+    if (await venue.isVisible()) {
+      await venue.click();
+      await page.getByRole("option", { name: "Minta Padel Aréna" }).click();
+    }
+    for (const [i, [us, them]] of sets.entries()) {
+      await form.getByLabel(`${i + 1}. szett, Ti`).fill(us);
+      await form.getByLabel(`${i + 1}. szett, Ők`).fill(them);
+    }
+    await page.getByRole("button", { name: "Rögzítem az eredményt" }).click();
+  };
+  await fill([
+    ["4", "2"],
+    ["4", "1"],
+  ]);
+  await expect(content(page).getByRole("alert")).toContainText("1. szett: 4:2 nem lehet. Lehet 6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6.");
+  await fill([
+    ["6", "4"],
+    ["7", "6"],
+  ]);
+  await expect(content(page).getByRole("status").filter({ hasText: "Rögzítettük. A másik pár megerősíti." })).toBeVisible();
   await context.close();
 });

@@ -132,6 +132,7 @@ export async function roundSwitch(
     const table = groupTable(
       g.pairs.map((p) => ({ id: p.pairId, elo: p.averageElo, withdrawn: p.withdrawn })),
       counted.filter((m) => m.groupId === g.id).map((m) => ({ a: m.pairA, b: m.pairB, outcome: outcomeOf(m) })),
+      g.setGames,
     );
     return { number: g.number, rows: table.map((r) => ({ pair: byId.get(r.pairId)!, place: r.rank })) };
   });

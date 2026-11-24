@@ -1,4 +1,4 @@
-import { activeSides, schedulingState, type Side } from "@padel-liga/rules";
+import { activeSides, schedulingState, type SetGames, type Side } from "@padel-liga/rules";
 import { and, asc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
@@ -43,6 +43,8 @@ export type OverviewPhase = {
   phase: number;
   phaseStartsAt: Date;
   deadline: Date;
+  // The round's set format (D173, #396).
+  setGames: SetGames;
   groupCount: number;
   groups: number[];
   matches: OverviewMatch[];
@@ -84,6 +86,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
       season: seasons.name,
       startsAt: seasonPhases.startsAt,
       deadline: seasonPhases.deadline,
+      setGames: seasonPhases.setGames,
     })
     .from(groups)
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
@@ -120,6 +123,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
         phase: g.phase,
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
+        setGames: g.setGames,
         groupCount: await groupCount(g.seasonId, g.phase),
         groups: [],
         matches: [],
@@ -151,7 +155,7 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     );
     const active = { a: sides.includes("a"), b: sides.includes("b") };
     const result = results.get(m.id) ?? EMPTY_RESULT;
-    const status = resultStatus(result.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
+    const status = resultStatus(result.state, names, g.setGames) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
     const overview = statusOf(state, result.state);
     const stuck = stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now });
     phase.history.push({
@@ -237,7 +241,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
   const results = await resultOf(ctx.match);
   const status = ctx.voided
     ? VOIDED_STATUS
-    : (resultStatus(results.state, names) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1)));
+    : (resultStatus(results.state, names, ctx.setGames) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1)));
   const pairOf = (pairId: number) => (pairId === ctx.match.pairA ? names.a : names.b);
   return {
     id: ctx.match.id,
@@ -287,7 +291,7 @@ export async function organizerMatch(leagueId: number, matchId: number, now = ne
         who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
         whoId: d.kind === "organizer" ? d.userId : null,
         pair: d.kind === "organizer" ? "szervező" : "automatikus",
-        text: neutralDecisionText(d, names),
+        text: neutralDecisionText(d, names, ctx.setGames),
       })),
     ].sort((x, y) => x.at.getTime() - y.at.getTime() || Number(x.id < 0) - Number(y.id < 0) || Math.abs(x.id) - Math.abs(y.id)),
   };

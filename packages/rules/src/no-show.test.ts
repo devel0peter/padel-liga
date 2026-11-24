@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { resolutionDue } from "./deadline";
 import { confirmRefusal, noShowClosesAt, noShowOutcome, rejectRefusal, reportRefusal, reportWithdrawalRefusal, type NoShowStatus } from "./no-show";
+import { SETS_TO_SIX, SHORT_SETS } from "./results";
 import { groupStandings } from "./standings";
 
 // Phase 1's deadline: Sunday 29 Nov 2026 23:59 Budapest; resolved Monday 06:00.
@@ -68,21 +69,25 @@ describe("the organizer's decision", () => {
     for (const status of ["withdrawn", "confirmed", "rejected"] as NoShowStatus[]) expect(rejectRefusal({ status })).toBe("not_open");
   });
 
-  it("records a 4-0 4-0 walkover for the reporting side; the other side is the absent one", () => {
+  it("records a walkover for the reporting side; the other side is the absent one", () => {
     expect(noShowOutcome("a")).toEqual({ outcome: { kind: "walkover", winner: "a" }, absent: "b" });
     expect(noShowOutcome("b")).toEqual({ outcome: { kind: "walkover", winner: "b" }, absent: "a" });
   });
 
-  it("counts in the standings as a walkover: 3 points, 2-0 sets and 8-0 games for the reporting pair", () => {
-    const { outcome } = noShowOutcome("b");
-    const rows = groupStandings(
-      [
-        { id: "p1", elo: 1500 },
-        { id: "p2", elo: 1400 },
-      ],
-      [{ a: "p1", b: "p2", outcome }],
-    );
-    expect(rows[0]).toMatchObject({ id: "p2", rank: 1, points: 3, wins: 1, setsWon: 2, setsLost: 0, gamesWon: 8, gamesLost: 0 });
-    expect(rows[1]).toMatchObject({ id: "p1", rank: 2, points: 0, losses: 1, setsWon: 0, setsLost: 2, gamesWon: 0, gamesLost: 8 });
-  });
+  // 4-0 4-0 in a short-set round (Győr round 1), 6-0 6-0 from round 2 (#396).
+  for (const setGames of [SHORT_SETS, SETS_TO_SIX])
+    it(`counts in the standings as a walkover: 3 points, 2-0 sets and ${2 * setGames}-0 games for the reporting pair (sets to ${setGames})`, () => {
+      const { outcome } = noShowOutcome("b");
+      const rows = groupStandings(
+        [
+          { id: "p1", elo: 1500 },
+          { id: "p2", elo: 1400 },
+        ],
+        [{ a: "p1", b: "p2", outcome }],
+        setGames,
+      );
+      const games = 2 * setGames;
+      expect(rows[0]).toMatchObject({ id: "p2", rank: 1, points: 3, wins: 1, setsWon: 2, setsLost: 0, gamesWon: games, gamesLost: 0 });
+      expect(rows[1]).toMatchObject({ id: "p1", rank: 2, points: 0, losses: 1, setsWon: 0, setsLost: 2, gamesWon: 0, gamesLost: games });
+    });
 });

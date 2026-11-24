@@ -1,7 +1,7 @@
 // No-shows (spec 8, #33, D108): at an accepted slot one side didn't turn up.
 // A player of the side that did reports it from the match page, after the
 // slot's start and before the deadline resolution runs; the league's
-// organizer confirms (a 4-0 4-0 walkover for the reporting side, a strike for
+// organizer confirms (a 6-0 6-0 or, in a short-set round, 4-0 4-0 walkover for the reporting side, a strike for
 // both players of the other) or rejects it. Pure; the reports live in
 // no_show_reports (app/lib/no-shows.server.ts).
 
@@ -86,7 +86,7 @@ export function rejectRefusal(r: { status: NoShowStatus }): NoShowRefusal | null
 }
 
 /**
- * What a confirmed no-show records (spec 8): a 4-0 4-0 walkover for the side
+ * What a confirmed no-show records (spec 8): a 6-0 6-0 (short sets: 4-0 4-0) walkover for the side
  * that reported it, and a strike for both players of the other side.
  */
 export function noShowOutcome(reporting: Side): { outcome: MatchOutcome; absent: Side } {

@@ -82,7 +82,7 @@ Organizer and platform admin are roles on a normal player account, inside the ap
 - There is no "home" pair: either pair may make the first proposal (section 6), so scheduling starts as soon as either side is ready.
 
 ## 6. Scheduling (core feature)
-1. Either pair can make a proposal: **availability ranges ("szombat 14–18") on at least 2 different Budapest days** (D144). A match is 60 minutes and courts are booked by the hour: every range starts and ends on a whole hour and fits at least one match; starts are 07:00–22:00, so a range lies within 07:00–23:00 of one day; every range starts after now (no lead time) and its last start (end minus 60 minutes) is before the deadline. A single exact time is a range one match long. Same-day ranges that overlap or touch are joined. Optionally with a venue.
+1. Either pair can make a proposal: **availability ranges ("szombat 14–18") on at least 2 different Budapest days** (D144). A match is 60 minutes (sets to 6 too, D173) and courts are booked by the hour: every range starts and ends on a whole hour and fits at least one match; starts are 07:00–22:00, so a range lies within 07:00–23:00 of one day; every range starts after now (no lead time) and its last start (end minus 60 minutes) is before the deadline. A single exact time is a range one match long. Same-day ranges that overlap or touch are joined. Optionally with a venue.
 2. The other pair can:
    - **accept** one whole-hour start inside one of the ranges (from the range's start to its end minus 60 minutes, still in the future), which schedules the match, or
    - **counter-propose** with a new proposal under the same rules.
@@ -96,13 +96,14 @@ Organizer and platform admin are roles on a normal player account, inside the ap
    - **Late cancellation (under 24 hours before the slot):** not an immediate walkover. The cancelling side must make the next proposal: only it gets the Teendő, but the other pair isn't blocked from proposing (D74). If the match isn't played by the deadline, the cancelling side counts as the inactive side in section 8 (walkover for the other side), regardless of its earlier activity.
 
 ## 7. Recording results
-- Format (league default, one format per league, no per-match variants; see section 12):
-  - Best of 2 sets. Short sets: a set goes to 4 games (win by 2); at 4-4 a regular tie-break to 7 (win by 2).
-  - Valid set scores: 4-0, 4-1, 4-2, 5-3 (4-3 plays on) and, after the tie-break, 5-4. Anything else, a third set, or a super tie-break at 2-0 is rejected with a Hungarian message (`packages/rules` `validateScore`).
+- Format (the same for every league, no per-match variants; see section 12). The set length belongs to the round (`season_phases.set_games`, decision log, 2026-11-24, D173, #396):
+  - Best of 2 sets. A set goes to 6 games (win by 2); at 6-6 a regular tie-break to 7 (win by 2).
+  - Valid set scores: 6-0, 6-1, 6-2, 6-3, 6-4, 7-5 (6-5 plays on) and, after the tie-break, 7-6. Anything else, a third set, or a super tie-break at 2-0 is rejected with a Hungarian message (`packages/rules` `validateScore`, which takes the round's format).
+  - **Short sets in Győr's round 1:** the round already running when sets to 6 came in (season 1, round 1; migration 0065 marks every round 1 whose groups were published then) keeps sets to 4: a set goes to 4 games, at 4-4 a tie-break, valid 4-0, 4-1, 4-2, 5-3 and 5-4. Its results, corrections, rulings and deadline run are checked and scored by that format for good; every other round, and every round created later, plays sets to 6.
   - At 1-1 in sets, a super tie-break to 10 (win by 2) replaces the third set.
   - Golden point: no advantage at deuce, one point decides; the receiving pair chooses which player receives.
   - For set and game difference the super tie-break counts as one set and as a 1-0 game (ITF convention).
-- Court booking: 60 minutes is usually enough (Győr clubs only take 60-minute bookings).
+- Court booking: 60 minutes is usually enough (Győr clubs only take 60-minute bookings); a set to 6 with golden point fits in an hour too (D173), so the match length stays 60 minutes everywhere (section 6).
 - Court time runs out: the match is unfinished. The pairs note the score and finish it from there in a new slot before the deadline. Only the final result is recorded.
 - One pair records the result, and the other confirms or disputes it.
 - **Where it was played (D146):** while the match has no club (none came with the booking, D74, and none was recorded after it), recording the result asks for one: the club is required (one of the city's active clubs), the court optional (at most 40 characters). Both go on the `result_recorded` event, and the match keeps the club (`matches.club_id`), so the match page's "Helyszín" shows it and a correction doesn't ask again. Once a club is known the result form doesn't ask, and a club sent anyway is ignored. A city with no active club can't be asked. The organizer's rulings don't ask.
@@ -118,9 +119,9 @@ The system resolves a match with no result at 06:00 Budapest the morning after t
 
 | Situation | Outcome |
 |---|---|
-| One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 4-0 4-0 |
+| One side active, the other did nothing (no response or no proposal) | Walkover win for the active side: 6-0 6-0 (4-0 4-0 in a short-set round, section 7) |
 | Both active, no agreement | Unplayed: 0 points for both sides, no Elo change, not counted in set and game difference. The organizer may award a walkover if the log shows one side clearly blocked the match |
-| Neither side active | Both sides get a loss, recorded as 0-4 0-4 for each (counts in set and game difference, 0 points) |
+| Neither side active | Both sides get a loss, recorded as 0-6 0-6 for each (0-4 0-4 in a short-set round; counts in set and game difference, 0 points) |
 | Late cancellation, then not played by the deadline | The cancelling side counts as inactive: walkover for the other side (section 6) |
 | Accepted slot, one side didn't show up | The side that showed up reports it, the organizer confirms, walkover (see below) |
 
@@ -130,7 +131,7 @@ The organizer can always override the outcome manually.
 
 ### No-show reports (decision log, 2026-11-05, D108, #33)
 - **Report:** a player of either pair, on the match page ("Nem jöttek el"), once the agreed slot has started and until the deadline resolution's time (06:00 Budapest the morning after the deadline); only on a match that is scheduled, has no result recorded and counts (no withdrawn pair). Before the slot's start it is refused. One waiting report per match; the player who made it can withdraw it until the organizer decides, and then a new one can be made.
-- **Decision:** the league's organizer (or an Admin) confirms or rejects it on the match's decision page (listed on "Viták"), with an optional reason both pairs see. Confirming stores a 4-0 4-0 walkover for the reporting pair as the organizer's ruling (the match final, so the tables count it) and gives a strike to both players of the other pair (source "no-show"; never a substitute). Rejecting changes nothing on the match. A match already final can't be confirmed (the organizer overrides it instead). Both are in the audit log (D91).
+- **Decision:** the league's organizer (or an Admin) confirms or rejects it on the match's decision page (listed on "Viták"), with an optional reason both pairs see. Confirming stores a walkover (6-0 6-0; 4-0 4-0 in a short-set round) for the reporting pair as the organizer's ruling (the match final, so the tables count it) and gives a strike to both players of the other pair (source "no-show"; never a substitute). Rejecting changes nothing on the match. A match already final can't be confirmed (the organizer overrides it instead). Both are in the audit log (D91).
 - **The deadline resolution** leaves a match with a waiting report alone; after a rejection the next run resolves it as usual.
 
 ### Strikes ("fekete pont", decision log, 2026-10-05)

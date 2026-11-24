@@ -53,7 +53,7 @@ function freshDb() {
       "insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, '2026/27 tél', ?, ?, '2026-11-09')",
     )
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
-  h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)").run(sec(PHASE), DEADLINE);
+  h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, 1, ?, ?, 4)").run(sec(PHASE), DEADLINE);
   h.raw.prepare("insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, ?)").run(sec("2026-11-06T10:00:00Z"));
   [1, 2, 3, 4].forEach((p, i) => h.raw.prepare("insert into group_pairs (group_id, pair_id, seed) values (1, ?, ?)").run(p, i + 1));
   h.raw.prepare("insert into matches (id, group_id, pair_a, pair_b, week, deadline) values (1, 1, 1, 2, 1, ?)").run(DEADLINE);

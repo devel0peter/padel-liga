@@ -23,14 +23,15 @@ import { pairName } from "./groups";
 import { loadMatch, NOT_FOUND, noWithdrawnPair, sideOf, type MatchContext } from "./matches.server";
 import { NO_SHOW_CHANGED, NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS, noShowDecisionReason } from "./no-shows";
 import { lostRace } from "./results.server";
-import { neutralOutcomeText } from "./results";
+import { neutralOutcomeText, walkoverScoreText } from "./results";
 import { strikeInserts, tellStruck, type StrikeGrant } from "./strikes.server";
 
 // No-shows (#33, spec 8, D108) in D1. A player of the pair that showed up
 // reports from the match page, after the agreed slot's start and before the
 // deadline resolution runs, that the other pair didn't come; one waiting
 // report per match, and the reporter can withdraw it before a decision. The
-// league's organizer confirms it (a 4-0 4-0 walkover for the reporting pair,
+// league's organizer confirms it (a walkover for the reporting pair, 6-0 6-0
+// or, in a short-set round, 4-0 4-0;
 // stored as an organizer's ruling so the tables read it, and a strike with
 // source "no_show" for the other pair's two players, never a substitute) or
 // rejects it, with an optional reason; each decision writes an audit entry
@@ -326,7 +327,7 @@ export async function decideNoShow(
         .set({ revision: revision + 1, status: "final", outcome })
         .where(and(eq(matches.id, ctx.match.id), eq(matches.revision, revision))),
       settle,
-      auditEntry({ actorId: userId, action: "match.no_show_confirm", target: `match:${ctx.match.id}`, detail: `${detail}: ${neutralOutcomeText(outcome, SIDES)}`, leagueId }),
+      auditEntry({ actorId: userId, action: "match.no_show_confirm", target: `match:${ctx.match.id}`, detail: `${detail}: ${neutralOutcomeText(outcome, SIDES, ctx.setGames)}`, leagueId }),
       // The strikes go in with the walkover, or neither does (#294's rows).
       ...strikeInserts([grant]),
     ]);
@@ -342,7 +343,10 @@ export async function decideNoShow(
     logError("no-show strike notice failed", { matchId: ctx.match.id, error });
   }
   await tellPairs(ctx, row.pairId, true);
-  return { ok: true, notice: "Jóváhagytad: 4:0, 4:0 a bejelentő párnak, a másik pár fekete pontot kapott. Mindkét pár értesítést kap." };
+  return {
+    ok: true,
+    notice: `Jóváhagytad: ${walkoverScoreText(ctx.setGames)} a bejelentő párnak, a másik pár fekete pontot kapott. Mindkét pár értesítést kap.`,
+  };
 }
 
 // spec 13, D108: both pairs, each from its own side. In the app and by push only.
@@ -353,7 +357,7 @@ async function tellPairs(ctx: MatchContext, reportingPairId: number, confirmed: 
       (["a", "b"] as const).flatMap((s) =>
         ctx.pairs[s].players.map((p) => ({
           userId: p.id,
-          message: noShowDecidedMessage({ matchId: ctx.match.id, confirmed, reported: ctx.pairs[s].pairId === reportingPairId }),
+          message: noShowDecidedMessage({ matchId: ctx.match.id, confirmed, reported: ctx.pairs[s].pairId === reportingPairId, setGames: ctx.setGames }),
         })),
       ),
     );

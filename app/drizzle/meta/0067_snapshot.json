@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "3b6a1553-e61e-4920-837c-efd009f452b6",
-  "prevId": "2cca579f-78c5-445e-8428-5db4436a2dc3",
+  "prevId": "f34910e4-452e-4fae-b004-451e31420146",
   "tables": {
     "account_invites": {
       "name": "account_invites",
@@ -3520,6 +3520,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "set_games": {
+          "name": "set_games",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 6
         }
       },
       "indexes": {},

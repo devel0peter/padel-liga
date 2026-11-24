@@ -1,4 +1,4 @@
-import { proposalErrors } from "@padel-liga/rules";
+import { proposalErrors, type SetGames } from "@padel-liga/rules";
 import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Users } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
@@ -32,7 +32,7 @@ import { COURT_MAX, SCHEDULING_GUIDE, fixesAtText, formatSlot, groupLine, status
 import { cn } from "~/lib/utils";
 import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
 import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
-import { parseScore, resultStatusView } from "~/lib/results";
+import { parseScore, resultStatusView, walkoverScoreText, walkoverScoreTo } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
 import { absenceLine } from "~/lib/substitutes";
@@ -420,18 +420,18 @@ function VenueForm({
 // Either pair cancels the scheduled slot until it starts (#27, spec 6.6).
 // Under 24 hours before it the cancellation is late, and the page says what
 // that means before asking.
-function cancelConsequence(late: boolean): string {
+function cancelConsequence(late: boolean, setGames: SetGames): string {
   return late
-    ? "Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek 4:0, 4:0-ra."
+    ? `Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek ${walkoverScoreTo(setGames)}.`
     : "Utána újra egyeztettek. Ha a kezdés előtti 24 órában mondjátok le, az késői lemondás: akkor nektek kell új időpontot ajánlani.";
 }
 
-function CancelButton({ late }: { late: boolean }) {
+function CancelButton({ late, setGames }: { late: boolean; setGames: SetGames }) {
   const busy = useNavigation().state !== "idle";
   const submit = useSubmit();
   return (
     <>
-      <p className="text-sm text-muted-foreground">{cancelConsequence(late)}</p>
+      <p className="text-sm text-muted-foreground">{cancelConsequence(late, setGames)}</p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button variant="outline" className="w-fit" disabled={busy}>
@@ -441,7 +441,7 @@ function CancelButton({ late }: { late: boolean }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{late ? "Késői lemondás. Biztosan lemondod?" : "Lemondod a meccset?"}</AlertDialogTitle>
-            <AlertDialogDescription>{cancelConsequence(late)} A másik pár értesítést kap.</AlertDialogDescription>
+            <AlertDialogDescription>{cancelConsequence(late, setGames)} A másik pár értesítést kap.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Mégse</AlertDialogCancel>
@@ -547,17 +547,17 @@ function AbsenceTicks({ players }: { players: NonNullable<AbsencePanel["resultFo
 
 
 // Nem jöttek el (#33, spec 8, D108): after the agreed slot's start a player
-// of the pair that showed up reports it; the organizer confirms (4-0 4-0 and
+// of the pair that showed up reports it; the organizer confirms (a walkover and
 // a strike for the other pair) or rejects it. Both pairs see a waiting
 // report and the decision with its reason; only the reporter can withdraw.
-function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
+function NoShowBody({ s, result, setGames }: { s: NoShowPanel; result?: ActionResult; setGames: SetGames }) {
   const busy = useNavigation().state !== "idle";
   const submit = useSubmit();
   return (
     <>
       {s.canReport && (
         <p className="text-sm text-muted-foreground">
-          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4:0, 4:0-ra nyertek, és ők fekete pontot kapnak.
+          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, {walkoverScoreTo(setGames)} nyertek, és ők fekete pontot kapnak.
         </p>
       )}
       {s.open && (
@@ -585,8 +585,8 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
               <span className="break-words">
                 {d.confirmed
                   ? d.ours
-                    ? "A szervező jóváhagyta a bejelentéseteket: 4:0, 4:0 nektek."
-                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0:4, 0:4, és fekete pontot kaptatok."
+                    ? `A szervező jóváhagyta a bejelentéseteket: ${walkoverScoreText(setGames)} nektek.`
+                    : `A szervező jóváhagyta, hogy nem jöttetek el: ${walkoverScoreText(setGames, false)}, és fekete pontot kaptatok.`
                   : d.ours
                     ? "A szervező elutasította a bejelentéseteket."
                     : "A szervező elutasította az ellenfeleitek bejelentését."}{" "}
@@ -608,7 +608,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Biztosan nem jöttek el?</AlertDialogTitle>
               <AlertDialogDescription>
-                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4:0, 4:0-ra nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
+                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, {walkoverScoreTo(setGames)} nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -683,7 +683,7 @@ function Fact({ icon: Icon, label, children }: { icon: React.ComponentType<{ cla
 export default function MatchRoute({ loaderData: m, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const result = actionData as ActionResult | undefined;
-  const status = resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue);
+  const status = resultStatusView(m.result, m.side, m.setGames) ?? statusView(m.state, m.side, m.venue);
   const r = m.result;
   const theirs = m.state.status !== "to_schedule" && m.state.status !== "scheduled" && m.state.by !== m.side;
   const ours = (m.state.status === "proposed" || m.state.status === "agreed_time") && !theirs;
@@ -871,7 +871,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {(noShowShown || (m.noShow.canReport && m.started)) && (
             <Panel title={m.noShow.canReport ? "Nem jött el az ellenfél?" : "Nem jöttek el"}>
-              <NoShowBody s={m.noShow} result={result} />
+              <NoShowBody s={m.noShow} result={result} setGames={m.setGames} />
             </Panel>
           )}
 
@@ -920,13 +920,13 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {m.state.status === "scheduled" && m.actions.cancel && (
             <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: már 24 órán belül van a kezdés." : "Lemondhatjátok, utána újra egyeztettek."}>
-              <CancelButton late={m.cancelLate} />
+              <CancelButton late={m.cancelLate} setGames={m.setGames} />
             </Fold>
           )}
 
           {m.noShow.canReport && !m.started && !noShowShown && (
             <Fold title="Nem jött el az ellenfél?" open={failed("no-show-report")}>
-              <NoShowBody s={m.noShow} result={result} />
+              <NoShowBody s={m.noShow} result={result} setGames={m.setGames} />
             </Fold>
           )}
 

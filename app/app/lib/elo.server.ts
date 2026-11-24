@@ -3,7 +3,7 @@ import { and, eq, isNotNull, or, sql } from "drizzle-orm";
 import { alias, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { eloChanges, jobRuns, matchAbsences, matchDecisions, matches, pairs, users } from "~/db/schema";
+import { eloChanges, groups, jobRuns, matchAbsences, matchDecisions, matches, pairs, seasonPhases, users } from "~/db/schema";
 import { logError, logWarn } from "~/lib/log";
 
 // Player Elo after every played match (#13, spec 11, D104). The ratings are
@@ -55,6 +55,8 @@ async function ratedMatches(): Promise<{ match: RatedMatch; at: number }[]> {
     .select({
       id: matches.id,
       outcome: matches.outcome,
+      // The round's set format (D173): the score is checked against it.
+      setGames: seasonPhases.setGames,
       a1: pairA.playerA,
       a2: pairA.playerB,
       b1: pairB.playerA,
@@ -69,10 +71,12 @@ async function ratedMatches(): Promise<{ match: RatedMatch; at: number }[]> {
     .from(matches)
     .innerJoin(pairA, eq(pairA.id, matches.pairA))
     .innerJoin(pairB, eq(pairB.id, matches.pairB))
+    .innerJoin(groups, eq(groups.id, matches.groupId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(ratedMatch);
   const list: { match: RatedMatch; at: number }[] = [];
   for (const r of rows) {
-    const winner = ratedWinner(r.outcome);
+    const winner = ratedWinner(r.outcome, r.setGames);
     if (!winner) continue;
     const times = [r.ruledAt, r.confirmedAt].filter((t): t is number => t !== null);
     // A player marked absent (#400): their Elo stands in for the substitute

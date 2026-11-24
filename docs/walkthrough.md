@@ -649,6 +649,21 @@ The player's leagues, one card each (#394, decision log (`docs/decisions.md`) D1
   - Ilona (Példaváros, no pair): "Nincs párod. Hívd meg a párodat" (it opens Profil's Párod).
   - `/leagues/pelda` as Anna: 404. In no league: "Melyik ligában játszol?" with "Csatlakozom".
 
+### 42. A player opts out of the next round on Ligáim, then takes it back (after step 41)
+
+Default in, and "Nem folytatom" until the round's deadline (#395, decision log (`docs/decisions.md`) D176; `app/e2e/42-opt-out.spec.ts`). Needs a running round: best seen on the running round seed below.
+
+- Page: `/leagues`; then `/admin/leagues/minta/pairs` and the season's Csoportok
+- Account: `kovacs.anna@example.test`; then her partner; then the Szervező
+- Do: as Anna, press "Nem folytatom" on the card, read the confirmation, press "Nem folytatom" in it; later press "Mégis folytatom".
+- Expect:
+  - Before: "Következő kör": "Benne vagytok a 2. körben (<start>-tól/-től). Ha nem folytatnád, jelezd <deadline>, 23:59-ig."
+  - The confirmation: the pair leaves the season after round 1, round 1's remaining matches still count and must be played, the partner can go on with a new partner; "Mégse" changes nothing.
+  - After: "Jelezted, hogy nem folytatod: az 1. kör után kiléptek a szezonból. Meggondolhatod …" with "Mégis folytatom". The partner's card says "A párod jelezte, hogy nem folytatja …" with no button, and the partner has one notice "A párod nem folytatja" (no email).
+  - Párok: "Kilép a kör végén" in the pair's Nevezés cell. Csoportok' preview: the pair under "Kimaradnak" with "nem folytatja". Napló: one entry with Anna as actor.
+  - "Mégis folytatom": the card is back to "Benne vagytok …", the partner gets "A párod mégis folytatja", Napló has a second entry.
+  - After the deadline the section is gone; in the season's last round it never shows.
+
 ## A running round instead
 
 `npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every pair-to-be above and Varga Dóra and Kiss Miklós have a finished account in Mintaváros, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.

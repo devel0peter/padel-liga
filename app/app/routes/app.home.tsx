@@ -1,28 +1,20 @@
-import { Form, Link, redirect, useNavigation } from "react-router";
+import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/app.home";
 import { AppPage } from "~/components/app-page";
+import { ChooseLeague } from "~/components/choose-league";
 import { GroupStanding, NextMatch, Todos, todos } from "~/components/my-group";
 import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { enteredNotice, SeasonEntry } from "~/components/season-entry";
 import { TipCard } from "~/components/tip-card";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
 import { appNav, navLeagues } from "~/lib/auth/permissions";
 import { requireUser } from "~/lib/auth/session.server";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "~/lib/format";
-import {
-  CHOOSE_LEAGUE_BUTTON,
-  CHOOSE_LEAGUE_TEXT,
-  CHOOSE_LEAGUE_TITLE,
-  LEAGUE_PARAM,
-  OFFER_LEAGUE_TEXT,
-  OFFER_LEAGUE_TITLE,
-  parseLeagueParam,
-} from "~/lib/league-members";
+import { LEAGUE_PARAM, parseLeagueParam } from "~/lib/league-members";
 import { chooseLeague, leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
 import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
@@ -158,39 +150,6 @@ function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
         Szabályzat
       </Link>
     </p>
-  );
-}
-
-// "Melyik ligában játszol?" (#331): for an account in no league, one row per
-// league with a season open for entries or running.
-function ChooseLeague({ choices, offered }: { choices: { id: number; city: string; name: string }[]; offered: boolean }) {
-  const busy = useNavigation().state !== "idle";
-  return (
-    <Card className="max-w-2xl border-nav-active">
-      <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg">{offered ? OFFER_LEAGUE_TITLE : CHOOSE_LEAGUE_TITLE}</CardTitle>
-        <CardDescription>{offered ? OFFER_LEAGUE_TEXT : CHOOSE_LEAGUE_TEXT}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="grid gap-3">
-          {choices.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center justify-between gap-3">
-              <span>
-                <span className="font-semibold">{c.city}</span>
-                <span className="block text-sm text-muted-foreground">{c.name}</span>
-              </span>
-              <Form method="post">
-                <input type="hidden" name="intent" value="join_league" />
-                <input type="hidden" name="league" value={c.id} />
-                <Button type="submit" disabled={busy}>
-                  {CHOOSE_LEAGUE_BUTTON}
-                </Button>
-              </Form>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
   );
 }
 

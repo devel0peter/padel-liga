@@ -236,6 +236,20 @@ describe("Mégis folytatom (#395)", () => {
 describe("after the deadline (#395 requirement 7)", () => {
   beforeEach(freshDb);
 
+  it("never brings an opted-out pair back as a new pair at a later switch, also one that joined late (joins_phase > 1)", async () => {
+    await optOut("p2a");
+    // A pair that entered for round 2 and opted out (here: the same entry, moved to joins_phase 2).
+    h.raw.exec("update season_entries set joins_phase = 2 where pair_id = 2");
+    finishAll();
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
+    finishAll();
+    const AFTER_ROUND_2 = new Date("2026-12-21T06:00:00Z");
+    const s = (await R.roundSwitch(1, 3, AFTER_ROUND_2))!;
+    expect(s.newPairs.map((n) => n.pair.pairId)).toEqual([]);
+    expect(ids(s.draft).flat()).not.toContain(2);
+  });
+
   it("still leaves as 'nem folytatja' once the pair is dissolved to form new pairs", async () => {
     await optOut("p2a");
     finishAll();

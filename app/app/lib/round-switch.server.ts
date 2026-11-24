@@ -1,5 +1,5 @@
-import { isFastSwitch, leaveReason, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
-import { and, asc, eq, gt, inArray, lt, lte, sql } from "drizzle-orm";
+import { isFastSwitch, leaveReason, optedOutAfter, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
+import { and, asc, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
@@ -91,12 +91,12 @@ export async function roundSwitch(
       .orderBy(asc(matches.id)),
     enteredPairs(seasonId),
     projection ? projection.leaving.map((pairId) => ({ pairId })) : pairsLeavingAfterPhase(seasonId, endingPhase),
-    // Opted out on Ligáim for the end of the ending phase or earlier (#395),
-    // whatever happened to the pair or its entry since.
+    // The season's opt-outs on Ligáim (#395), whatever happened to the pair
+    // or its entry since; optedOutAfter picks the ones that end by now.
     db
-      .select({ pairId: seasonEntries.pairId })
+      .select({ pairId: seasonEntries.pairId, optOutPhase: seasonEntries.optOutPhase })
       .from(seasonEntries)
-      .where(and(eq(seasonEntries.seasonId, seasonId), lte(seasonEntries.optOutPhase, endingPhase))),
+      .where(and(eq(seasonEntries.seasonId, seasonId), isNotNull(seasonEntries.optOutPhase))),
   ]);
 
   const withdrawn = new Set(stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((p) => p.pairId)));
@@ -149,7 +149,7 @@ export async function roundSwitch(
   // default in (packages/rules leaveReason).
   const entry = new Map(entered.map((p) => [p.pairId, p]));
   const strikes = new Set(strikeLeavers.map((p) => p.pairId));
-  const out = new Set(optedOut.map((p) => p.pairId));
+  const out = new Set(optedOut.filter((p) => optedOutAfter(p.optOutPhase, endingPhase)).map((p) => p.pairId));
   const reasonOf = (p: GroupPair): LeaveReason | null =>
     leaveReason({ strikes: strikes.has(p.pairId), optedOut: out.has(p.pairId), active: p.active, entered: entry.has(p.pairId) });
   const continuing = new Set(tables.flatMap((t) => t.rows.map((r) => r.pair.pairId)));
@@ -164,9 +164,12 @@ export async function roundSwitch(
 
   // New pairs: entered for a later phase, joining by this one, not playing
   // on from the ending phase (a late entry, a re-formed pair, or a pair the
-  // organizer entered again after a withdrawal), in entry order.
+  // organizer entered again after a withdrawal), in entry order. Never a pair
+  // that opted out (#395): its entry stays approved, so a late entry that
+  // left would otherwise come back at the switch after the one it left in
+  // (entering again clears the opt-out).
   const newPairs = entered
-    .filter((p) => p.joinsPhase > 1 && p.joinsPhase <= nextPhase && !continuing.has(p.pairId) && !strikes.has(p.pairId))
+    .filter((p) => p.joinsPhase > 1 && p.joinsPhase <= nextPhase && !continuing.has(p.pairId) && !strikes.has(p.pairId) && !out.has(p.pairId))
     // Rated by the pair's average current Elo, the level's starting value for
     // a player without a rated match, with no discount (D107f).
     .map((pair) => ({ pair, rating: pair.averageElo }));

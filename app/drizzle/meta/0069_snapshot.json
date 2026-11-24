@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f3267273-e2df-48e9-a6da-3a00e119fa28",
+  "id": "bff26ccb-838c-41bb-aaa8-1997cca0e95a",
   "prevId": "3b6a1553-e61e-4920-837c-efd009f452b6",
   "tables": {
     "account_invites": {
@@ -3196,6 +3196,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "listed": {
+          "name": "listed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
@@ -3412,27 +3420,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "opt_out_phase": {
-          "name": "opt_out_phase",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "opted_out_by": {
-          "name": "opted_out_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "opted_out_at": {
-          "name": "opted_out_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
@@ -3499,19 +3486,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "season_entries_opted_out_by_users_id_fk": {
-          "name": "season_entries_opted_out_by_users_id_fk",
-          "tableFrom": "season_entries",
-          "tableTo": "users",
-          "columnsFrom": [
-            "opted_out_by"
           ],
           "columnsTo": [
             "id"

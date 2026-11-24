@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { OptOutForm } from "~/components/opt-out-section";
+import { PartnerFinderView } from "~/components/partner-finder";
 import { SeasonEntry } from "~/components/season-entry";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -14,6 +15,7 @@ import {
   placeText,
   startsText,
 } from "~/lib/my-leagues";
+import { FINDER_ID, FINDER_OPEN_INLINE, FINDER_TITLE, finderPath } from "~/lib/partner-search";
 import { PAIR_SECTION_PATH } from "~/lib/pairs";
 
 // One league on Ligáim (#394): a card made of sections, one per topic, so a
@@ -24,9 +26,9 @@ import { PAIR_SECTION_PATH } from "~/lib/pairs";
 export type SectionProps = { card: MyLeagueCard; actionData?: MyLeaguesActionData };
 
 /** A section of the card: a small title and its lines. */
-export function CardSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function CardSection({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className="grid content-start gap-1">
+    <section id={id} aria-label={title} className="grid scroll-mt-20 content-start gap-1">
       <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</h3>
       {children}
     </section>
@@ -66,8 +68,23 @@ export function PairSection({ card }: SectionProps) {
           <Link to={PAIR_SECTION_PATH} className="font-semibold underline">
             {INVITE_PARTNER}
           </Link>
+          {", vagy "}
+          <Link to={finderPath(card.league.slug)!} className="font-semibold underline">
+            {FINDER_OPEN_INLINE}
+          </Link>
+          .
         </p>
       )}
+    </CardSection>
+  );
+}
+
+/** Párkereső (#398): the league's seekers for a player without a pair; with one, one line. */
+export function FinderSection({ card }: SectionProps) {
+  if (!card.finder) return null;
+  return (
+    <CardSection title={FINDER_TITLE} id={FINDER_ID}>
+      <PartnerFinderView finder={card.finder} />
     </CardSection>
   );
 }
@@ -173,6 +190,7 @@ export function NextRoundSection({ card }: SectionProps) {
 export const SECTIONS: React.ComponentType<SectionProps>[] = [
   RoundSection,
   PairSection,
+  FinderSection,
   PlaceSection,
   NextRoundSection,
   SummarySection,

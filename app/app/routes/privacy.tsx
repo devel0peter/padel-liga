@@ -280,6 +280,14 @@ export default function Privacy() {
               a párod nevével, e-mail-címével és telefonszámával. A jelzés
               alapból ki van kapcsolva, és bármikor kikapcsolhatod.
             </p>
+            <p>
+              A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét,
+              Élő-pontját, azt, hogy mióta keres párt, valamint a
+              telefonszámát és az e-mail-címét. A liga többi pár nélküli
+              játékosa ugyanezt látja róluk, telefonszám és e-mail-cím nélkül. Ha
+              felhívod vagy írsz valakinek, az a saját telefonodról vagy
+              levelezésedből megy: mi nem küldünk és nem tárolunk róla semmit.
+            </p>
           </Section>
 
           <Section title="Ha változik a párod">

@@ -229,7 +229,7 @@ describe("Profil: Párod and Korábbi párjaid", () => {
         league: expect.objectContaining({ id: 1, name: "Padelpárbaj Győr" }),
         pair: { id: 2, partnerName: "Kis Béla", partnerEmail: "bela@x.hu", partnerPhone: "+36 30 123 4568" },
         link: null,
-        seeking: null,
+        search: null,
       }),
     ]);
   });
@@ -254,9 +254,9 @@ describe("Profil: Párod and Korábbi párjaid", () => {
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'lone', 'chosen')`);
     const d: any = await P.loader(args(get(lone)));
     expect(d.pair.multi).toBe(true);
-    expect(d.pair.overview.map((o: any) => [o.league.name, o.pair, o.seeking])).toEqual([
-      ["Padelpárbaj Győr", null, false],
-      ["Padelpárbaj Győr 2", null, false],
+    expect(d.pair.overview.map((o: any) => [o.league.name, o.pair, o.search, o.finder])).toEqual([
+      ["Padelpárbaj Győr", null, { seeking: false, listed: false }, "/leagues/gyor#parkereso"],
+      ["Padelpárbaj Győr 2", null, { seeking: false, listed: false }, "/leagues/gyor2#parkereso"],
     ]);
     expect(d.pair.overview.every((o: any) => /\/pair\/join\/[\w-]+$/.test(o.link))).toBe(true);
     expect(d.former).toEqual([]);
@@ -266,7 +266,8 @@ describe("Profil: Párod and Korábbi párjaid", () => {
     expect(await P.action(args(form(lone, { intent: "partner_search", league: "1", seeking: "1" })))).toEqual({ intent: "partner_search", ok: true });
     expect(h.raw.prepare("select seeking from partner_searches where user_id = 'lone' and league_id = 1").get().seeking).toBe(1);
     const d: any = await P.loader(args(get(lone)));
-    expect(d.pair.overview[0].seeking).toBe(true);
+    // Her own switch-on is under the Párkereső wording (#398): listed.
+    expect(d.pair.overview[0].search).toEqual({ seeking: true, listed: true });
     // Not a league of hers: refused.
     const refused: any = await P.action(args(form(lone, { intent: "partner_search", league: "2", seeking: "1" }))).catch((e) => e);
     expect(refused.status).toBe(400);

@@ -24,6 +24,7 @@ import {
 } from "./my-leagues";
 import { optOutView, type OptOutView } from "./opt-out";
 import { optOut, optOutCard, undoOptOut } from "./opt-out.server";
+import { partnerFinder, type PartnerFinder } from "./partner-search.server";
 import { seasonRecords } from "./profiles.server";
 import { applyToSeason, entryCounts, entryViews } from "./season-entries.server";
 import type { EntryView } from "./season-entries";
@@ -32,8 +33,9 @@ import { getSeason, listSeasons } from "./seasons.server";
 
 // Ligáim (#394): one card per league of the player (D128). The round, the
 // summary and the place come from ladderPage, the Tabella's own loader, so
-// the numbers are the same as there. The partner is selected by name only:
-// no email or phone is read on the way here.
+// the numbers are the same as there. The partner is selected by name only;
+// the only phone and email on the card are Párkereső's, between two of the
+// league's listed seekers (#398, D177, partnerFinder).
 
 export type MyLeagueCard = {
   league: { name: string; slug: string; city: string };
@@ -53,7 +55,18 @@ export type MyLeagueCard = {
   /** Null before the season's groups are out. */
   summary: LeagueSummary | null;
   own: OwnSeason;
+  /**
+   * Párkereső (#398): "Neked már van párod.", or the league's listed seekers,
+   * with phone and email only when the player is one too. Its pair link is a
+   * path until the route gives it the site's address (withOrigin).
+   */
+  finder: PartnerFinder | null;
 };
+
+/** Párkereső's pair link as a full address, to copy and share (the request's origin). */
+export function withOrigin(card: MyLeagueCard, origin: string): MyLeagueCard {
+  return card.finder?.kind === "single" ? { ...card, finder: { ...card.finder, link: origin + card.finder.link } } : card;
+}
 
 /** The partner's name in each league where the player has an active pair. */
 async function partners(userId: string, leagueIds: number[]): Promise<Map<number, string>> {
@@ -141,6 +154,7 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
       optOut: optOut ? optOutView(optOut) : null,
       summary: ladder?.kind === "ladder" ? leagueSummary(ladder.phase, bands) : null,
       own: { matches: record?.matches ?? 0, wins: record?.wins ?? 0, elo: rating === null ? null : Math.round(rating) },
+      finder: await partnerFinder(user, league.id, now),
       order: seasonOrder(calendar),
     });
   }

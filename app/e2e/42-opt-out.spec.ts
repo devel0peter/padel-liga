@@ -1,4 +1,4 @@
-// Walkthrough step 42 (#395, D176): default in, and "Nem folytatom" on
+// Walkthrough step 43 (#395, D176): default in, and "Nem folytatom" on
 // Ligáim. Anna's pair plays round 1 of Mintaváros (published in 06-groups):
 // her card says they are in round 2 and until when she can opt out; she opts
 // out after the confirmation, her partner gets one notice (no email), Párok
@@ -14,7 +14,7 @@ const anna = PAIRS.p1[0];
 const partner = PAIRS.p1[1];
 const DAY = 86400;
 
-test("42. Nem folytatom on Ligáim: the confirmation, the partner's notice, Párok and Napló, then Mégis folytatom", async ({ browser }) => {
+test("43. Nem folytatom on Ligáim: the confirmation, the partner's notice, Párok and Napló, then Mégis folytatom", async ({ browser }) => {
   const org = await as(browser, ORGANIZER.email);
   const season = await seasonPath(org.page);
   const id = Number(/\/seasons\/(\d+)$/.exec(season)![1]);

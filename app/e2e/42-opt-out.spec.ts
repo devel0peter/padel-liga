@@ -69,7 +69,8 @@ test("42. Nem folytatom on Ligáim: the confirmation, the partner's notice, Pár
 
     // The organizer: Párok and Napló.
     await visit(org.page, "/admin/leagues/minta/pairs");
-    await expect(content(org.page).getByRole("row").filter({ hasText: anna.name })).toContainText("Kilép a kör végén");
+    // The pair's row (Párok also lists Anna's strikes under "Fekete pontok").
+    await expect(content(org.page).getByRole("row").filter({ hasText: anna.name }).filter({ hasText: "Kilép a kör végén" })).toHaveCount(1);
     await test.info().attach("Párok", { body: await org.page.screenshot({ fullPage: true }), contentType: "image/png" });
     expect(d1(`select count(*) as n from audit_log where action = 'season_entry.opt_out' and target = 'pair:${pair!.id}'`)).toEqual([{ n: 1 }]);
 
@@ -85,6 +86,9 @@ test("42. Nem folytatom on Ligáim: the confirmation, the partner's notice, Pár
     expect(d1(`select count(*) as n from email_messages where to_email in ('${anna.email}', '${partner.email}') and created_at >= ${now}`)).toEqual([{ n: 0 }]);
     await context.close();
   } finally {
+    // Whatever happened above: default in again, and round 1's own first day,
+    // so 99-round-switch drafts the pair as before.
+    d1Update(`update season_entries set opt_out_phase = null, opted_out_by = null, opted_out_at = null where season_id = ${id} and pair_id = ${pair!.id}`);
     d1Update(`update season_phases set starts_at = ${before!.starts_at} where season_id = ${id} and number = 1`);
     await org.context.close();
   }

@@ -289,7 +289,8 @@ function SeasonForm({
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">Szünetek</legend>
         <p className="text-xs text-muted-foreground">
-          Szünet alatt nem fut kör: ha egy kör beleérne, a szünet utáni hétfőn kezdődik.
+          Az induló naptárban szünet alatt nem fut kör: ha egy kör beleérne, a szünet utáni hétfőn kezdődik. Ha később
+          meghosszabbítasz egy kört, a későbbi körök ugyanennyivel tolódnak, a szünetet nem ugorják át.
         </p>
         {breaks.map((b, i) => (
           <div key={b.key} className="flex flex-wrap items-center gap-2">

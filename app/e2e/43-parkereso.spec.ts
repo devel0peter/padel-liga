@@ -1,4 +1,4 @@
-// Párkereső (#398, D177): three new Mintaváros players without a partner.
+// Walkthrough step 42, Párkereső (#398, D177): three new Mintaváros players without a partner.
 // Pál opens it from Kezdőlap and switches it on with "Bekapcsolom a
 // párkeresést"; Panni sees him without contact data until she switches it on
 // too, then both see each other's phone and email. Petra's switch is made

@@ -4,7 +4,7 @@ import { ChooseLeague } from "~/components/choose-league";
 import { LeagueCard } from "~/components/league-card";
 import { requireUser } from "~/lib/auth/session.server";
 import { leagueChoices } from "~/lib/league-members.server";
-import { myLeagueCards, myLeaguesAction } from "~/lib/my-leagues.server";
+import { myLeagueCards, myLeaguesAction, withOrigin } from "~/lib/my-leagues.server";
 import { SITE_NAME } from "~/lib/site";
 
 // Ligáim (#394): the player's leagues, one card each with a short summary,
@@ -19,7 +19,8 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const now = new Date();
-  const cards = await myLeagueCards(user, now);
+  const origin = new URL(request.url).origin;
+  const cards = (await myLeagueCards(user, now)).map((c) => withOrigin(c, origin));
   const choices = cards.length === 0 ? await leagueChoices(user.id, now) : [];
   return { cards, choices: choices.map((c) => ({ id: c.id, city: c.cityName, name: c.name })) };
 }

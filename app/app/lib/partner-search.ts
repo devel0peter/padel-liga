@@ -32,6 +32,8 @@ export const FINDER_SWITCH_ON = "Bekapcsolom a párkeresést";
 export const FINDER_EMPTY = "Most rajtad kívül senki sem keres párt ebben a ligában.";
 export const FINDER_LOCKED = "Az elérhetőségüket akkor látod, ha te is bekapcsolod a párkeresést: ők is a tiédet.";
 export const FINDER_OPEN = "Nézd meg a Párkeresőt";
+// Inside a sentence: "Nincs párod. Hívd meg a párodat, vagy nézd meg a Párkeresőt."
+export const FINDER_OPEN_INLINE = "nézd meg a Párkeresőt";
 
 /** The league's Párkereső: the section of its card on Ligáim. */
 export const finderPath = (leagueSlug: string | undefined) => (leagueSlug ? `/leagues/${leagueSlug}#${FINDER_ID}` : undefined);

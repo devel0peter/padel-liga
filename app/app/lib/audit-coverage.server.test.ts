@@ -199,17 +199,36 @@ const STEPS: Step[] = [
     },
   },
   {
-    // A permanent partner change (#402) made final by the players (their own
-    // steps are audited in partner-changes.server.test.ts), undone on Párok.
-    action: "partner_change.undo",
+    // A permanent partner change (#402) the new partner accepted (the
+    // players' steps are audited in partner-changes.server.test.ts), approved
+    // on Párok (#416), then undone there.
+    action: "partner_change.approve",
     actor: ORG,
     run: async () => {
       h.raw
         .prepare(
-          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, starts_phase, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'final', 2, ?)",
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'accepted', ?)",
         )
         .run(sec("2026-11-10T10:00:00Z"));
-      await expectOk(CHANGES.undoPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE));
+      await expectOk(CHANGES.approvePartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE));
+    },
+  },
+  {
+    action: "partner_change.undo",
+    actor: ORG,
+    run: () => expectOk(CHANGES.undoPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE)),
+  },
+  {
+    // Accepted again, and rejected with a reason (#416).
+    action: "partner_change.reject",
+    actor: ORG,
+    run: async () => {
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'accepted', ?)",
+        )
+        .run(sec("2026-11-11T09:00:00Z"));
+      await expectOk(CHANGES.rejectPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, "Túl sok csere.", IN_PHASE));
     },
   },
   {
@@ -316,7 +335,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.cities.tsx": ["city.create", "city.update", "city.delete"],
   "admin.clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
-  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel", "partner_change.undo"],
+  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel", "partner_change.approve", "partner_change.reject", "partner_change.undo"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete", "phase.extend"],
   "admin.league-players.tsx": ["pair.create"],

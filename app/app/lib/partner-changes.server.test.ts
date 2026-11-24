@@ -72,6 +72,12 @@ async function world() {
 
 const matchesOf = (pairId: number) => all("select id from matches where pair_a = ? or pair_b = ? order by id", pairId, pairId).map((m) => m.id as number);
 
+// The new partner accepts and the Szervező approves (#416): the change is final.
+async function final(now = DURING, id = 1) {
+  expect(await P.acceptPartnerChange({ id: "q" }, id, now)).toMatchObject({ ok: true });
+  return P.approvePartnerChange("o", 1, id, now);
+}
+
 describe("starting, withdrawing and declining (#402 req 1-3)", () => {
   beforeEach(world);
 
@@ -143,22 +149,77 @@ describe("starting, withdrawing and declining (#402 req 1-3)", () => {
 describe("accepting in a running round (#402 req 5-7)", () => {
   beforeEach(world);
 
-  it("is final: the leaving player is marked absent on every remaining match, the new partner named; notices and email", async () => {
+  it("accepted, it waits for the Szervező: both see \"Jóváhagyásra vár\", nothing is marked, the organizers are told (#416)", async () => {
+    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`.replace("insert", "insert or ignore"));
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    h.mails = [];
+    expect(await P.acceptPartnerChange({ id: "q" }, 1, DURING)).toMatchObject({ ok: true });
+    expect(change()).toMatchObject({ status: "accepted", starts_phase: null });
+    expect(marks()).toEqual([]);
+    const { getSeason } = await import("~/lib/seasons.server");
+    const season = (await getSeason(1))!;
+    expect((await P.partnerChangeView("a1", 1, season, DURING))!.items[0]!.text).toMatch(/^Jóváhagyásra vár/);
+    expect((await P.partnerChangeView("q", 1, season, DURING))!.items[0]!.text).toMatch(/^Jóváhagyásra vár/);
+    // The organizers: one in-app notice each, their own kind; no email at all.
+    expect(notices("partner_change_waiting").map((n) => n.user_id)).toEqual(["o"]);
+    expect(h.mails).toEqual([]);
+    expect(audits("partner_change.accept")).toEqual([{ actor_id: "q", target: "partner_change:1", detail: "pair:1", league_id: 1 }]);
+    // The new partner is taken while it waits.
+    const PAIRS = await import("~/lib/pairs.server");
+    expect(await PAIRS.createPair("o", 1, "q", "r")).toMatchObject({ ok: false });
+  });
+
+  it("the Szervező's approval makes it final: the leaving player is marked absent on every remaining match, the new partner named; notices and email", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
     h.mails = [];
     // One match of pair 1 already has a result: it keeps who played.
     const [played, ...rest] = matchesOf(1);
     h.raw.prepare("update matches set status = 'final', outcome = ? where id = ?").run(JSON.stringify({ kind: "played", score: { sets: [[6, 1], [6, 2]] } }), played);
+    h.raw.exec("delete from notifications");
     expect(await P.acceptPartnerChange({ id: "q" }, 1, DURING)).toMatchObject({ ok: true });
-    expect(change()).toMatchObject({ status: "final", starts_phase: 2 });
+    expect(await P.approvePartnerChange("o", 2, 1, DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.not_waiting });
+    expect(await P.approvePartnerChange("o", 1, 1, DURING)).toMatchObject({ ok: true });
+    expect(change()).toMatchObject({ status: "final", starts_phase: 2, decided_by: "o" });
     expect(marks()).toEqual(rest.map((m) => ({ match_id: m, pair_id: 1, absent_id: "b1", marked_by: "q", partner_change_id: 1 })));
-    // The leaving player: in the app and by email; the starter in the app; the opponents the usual notice.
-    expect(notices("partner_change").map((n) => n.user_id)).toEqual(["a1", "b1", "q"]);
+    // The starter (accepted, then final), the leaving player and the new partner in the app; only the leaving player by email.
+    expect(notices("partner_change").map((n) => n.user_id)).toEqual(["a1", "a1", "b1", "q"]);
     expect(h.mails).toEqual([expect.objectContaining({ toEmail: "b1@x.hu", kind: "final", partner: "Játékos Q", staying: "Játékos A1", from: 2 })]);
     const opponents = notices("absence_marked");
     expect(opponents.length).toBe(rest.length * 2);
     expect(opponents.every((n) => n.body.includes("Játékos Q"))).toBe(true);
-    expect(audits("partner_change.accept")).toEqual([{ actor_id: "q", target: "partner_change:1", detail: "pair:1; starts phase 2", league_id: 1 }]);
+    expect(audits("partner_change.approve")).toEqual([{ actor_id: "o", target: "partner_change:1", detail: "pair:1; starts phase 2", league_id: 1 }]);
+    // Decided once.
+    expect(await P.approvePartnerChange("o", 1, 1, DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.not_waiting });
+  });
+
+  it("the Szervező's rejection ends it: the three get the reason in the app, no email, the old pair stays (#416)", async () => {
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    h.mails = [];
+    h.raw.exec("delete from notifications");
+    expect(await P.rejectPartnerChange("o", 1, 1, "x".repeat(301), DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.reason });
+    expect(await P.rejectPartnerChange("o", 1, 1, " Túl sok csere. ", DURING)).toMatchObject({ ok: true });
+    expect(change()).toMatchObject({ status: "rejected", reason: "Túl sok csere.", decided_by: "o" });
+    const told = notices("partner_change");
+    expect(told.map((n) => n.user_id)).toEqual(["a1", "b1", "q"]);
+    expect(told.every((n) => n.body.includes("Indoklás: Túl sok csere."))).toBe(true);
+    expect(h.mails).toEqual([]);
+    expect(marks()).toEqual([]);
+    expect(one("select status from pairs where id = 1").status).toBe("active");
+    expect(audits("partner_change.reject")).toEqual([{ actor_id: "o", target: "partner_change:1", detail: "pair:1", league_id: 1 }]);
+    // Free again, and the pair can ask again.
+    expect(await P.startPartnerChange({ id: "a1" }, 1, "q", DURING)).toMatchObject({ ok: true });
+  });
+
+  it("a change still waiting when the round switch draft is made starts at the following switch once approved (#416)", async () => {
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    h.raw.prepare("insert into groups (season_id, phase, number) values (1, 2, 1)").run();
+    await P.approvePartnerChange("o", 1, 1, DURING);
+    expect(change()).toMatchObject({ status: "final", starts_phase: 3 });
+    // Not in round 2's switch.
+    expect(await P.switchChanges(1, 2)).toEqual([]);
+    expect((await P.switchChanges(1, 3)).map((c) => c.oldPairId)).toEqual([1]);
   });
 
   it("a new partner who meanwhile got a pair can't accept", async () => {
@@ -171,14 +232,14 @@ describe("accepting in a running round (#402 req 5-7)", () => {
   it("a change made after the round switch draft starts at the following switch", async () => {
     h.raw.prepare("insert into groups (season_id, phase, number) values (1, 2, 1)").run();
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    expect(await P.acceptPartnerChange({ id: "q" }, 1, DURING)).toMatchObject({ ok: true });
+    expect(await final()).toMatchObject({ ok: true });
     expect(change().starts_phase).toBe(3);
   });
 
   it("in the season's last round it starts at the season switch", async () => {
     for (const phase of [2, 3, 4]) h.raw.prepare("insert into groups (season_id, phase, number) values (1, ?, 1)").run(phase);
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    expect(await P.acceptPartnerChange({ id: "q" }, 1, DURING)).toMatchObject({ ok: true });
+    expect(await final()).toMatchObject({ ok: true });
     expect(change().starts_phase).toBeNull();
   });
 
@@ -190,7 +251,7 @@ describe("accepting in a running round (#402 req 5-7)", () => {
     expect((await P.partnerChangeView("q", 1, season, DURING))!.items).toEqual([expect.objectContaining({ role: "partner", canAnswer: true })]);
     expect((await P.partnerChangeView("a1", 1, season, DURING))!).toMatchObject({ items: [{ role: "staying", canWithdraw: true }], start: null });
     expect((await P.partnerChangeView("b1", 1, season, DURING))!).toMatchObject({ items: [{ role: "leaving", canAnswer: false, canWithdraw: false }], start: null });
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     expect((await P.partnerChangeView("b1", 1, season, DURING))!.items[0]!.text).toBe("Játékos Q játszik helyetted Játékos A1 mellett. A 2. körtől nincs párod ebben a ligában.");
     // The new partner is no longer offered to another pair.
     expect((await P.partnerChangeView("a2", 1, season, DURING))?.start?.candidates.map((c) => c.id)).toEqual(["o", "r"]);
@@ -208,7 +269,7 @@ describe("a pair that hasn't played yet (#402 req 6)", () => {
     h.raw.exec(`insert into groups (id, season_id, phase, number, basis) values (50, 1, 2, 1, '1,2,5|3,4')`);
     h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (50, 5, 1)`);
     await P.startPartnerChange({ id: "b5" }, 1, "q", DURING);
-    expect(await P.acceptPartnerChange({ id: "q" }, 1, DURING)).toMatchObject({ ok: true });
+    expect(await final()).toMatchObject({ ok: true });
     const fresh = one("select id, player_a, player_b, status, source from pairs where status = 'active' and (player_a = 'q' or player_b = 'q')");
     expect(fresh).toMatchObject({ player_a: "q", player_b: "b5", source: "change" });
     expect(one("select status from pairs where id = 5").status).toBe("dissolved");
@@ -228,7 +289,7 @@ describe("the organizer's undo (#402 req 8)", () => {
 
   it("revokes the marks on matches not played yet, tells all three, and is audited", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     const [first] = matchesOf(1);
     // One of them was played meanwhile: its mark stays.
     h.raw.prepare("update matches set status = 'final' where id = ?").run(first);
@@ -244,7 +305,7 @@ describe("the organizer's undo (#402 req 8)", () => {
 
   it("can't undo a change of another league", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     expect(await P.undoPartnerChange("o", 2, 1, DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.not_final });
   });
 
@@ -254,7 +315,16 @@ describe("the organizer's undo (#402 req 8)", () => {
       expect.objectContaining({ id: 1, status: "open", staying: "Játékos A1", leaving: "Játékos B1", partner: "Játékos Q", canUndo: false }),
     ]);
     await P.acceptPartnerChange({ id: "q" }, 1, DURING);
-    expect(await P.leaguePartnerChanges(1, DURING)).toEqual([expect.objectContaining({ status: "final", startsPhase: 2, canUndo: true })]);
+    expect(await P.leaguePartnerChanges(1, DURING)).toEqual([
+      expect.objectContaining({ status: "accepted", canDecide: true, canUndo: false, counts: { staying: 0, partner: 0 } }),
+    ]);
+    await P.approvePartnerChange("o", 1, 1, DURING);
+    expect(await P.leaguePartnerChanges(1, DURING)).toEqual([
+      expect.objectContaining({ status: "final", startsPhase: 2, canUndo: true, canDecide: false, counts: { staying: 1, partner: 1 } }),
+    ]);
+    // How often a pair played with an absent player this season (#416): pair 1's marked matches.
+    expect((await P.pairAbsenceCounts(1, DURING)).get(1)).toBe(marks().length);
+    expect((await P.pairAbsenceCounts(1, DURING)).get(2)).toBeUndefined();
   });
 });
 
@@ -270,7 +340,7 @@ describe("Élő-pont and account deletion around a final change", () => {
 
   it("the leaving player's Élő-pont doesn't change on a match the new partner played; the other three are rated", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     const [first] = matchesOf(1);
     h.raw
       .prepare("update matches set status = 'final', outcome = ?, revision = revision + 1 where id = ?")
@@ -286,7 +356,7 @@ describe("Élő-pont and account deletion around a final change", () => {
 
   it("a new partner who deletes their account ends the change: the marks on unplayed matches go", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     expect(marks().length).toBeGreaterThan(0);
     const D = await import("~/lib/account-deletion.server");
     expect(await D.deleteOwnAccount("q", DURING)).toMatchObject({ ok: true, mode: "remove" });
@@ -313,7 +383,7 @@ describe("a committed new partner can't be paired elsewhere (review M1)", () => 
     const PAIRS = await import("~/lib/pairs.server");
     expect((await leagueSeekers({ id: 1 })).map((s) => s.id)).toContain("q");
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     expect(one("select seeking from partner_searches where user_id = 'q'").seeking).toBe(0);
     expect((await leagueSeekers({ id: 1 })).map((s) => s.id)).not.toContain("q");
     expect((await PAIRS.pairCandidates({ id: 1 })).map((c) => c.id)).not.toContain("q");
@@ -331,7 +401,7 @@ describe("a committed new partner can't be paired elsewhere (review M1)", () => 
 
   it("a change whose old pair is gone from the draft at its switch ends, and its three players are told", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     // A round 2 draft without pair 1 (the organizer took it out).
     h.raw.exec(`insert into groups (id, season_id, phase, number) values (60, 1, 2, 1)`);
     h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (60, 2, 1), (60, 3, 2), (60, 4, 3)`);
@@ -349,7 +419,7 @@ describe("marks and the window (review L2, L3)", () => {
 
   it("an undo keeps the mark of a match whose agreed start has passed, even without a result", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     const [started] = matchesOf(1);
     h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = ?").run(sec("2026-11-11T18:00:00Z"), started);
     await P.undoPartnerChange("o", 1, 1, at("2026-11-11T20:00:00Z"));
@@ -360,7 +430,7 @@ describe("marks and the window (review L2, L3)", () => {
     const [first] = matchesOf(1);
     h.raw.prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 1, 'b1', 'a1', ?)").run(first, sec("2026-11-10T09:00:00Z"));
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     expect(marks().find((m) => m.match_id === first)).toMatchObject({ absent_id: "b1", marked_by: "a1", partner_change_id: 1 });
     const { absencesOf } = await import("~/lib/substitutes.server");
     expect((await absencesOf([first])).get(first)![0]!.substitute).toBe("Játékos Q");
@@ -372,7 +442,7 @@ describe("account deletion (review L5)", () => {
 
   it("the leaving player's deletion lets a final change go ahead", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     h.raw.exec("update season_phases set deadline = 1 where number = 1");
     const D = await import("~/lib/account-deletion.server");
     expect(await D.deleteOwnAccount("b1", DURING)).toMatchObject({ ok: true, mode: "anonymize" });
@@ -382,7 +452,7 @@ describe("account deletion (review L5)", () => {
 
   it("the starter's deletion undoes it and tells the other two in the app", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     h.raw.exec("update season_phases set deadline = 1 where number = 1");
     h.raw.exec("delete from notifications");
     const D = await import("~/lib/account-deletion.server");
@@ -406,7 +476,7 @@ describe("no other email for the new partner (review round 2, M3)", () => {
     expect(await remindedC()).toContain("q");
     h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'q', 1)`);
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
-    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    await final();
     // The accept switched "Párt keresek" off (and the listing on Párkereső, D177), which alone would make q due for C.
     expect(one("select seeking, listed from partner_searches where user_id = 'q'")).toEqual({ seeking: 0, listed: 0 });
     expect(await remindedC()).not.toContain("q");

@@ -18,7 +18,11 @@ export type PartnerChangeStatus =
   // Unanswered for LAPSE_DAYS: stored lazily (a read treats an old open row
   // as lapsed already, lapsedAt), so no cron step is needed.
   | "lapsed"
-  // Accepted: final, until the new pair starts (the organizer can undo it).
+  // Accepted by the new partner: waits for the organizer (#416, D180).
+  | "accepted"
+  // The organizer said no, with an optional reason.
+  | "rejected"
+  // Approved: final, until the new pair starts (the organizer can undo it).
   | "final"
   | "undone"
   // The new pair exists and plays: the old pair is dissolved.
@@ -41,7 +45,7 @@ export function currentStatus(c: { status: PartnerChangeStatus; createdAt: Date 
 
 /** A change that still holds the pair: one at a time per pair (#402 req 2). */
 export function isLive(status: PartnerChangeStatus): boolean {
-  return status === "open" || status === "final";
+  return status === "open" || status === "accepted" || status === "final";
 }
 
 /**
@@ -85,9 +89,13 @@ export type PartnerChangeRefusal =
   // The new partner is one of the pair, not a registered player of the
   // league, already in a pair, or named in another final change.
   | "partner"
-  // The change is not open (answered, withdrawn, lapsed) or not final.
+  // The change is not open (answered, withdrawn, lapsed), not waiting for
+  // the organizer, or not final.
   | "not_open"
+  | "not_waiting"
   | "not_final"
+  // A rejection's reason is too long.
+  | "reason"
   // Only the one who sent it withdraws, only the new partner answers.
   | "not_yours";
 
@@ -97,7 +105,9 @@ export const PARTNER_CHANGE_REFUSALS: Record<PartnerChangeRefusal, string> = {
   already: "Már van egy folyamatban lévő partnercseréd ebben a ligában.",
   partner: "Őt most nem hívhatod: már van párja, vagy nem játszik a ligában.",
   not_open: "Ez a kérés már nem érvényes.",
+  not_waiting: "Ez a partnercsere már nem vár döntésre.",
   not_final: "Ez a partnercsere már nem vonható vissza.",
+  reason: "Az indoklás legfeljebb 300 karakter lehet.",
   not_yours: "Ez a kérés nem a tiéd.",
 };
 
@@ -140,14 +150,24 @@ export function withdrawRefusal(c: { status: PartnerChangeStatus; startedBy: str
   return c.status === "open" ? null : "not_open";
 }
 
+/** A rejection's optional reason (#416): at most this many characters, as other organizer reasons. */
+export const REASON_MAX = 300;
+
+/** Why the organizer can't approve or reject this change, or null: only an accepted one (#416). */
+export function decideRefusal(c: { status: PartnerChangeStatus }, reason = ""): PartnerChangeRefusal | null {
+  if (c.status !== "accepted") return "not_waiting";
+  return reason.trim().length > REASON_MAX ? "reason" : null;
+}
+
 /** Why the organizer can't undo this change, or null: only a final one, before the new pair starts (#402 req 8). */
 export function undoRefusal(c: { status: PartnerChangeStatus }): PartnerChangeRefusal | null {
   return c.status === "final" ? null : "not_final";
 }
 
 /** Párok's state line for the organizer (#402 req 8). */
-export function changeStateText(c: { status: "open" | "final" | "started"; startsPhase: number | null; createdAt: Date }): string {
+export function changeStateText(c: { status: "open" | "accepted" | "final" | "started"; startsPhase: number | null; createdAt: Date }): string {
   if (c.status === "open") return `Az új partner válaszára vár, ${formatUntilDate(lapsesAt(c.createdAt))}.`;
+  if (c.status === "accepted") return "Az új partner elfogadta. Jóváhagyásra vár: te döntesz róla.";
   if (c.status === "final") return `Elfogadva. Az új pár ${startsText(c.startsPhase)} játszik, addig az új partner helyettesít.`;
   return "Az új pár már játszik.";
 }
@@ -158,7 +178,7 @@ export const SECTION_TITLE = "Állandó partnercsere";
 export const ASK_TEXT = "Végleg új partnerrel játszanál?";
 
 export const START_TEXT =
-  "Ha a párod végleg kiesik (sérülés, költözés), új partnerrel folytathatod a helyeteken. Az új partner a kör hátralévő meccsein helyette játszik, utána pedig ő lesz a párod.";
+  "Ha a párod végleg kiesik (sérülés, költözés), új partnerrel folytathatod a helyeteken. Ha az új partner elfogadja és a szervező jóváhagyja, a kör hátralévő meccsein ő játszik helyette, utána pedig ő lesz a párod.";
 export const NO_CANDIDATES = "Most nincs a ligában pár nélküli játékos, akit hívhatnál.";
 
 /** What the card shows a player about a change, by their role in it. */
@@ -169,9 +189,28 @@ export function openText(role: ChangeRole, c: { starter: string; leaving: string
   const until = formatUntilDate(c.lapsesAt);
   if (role === "staying") return `Elküldted ${c.partner} részére. ${until} válaszolhat.`;
   if (role === "partner")
-    return `${c.starter} állandó partnernek hív ${c.leaving} helyett. Ha elfogadod, a kör hátralévő meccsein helyettesként játszol, utána pedig párként. ${capitalize(until)} válaszolhatsz.`;
+    return `${c.starter} állandó partnernek hív ${c.leaving} helyett. Ha elfogadod és a szervező jóváhagyja, a kör hátralévő meccsein helyettesként játszol, utána pedig párként. ${capitalize(until)} válaszolhatsz.`;
   // The other player of the pair (the one who would leave).
   return `${c.starter} állandó partnercserét kért: ${c.partner} játszana helyetted. Még nem válaszolt.`;
+}
+
+/** An accepted change waiting for the organizer (#416): "Jóváhagyásra vár". */
+export const WAITING = "Jóváhagyásra vár";
+
+export function waitingText(role: ChangeRole, c: { starter: string; leaving: string; partner: string }): string {
+  if (role === "staying") return `${WAITING}: ${c.partner} elfogadta, a szervező dönt róla. Addig ${c.leaving} játszik veled.`;
+  if (role === "partner") return `${WAITING}: elfogadtad ${c.starter} kérését, a szervező dönt róla.`;
+  return `${c.starter} állandó partnercserét kért: ${c.partner} játszana helyetted. ${WAITING}: a szervező dönt róla.`;
+}
+
+/** Párok's line of how often a player changed partner this season (#416). */
+export function changeCountText(name: string, count: number): string {
+  return count === 0 ? `${name}: még nem cserélt partnert ebben a szezonban.` : `${name}: ${count} állandó partnercsere ebben a szezonban.`;
+}
+
+/** Párok's line of a pair's matches with an absent player this season (#416). */
+export function absenceCountText(count: number): string | null {
+  return count === 0 ? null : `Helyettessel: ${count} meccs ebben a szezonban`;
 }
 
 export function finalText(role: ChangeRole, c: { staying: string; leaving: string; partner: string; phase: number | null }): string {
@@ -183,7 +222,9 @@ export function finalText(role: ChangeRole, c: { staying: string; leaving: strin
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-export const SENT_NOTICE = "Elküldtük. Ha elfogadja, ő játszik a párod helyett.";
+export const SENT_NOTICE = "Elküldtük. Ha elfogadja és a szervező jóváhagyja, ő játszik a párod helyett.";
 export const WITHDRAWN_NOTICE = "Visszavontad a kérést.";
-export const ACCEPTED_NOTICE = "Elfogadtad. A kör hátralévő meccsein te játszol helyette.";
+export const ACCEPTED_NOTICE = "Elfogadtad. Jóváhagyásra vár: ha a szervező jóváhagyja, a kör hátralévő meccsein te játszol helyette.";
+export const APPROVED_NOTICE = "Jóváhagytad a partnercserét.";
+export const REJECTED_NOTICE = "Elutasítottad a partnercserét.";
 export const DECLINED_NOTICE = "Nem fogadtad el.";

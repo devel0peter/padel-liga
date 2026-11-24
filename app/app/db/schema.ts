@@ -465,6 +465,7 @@ export const notifications = sqliteTable(
         "strike",
         "absence_marked",
         "partner_change",
+        "partner_change_waiting",
         "no_show_reported",
         "no_show_confirmed",
         "no_show_rejected",
@@ -733,12 +734,13 @@ export const seasonEntries = sqliteTable(
 // A permanent partner change ("Állandó partnercsere", #402, spec 4, D178):
 // a player of the pair (`started_by`, who stays) names a registered player
 // of the league without a pair (`partner_id`) instead of the other player
-// (`leaving_id`); final when the new partner accepts. Until the new pair
+// (`leaving_id`); final when the new partner accepts and the organizer
+// approves it (#416, D180). Until the new pair
 // starts the new partner plays the old pair's matches instead of the
 // leaving player (match_absences.partner_change_id); the new pair starts at
 // the round switch into `starts_phase` in the old pair's spot (#403, D179),
 // or at once when the old pair hasn't played yet (`new_pair_id` then).
-// One open or final change per pair. An open one lapses after 7 days, stored
+// One open, accepted or final change per pair. An open one lapses after 7 days, stored
 // lazily (partner-changes.ts currentStatus). Personal data: who changed
 // with whom; names only on the pages, never an email or phone.
 export const partnerChanges = sqliteTable(
@@ -766,7 +768,9 @@ export const partnerChanges = sqliteTable(
     partnerId: text("partner_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    status: text("status", { enum: ["open", "withdrawn", "declined", "lapsed", "final", "undone", "started"] })
+    // "accepted": the new partner said yes, the organizer decides (#416):
+    // approved it is "final", else "rejected".
+    status: text("status", { enum: ["open", "withdrawn", "declined", "lapsed", "accepted", "rejected", "final", "undone", "started"] })
       .notNull()
       .default("open"),
     // The round whose switch the new pair starts at; null: at the season
@@ -777,17 +781,22 @@ export const partnerChanges = sqliteTable(
     answeredAt: integer("answered_at", { mode: "timestamp" }),
     // Who withdrew, undid or started it, and when: the organizer for an undo.
     endedBy: text("ended_by").references(() => users.id, { onDelete: "set null" }),
+    // The organizer's approval or rejection of an accepted change (#416), with
+    // the optional reason of a rejection (the three players see it).
+    decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    reason: text("reason"),
     endedAt: integer("ended_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (t) => [
     uniqueIndex("partner_changes_live_pair_idx")
       .on(t.pairId)
-      .where(sql`${t.status} in ('open', 'final')`),
-    // A new partner joins one pair at a time.
+      .where(sql`${t.status} in ('open', 'accepted', 'final')`),
+    // A new partner joins one pair at a time, also while the organizer decides.
     uniqueIndex("partner_changes_final_partner_idx")
       .on(t.leagueId, t.partnerId)
-      .where(sql`${t.status} = 'final'`),
+      .where(sql`${t.status} in ('accepted', 'final')`),
     index("partner_changes_season_idx").on(t.seasonId, t.status),
     index("partner_changes_partner_idx").on(t.partnerId),
   ],

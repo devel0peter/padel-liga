@@ -249,7 +249,7 @@ export function partnerChange(input: PartnerChangeEmail): Email {
       [
         `Szia ${input.to}!`,
         `${input.starter} állandó partnernek hív a ligában (${input.league}), ${input.leaving} helyett.`,
-        `Ha elfogadod, a kör hátralévő meccsein helyettesként játszol, utána pedig párként, a helyükön.`,
+        `Ha elfogadod és a szervező jóváhagyja, a kör hátralévő meccsein helyettesként játszol, utána pedig párként, a helyükön.`,
         `A Ligáim oldalon fogadhatod el, ${formatDeadline(input.lapsesAt)}-ig:`,
         card,
         SIGNATURE,

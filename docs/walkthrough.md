@@ -660,17 +660,19 @@ The league's seekers see each other, with phone and email only between two seeke
   - Once paired: "Neked már van párod." on both cards, and they are gone from the others' list. Anna (with a pair) sees only that line.
   - `/leagues/minta` logged out goes to the login; as Ilona (Példaváros) it is 404.
 
-### 44. A player changes partner permanently; the Szervező undoes it (after step 11)
+### 44. A player changes partner permanently; the Szervező approves it, then undoes it (after step 11)
 
-"Állandó partnercsere" on Ligáim (#402, decision log (`docs/decisions.md`) D178; `app/e2e/44-partner-change.spec.ts`). Best seen on the running round seed below. Emails are printed by the dev server, never sent.
+"Állandó partnercsere" on Ligáim (#402, #416, decision log (`docs/decisions.md`) D178, D180; `app/e2e/44-partner-change.spec.ts`). Best seen on the running round seed below. Emails are printed by the dev server, never sent.
 
 - Page: `/leagues/minta`, then the match page, then Párok (`/admin/leagues/minta/pairs`)
 - Account: a player of a pair in round 1; then the new partner (a registered player of Mintaváros without a pair); then the Szervező
-- Do: in "Állandó partnercsere" open "Végleg új partnerrel játszanál?", pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Visszavonás" on the change in "Állandó partnercserék" and confirm.
+- Do: in "Állandó partnercsere" open "Végleg új partnerrel játszanál?", pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Jóváhagyom" on the change in "Állandó partnercserék" on Párok; later press "Visszavonás" there and confirm. (Or "Elutasítom" with a reason instead of approving.)
 - Expect:
   - The picker lists names only (no email or phone): the league's players with no pair. After sending: "Elküldtük." and "Elküldted <név> részére. <nap>-ig válaszolhat." with "Visszavonom"; the partner sees that a change was asked. A second change can't be started while one waits.
   - The new partner: one email ("<név> állandó partnernek hív") and an in-app notice; on Ligáim "<név> állandó partnernek hív <partner> helyett." with "Elfogadom" and "Nem fogadom el". Unanswered, it disappears after 7 days.
-  - After "Elfogadom": "Elfogadtad.", and "A 2. körtől <név> párja vagy." The leaving player gets one email ("Új partner a helyeden") and an in-app notice; the starter an in-app notice. Every remaining match of the pair in round 1 (before its agreed start) shows "<távozó> helyett <új partner> játszik"; the opponents get "Helyettes a meccseteken" naming the new partner. No approval waits for the Szervező.
+  - After "Elfogadom": "Elfogadtad.", and "Jóváhagyásra vár" for the starter and the new partner; nothing on the matches yet. The Szervező (and the Admins) get "Partnercsere jóváhagyásra vár" in the app and by push, no email; Párok shows the change with "Jóváhagyásra vár", how often the two changed partner this season, "Jóváhagyom" and "Elutasítom".
+  - After "Jóváhagyom": the new partner's card says "A 2. körtől <név> párja vagy." The leaving player gets one email ("Új partner a helyeden") and an in-app notice; the starter and the new partner an in-app notice. Every remaining match of the pair in round 1 (before its agreed start) shows "<távozó> helyett <új partner> játszik"; the opponents get "Helyettes a meccseteken" naming the new partner. Párok's pair row shows "Helyettessel: <n> meccs ebben a szezonban".
+  - "Elutasítom" instead: the change ends, the three players get "Elutasított partnercsere" with the reason in the app and by push, no email.
   - Párok: "Állandó partnercserék" with "<maradó>: <távozó> helyett <új partner>" and its state; after "Visszavonás" the marks on matches not played yet are gone and all three get an in-app notice.
 
 ### 45. The new pair takes the old pair's spot at the round switch (after step 44, before step 11's round ends)

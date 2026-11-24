@@ -44,10 +44,11 @@ export function activePairWith(leagueId: number, userIds: string[]) {
     or ${committedPartner(leagueId, userIds)})`;
 }
 
-// The new partner of a final permanent partner change in the league (#402).
+// The new partner of an accepted (waiting for the organizer, #416) or final
+// permanent partner change in the league (#402).
 export function committedPartner(leagueId: number, userIds: string[] | SQL) {
   const who = Array.isArray(userIds) ? sql`(${sql.join(userIds.map((u) => sql`${u}`), sql`, `)})` : sql`(${userIds})`;
-  return sql`exists (select 1 from ${partnerChanges} pc where pc.league_id = ${leagueId} and pc.status = 'final' and pc.partner_id in ${who})`;
+  return sql`exists (select 1 from ${partnerChanges} pc where pc.league_id = ${leagueId} and pc.status in ('accepted', 'final') and pc.partner_id in ${who})`;
 }
 
 export type PairOverview = {

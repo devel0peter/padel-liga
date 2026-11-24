@@ -238,8 +238,8 @@ export default function Privacy() {
               </li>
               <li>
                 <strong>Állandó partnercserénél</strong> azt tároljuk, ki kérte,
-                kinek a helyére, ki az új partner, mikor válaszolt, és ha a szervező
-                visszavonta, ki és mikor. Hármótok és a liga szervezője látja, a
+                kinek a helyére, ki az új partner, mikor válaszolt, a szervező
+                döntését (ki, mikor, elutasításnál az indoklást), és ha visszavonta, ki és mikor. Hármótok és a liga szervezője látja, a
                 csoportbeosztásban a szervező is. Amíg az új pár el nem indul, a
                 meccs négy játékosa látja, hogy az új partner játszik a távozó
                 helyett. E-mail-címet vagy telefonszámot ehhez senkinek nem mutatunk.

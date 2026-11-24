@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  absenceCountText,
   answerRefusal,
+  changeCountText,
   currentStatus,
+  decideRefusal,
   finalText,
   isLive,
   lapsesAt,
@@ -11,8 +14,37 @@ import {
   startsAt,
   startsText,
   undoRefusal,
+  waitingText,
   withdrawRefusal,
 } from "./partner-changes";
+
+describe("the organizer's approval (#416)", () => {
+  const SENT_AT = new Date("2026-11-20T10:00:00Z");
+
+  it("only an accepted change waits for a decision; a reason is at most 300 characters", () => {
+    expect(decideRefusal({ status: "accepted" })).toBeNull();
+    expect(decideRefusal({ status: "accepted" }, "x".repeat(300))).toBeNull();
+    expect(decideRefusal({ status: "accepted" }, "x".repeat(301))).toBe("reason");
+    for (const status of ["open", "final", "rejected", "started"] as const) expect(decideRefusal({ status })).toBe("not_waiting");
+  });
+
+  it("a waiting change holds the pair and never lapses", () => {
+    expect(isLive("accepted")).toBe(true);
+    expect(isLive("rejected")).toBe(false);
+    expect(currentStatus({ status: "accepted", createdAt: SENT_AT }, new Date("2026-12-30T10:00:00Z"))).toBe("accepted");
+  });
+
+  it("tells each player it waits, and Párok how often they changed partner", () => {
+    const c = { starter: "Anna", leaving: "Béla", partner: "Cili" };
+    expect(waitingText("staying", c)).toBe("Jóváhagyásra vár: Cili elfogadta, a szervező dönt róla. Addig Béla játszik veled.");
+    expect(waitingText("partner", c)).toBe("Jóváhagyásra vár: elfogadtad Anna kérését, a szervező dönt róla.");
+    expect(waitingText("leaving", c)).toContain("Jóváhagyásra vár");
+    expect(changeCountText("Anna", 0)).toBe("Anna: még nem cserélt partnert ebben a szezonban.");
+    expect(changeCountText("Anna", 2)).toBe("Anna: 2 állandó partnercsere ebben a szezonban.");
+    expect(absenceCountText(0)).toBeNull();
+    expect(absenceCountText(3)).toBe("Helyettessel: 3 meccs ebben a szezonban");
+  });
+});
 
 const SENT = new Date("2026-11-20T10:00:00Z");
 const day = (n: number) => new Date(SENT.getTime() + n * 86_400_000);

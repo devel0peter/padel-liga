@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, isNull, max, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -88,7 +88,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
       db
         .select({ leagueId: partnerChanges.leagueId, userId: partnerChanges.partnerId })
         .from(partnerChanges)
-        .where(eq(partnerChanges.status, "final")),
+        .where(inArray(partnerChanges.status, ["accepted", "final"])),
     ]);
   return {
     now,

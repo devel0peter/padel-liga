@@ -80,7 +80,8 @@ export type ReminderInput = {
   // rejected isn't reminded either.
   entries: readonly { seasonId: number; pairId: number }[];
   partnerSearches: readonly { leagueId: number; userId: string; seeking: boolean; updatedAt: Date }[];
-  // The new partners of final permanent partner changes (#402): committed to
+  // The new partners of accepted or final permanent partner changes (#402,
+  // #416): committed to
   // a pair that starts at the next round switch, so not "without a pair" (C).
   committed: readonly { leagueId: number; userId: string }[];
   // Unsubscribed, bounced or complained addresses, lowercase.

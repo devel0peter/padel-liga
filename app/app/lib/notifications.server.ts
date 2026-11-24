@@ -10,6 +10,7 @@ import {
   disputeRecipients,
   KIND_TOPIC,
   isEnabled,
+  partnerChangeWaitingMessage,
   resultDisputedMessage,
   noShowReportedMessage,
   pushPayload,
@@ -420,6 +421,18 @@ export async function notifyResultDisputed(input: {
 }): Promise<void> {
   const message = resultDisputedMessage(input);
   await notify("result_disputed", (await leagueStaff(input.leagueId, input.disputedBy)).map((userId) => ({ userId, message })));
+}
+
+// An accepted permanent partner change waits for the organizer (#416): the
+// league's Szervezők and the Admins, in the app and by push (their own
+// switch), never by email; the accepting player left out. Never throws.
+export async function notifyPartnerChangeWaiting(input: { leagueId: number; leagueSlug: string; leagueName: string; except: string }): Promise<void> {
+  try {
+    const message = partnerChangeWaitingMessage(input);
+    await notify("partner_change_waiting", (await leagueStaff(input.leagueId, input.except)).map((userId) => ({ userId, message })));
+  } catch (error) {
+    logError("notification failed", { kind: "partner_change_waiting", error });
+  }
 }
 
 // The league's Szervezők and every Admin, once each, accounts being deleted

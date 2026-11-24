@@ -26,6 +26,10 @@ export const NOTIFICATION_KINDS = {
     label: "Nem jöttek el",
     description: "Ha egy pár jelzi, hogy az ellenfele nem jött el a ligád egy meccsére, és te döntesz róla.",
   },
+  partner_change_waiting: {
+    label: "Partnercsere jóváhagyásra vár",
+    description: "Ha a ligádban egy állandó partnercserét az új partner elfogadott, és te hagyod jóvá vagy utasítod el.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -193,7 +197,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
   if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
-  return ["result_disputed", "no_show_reported"];
+  return ["result_disputed", "no_show_reported", "partner_change_waiting"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -466,6 +470,17 @@ export function absenceMarkedMessage(input: { matchId: number; name: string; pla
   };
 }
 
+// To the league's Szervezők and the Admins (app and push, never email): an
+// accepted permanent partner change waits for them (#416). No names: Párok
+// shows them.
+export function partnerChangeWaitingMessage(input: { leagueSlug: string; leagueName: string }): Message {
+  return {
+    title: `Partnercsere jóváhagyásra vár · ${input.leagueName}`,
+    body: "Egy állandó partnercserét az új partner elfogadott. Te döntesz róla a Párok oldalon.",
+    url: `/admin/leagues/${input.leagueSlug}/pairs`,
+  };
+}
+
 // --- Permanent partner change (#402, D178) ------------------------------------
 // Names, never an email or phone; each links to the league's card on Ligáim.
 
@@ -480,6 +495,12 @@ function changeFrom(from: number | "now" | null): string {
 export type PartnerChangeNotice =
   | { kind: "asked"; league: League; starter: string; leaving: string }
   | { kind: "withdrawn"; league: League; starter: string }
+  // The new partner accepted: it waits for the organizer (#416).
+  | { kind: "accepted"; league: League; partner: string }
+  // The organizer rejected it, with the optional reason (#416).
+  | { kind: "rejected"; league: League; staying: string; leaving: string; partner: string; reason: string | null }
+  // Approved: to the new partner (#416).
+  | { kind: "final_partner"; league: League; staying: string; leaving: string; from: number | "now" | null }
   | { kind: "declined"; league: League; partner: string }
   | { kind: "final_leaving"; league: League; staying: string; partner: string; from: number | "now" | null }
   | { kind: "final_staying"; league: League; partner: string; from: number | "now" | null }
@@ -494,6 +515,23 @@ export function partnerChangeMessage(n: PartnerChangeNotice): Message {
   switch (n.kind) {
     case "asked":
       return { title: "Állandó partnernek hívnak", body: `${n.starter} állandó partnernek hív ${n.leaving} helyett (${n.league.name}). A Ligáim oldalon válaszolhatsz.`, url };
+    case "accepted":
+      return { title: "Jóváhagyásra vár", body: `${n.partner} elfogadta az állandó partnercserét (${n.league.name}). A szervező dönt róla.`, url };
+    case "rejected":
+      return {
+        title: "Elutasított partnercsere",
+        body: `A szervező nem hagyta jóvá az állandó partnercserét: ${n.staying} párja továbbra is ${n.leaving}, ${n.partner} nem játszik helyette (${n.league.name}).${n.reason ? ` Indoklás: ${n.reason}` : ""}`,
+        url,
+      };
+    case "final_partner":
+      return {
+        title: "Jóváhagyták a partnercserét",
+        body:
+          n.from === "now"
+            ? `Mostantól ${n.staying} párja vagy (${n.league.name}).`
+            : `A kör hátralévő meccsein ${n.leaving} helyett játszol, ${changeFrom(n.from)} pedig ${n.staying} párja vagy (${n.league.name}).`,
+        url,
+      };
     case "withdrawn":
       return { title: "Visszavont partnercsere", body: `${n.starter} visszavonta az állandó partnercserét (${n.league.name}).`, url };
     case "declined":

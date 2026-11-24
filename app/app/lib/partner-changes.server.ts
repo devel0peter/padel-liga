@@ -14,11 +14,15 @@ import { phasesWithGroups } from "./groups.server";
 import { pairMemberStatements } from "./league-members.server";
 import { logError, logInfo, logWarn } from "./log";
 import { absenceMarkedMessage, partnerChangeMessage } from "./notifications";
-import { notifyPlayers } from "./notifications.server";
+import { notifyPartnerChangeWaiting, notifyPlayers } from "./notifications.server";
 import { activePairIdOf, activePairWith, insertPairIfFree } from "./pairs.server";
 import {
   ACCEPTED_NOTICE,
   answerRefusal,
+  APPROVED_NOTICE,
+  decideRefusal,
+  REJECTED_NOTICE,
+  waitingText,
   currentStatus,
   DECLINED_NOTICE,
   finalText,
@@ -156,7 +160,7 @@ function freePlayer(leagueId: number, userId: string, exceptChange?: number) {
       or exists (select 1 from pairs mp where mp.league_id = ${leagueId} and (mp.player_a = u.id or mp.player_b = u.id))))
     and not ${activePairWith(leagueId, [userId])}
     and not exists (select 1 from ${partnerChanges} fc where fc.league_id = ${leagueId} and fc.partner_id = ${userId}
-      and fc.status = 'final' and fc.id <> ${exceptChange ?? 0})`;
+      and fc.status in ('accepted', 'final') and fc.id <> ${exceptChange ?? 0})`;
 }
 
 async function isFree(leagueId: number, userId: string, exceptChange?: number): Promise<boolean> {
@@ -177,7 +181,7 @@ export async function partnerCandidates(leagueId: number, except: readonly strin
         sql`(exists (select 1 from league_members lm where lm.league_id = ${leagueId} and lm.user_id = ${users.id})
           or exists (select 1 from pairs mp where mp.league_id = ${leagueId} and (mp.player_a = ${users.id} or mp.player_b = ${users.id})))`,
         sql`not exists (select 1 from ${pairs} p where p.league_id = ${leagueId} and p.status = 'active' and (p.player_a = ${users.id} or p.player_b = ${users.id}))`,
-        sql`not exists (select 1 from ${partnerChanges} fc where fc.league_id = ${leagueId} and fc.partner_id = ${users.id} and fc.status = 'final')`,
+        sql`not exists (select 1 from ${partnerChanges} fc where fc.league_id = ${leagueId} and fc.partner_id = ${users.id} and fc.status in ('accepted', 'final'))`,
       ),
     )
     .orderBy(asc(users.name), asc(users.id));
@@ -186,7 +190,7 @@ export async function partnerCandidates(leagueId: number, except: readonly strin
 
 // The pair's open (not lapsed) or final change.
 async function liveChangeOf(pairId: number, now: Date): Promise<ChangeRow | undefined> {
-  const rows = await changesQuery().where(and(eq(partnerChanges.pairId, pairId), inArray(partnerChanges.status, ["open", "final"])));
+  const rows = await changesQuery().where(and(eq(partnerChanges.pairId, pairId), inArray(partnerChanges.status, ["open", "accepted", "final"])));
   return rows.find((r) => isLive(currentStatus(r, now)));
 }
 
@@ -197,7 +201,7 @@ const notLapsed = (now: Date) => sql`${partnerChanges.createdAt} > ${sec(now) - 
 export type PartnerChangeItem = {
   id: number;
   role: ChangeRole;
-  status: "open" | "final";
+  status: "open" | "accepted" | "final";
   text: string;
   canWithdraw: boolean;
   canAnswer: boolean;
@@ -219,14 +223,14 @@ export async function partnerChangeView(userId: string, leagueId: number, season
   const rows = await changesQuery().where(
     and(
       eq(partnerChanges.seasonId, season.id),
-      inArray(partnerChanges.status, ["open", "final"]),
+      inArray(partnerChanges.status, ["open", "accepted", "final"]),
       or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId)),
     ),
   );
   const items: PartnerChangeItem[] = [];
   for (const c of rows) {
     const status = currentStatus(c, now);
-    if (status !== "open" && status !== "final") continue;
+    if (status !== "open" && status !== "accepted" && status !== "final") continue;
     const role = roleOf(c, userId);
     items.push({
       id: c.id,
@@ -235,7 +239,9 @@ export async function partnerChangeView(userId: string, leagueId: number, season
       text:
         status === "open"
           ? openText(role, { starter: c.stayingName, leaving: c.leavingName, partner: c.partnerName, lapsesAt: lapsesAt(c.createdAt) })
-          : finalText(role, { staying: c.stayingName, leaving: c.leavingName, partner: c.partnerName, phase: c.startsPhase }),
+          : status === "accepted"
+            ? waitingText(role, { starter: c.stayingName, leaving: c.leavingName, partner: c.partnerName })
+            : finalText(role, { staying: c.stayingName, leaving: c.leavingName, partner: c.partnerName, phase: c.startsPhase }),
       canWithdraw: status === "open" && role === "staying",
       canAnswer: status === "open" && role === "partner",
     });
@@ -342,50 +348,31 @@ export async function declinePartnerChange(user: Pick<User, "id">, changeId: num
 }
 
 /**
- * The new partner accepts (#402 req 3, 5, 6): the change is final. A pair
- * waiting for its first round becomes the new pair at once; otherwise the
- * leaving player is marked absent on the old pair's matches the window still
- * allows, and the new pair starts at the next round switch (the following
- * one once that switch's draft exists).
+ * The new partner accepts (#402 req 3; #416 req 1-2): the change waits for
+ * the organizer ("Jóváhagyásra vár"). Nothing is marked yet and the old pair
+ * plays on, but the new partner is taken from now (activePairWith) and no
+ * longer looks for a partner. The starter is told in the app, the league's
+ * organizers get "Partnercsere jóváhagyásra vár" (app and push, no email).
  */
 export async function acceptPartnerChange(user: Pick<User, "id">, changeId: number, now = new Date()): Promise<Result> {
   const c = await changeById(changeId);
   if (!c) return refused("not_open");
   const season = await getSeason(c.seasonId);
-  const [pairRow] = await db.select({ status: pairs.status, a: pairs.playerA, b: pairs.playerB }).from(pairs).where(eq(pairs.id, c.pairId));
-  const pairActive =
-    pairRow?.status === "active" && [pairRow.a, pairRow.b].includes(c.startedBy) && [pairRow.a, pairRow.b].includes(c.leavingId);
   const refusal = answerRefusal({ status: currentStatus(c, now), partnerId: c.partnerId }, user.id, {
-    pairActive,
+    pairActive: await oldPairActive(c),
     seasonOpen: seasonOpen(season, now),
     partnerFree: await isFree(c.leagueId, c.partnerId, c.id),
   });
   if (refusal) return refused(refusal);
-
-  const [withGroups, played] = await Promise.all([phasesWithGroups(c.seasonId), playedInSeason(c.pairId, c.seasonId)]);
-  const when = startsAt({ phases: season!.phases.map((p) => p.number), withGroups: withGroups.map((g) => g.phase), played });
-  if (when.kind === "now") {
-    const started = await startNow(c, user.id, now);
-    if (!started) return refused("partner");
-    await tellFinal(c, null, true);
-    return { ok: true, notice: ACCEPTED_NOTICE };
-  }
-  const startsPhase = when.kind === "switch" ? when.phase : null;
   try {
     const [done] = await db.batch([
       db
         .update(partnerChanges)
-        .set({ status: "final", answeredAt: now, startsPhase })
+        .set({ status: "accepted", answeredAt: now })
         .where(and(eq(partnerChanges.id, changeId), eq(partnerChanges.status, "open"), notLapsed(now), freePlayer(c.leagueId, c.partnerId, c.id)))
         .returning({ id: partnerChanges.id }),
-      auditIfChanged({
-        actorId: user.id,
-        action: "partner_change.accept",
-        target: `partner_change:${changeId}`,
-        detail: `pair:${c.pairId}; starts ${startsPhase === null ? "next season" : `phase ${startsPhase}`}`,
-        leagueId: c.leagueId,
-      }),
-      // Committed now: no longer looking for a partner (D59), nor listed on
+      auditIfChanged({ actorId: user.id, action: "partner_change.accept", target: `partner_change:${changeId}`, detail: `pair:${c.pairId}`, leagueId: c.leagueId }),
+      // Taken now: no longer looking for a partner (D59), nor listed on
       // Párkereső (D177: switching off clears the listing).
       db
         .update(partnerSearches)
@@ -395,7 +382,7 @@ export async function acceptPartnerChange(user: Pick<User, "id">, changeId: numb
             eq(partnerSearches.leagueId, c.leagueId),
             eq(partnerSearches.userId, c.partnerId),
             eq(partnerSearches.seeking, true),
-            sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${changeId} and ${partnerChanges.status} = 'final')`,
+            sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${changeId} and ${partnerChanges.status} = 'accepted')`,
           ),
         ),
     ]);
@@ -404,11 +391,95 @@ export async function acceptPartnerChange(user: Pick<User, "id">, changeId: numb
     if (/UNIQUE/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) return refused("partner");
     throw e;
   }
-  logInfo("partner change final", { leagueId: c.leagueId, pairId: c.pairId, startsPhase });
+  logInfo("partner change accepted", { leagueId: c.leagueId, pairId: c.pairId });
+  const league = await leagueSlug(c.leagueId);
+  await notifyPlayers("partner_change", [{ userId: c.startedBy, message: partnerChangeMessage({ kind: "accepted", league, partner: c.partnerName }) }]);
+  await notifyPartnerChangeWaiting({ leagueId: c.leagueId, leagueSlug: league.slug, leagueName: league.name, except: c.partnerId });
+  return { ok: true, notice: ACCEPTED_NOTICE };
+}
+
+// The old pair still holds the starter and the leaving player, active.
+async function oldPairActive(c: Pick<ChangeRow, "pairId" | "startedBy" | "leavingId">): Promise<boolean> {
+  const [row] = await db.select({ status: pairs.status, a: pairs.playerA, b: pairs.playerB }).from(pairs).where(eq(pairs.id, c.pairId));
+  return row?.status === "active" && [row.a, row.b].includes(c.startedBy) && [row.a, row.b].includes(c.leavingId);
+}
+
+/**
+ * The organizer approves an accepted change on Párok (#416): now it is final,
+ * with #402's effects. A pair waiting for its first round becomes the new
+ * pair at once; otherwise the leaving player is marked absent on the old
+ * pair's matches the window still allows, and the new pair starts at the
+ * next round switch (the following one once that switch's draft exists:
+ * also for a change that waited for approval while the draft was made).
+ */
+export async function approvePartnerChange(actorId: string, leagueId: number, changeId: number, now = new Date()): Promise<Result> {
+  const c = await changeById(changeId);
+  if (!c || c.leagueId !== leagueId) return refused("not_waiting");
+  const refusal = decideRefusal({ status: c.status });
+  if (refusal) return refused(refusal);
+  const season = await getSeason(c.seasonId);
+  if (!(await oldPairActive(c))) return refused("not_open");
+  if (!seasonOpen(season, now)) return refused("season_over");
+  const [withGroups, played] = await Promise.all([phasesWithGroups(c.seasonId), playedInSeason(c.pairId, c.seasonId)]);
+  const when = startsAt({ phases: season!.phases.map((p) => p.number), withGroups: withGroups.map((g) => g.phase), played });
+  if (when.kind === "now") {
+    if (!(await startNow(c, actorId, now))) return refused("not_waiting");
+    await tellFinal(c, null, true);
+    return { ok: true, notice: APPROVED_NOTICE };
+  }
+  const startsPhase = when.kind === "switch" ? when.phase : null;
+  const [done] = await db.batch([
+    db
+      .update(partnerChanges)
+      .set({ status: "final", startsPhase, decidedBy: actorId, decidedAt: now })
+      .where(and(eq(partnerChanges.id, changeId), eq(partnerChanges.status, "accepted")))
+      .returning({ id: partnerChanges.id }),
+    auditIfChanged({
+      actorId,
+      action: "partner_change.approve",
+      target: `partner_change:${changeId}`,
+      detail: `pair:${c.pairId}; starts ${startsPhase === null ? "next season" : `phase ${startsPhase}`}`,
+      leagueId,
+    }),
+  ]);
+  if (done.length === 0) return refused("not_waiting");
+  logInfo("partner change final", { leagueId, pairId: c.pairId, startsPhase });
   const marked = await markRemaining(c, null, now);
   await tellFinal(c, startsPhase, false);
   await tellOpponents(c, marked, false);
-  return { ok: true, notice: ACCEPTED_NOTICE };
+  return { ok: true, notice: APPROVED_NOTICE };
+}
+
+/**
+ * The organizer rejects an accepted change on Párok (#416 req 3), with an
+ * optional reason: it ends, the old pair stays, and the three players get
+ * the reason in the app and by push; no email.
+ */
+export async function rejectPartnerChange(actorId: string, leagueId: number, changeId: number, reason: string, now = new Date()): Promise<Result> {
+  const c = await changeById(changeId);
+  if (!c || c.leagueId !== leagueId) return refused("not_waiting");
+  const refusal = decideRefusal({ status: c.status }, reason);
+  if (refusal) return refused(refusal);
+  const why = reason.trim() || null;
+  const [done] = await db.batch([
+    db
+      .update(partnerChanges)
+      .set({ status: "rejected", decidedBy: actorId, decidedAt: now, reason: why })
+      .where(and(eq(partnerChanges.id, changeId), eq(partnerChanges.status, "accepted")))
+      .returning({ id: partnerChanges.id }),
+    auditIfChanged({ actorId, action: "partner_change.reject", target: `partner_change:${changeId}`, detail: `pair:${c.pairId}`, leagueId }),
+  ]);
+  if (done.length === 0) return refused("not_waiting");
+  logInfo("partner change rejected", { leagueId, pairId: c.pairId });
+  const league = await leagueSlug(leagueId);
+  await notifyPlayers(
+    "partner_change",
+    [c.startedBy, c.leavingId, c.partnerId].map((userId) => ({
+      userId,
+      message: partnerChangeMessage({ kind: "rejected", league, staying: c.stayingName, leaving: c.leavingName, partner: c.partnerName, reason: why }),
+    })),
+  );
+  return { ok: true, notice: REJECTED_NOTICE };
 }
 
 // Whether the pair is (or was) in a published group of the season.
@@ -519,17 +590,17 @@ async function startNow(c: ChangeRow, actorId: string, now: Date): Promise<boole
   const newPair = activePairIdOf(c.leagueId, players[0], players[1]);
   try {
     await db.batch([
-      // If this doesn't take the change (answered or lapsed meanwhile), the
+      // If this doesn't take the change (decided meanwhile), the
       // old pair isn't dissolved and the statements after it fail the batch.
       db
         .update(partnerChanges)
-        .set({ status: "final", answeredAt: now })
-        .where(and(eq(partnerChanges.id, c.id), eq(partnerChanges.status, "open"), notLapsed(now), freePlayer(c.leagueId, c.partnerId, c.id))),
+        .set({ status: "final", decidedBy: actorId, decidedAt: now })
+        .where(and(eq(partnerChanges.id, c.id), eq(partnerChanges.status, "accepted"))),
       ...startStatements(c, players, { kind: "copy" }, actorId, now),
       ...drafts.map((d) => db.update(groupPairs).set({ pairId: sql<number>`${newPair}` }).where(and(eq(groupPairs.groupId, d.id), eq(groupPairs.pairId, c.pairId)))),
       auditEntry({
         actorId,
-        action: "partner_change.accept",
+        action: "partner_change.approve",
         target: `partner_change:${c.id}`,
         detail: sql`${`pair:${c.pairId}; started at once, new pair:`} || ${newPair}`,
         leagueId: c.leagueId,
@@ -668,6 +739,7 @@ async function tellFinal(c: ChangeRow, startsPhase: number | null, now: boolean)
     await notifyPlayers("partner_change", [
       { userId: c.leavingId, message: partnerChangeMessage({ kind: "final_leaving", league, staying: c.stayingName, partner: c.partnerName, from }) },
       { userId: c.startedBy, message: partnerChangeMessage({ kind: "final_staying", league, partner: c.partnerName, from }) },
+      { userId: c.partnerId, message: partnerChangeMessage({ kind: "final_partner", league, staying: c.stayingName, leaving: c.leavingName, from }) },
     ]);
     const email = (await emailsOf([c.leavingId])).get(c.leavingId);
     if (email)
@@ -719,25 +791,36 @@ async function tellOpponents(c: Pick<ChangeRow, "id" | "pairId" | "leavingName" 
 export type LeagueChangeRow = {
   id: number;
   pairId: number;
-  status: "open" | "final" | "started";
+  status: "open" | "accepted" | "final" | "started";
   staying: string;
   leaving: string;
   partner: string;
   startsPhase: number | null;
   createdAt: Date;
   canUndo: boolean;
+  // An accepted change waits for the organizer's approval or rejection (#416).
+  canDecide: boolean;
+  // How many approved changes (final or started) the starter and the new
+  // partner have had this season, in any role (#416 req 5).
+  counts: { staying: number; partner: number };
 };
 
-/** Párok's list (#402 req 8): the league's open and final changes, and the started ones of the season, newest first. */
+/**
+ * Párok's list (#402 req 8, #416): the season's open, waiting and final
+ * changes, and the started ones, newest first, each with how often its
+ * starter and new partner changed partner this season.
+ */
 export async function leaguePartnerChanges(leagueId: number, now = new Date()): Promise<LeagueChangeRow[]> {
   const season = await seasonOf(leagueId, now);
   if (!season) return [];
   const rows = await changesQuery()
-    .where(and(eq(partnerChanges.seasonId, season.id), inArray(partnerChanges.status, ["open", "final", "started"])))
+    .where(and(eq(partnerChanges.seasonId, season.id), inArray(partnerChanges.status, ["open", "accepted", "final", "started"])))
     .orderBy(desc(partnerChanges.id));
+  const approved = rows.filter((c) => c.status === "final" || c.status === "started");
+  const countOf = (userId: string) => approved.filter((c) => [c.startedBy, c.leavingId, c.partnerId].includes(userId)).length;
   return rows.flatMap((c) => {
     const status = currentStatus(c, now);
-    if (status !== "open" && status !== "final" && status !== "started") return [];
+    if (status !== "open" && status !== "accepted" && status !== "final" && status !== "started") return [];
     return [
       {
         id: c.id,
@@ -749,10 +832,31 @@ export async function leaguePartnerChanges(leagueId: number, now = new Date()): 
         startsPhase: c.startsPhase,
         createdAt: c.createdAt,
         canUndo: undoRefusal({ status }) === null,
+        canDecide: decideRefusal({ status }) === null,
+        counts: { staying: countOf(c.startedBy), partner: countOf(c.partnerId) },
       },
     ];
   });
 }
+
+/**
+ * Párok (#416 req 5): per pair, the number of the league's current-season
+ * matches where a player of the pair was marked absent (#400), a partner
+ * change's marks included. Pairs without one are left out.
+ */
+export async function pairAbsenceCounts(leagueId: number, now = new Date()): Promise<Map<number, number>> {
+  const season = await seasonOf(leagueId, now);
+  if (!season) return new Map();
+  const rows = await db
+    .select({ pairId: matchAbsences.pairId, n: sql<number>`count(distinct ${matchAbsences.matchId})` })
+    .from(matchAbsences)
+    .innerJoin(matches, eq(matches.id, matchAbsences.matchId))
+    .innerJoin(groups, eq(groups.id, matches.groupId))
+    .where(eq(groups.seasonId, season.id))
+    .groupBy(matchAbsences.pairId);
+  return new Map(rows.map((r) => [r.pairId, r.n]));
+}
+
 
 /**
  * "Visszavonás" on Párok (#402 req 8): a final change is undone until the
@@ -821,14 +925,15 @@ function marksStillOpen(changeId: number, now: Date) {
 
 // --- Account deletion (section 3) ----------------------------------------------
 
-// The changes a deletion ends (partnerChangeDeletion): every open one of the
-// account, and every final one where it isn't the leaving player. A final
+// The changes a deletion ends (partnerChangeDeletion): every open or
+// accepted (waiting, #416) one of the account, and every final one where it
+// isn't the leaving player. A final
 // change whose leaving player goes keeps going: the old pair is dissolved
 // anyway, and the staying player keeps the spot (#403, switchChanges).
 function endedByDeletion(userId: string) {
   return and(
     or(
-      eq(partnerChanges.status, "open"),
+      inArray(partnerChanges.status, ["open", "accepted"]),
       and(eq(partnerChanges.status, "final"), or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.partnerId, userId))),
     ),
     or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId)),
@@ -863,7 +968,7 @@ export function partnerChangeDeletion(userId: string, now: Date, guard: SQL) {
     db.delete(matchAbsences).where(and(inArray(matchAbsences.partnerChangeId, ended), windowStillOpen(now), guard)),
     db
       .update(partnerChanges)
-      .set({ status: sql`case when ${partnerChanges.status} = 'open' then 'withdrawn' else 'undone' end`, endedAt: now })
+      .set({ status: sql`case when ${partnerChanges.status} in ('open', 'accepted') then 'withdrawn' else 'undone' end`, endedAt: now })
       .where(and(endedByDeletion(userId), guard)),
   ] as const;
 }

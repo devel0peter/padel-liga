@@ -1,7 +1,8 @@
-// Walkthrough step 44 (#402, D178): a permanent partner change. A player of a
-// pair in the running round names a new partner by name on Ligáim, the new
-// partner accepts there, and the leaving player is marked absent on the
-// pair's remaining matches with the new partner named on the match page.
+// Walkthrough step 44 (#402, D178; #416, D180): a permanent partner change. A
+// player of a pair in the running round names a new partner by name on
+// Ligáim, the new partner accepts there, the Szervező approves it on Párok,
+// and the leaving player is marked absent on the pair's remaining matches
+// with the new partner named on the match page.
 // The new partner and the leaving player each get one email (printed by the
 // dev server, never sent). The Szervező undoes it on Párok, which takes the
 // marks away again, so later specs see the walkthrough's state. Idegen Ilona
@@ -80,21 +81,40 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     await expect(theirs).toContainText(`${m.starter_name} állandó partnernek hív ${m.leaving} helyett.`);
     await theirs.getByRole("button", { name: "Elfogadom" }).click();
     await expect(theirs).toContainText("Elfogadtad.");
-    await expect(theirs).toContainText(`${m.starter_name} párja vagy`);
+
+    // Waiting for the Szervező (#416): both see it, nothing is marked yet, the organizers are told.
+    await expect(theirs).toContainText("Jóváhagyásra vár");
+    await visit(starter.page, `/leagues/${LEAGUE.slug}`);
+    await expect(content(starter.page).getByRole("region", { name: "Állandó partnercsere" })).toContainText("Jóváhagyásra vár");
+    expect(d1(`select count(*) n from match_absences where match_id = ${match.id}`)[0]!.n).toBe(0);
+    const [{ id: orgId }] = d1(`select id from users where email = '${ORGANIZER.email}'`) as { id: string }[];
+    expect(d1(`select count(*) n from notifications where user_id = '${orgId}' and kind = 'partner_change_waiting'`)[0]!.n).toBeGreaterThan(0);
+
+    // The Szervező approves it on Párok, seeing how often the two changed partner.
+    const org = await as(browser, ORGANIZER.email);
+    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/pairs`);
+    const changes = content(org.page).getByRole("region", { name: "Állandó partnercserék" });
+    await expect(changes).toContainText(`${m.starter_name}: ${m.leaving} helyett ${OUTSIDER.name}`);
+    await expect(changes).toContainText("Jóváhagyásra vár");
+    await expect(changes).toContainText(`${OUTSIDER.name}: még nem cserélt partnert ebben a szezonban.`);
+    await changes.getByRole("button", { name: "Jóváhagyom" }).click();
+    await expect(changes.getByRole("button", { name: "Visszavonás" })).toBeVisible();
 
     // The leaving player: one email naming who replaces them.
     const [final] = await waitForEmails(offset, 1, (e) => /Új partner a helyeden/.test(e.subject));
     expect(final!.text).toContain(`helyetted ${OUTSIDER.name} játszik`);
+    await visit(partner.page, `/leagues/${LEAGUE.slug}`);
+    await expect(content(partner.page).getByRole("region", { name: "Állandó partnercsere" })).toContainText(`${m.starter_name} párja vagy`);
 
     // The match page: the leaving player doesn't play, the new partner does.
     await visit(starter.page, `/matches/${match.id}`);
     await expect(content(starter.page)).toContainText(`${m.leaving} helyett ${OUTSIDER.name} játszik`);
 
-    // The Szervező undoes it on Párok: the mark goes.
-    const org = await as(browser, ORGANIZER.email);
+    // Párok counts the pair's match with an absent player this season.
     await visit(org.page, `/admin/leagues/${LEAGUE.slug}/pairs`);
-    const changes = content(org.page).getByRole("region", { name: "Állandó partnercserék" });
-    await expect(changes).toContainText(`${m.starter_name}: ${m.leaving} helyett ${OUTSIDER.name}`);
+    await expect(content(org.page)).toContainText(/Helyettessel: \d+ meccs ebben a szezonban/);
+
+    // The Szervező undoes it on Párok: the mark goes.
     await changes.getByRole("button", { name: "Visszavonás" }).click();
     await org.page.getByRole("alertdialog").getByRole("button", { name: "Visszavonás" }).click();
     await expect(changes.getByRole("button", { name: "Visszavonás" })).toHaveCount(0);

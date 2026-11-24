@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "26287c82-a1d7-400d-b335-21b9825a721c",
+  "id": "5120d4d6-cb5b-4110-9357-b17affcde018",
   "prevId": "bff26ccb-838c-41bb-aaa8-1997cca0e95a",
   "tables": {
     "account_invites": {
@@ -3280,6 +3280,27 @@
           "notNull": false,
           "autoincrement": false
         },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "ended_at": {
           "name": "ended_at",
           "type": "integer",
@@ -3302,7 +3323,7 @@
             "pair_id"
           ],
           "isUnique": true,
-          "where": "\"partner_changes\".\"status\" in ('open', 'final')"
+          "where": "\"partner_changes\".\"status\" in ('open', 'accepted', 'final')"
         },
         "partner_changes_final_partner_idx": {
           "name": "partner_changes_final_partner_idx",
@@ -3311,7 +3332,7 @@
             "partner_id"
           ],
           "isUnique": true,
-          "where": "\"partner_changes\".\"status\" = 'final'"
+          "where": "\"partner_changes\".\"status\" in ('accepted', 'final')"
         },
         "partner_changes_season_idx": {
           "name": "partner_changes_season_idx",
@@ -3427,6 +3448,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "ended_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "partner_changes_decided_by_users_id_fk": {
+          "name": "partner_changes_decided_by_users_id_fk",
+          "tableFrom": "partner_changes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "decided_by"
           ],
           "columnsTo": [
             "id"

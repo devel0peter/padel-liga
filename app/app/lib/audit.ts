@@ -42,6 +42,8 @@ export const AUDIT_ACTIONS = {
   "partner_change.withdraw": "Állandó partnercsere: kérés visszavonva",
   "partner_change.accept": "Állandó partnercsere elfogadva",
   "partner_change.decline": "Állandó partnercsere elutasítva",
+  "partner_change.approve": "Állandó partnercsere jóváhagyása",
+  "partner_change.reject": "Állandó partnercsere elutasítása",
   "partner_change.undo": "Állandó partnercsere visszavonása",
   "partner_change.start": "Állandó partnercsere: az új pár indul",
   "season_entry.enter": "Benevezés",

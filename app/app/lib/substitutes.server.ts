@@ -47,6 +47,18 @@ export async function absencesOf(matchIds: readonly number[]): Promise<Map<numbe
 
 const marksOf = async (matchId: number) => (await absencesOf([matchId])).get(matchId) ?? [];
 
+/**
+ * The marks of one match for the organizer's match and decision pages:
+ * `played` once the match was played or its start passed (the window is
+ * closed), as the four players read it on the match page.
+ */
+export async function organizerAbsences(matchId: number, now = new Date()): Promise<{ id: string; name: string; played: boolean }[]> {
+  const ctx = await loadMatch(matchId);
+  if (!ctx) return [];
+  const { open } = windowOf(ctx.match, ctx.voided, now);
+  return (await marksOf(matchId)).map((m) => ({ id: m.absentId, name: m.name, played: m.afterMatch || !open }));
+}
+
 // The window of a match from its mirrored status (matches.server keeps
 // scheduled_at in step with the log): before the agreed start, or the
 // deadline while none is agreed; closed once a result is recorded.

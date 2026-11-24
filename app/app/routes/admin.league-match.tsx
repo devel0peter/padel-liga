@@ -11,10 +11,10 @@ import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
 import { STUCK_TEXT } from "~/lib/match-overview";
 import { organizerMatch } from "~/lib/match-overview.server";
-import { absencesOf } from "~/lib/substitutes.server";
 import { getLeague } from "~/lib/leagues.server";
 import { groupLine } from "~/lib/matches";
 import { SITE_NAME } from "~/lib/site";
+import { organizerAbsences } from "~/lib/substitutes.server";
 
 // One match for the league's Szervező and the Admin (#158, D76): status,
 // who has been active, both pairs' phone numbers while the phase runs (so
@@ -36,7 +36,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const match = Number.isInteger(id) && id > 0 ? await organizerMatch(league.id, id) : null;
   if (!match) throw data(NOT_FOUND, { status: 404 });
   // Who doesn't (or didn't) play (#400).
-  const absent = ((await absencesOf([id])).get(id) ?? []).map((a) => ({ id: a.absentId, name: a.name, afterMatch: a.afterMatch }));
+  const absent = await organizerAbsences(id);
   return { league: { slug: league.slug }, match, absent };
 }
 

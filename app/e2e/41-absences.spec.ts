@@ -87,6 +87,12 @@ test("Helyettes: marked before the match and taken back, then ticked on the resu
   await expect(content(opp.page)).toContainText("Megerősítetted");
   await opp.context.close();
 
+  // The Szervező sees who didn't play on the match's page under Meccsek.
+  const org = await as(browser, ORGANIZER.email);
+  await visit(org.page, `/admin/leagues/minta/matches/${m.id}`);
+  await expect(content(org.page).getByRole("region", { name: "Állapot" })).toContainText(`${m.partner} helyett helyettes játszott.`);
+  await org.context.close();
+
   // The absent player isn't rated for it; the recording player is.
   expect(d1(`select count(*) as n from elo_changes where match_id = ${m.id} and user_id = '${m.b_id}'`)[0]!.n).toBe(0);
   expect(d1(`select count(*) as n from elo_changes where match_id = ${m.id} and user_id = '${m.a_id}'`)[0]!.n).toBe(1);

@@ -14,5 +14,8 @@ export const ABSENCE_REFUSALS: Record<AbsenceRefusal, string> = {
 
 export const ABSENCE_CHANGED = "Közben változott a meccs. Nézd meg újra, és próbáld még egyszer.";
 
+// "helyett helyettes játszik" / "játszott": after the name, also a linked one.
+export const absenceTail = (played: boolean) => `helyett helyettes ${played ? "játszott" : "játszik"}`;
+
 // "Kiss Anna helyett helyettes játszik" / "játszott".
-export const absenceLine = (name: string, played: boolean) => `${name} helyett helyettes ${played ? "játszott" : "játszik"}`;
+export const absenceLine = (name: string, played: boolean) => `${name} ${absenceTail(played)}`;

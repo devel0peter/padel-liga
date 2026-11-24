@@ -138,6 +138,15 @@ describe("marking a player as not playing before the match (#400)", () => {
     expect(await S.unmarkAbsence("a", 1, "b", AFTER)).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
   });
 
+  it("shows the organizer's pages each mark, played once the window closed or named with the result", async () => {
+    await S.markAbsence("a", 1, "b", NOW);
+    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "b", name: "Játékos B", played: false }]);
+    // After the deadline (no time agreed), the match counts as played for the text.
+    expect(await S.organizerAbsences(1, new Date(DEADLINE * 1000 + 1000))).toEqual([{ id: "b", name: "Játékos B", played: true }]);
+    await R.resultStep("a", 1, { kind: "record", score: WIN_A, absent: ["a"] } as any, NOW);
+    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "a", name: "Játékos A", played: true }]);
+  });
+
   it("marks one player on one match on its own (#402 reuses it), once", async () => {
     const { revision } = one("select revision from matches where id = 1") as { revision: number };
     const input = { matchId: 1, revision, pairId: 1, absentId: "b", markedBy: null, afterMatch: false, now: NOW };

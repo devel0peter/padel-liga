@@ -15,11 +15,11 @@ import { decideMatch, decisionPage } from "~/lib/decisions.server";
 import { formatDateTime, formatDeadline, formatSlot } from "~/lib/format";
 import { NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS } from "~/lib/no-shows";
 import { decideNoShow, leagueNoShows } from "~/lib/no-shows.server";
-import { absencesOf } from "~/lib/substitutes.server";
 import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
 import { bothLostText, neutralScoreText, parseOutcome, versusText, walkoverScoreText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
+import { organizerAbsences } from "~/lib/substitutes.server";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
 // the league, played or not, with a required reason; and a waiting no-show
@@ -49,7 +49,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // A waiting no-show report on this match (#33), if any.
   const [noShow] = await leagueNoShows(league.id, id);
   // Who didn't play (#400): the opponents confirmed or disputed the result with it.
-  const absent = ((await absencesOf([id])).get(id) ?? []).map((a) => ({ id: a.absentId, name: a.name, afterMatch: a.afterMatch }));
+  const absent = await organizerAbsences(id);
   return { slug: league.slug, page, noShow: noShow ?? null, absent };
 }
 

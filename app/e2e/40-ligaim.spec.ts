@@ -50,7 +50,8 @@ test("41. Ligáim in the sidebar and on the phone bar; the card with the round, 
   // The phone's bottom bar: Kezdőlap, Tabella, Ligáim, Értesítések, Profil; no sideways scrolling.
   await page.setViewportSize({ width: 390, height: 844 });
   const bar = page.getByRole("navigation", { name: "Fő menü" });
-  await expect(bar.getByRole("link")).toHaveText(["Kezdőlap", "Tabella", "Ligáim", "Értesítések", /Profil/]);
+  // Értesítések carries the unread count when there is one.
+  await expect(bar.getByRole("link")).toHaveText(["Kezdőlap", "Tabella", "Ligáim", /^Értesítések(\d+\+?)?$/, /Profil$/]);
   await bar.getByRole("link", { name: "Ligáim" }).click();
   await expect(page).toHaveURL(/\/leagues$/);
   await expect(bar.getByRole("link", { name: "Ligáim" })).toHaveAttribute("aria-current", "page");

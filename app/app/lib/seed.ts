@@ -189,7 +189,6 @@ export function insertStatements(now: Date): string[] {
 
   out.push(
     `insert into seasons (league_id, name, registration_opens_at, registration_closes_at, first_phase_start, breaks) ` +
-
       `select id, ${q(SEASON_NAME)}, ${secs(opensAt)}, ${secs(closesAt)}, ${q(start)}, '[]' ` +
       `from leagues where slug = ${q(LEAGUE.slug)}`,
   );

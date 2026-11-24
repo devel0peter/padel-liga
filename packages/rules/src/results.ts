@@ -51,11 +51,6 @@ export const SHORT_SETS: SetGames = 4;
 /** Sets to 6: every round from Győr's round 2 on, and every new round (D173). */
 export const SETS_TO_SIX: SetGames = 6;
 
-/** A stored set format read back (the column is a plain integer); null if it is not one. */
-export function asSetGames(n: unknown): SetGames | null {
-  return n === SHORT_SETS || n === SETS_TO_SIX ? (n as SetGames) : null;
-}
-
 export const SUPER_TIE_BREAK_POINTS = 10;
 
 const isCount = (n: number) => Number.isInteger(n) && n >= 0;

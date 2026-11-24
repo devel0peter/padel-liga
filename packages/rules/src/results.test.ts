@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   bothInactiveSide,
-  asSetGames,
   isValidSet,
   isValidSuperTieBreak,
   type MatchScore,
@@ -219,15 +218,9 @@ describe("validateScore by the round's format (#396 acceptance)", () => {
   });
 });
 
-describe("validSetsText and asSetGames", () => {
+describe("validSetsText", () => {
   it("lists the valid sets of each format in Hungarian", () => {
     expect(validSetsText(SHORT_SETS)).toBe("4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4");
     expect(validSetsText(SETS_TO_SIX)).toBe("6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6");
-  });
-
-  it("reads a stored format back, and nothing else", () => {
-    expect(asSetGames(4)).toBe(4);
-    expect(asSetGames(6)).toBe(6);
-    for (const bad of [0, 5, 7, "6", null, undefined]) expect(asSetGames(bad)).toBeNull();
   });
 });

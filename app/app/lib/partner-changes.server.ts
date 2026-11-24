@@ -773,6 +773,112 @@ export async function undoPartnerChange(actorId: string, leagueId: number, chang
   return { ok: true, notice: "Visszavontad a partnercserét." };
 }
 
+// --- The round switch (#403) ---------------------------------------------------
+
+type SwitchPlayer = { id: string; name: string; level: string | null; elo: number | null; email: string };
+
+export type SwitchChange = {
+  id: number;
+  oldPairId: number;
+  // "final": the new pair isn't there yet: the old pair's row stands for it
+  // until the publish; "started": the new pair exists (a publish that
+  // failed after starting it, startChangesAtPublish).
+  status: "final" | "started";
+  newPairId: number | null;
+  staying: SwitchPlayer;
+  partner: SwitchPlayer;
+  leaving: string;
+};
+
+/**
+ * The changes whose new pair starts at the round switch into `phase` (#403):
+ * final ones whose old pair is still active, and ones already started there,
+ * in the order they became final.
+ */
+export async function switchChanges(seasonId: number, phase: number): Promise<SwitchChange[]> {
+  const rows = await db
+    .select({
+      ...changeColumns,
+      stayingLevel: staying.level,
+      stayingElo: staying.elo,
+      stayingEmail: staying.email,
+      partnerLevel: partner.level,
+      partnerElo: partner.elo,
+      partnerEmail: partner.email,
+      pairStatus: pairs.status,
+    })
+    .from(partnerChanges)
+    .innerJoin(staying, eq(staying.id, partnerChanges.startedBy))
+    .innerJoin(leaving, eq(leaving.id, partnerChanges.leavingId))
+    .innerJoin(partner, eq(partner.id, partnerChanges.partnerId))
+    .innerJoin(pairs, eq(pairs.id, partnerChanges.pairId))
+    .where(and(eq(partnerChanges.seasonId, seasonId), eq(partnerChanges.startsPhase, phase), inArray(partnerChanges.status, ["final", "started"])))
+    .orderBy(asc(partnerChanges.answeredAt), asc(partnerChanges.id));
+  return rows
+    .filter((r) => (r.status === "final" ? r.pairStatus === "active" : r.newPairId !== null))
+    .map((r) => ({
+      id: r.id,
+      oldPairId: r.pairId,
+      status: r.status as "final" | "started",
+      newPairId: r.newPairId,
+      staying: { id: r.startedBy, name: nameOf(r.stayingName), level: r.stayingLevel, elo: r.stayingElo, email: r.stayingEmail },
+      partner: { id: r.partnerId, name: nameOf(r.partnerName), level: r.partnerLevel, elo: r.partnerElo, email: r.partnerEmail },
+      leaving: r.leavingName,
+    }));
+}
+
+
+/**
+ * At the publish of the round switch into `phase` (#403 req 2): each final
+ * change starting there whose old pair is in the draft becomes the new pair
+ * (startStatements), which takes the old pair's row in the draft, one batch
+ * per change. A change that can't start (the new partner got a pair in the
+ * meantime) stays final and its old pair plays on, with a warning in the
+ * log. Before publishPhase, which then creates the matches with the new
+ * pairs. Returns how many started.
+ */
+export async function startChangesAtPublish(seasonId: number, phase: number, actorId: string, now = new Date()): Promise<number> {
+  // The draft's rows, by pair: only a change whose old pair is there starts.
+  const rows = await db
+    .select({ groupId: groupPairs.groupId, pairId: groupPairs.pairId })
+    .from(groupPairs)
+    .innerJoin(groups, eq(groups.id, groupPairs.groupId))
+    .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase), isNull(groups.publishedAt)));
+  if (rows.length === 0) return 0;
+  const draftIds = [...new Set(rows.map((r) => r.groupId))];
+  const inDraft = new Set(rows.map((r) => r.pairId));
+  const changes = (await switchChanges(seasonId, phase)).filter((c) => c.status === "final" && inDraft.has(c.oldPairId));
+  let started = 0;
+  for (const s of changes) {
+    const c = await changeById(s.id);
+    if (!c) continue;
+    const players = await newPairPlayers(c);
+    const newPair = activePairIdOf(c.leagueId, players[0], players[1]);
+    try {
+      await db.batch([
+        ...startStatements(c, players, { kind: "phase", phase }, actorId, now),
+        // The new pair takes the old pair's row in the draft.
+        db
+          .update(groupPairs)
+          .set({ pairId: sql<number>`${newPair}` })
+          .where(and(inArray(groupPairs.groupId, draftIds), eq(groupPairs.pairId, c.pairId))),
+        auditEntry({
+          actorId,
+          action: "partner_change.start",
+          target: `partner_change:${c.id}`,
+          detail: sql`${`pair:${c.pairId} -> pair:`} || ${newPair} || ${`; phase ${phase}`}`,
+          leagueId: c.leagueId,
+        }),
+      ]);
+      started++;
+    } catch (e) {
+      if (!/NOT NULL|UNIQUE/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) throw e;
+      logWarn("partner change could not start", { changeId: c.id, phase });
+    }
+  }
+  return started;
+}
+
 /**
  * After a round switch publish (#402 req 6): a final change that starts at
  * a later switch (made after this one's draft) keeps the new partner on the

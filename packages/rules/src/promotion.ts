@@ -203,16 +203,53 @@ export interface RoundSwitchInput<T extends SeedablePair> {
   readonly leaves: (pair: T) => boolean;
   /** New pairs (late entries, re-formed pairs, returning players), in entry order: it breaks rating ties. */
   readonly newPairs: readonly T[];
+  /** Permanent partner changes that start at this switch (#403), in the order they became final. */
+  readonly changes?: readonly PartnerChange<T>[];
+}
+
+/**
+ * A permanent partner change (#402, #403, D179): the pair of the ending
+ * phase's tables (`old`) and the pair formed from its staying player and the
+ * new partner (`pair`), rated as any pair (its players' average Elo).
+ */
+export interface PartnerChange<T> {
+  readonly old: T;
+  readonly pair: T;
+}
+
+/**
+ * The new pairs of permanent partner changes take their old pairs' spots
+ * (#403, spec 10, D179): each old pair still in the groups after promotion,
+ * relegation and the leavers' re-cut is replaced, in place, by its new pair.
+ * A change whose old pair is not there (it left by a 3rd strike, or was
+ * withdrawn mid-phase) has no spot to keep: its new pair comes back in
+ * `unplaced`, for the new-pair rules (placeNewPairs). Returns new groups.
+ */
+export function keepSpots<T>(groups: readonly (readonly T[])[], changes: readonly PartnerChange<T>[]): { groups: T[][]; unplaced: T[] } {
+  const by = new Map(changes.map((c) => [c.old, c.pair]));
+  const kept = new Set<T>();
+  const out = groups.map((g) =>
+    g.map((p) => {
+      const pair = by.get(p);
+      if (pair === undefined) return p;
+      kept.add(p);
+      return pair;
+    }),
+  );
+  return { groups: out, unplaced: changes.filter((c) => !kept.has(c.old)).map((c) => c.pair) };
 }
 
 /**
  * The next phase's draft groups (spec 10): promotion and relegation of the
  * ending phase's tables, the leavers removed and the groups re-cut top-down,
- * then the new pairs placed (placeNewPairs).
+ * the new pairs of permanent partner changes put in their old pairs' spots
+ * (keepSpots, #403), then the new pairs placed (placeNewPairs): the late
+ * entries first, then the partner changes whose old pair left.
  * Each group comes out by seed: average Elo, strongest first (ties keep the
  * order above). Top group first.
  */
 export function roundSwitchDraft<T extends SeedablePair>(input: RoundSwitchInput<T>): T[][] {
   const continuing = recut(promoteAndRelegate(input.tables, input.fast), input.leaves);
-  return placeNewPairs(continuing, input.newPairs).map((g) => seedOrder(g));
+  const { groups, unplaced } = keepSpots(continuing, input.changes ?? []);
+  return placeNewPairs(groups, [...input.newPairs, ...unplaced]).map((g) => seedOrder(g));
 }

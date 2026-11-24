@@ -23,6 +23,12 @@ export function movement(origin: Origin, to: number): "up" | "down" | "stay" | "
   return to < origin.group ? "up" : to > origin.group ? "down" : "stay";
 }
 
+// A pair formed by a permanent partner change (#403): "Partnercsere: <távozó>
+// helyett <új partner>", on the draft and the preview; null for any other.
+export function changeText(change: { leaving: string; partner: string } | undefined): string | null {
+  return change ? `Partnercsere: ${change.leaving} helyett ${change.partner}` : null;
+}
+
 // "3. csoport, 1. hely", or "Új pár".
 export function originText(origin: Origin): string {
   return origin.kind === "new" ? "Új pár" : `${origin.group}. csoport, ${origin.place}. hely`;

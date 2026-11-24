@@ -78,6 +78,7 @@ export const emailMessages = sqliteTable(
         "strike_warning",
         "season_start",
         "round_extended",
+        "partner_change",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
@@ -463,6 +464,7 @@ export const notifications = sqliteTable(
         "round_extended",
         "strike",
         "absence_marked",
+        "partner_change",
         "no_show_reported",
         "no_show_confirmed",
         "no_show_rejected",
@@ -570,9 +572,10 @@ export const pairs = sqliteTable(
     // "signup": formed from the interest signup (#89), or by an invite before
     // #97; "manual": made by a Szervező on the Párok page (#97); "link": a
     // player accepted the other's pair link (2026-10-31); "search": made from
-    // Regisztráltak on Párkeresők (D113, #297; "manual" before). A text
+    // Regisztráltak on Párkeresők (D113, #297; "manual" before); "change": a
+    // player's permanent partner change (#402, D178). A text
     // column without a CHECK: a new value needs no migration.
-    source: text("source", { enum: ["signup", "manual", "link", "search"] }).notNull().default("signup"),
+    source: text("source", { enum: ["signup", "manual", "link", "search", "change"] }).notNull().default("signup"),
     dissolvedAt: integer("dissolved_at", { mode: "timestamp" }),
     dissolvedBy: text("dissolved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp" })
@@ -721,6 +724,69 @@ export const seasonEntries = sqliteTable(
   (t) => [
     uniqueIndex("season_entries_season_pair_idx").on(t.seasonId, t.pairId),
     index("season_entries_pair_idx").on(t.pairId),
+  ],
+);
+
+// A permanent partner change ("Állandó partnercsere", #402, spec 4, D178):
+// a player of the pair (`started_by`, who stays) names a registered player
+// of the league without a pair (`partner_id`) instead of the other player
+// (`leaving_id`); final when the new partner accepts. Until the new pair
+// starts the new partner plays the old pair's matches instead of the
+// leaving player (match_absences.partner_change_id); the new pair starts at
+// the round switch into `starts_phase` in the old pair's spot (#403, D179),
+// or at once when the old pair hasn't played yet (`new_pair_id` then).
+// One open or final change per pair. An open one lapses after 7 days, stored
+// lazily (partner-changes.ts currentStatus). Personal data: who changed
+// with whom; names only on the pages, never an email or phone.
+export const partnerChanges = sqliteTable(
+  "partner_changes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    // The old pair.
+    pairId: integer("pair_id")
+      .notNull()
+      .references(() => pairs.id, { onDelete: "cascade" }),
+    // History like the pair itself: account deletion anonymizes such an
+    // account, never removes it.
+    startedBy: text("started_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    leavingId: text("leaving_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    partnerId: text("partner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: text("status", { enum: ["open", "withdrawn", "declined", "lapsed", "final", "undone", "started"] })
+      .notNull()
+      .default("open"),
+    // The round whose switch the new pair starts at; null: at the season
+    // switch (#49), or it started at once.
+    startsPhase: integer("starts_phase"),
+    newPairId: integer("new_pair_id").references(() => pairs.id, { onDelete: "set null" }),
+    // When the new partner answered (accepted or declined).
+    answeredAt: integer("answered_at", { mode: "timestamp" }),
+    // Who withdrew, undid or started it, and when: the organizer for an undo.
+    endedBy: text("ended_by").references(() => users.id, { onDelete: "set null" }),
+    endedAt: integer("ended_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("partner_changes_live_pair_idx")
+      .on(t.pairId)
+      .where(sql`${t.status} in ('open', 'final')`),
+    // A new partner joins one pair at a time.
+    uniqueIndex("partner_changes_final_partner_idx")
+      .on(t.leagueId, t.partnerId)
+      .where(sql`${t.status} = 'final'`),
+    index("partner_changes_season_idx").on(t.seasonId, t.status),
+    index("partner_changes_partner_idx").on(t.partnerId),
   ],
 );
 
@@ -1112,6 +1178,9 @@ export const matchAbsences = sqliteTable(
     markedBy: text("marked_by").references(() => users.id, { onDelete: "set null" }),
     markedAt: integer("marked_at", { mode: "timestamp" }).notNull(),
     afterMatch: integer("after_match", { mode: "boolean" }).notNull().default(false),
+    // A mark a permanent partner change made (#402, D178): its new partner
+    // plays instead (the match page names them), and an undo takes it back.
+    partnerChangeId: integer("partner_change_id").references(() => partnerChanges.id, { onDelete: "set null" }),
   },
   (t) => [uniqueIndex("match_absences_player_idx").on(t.matchId, t.absentId)],
 );

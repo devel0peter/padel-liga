@@ -31,7 +31,8 @@ export type MessageKind =
   | "match_tomorrow"
   | "strike_warning"
   | "season_start"
-  | "round_extended";
+  | "round_extended"
+  | "partner_change";
 
 // Mail to a whole list: sent last, behind TRANSACTIONAL_RESERVE, so a big
 // list spreads over days without delaying signup emails or login codes.

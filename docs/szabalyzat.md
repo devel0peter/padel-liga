@@ -44,7 +44,11 @@ A részleteket lent találod.
   - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.
-- **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni Élő-pontja alapján soroljuk be.
+- **Párcsere:** ha a párod végleg kiesik (sérülés, költözés), bármikor cserélhetsz partnert magad is, a szezon utolsó körének határidejéig: a Ligáim oldalon az **Állandó partnercsere** résznél válaszd ki az új partnered a liga pár nélküli játékosai közül. Ezt a pár bármelyik tagja elindíthatja, a párcsere után ő marad. Ha az új partnered 7 napon belül elfogadja, a csere végleges, a szervező jóváhagyása nélkül.
+  - A kör hátralévő meccsein az új partnered játszik a régi párod helyett, mint a helyettes (lásd lent): a régi párod Élő-pontja ezeken nem változik.
+  - A következő körtől az új pár a régi pár helyén játszik (lásd a 7. pontot). Ha a következő kör beosztása már elkészült, akkor az azutáni körtől, addig az új partnered a következő kör meccsein is helyettesként játszik.
+  - A régi párod értesítést kap, és utána új párt alakíthat, amelyet új párként sorolunk be.
+  - Vita esetén a szervező az új pár indulásáig visszavonhatja a cserét. Két kör között a szervező is cserélhet partnert, ilyenkor szólj neki.
 - **Helyettes:** ha valamelyikőtök nem tud játszani egy meccsen, bárki beállhat helyette, a ligán kívülről is, a szervező jóváhagyása nélkül. A nevét nem kell megadni, csak azt jelöljétek a meccs oldalán, hogy ki nem játszik: a meccs előtt bármelyikőtök, hirtelen sérülésnél pedig az eredmény beírásakor az, aki beírja. Az ellenfél értesítést kap, és az eredménnyel együtt ezt is megerősíti.
   - Az eredmény a párotoké, ugyanúgy számít, mint bármelyik meccs.
   - A hiányzó játékos Élő-pontja nem változik: a számításban az ő Élő-pontja áll a helyettesé helyett. A másik három játékosé a szokásos módon változik.

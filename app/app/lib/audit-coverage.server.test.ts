@@ -33,6 +33,7 @@ const SEASONS = await import("~/lib/seasons.server");
 const START = await import("~/lib/season-start.server");
 const REMINDERS = await import("~/lib/reminders.server");
 const PAIRS = await import("~/lib/pairs.server");
+const CHANGES = await import("~/lib/partner-changes.server");
 const ENTRIES = await import("~/lib/season-entries.server");
 const GROUPS = await import("~/lib/groups.server");
 const RESULTS = await import("~/lib/results.server");
@@ -198,6 +199,20 @@ const STEPS: Step[] = [
     },
   },
   {
+    // A permanent partner change (#402) made final by the players (their own
+    // steps are audited in partner-changes.server.test.ts), undone on Párok.
+    action: "partner_change.undo",
+    actor: ORG,
+    run: async () => {
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, starts_phase, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'final', 2, ?)",
+        )
+        .run(sec("2026-11-10T10:00:00Z"));
+      await expectOk(CHANGES.undoPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE));
+    },
+  },
+  {
     action: "strike.cancel",
     actor: ORG,
     run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
@@ -266,11 +281,14 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search, and joining a league (their own tests check the entry).
+// and partner search, joining a league, and a permanent partner change's
+// steps and its start at a round switch publish (#402, #403; their own tests
+// check the entries).
 // RETIRED: written by flows that went with the interest list (#333, D129)
 // and with the organizer's approval of named substitutes (#400, D175);
 // Napló still names their old entries, nothing writes new ones.
-const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
+const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join",
+  "partner_change.request", "partner_change.withdraw", "partner_change.accept", "partner_change.decline", "partner_change.start"];
 const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send", "substitute.approve", "substitute.reject", "substitute.revoke"];
 
 // Every admin page with an action, and the audit actions its action writes.
@@ -279,7 +297,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.cities.tsx": ["city.create", "city.update", "city.delete"],
   "admin.clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
-  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
+  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel", "partner_change.undo"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete", "phase.extend"],
   "admin.league-players.tsx": ["pair.create"],

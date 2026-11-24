@@ -1,8 +1,10 @@
-import { Link } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import { SeasonEntry } from "~/components/season-entry";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Label } from "~/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import type { MyLeagueCard, MyLeaguesActionData } from "~/lib/my-leagues.server";
 import {
   INVITE_PARTNER,
@@ -14,6 +16,7 @@ import {
   startsText,
 } from "~/lib/my-leagues";
 import { PAIR_SECTION_PATH } from "~/lib/pairs";
+import { NO_CANDIDATES, SECTION_TITLE as PARTNER_CHANGE_TITLE, START_TEXT as PARTNER_CHANGE_START } from "~/lib/partner-changes";
 
 // One league on Ligáim (#394): a card made of sections, one per topic, so a
 // later item adds its own section to SECTIONS without reshaping the card
@@ -74,7 +77,7 @@ export function PairSection({ card }: SectionProps) {
 /** Where the pair is in the season: its group and place, the round it starts in, or the entry. */
 export function PlaceSection({ card, actionData }: SectionProps) {
   if (!card.season) return null;
-  const answered = actionData?.season === card.season.id ? actionData : undefined;
+  const answered = actionData?.season === card.season.id && !actionData.topic ? actionData : undefined;
   const entry = card.entry;
   return (
     <CardSection title="Helyetek">
@@ -158,8 +161,96 @@ export function LinksSection({ card }: SectionProps) {
   );
 }
 
+/**
+ * "Állandó partnercsere" (#402): the changes the player takes part in (the
+ * new partner answers here, the one who sent it can take it back), and the
+ * picker of a new partner by name while the player may start one.
+ */
+export function PartnerChangeSection({ card, actionData }: SectionProps) {
+  const busy = useNavigation().state !== "idle";
+  const view = card.partnerChange;
+  if (!view || !card.season) return null;
+  const answered = actionData?.topic === "partner_change" && actionData.season === card.season.id ? actionData : undefined;
+  const seasonId = card.season.id;
+  return (
+    <CardSection title={PARTNER_CHANGE_TITLE}>
+      {answered && (
+        <p role={answered.error ? "alert" : "status"} className={answered.error ? "font-semibold text-destructive" : "font-medium"}>
+          {answered.error ?? answered.notice}
+        </p>
+      )}
+      {view.items.map((item) => (
+        <div key={item.id} className="grid gap-2">
+          <p>{item.text}</p>
+          {(item.canAnswer || item.canWithdraw) && (
+            <Form method="post" className="flex flex-wrap gap-2">
+              <input type="hidden" name="season" value={seasonId} />
+              <input type="hidden" name="change" value={item.id} />
+              {item.canAnswer && (
+                <>
+                  <Button type="submit" name="intent" value="partner_change_accept" size="sm" disabled={busy}>
+                    Elfogadom
+                  </Button>
+                  <Button type="submit" name="intent" value="partner_change_decline" size="sm" variant="outline" disabled={busy}>
+                    Nem fogadom el
+                  </Button>
+                </>
+              )}
+              {item.canWithdraw && (
+                <Button type="submit" name="intent" value="partner_change_withdraw" size="sm" variant="outline" disabled={busy}>
+                  Visszavonom
+                </Button>
+              )}
+            </Form>
+          )}
+        </div>
+      ))}
+      {view.start && (
+        <div className="grid gap-2">
+          <p className="text-muted-foreground">{PARTNER_CHANGE_START}</p>
+          {view.start.candidates.length === 0 ? (
+            <p className="text-muted-foreground">{NO_CANDIDATES}</p>
+          ) : (
+            <Form method="post" className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="intent" value="partner_change_start" />
+              <input type="hidden" name="season" value={seasonId} />
+              <input type="hidden" name="league" value={card.league.slug} />
+              <div className="grid min-w-0 flex-1 basis-48 gap-1">
+                <Label htmlFor={`partner-${seasonId}`}>Új partner</Label>
+                <Select name="partner" required>
+                  <SelectTrigger id={`partner-${seasonId}`} className="w-full">
+                    <SelectValue placeholder="Válassz játékost" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {view.start.candidates.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" size="sm" disabled={busy}>
+                Kérés küldése
+              </Button>
+            </Form>
+          )}
+        </div>
+      )}
+    </CardSection>
+  );
+}
+
 /** The card's sections, in order. A later item adds its section here. */
-export const SECTIONS: React.ComponentType<SectionProps>[] = [RoundSection, PairSection, PlaceSection, SummarySection, OwnSeasonSection, LinksSection];
+export const SECTIONS: React.ComponentType<SectionProps>[] = [
+  RoundSection,
+  PairSection,
+  PartnerChangeSection,
+  PlaceSection,
+  SummarySection,
+  OwnSeasonSection,
+  LinksSection,
+];
 
 /** `link`: the league's own address, on the title, when the page lists several. */
 export function LeagueCard({ card, actionData, link }: SectionProps & { link?: string }) {

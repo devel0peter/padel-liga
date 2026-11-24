@@ -232,6 +232,49 @@ export function seasonStart(input: { to: string; league: string; season: string;
   );
 }
 
+// Permanent partner change (#402, D178): the new partner is asked, and once
+// it is final the leaving player is told who replaces them and from when.
+// Names only, never an email or phone; the link opens the league's card on
+// Ligáim, where the answer is given.
+export type PartnerChangeEmail =
+  | { kind: "asked"; to: string; starter: string; leaving: string; league: string; leagueSlug: string; lapsesAt: Date }
+  | { kind: "final"; to: string; staying: string; partner: string; league: string; leagueSlug: string; from: number | "now" | null };
+
+export function partnerChange(input: PartnerChangeEmail): Email {
+  const card = `${SITE_URL}/leagues/${input.leagueSlug}`;
+  const reason = footer(`Azért kaptad ezt a levelet, mert játszol a ${SITE_URL.replace("https://", "")} ligájában.`);
+  if (input.kind === "asked")
+    return buildPlain(
+      `${input.starter} állandó partnernek hív – ${SITE_NAME}`,
+      [
+        `Szia ${input.to}!`,
+        `${input.starter} állandó partnernek hív a ligában (${input.league}), ${input.leaving} helyett.`,
+        `Ha elfogadod, a kör hátralévő meccsein helyettesként játszol, utána pedig párként, a helyükön.`,
+        `A Ligáim oldalon fogadhatod el, ${formatDeadline(input.lapsesAt)}-ig:`,
+        card,
+        SIGNATURE,
+      ],
+      [card],
+      reason,
+    );
+  const from = input.from === "now" ? "mostantól" : input.from === null ? "a következő szezontól" : `${withArticle(input.from)} körtől`;
+  return buildPlain(
+    `Új partner a helyeden – ${SITE_NAME}`,
+    [
+      `Szia ${input.to}!`,
+      `${input.staying} állandó partnercserét kért a ligában (${input.league}): helyetted ${input.partner} játszik.`,
+      input.from === "now"
+        ? `Ebben a ligában mostantól nincs párod.`
+        : `A kör hátralévő meccsein már ő játszik, ${from} pedig ${input.staying} párja lesz. Onnantól nincs párod ebben a ligában.`,
+      `Új párral később is nevezhetsz. Ha valami nem stimmel, írj a szervezőnek, vagy válaszolj erre a levélre.`,
+      card,
+      SIGNATURE,
+    ],
+    [card],
+    reason,
+  );
+}
+
 // The organizer extended the running round (#356, D151): every player of the
 // round gets the new deadline and, when there is one, the next round's new
 // start. Names only the recipient.

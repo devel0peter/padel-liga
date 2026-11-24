@@ -79,7 +79,12 @@ export type PlayerKind =
   | "season_start"
   // The organizer extended the running round (#356, D151): every player of
   // the round, in the app and by push, plus one email (round_extended).
-  | "round_extended";
+  | "round_extended"
+  // A permanent partner change (#402, D178), in the app and by push: the
+  // new partner is asked (plus one email), the starter hears the answer, the
+  // leaving player that it is final (plus one email), all three about an
+  // organizer's undo, the new partner about a request taken back.
+  | "partner_change";
 
 // --- Push topics (#349, D159) ------------------------------------------------
 // A player chooses by topic which pushes they get, on the profile under the
@@ -135,6 +140,7 @@ export const KIND_TOPIC: Readonly<Record<PlayerKind, PushTopic>> = {
   pair_intro: "season",
   pair_withdrawn: "season",
   round_extended: "season",
+  partner_change: "season",
   absence_marked: "absences",
   no_show_confirmed: "absences",
   no_show_rejected: "absences",
@@ -448,16 +454,70 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
 
 // To the match's other three players when a player is marked as not playing
 // (`played`: marked with the result, after the match) or the mark is taken back.
-export function absenceMarkedMessage(input: { matchId: number; name: string; played?: boolean; withdrawn?: boolean }): Message {
+// `substitute`: the new partner of a permanent partner change (#402), named.
+export function absenceMarkedMessage(input: { matchId: number; name: string; played?: boolean; withdrawn?: boolean; substitute?: string }): Message {
   if (input.withdrawn) return { title: "Mégsem jön helyettes", body: `Mégis ${input.name} játszik a meccseteken.`, url: matchUrl(input.matchId) };
   return {
     title: "Helyettes a meccseteken",
     body: input.played
       ? `${input.name} helyett helyettes játszott a meccseteken. Az eredménnyel együtt ezt is megerősítitek.`
-      : `${input.name} helyett helyettes játszik a meccseteken.`,
+      : `${input.name} helyett ${input.substitute ?? "helyettes"} játszik a meccseteken.`,
     url: matchUrl(input.matchId),
   };
 }
+
+// --- Permanent partner change (#402, D178) ------------------------------------
+// Names, never an email or phone; each links to the league's card on Ligáim.
+
+type League = { slug: string; name: string };
+const leagueCard = (league: League) => `/leagues/${league.slug}`;
+
+/** "a 2. körtől", "mostantól", "a következő szezontól". */
+function changeFrom(from: number | "now" | null): string {
+  return from === "now" ? "mostantól" : from === null ? "a következő szezontól" : `${withArticle(from)} körtől`;
+}
+
+export type PartnerChangeNotice =
+  | { kind: "asked"; league: League; starter: string; leaving: string }
+  | { kind: "withdrawn"; league: League; starter: string }
+  | { kind: "declined"; league: League; partner: string }
+  | { kind: "final_leaving"; league: League; staying: string; partner: string; from: number | "now" | null }
+  | { kind: "final_staying"; league: League; partner: string; from: number | "now" | null }
+  | { kind: "undone"; league: League; staying: string; leaving: string; partner: string };
+
+export function partnerChangeMessage(n: PartnerChangeNotice): Message {
+  const url = leagueCard(n.league);
+  switch (n.kind) {
+    case "asked":
+      return { title: "Állandó partnernek hívnak", body: `${n.starter} állandó partnernek hív ${n.leaving} helyett (${n.league.name}). A Ligáim oldalon válaszolhatsz.`, url };
+    case "withdrawn":
+      return { title: "Visszavont partnercsere", body: `${n.starter} visszavonta az állandó partnercserét (${n.league.name}).`, url };
+    case "declined":
+      return { title: "Nem fogadta el", body: `${n.partner} nem fogadta el az állandó partnercserét (${n.league.name}).`, url };
+    case "final_leaving":
+      return {
+        title: "Új partner a helyeden",
+        body: `${n.partner} játszik helyetted ${n.staying} mellett (${n.league.name}). ${capitalize(changeFrom(n.from))} nincs párod ebben a ligában.`,
+        url,
+      };
+    case "final_staying":
+      return {
+        title: "Elfogadta",
+        body:
+          n.from === "now"
+            ? `${n.partner} elfogadta: mostantól ő a párod (${n.league.name}).`
+            : `${n.partner} elfogadta: a kör hátralévő meccsein ő játszik, ${changeFrom(n.from)} pedig ő a párod (${n.league.name}).`,
+        url,
+      };
+    case "undone":
+      return {
+        title: "Visszavont partnercsere",
+        body: `A szervező visszavonta az állandó partnercserét: ${n.staying} párja továbbra is ${n.leaving}, ${n.partner} nem játszik helyette (${n.league.name}).`,
+        url,
+      };
+  }
+}
+
 
 // --- No-shows (#33, D108) ---------------------------------------------------
 

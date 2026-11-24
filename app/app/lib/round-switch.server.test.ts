@@ -11,6 +11,7 @@ vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockCl
 vi.mock("~/lib/email/outbox.server", () => ({
   queueGroupsPublished: async (messages: any[]) => h.mails.push(...messages),
   queueStrikeWarnings: async () => {},
+  queuePartnerChangeEmail: async () => {},
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");

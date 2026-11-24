@@ -1,9 +1,10 @@
 import { absenceClosesAt, absenceOpen, markRefusal, resultAbsences, unmarkRefusal, type Side } from "@padel-liga/rules";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { matchAbsences, matches, users } from "~/db/schema";
+import { matchAbsences, matches, partnerChanges, users } from "~/db/schema";
 import { logError, logInfo } from "~/lib/log";
 import { absenceMarkedMessage, type Message } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
@@ -27,7 +28,11 @@ export type StepResult = { ok: true; notice: string } | { ok: false; error: stri
 
 const NAMELESS = "Törölt játékos";
 
-export type AbsenceMark = { pairId: number; absentId: string; name: string; afterMatch: boolean };
+// `substitute`: the new partner of the permanent partner change that made
+// the mark (#402, D178), by name; null for a pair's own mark (no name, #400).
+export type AbsenceMark = { pairId: number; absentId: string; name: string; afterMatch: boolean; substitute: string | null };
+
+const changePartner = alias(users, "absence_change_partner");
 
 /** The marks of these matches, by match. */
 export async function absencesOf(matchIds: readonly number[]): Promise<Map<number, AbsenceMark[]>> {
@@ -35,12 +40,26 @@ export async function absencesOf(matchIds: readonly number[]): Promise<Map<numbe
   for (const ids of chunks([...new Set(matchIds)])) {
     if (ids.length === 0) continue;
     const rows = await db
-      .select({ matchId: matchAbsences.matchId, pairId: matchAbsences.pairId, absentId: matchAbsences.absentId, name: users.name, afterMatch: matchAbsences.afterMatch })
+      .select({
+        matchId: matchAbsences.matchId,
+        pairId: matchAbsences.pairId,
+        absentId: matchAbsences.absentId,
+        name: users.name,
+        afterMatch: matchAbsences.afterMatch,
+        substitute: changePartner.name,
+        substituteDeleted: changePartner.deletedAt,
+      })
       .from(matchAbsences)
       .innerJoin(users, eq(users.id, matchAbsences.absentId))
+      .leftJoin(partnerChanges, eq(partnerChanges.id, matchAbsences.partnerChangeId))
+      .leftJoin(changePartner, eq(changePartner.id, partnerChanges.partnerId))
       .where(inArray(matchAbsences.matchId, ids))
       .orderBy(asc(matchAbsences.id));
-    for (const { matchId, ...r } of rows) out.set(matchId, [...(out.get(matchId) ?? []), { ...r, name: r.name || NAMELESS }]);
+    for (const { matchId, substituteDeleted, ...r } of rows)
+      out.set(matchId, [
+        ...(out.get(matchId) ?? []),
+        { ...r, name: r.name || NAMELESS, substitute: r.substitute === null ? null : substituteDeleted ? NAMELESS : r.substitute || "Névtelen" },
+      ]);
   }
   return out;
 }
@@ -52,11 +71,11 @@ const marksOf = async (matchId: number) => (await absencesOf([matchId])).get(mat
  * `played` once the match was played or its start passed (the window is
  * closed), as the four players read it on the match page.
  */
-export async function organizerAbsences(matchId: number, now = new Date()): Promise<{ id: string; name: string; played: boolean }[]> {
+export async function organizerAbsences(matchId: number, now = new Date()): Promise<{ id: string; name: string; played: boolean; substitute: string | null }[]> {
   const ctx = await loadMatch(matchId);
   if (!ctx) return [];
   const { open } = windowOf(ctx.match, ctx.voided, now);
-  return (await marksOf(matchId)).map((m) => ({ id: m.absentId, name: m.name, played: m.afterMatch || !open }));
+  return (await marksOf(matchId)).map((m) => ({ id: m.absentId, name: m.name, played: m.afterMatch || !open, substitute: m.substitute }));
 }
 
 // The window of a match from its mirrored status (matches.server keeps
@@ -84,7 +103,7 @@ export type AbsencePanel = {
   open: boolean;
   closesAt: Date;
   // Every mark of both pairs: all four players see them.
-  marked: { absentId: string; name: string; ours: boolean; afterMatch: boolean; canUnmark: boolean }[];
+  marked: { absentId: string; name: string; ours: boolean; afterMatch: boolean; canUnmark: boolean; substitute: string | null }[];
   // While the window is open: the own pair's players not marked yet.
   form: Person[] | null;
   // The result form's ticks (#400), while this pair can record the result:
@@ -123,6 +142,8 @@ export type AbsenceInput = {
   markedBy: string | null;
   afterMatch: boolean;
   now: Date;
+  // The permanent partner change that marks it (#402), if any.
+  partnerChangeId?: number | null;
 };
 
 export function absenceInsert(a: AbsenceInput) {
@@ -133,6 +154,7 @@ export function absenceInsert(a: AbsenceInput) {
     markedBy: a.markedBy,
     markedAt: a.now,
     afterMatch: a.afterMatch,
+    partnerChangeId: a.partnerChangeId ?? null,
   });
 }
 

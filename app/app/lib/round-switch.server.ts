@@ -10,6 +10,7 @@ import { phaseProjection } from "./deadline-projection.server";
 import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
+import { markChangesAfterPublish } from "./partner-changes.server";
 import { resultsOf } from "./result-log.server";
 import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin, OUTDATED_DRAFT } from "./round-switch";
 import { getSeason } from "./seasons.server";
@@ -272,7 +273,10 @@ export async function publishRoundSwitch(seasonId: number, nextPhase: number, ac
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
   if (s.disputes.length > 0) return { ok: false, error: DISPUTES_FIRST };
   if (stored.length > 0 && !stored.some((g) => g.publishedAt) && draftOutdated(stored, s)) return { ok: false, error: OUTDATED_DRAFT };
-  return publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
+  const result = await publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
+  // A partner change made after this draft: its new partner plays the old pair's new matches too (#402).
+  if (result.ok) await markChangesAfterPublish(seasonId, nextPhase, now);
+  return result;
 }
 
 // --- The cron step -----------------------------------------------------------

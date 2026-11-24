@@ -12,6 +12,14 @@ import { ladderPage, pairIdsOf } from "./ladder.server";
 import { chooseLeague, playerLeagues, type ListedLeague } from "./league-members.server";
 import { minEntriesByLeague } from "./leagues.server";
 import {
+  acceptPartnerChange,
+  declinePartnerChange,
+  partnerChangeView,
+  startPartnerChange,
+  withdrawPartnerChange,
+  type PartnerChangeView,
+} from "./partner-changes.server";
+import {
   leagueSummary,
   newestFirst,
   ownPlace,
@@ -48,6 +56,8 @@ export type MyLeagueCard = {
   entry: EntryView | null;
   /** Null before the season's groups are out. */
   summary: LeagueSummary | null;
+  /** "Állandó partnercsere" (#402): null when there is nothing to show. */
+  partnerChange: PartnerChangeView | null;
   own: OwnSeason;
 };
 
@@ -125,6 +135,7 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
     const place = ladder?.kind === "ladder" ? ownPlace(ladder.phase, bands) : null;
     const entry = season ? (views.get(season.id) ?? null) : null;
     const record = season ? records.get(season.id) : undefined;
+    const partnerChange = await partnerChangeView(user.id, league.id, season ?? undefined, now);
     cards.push({
       league: { name: league.name, slug: league.slug, city: cities.find((c) => c.slug === league.city)?.name ?? league.city },
       season: season ? { id: season.id, name: season.name } : null,
@@ -134,6 +145,7 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
       joins: place || !season ? null : joinsOf(season, entry, now),
       entry,
       summary: ladder?.kind === "ladder" ? leagueSummary(ladder.phase, bands) : null,
+      partnerChange,
       own: { matches: record?.matches ?? 0, wins: record?.wins ?? 0, elo: rating === null ? null : Math.round(rating) },
       order: seasonOrder(calendar),
     });
@@ -141,7 +153,10 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
   return newestFirst(cards).map(({ order: _, ...card }) => card);
 }
 
-export type MyLeaguesActionData = { season: number; error?: string; notice?: string; ok?: true };
+// `topic`: the card section the answer is for; none: the entry (#23).
+export type MyLeaguesActionData = { season: number; topic?: "partner_change"; error?: string; notice?: string; ok?: true };
+
+const PARTNER_CHANGE_INTENTS: readonly string[] = ["partner_change_start", "partner_change_withdraw", "partner_change_accept", "partner_change_decline"];
 
 /**
  * Ligáim's form posts, the same as Kezdőlap's: "Nevezünk" on a card (#23)
@@ -154,7 +169,32 @@ export async function myLeaguesAction(user: User, form: FormData): Promise<MyLea
     return { season: 0, ok: true };
   }
   const season = Number(form.get("season") || 0);
+  const intent = String(form.get("intent") ?? "");
+  if (PARTNER_CHANGE_INTENTS.includes(intent)) return partnerChangeAction(user, intent, season, form);
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0) throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
   return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };
+}
+
+// "Állandó partnercsere" on a card (#402): start (in the card's league), take
+// back, accept or decline. The answer goes to the card of `season`.
+async function partnerChangeAction(user: User, intent: string, season: number, form: FormData): Promise<MyLeaguesActionData> {
+  if (!Number.isInteger(season) || season <= 0) throw new Response("Hibás kérés.", { status: 400 });
+  const now = new Date();
+  let result;
+  if (intent === "partner_change_start") {
+    const league = (await playerLeagues(user.id)).find((l) => l.slug === String(form.get("league") ?? ""));
+    if (!league) throw new Response("Hibás kérés.", { status: 400 });
+    result = await startPartnerChange(user, league.id, String(form.get("partner") ?? ""), now);
+  } else {
+    const change = Number(form.get("change") || 0);
+    if (!Number.isInteger(change) || change <= 0) throw new Response("Hibás kérés.", { status: 400 });
+    result =
+      intent === "partner_change_withdraw"
+        ? await withdrawPartnerChange(user, change, now)
+        : intent === "partner_change_accept"
+          ? await acceptPartnerChange(user, change, now)
+          : await declinePartnerChange(user, change, now);
+  }
+  return result.ok ? { season, topic: "partner_change", notice: result.notice } : { season, topic: "partner_change", error: result.error };
 }

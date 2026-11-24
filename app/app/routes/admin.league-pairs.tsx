@@ -9,6 +9,17 @@ import { ChangeDialog, CreateDialog, DissolveButton, EntryCell } from "~/compone
 import { PersonLink } from "~/components/person-link";
 import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -44,6 +55,8 @@ import { formatElo } from "~/lib/groups";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, dissolvePair, leaguePairs, pairCandidates } from "~/lib/pairs.server";
+import { changeStateText } from "~/lib/partner-changes";
+import { leaguePartnerChanges, undoPartnerChange } from "~/lib/partner-changes.server";
 import { missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
@@ -94,7 +107,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const [strikeList, seasons] = await Promise.all([leagueStrikes(league.id), listSeasons(league.id)]);
   const strikeSeason = currentSeason(seasons, new Date())?.id ?? 0;
   const strikes = strikeList.filter((s) => s.seasonId === strikeSeason);
+  const changes = await leaguePartnerChanges(league.id);
   return {
+    partnerChanges: changes.map((c) => ({ ...c, state: changeStateText(c) })),
     strikes,
     strikeCounts: Object.fromEntries(countsBySeason(strikes).get(strikeSeason) ?? []),
     name: league.name,
@@ -133,6 +148,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     result = await withdrawPairMidPhase(actor, league.id, pairId, seasonId, field("reason"));
   else if (intent === "strike-cancel" && valid(Number(field("strike"))))
     result = await cancelStrike(actor.id, league.id, Number(field("strike")), field("reason"));
+  else if (intent === "partner-change-undo" && valid(Number(field("change"))))
+    result = await undoPartnerChange(actor.id, league.id, Number(field("change")));
   else throw new Response("Hibás kérés.", { status: 400 });
   return result.ok ? { ok: true as const } : { error: result.error };
 }
@@ -247,6 +264,76 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
 }
 
 type Strike = Route.ComponentProps["loaderData"]["strikes"][number];
+
+type PartnerChange = Route.ComponentProps["loaderData"]["partnerChanges"][number];
+
+// The players' permanent partner changes of the season (#402, spec 4,
+// D178): open (waiting for the new partner), final (the new partner plays
+// instead until the new pair starts) and started. A final one can be undone
+// until the new pair starts. Names only.
+function PartnerChangesSection({ changes }: { changes: PartnerChange[] }) {
+  if (changes.length === 0) return null;
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="partner-changes-title">
+      <h2 id="partner-changes-title" className="font-display text-lg font-bold">
+        Állandó partnercserék
+      </h2>
+      <p className="max-w-2xl text-sm text-muted-foreground">
+        A játékosok maguk cserélnek partnert a Ligáim oldalon: az új partner elfogadja, és onnantól a kör hátralévő meccsein ő
+        játszik. Az új pár a körváltáskor a régi pár helyére kerül. Vita esetén itt visszavonhatod, amíg az új pár el nem indul.
+      </p>
+      <ul className="grid gap-3">
+        {changes.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+            <div className="grid min-w-0 gap-0.5">
+              <span className="font-medium break-words">
+                {c.staying}: {c.leaving} helyett {c.partner}
+              </span>
+              <span className="text-sm text-muted-foreground">{c.state}</span>
+            </div>
+            {c.canUndo && <UndoChangeButton change={c} />}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function UndoChangeButton({ change }: { change: PartnerChange }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const busy = fetcher.state !== "idle";
+  return (
+    <div className="grid gap-1">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" size="sm" disabled={busy}>
+            Visszavonás
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Visszavonod a partnercserét?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {change.leaving} marad {change.staying} párja, és a még le nem játszott meccseken újra ő játszik. Mindhárman
+              értesítést kapnak.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Mégse</AlertDialogCancel>
+            <AlertDialogAction onClick={() => fetcher.submit({ intent: "partner-change-undo", change: String(change.id) }, { method: "post" })}>
+              Visszavonás
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {fetcher.data?.error && (
+        <p role="alert" className="text-sm font-semibold text-destructive">
+          {fetcher.data.error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const STRIKE_SOURCES = { deadline: "Határidő: nem próbált egyeztetni", no_show: "Nem jelent meg" } as const;
 
@@ -369,7 +456,7 @@ function CancelStrikeDialog({ strike }: { strike: Strike }) {
 }
 
 export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
-  const { name, slug, rows, counts, query, activePairs, candidates, canMail, strikes, strikeCounts } = loaderData;
+  const { name, slug, rows, counts, query, activePairs, candidates, canMail, strikes, strikeCounts, partnerChanges } = loaderData;
   return (
     <AppPage
       title="Párok"
@@ -408,6 +495,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
+      <PartnerChangesSection changes={partnerChanges} />
       <StrikesSection strikes={strikes} slug={slug} />
     </AppPage>
   );

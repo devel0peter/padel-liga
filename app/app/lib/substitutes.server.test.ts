@@ -90,8 +90,8 @@ describe("marking a player as not playing before the match (#400)", () => {
 
   it("shows every mark to all four players; only the own pair can take it back", async () => {
     await S.markAbsence("a", 1, "b", NOW);
-    expect((await panel("c")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: false, canUnmark: false }]);
-    expect((await panel("a")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: true, canUnmark: true }]);
+    expect((await panel("c")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: false, canUnmark: false, substitute: null }]);
+    expect((await panel("a")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: true, canUnmark: true, substitute: null }]);
     expect((await panel("a")).form).toEqual([{ id: "a", name: "Játékos A" }]);
     expect((await panel("c")).form).toEqual([
       { id: "c", name: "Játékos C" },
@@ -140,11 +140,11 @@ describe("marking a player as not playing before the match (#400)", () => {
 
   it("shows the organizer's pages each mark, played once the window closed or named with the result", async () => {
     await S.markAbsence("a", 1, "b", NOW);
-    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "b", name: "Játékos B", played: false }]);
+    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "b", name: "Játékos B", played: false, substitute: null }]);
     // After the deadline (no time agreed), the match counts as played for the text.
-    expect(await S.organizerAbsences(1, new Date(DEADLINE * 1000 + 1000))).toEqual([{ id: "b", name: "Játékos B", played: true }]);
+    expect(await S.organizerAbsences(1, new Date(DEADLINE * 1000 + 1000))).toEqual([{ id: "b", name: "Játékos B", played: true, substitute: null }]);
     await R.resultStep("a", 1, { kind: "record", score: WIN_A, absent: ["a"] } as any, NOW);
-    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "a", name: "Játékos A", played: true }]);
+    expect(await S.organizerAbsences(1, NOW)).toEqual([{ id: "a", name: "Játékos A", played: true, substitute: null }]);
   });
 
   it("marks one player on one match on its own (#402 reuses it), once", async () => {

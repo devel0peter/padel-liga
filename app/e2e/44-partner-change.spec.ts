@@ -39,6 +39,7 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     await visit(starter.page, `/leagues/${LEAGUE.slug}`);
     const section = content(starter.page).getByRole("region", { name: "Állandó partnercsere" });
     await expect(section).toContainText("új partnerrel folytathatod a helyeteken");
+    await section.getByText("Végleg új partnerrel játszanál?").click();
     await section.getByRole("combobox", { name: "Új partner" }).click();
     await starter.page.getByRole("option", { name: OUTSIDER.name }).click();
     await section.getByRole("button", { name: "Kérés küldése" }).click();

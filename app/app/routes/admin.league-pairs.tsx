@@ -467,6 +467,8 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         A játékosok párlinkkel lesznek párok, vagy te teszed őket párba itt vagy a Játékosok oldalon. A kihirdetett csoportban
         játszó pár a kör határidejéig nem bontható fel.
       </p>
+      {/* Few and time-bound (until the new pair starts): above the long list. */}
+      <PartnerChangesSection changes={partnerChanges} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />
       {rows.length === 0 ? (
         <p className="py-10 text-center text-muted-foreground">
@@ -495,7 +497,6 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
           </Table>
         </div>
       )}
-      <PartnerChangesSection changes={partnerChanges} />
       <StrikesSection strikes={strikes} slug={slug} />
     </AppPage>
   );

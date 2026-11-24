@@ -16,7 +16,7 @@ import {
   startsText,
 } from "~/lib/my-leagues";
 import { PAIR_SECTION_PATH } from "~/lib/pairs";
-import { NO_CANDIDATES, SECTION_TITLE as PARTNER_CHANGE_TITLE, START_TEXT as PARTNER_CHANGE_START } from "~/lib/partner-changes";
+import { ASK_TEXT as PARTNER_CHANGE_ASK, NO_CANDIDATES, SECTION_TITLE as PARTNER_CHANGE_TITLE, START_TEXT as PARTNER_CHANGE_START } from "~/lib/partner-changes";
 
 // One league on Ligáim (#394): a card made of sections, one per topic, so a
 // later item adds its own section to SECTIONS without reshaping the card
@@ -205,37 +205,41 @@ export function PartnerChangeSection({ card, actionData }: SectionProps) {
           )}
         </div>
       ))}
+      {/* Rarely needed: folded until opened, open again after a refused start. */}
       {view.start && (
-        <div className="grid gap-2">
-          <p className="text-muted-foreground">{PARTNER_CHANGE_START}</p>
-          {view.start.candidates.length === 0 ? (
-            <p className="text-muted-foreground">{NO_CANDIDATES}</p>
-          ) : (
-            <Form method="post" className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="intent" value="partner_change_start" />
-              <input type="hidden" name="season" value={seasonId} />
-              <input type="hidden" name="league" value={card.league.slug} />
-              <div className="grid min-w-0 flex-1 basis-48 gap-1">
-                <Label htmlFor={`partner-${seasonId}`}>Új partner</Label>
-                <Select name="partner" required>
-                  <SelectTrigger id={`partner-${seasonId}`} className="w-full">
-                    <SelectValue placeholder="Válassz játékost" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {view.start.candidates.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" size="sm" disabled={busy}>
-                Kérés küldése
-              </Button>
-            </Form>
-          )}
-        </div>
+        <details open={!!answered?.error}>
+          <summary className="cursor-pointer font-medium underline-offset-2 hover:underline">{PARTNER_CHANGE_ASK}</summary>
+          <div className="mt-2 grid gap-2">
+            <p className="text-muted-foreground">{PARTNER_CHANGE_START}</p>
+            {view.start.candidates.length === 0 ? (
+              <p className="text-muted-foreground">{NO_CANDIDATES}</p>
+            ) : (
+              <Form method="post" className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="intent" value="partner_change_start" />
+                <input type="hidden" name="season" value={seasonId} />
+                <input type="hidden" name="league" value={card.league.slug} />
+                <div className="grid min-w-0 flex-1 basis-48 gap-1">
+                  <Label htmlFor={`partner-${seasonId}`}>Új partner</Label>
+                  <Select name="partner" required>
+                    <SelectTrigger id={`partner-${seasonId}`} className="w-full">
+                      <SelectValue placeholder="Válassz játékost" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {view.start.candidates.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" size="sm" disabled={busy}>
+                  Kérés küldése
+                </Button>
+              </Form>
+            )}
+          </div>
+        </details>
       )}
     </CardSection>
   );

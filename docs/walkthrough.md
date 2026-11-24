@@ -652,7 +652,7 @@ The player's leagues, one card each (#394, decision log (`docs/decisions.md`) D1
 
 - Page: `/leagues/minta`, then the match page, then Párok (`/admin/leagues/minta/pairs`)
 - Account: a player of a pair in round 1; then the new partner (a registered player of Mintaváros without a pair); then the Szervező
-- Do: in "Állandó partnercsere" pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Visszavonás" on the change in "Állandó partnercserék" and confirm.
+- Do: in "Állandó partnercsere" open "Végleg új partnerrel játszanál?", pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Visszavonás" on the change in "Állandó partnercserék" and confirm.
 - Expect:
   - The picker lists names only (no email or phone): the league's players with no pair. After sending: "Elküldtük." and "Elküldted <név> részére. <nap>-ig válaszolhat." with "Visszavonom"; the partner sees that a change was asked. A second change can't be started while one waits.
   - The new partner: one email ("<név> állandó partnernek hív") and an in-app notice; on Ligáim "<név> állandó partnernek hív <partner> helyett." with "Elfogadom" and "Nem fogadom el". Unanswered, it disappears after 7 days.

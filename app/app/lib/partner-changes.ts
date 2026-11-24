@@ -155,6 +155,7 @@ export function changeStateText(c: { status: "open" | "final" | "started"; start
 // --- Ligáim's "Állandó partnercsere" section ---------------------------------
 
 export const SECTION_TITLE = "Állandó partnercsere";
+export const ASK_TEXT = "Végleg új partnerrel játszanál?";
 
 export const START_TEXT =
   "Ha a párod végleg kiesik (sérülés, költözés), új partnerrel folytathatod a helyeteken. Az új partner a kör hátralévő meccsein helyette játszik, utána pedig ő lesz a párod.";

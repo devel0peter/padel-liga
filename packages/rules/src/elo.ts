@@ -1,7 +1,7 @@
 // Elo ratings (spec section 11, szabalyzat section 8): starting values, the
 // pair rating and the update after every played match (#13).
 
-import { type Side, validateScore } from "./results";
+import { type SetGames, type Side, validateScore } from "./results";
 import type { MatchOutcome } from "./standings";
 
 /** The signup levels (the same keys as the app's level field). */
@@ -61,9 +61,9 @@ export function expectedScore(own: number, opponent: number): number {
  * The winning side of an outcome that changes Elo, or null: only a played
  * match does. A walkover, both-inactive and unplayed match change nothing.
  */
-export function ratedWinner(outcome: MatchOutcome | null): Side | null {
+export function ratedWinner(outcome: MatchOutcome | null, setGames: SetGames): Side | null {
   if (outcome?.kind !== "played") return null;
-  const v = validateScore(outcome.score);
+  const v = validateScore(outcome.score, setGames);
   return v.ok ? v.totals.winner : null;
 }
 

@@ -1,4 +1,4 @@
-import type { MatchOutcome, MatchScore } from "@padel-liga/rules";
+import type { MatchOutcome, MatchScore, SetGames } from "@padel-liga/rules";
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -340,6 +340,10 @@ export const seasonPhases = sqliteTable(
     number: integer("number").notNull(), // 1–4
     startsAt: integer("starts_at", { mode: "timestamp" }).notNull(), // Monday 00:00 Budapest
     deadline: integer("deadline", { mode: "timestamp" }).notNull(), // Sunday 23:59 Budapest
+    // Games that win a set in this round (D173, #396): 6 for every round,
+    // 4 only for the rounds already published when sets to 6 came in (Győr's
+    // round 1), so their results keep the format they were played in.
+    setGames: integer("set_games").$type<SetGames>().notNull().default(6),
   },
   (t) => [primaryKey({ columns: [t.seasonId, t.number] })],
 );

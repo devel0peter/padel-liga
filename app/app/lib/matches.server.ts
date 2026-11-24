@@ -21,6 +21,7 @@ import {
   type ResultState,
   type SchedulingEventKind,
   type SchedulingState,
+  type SetGames,
   type Side,
   type SlotError,
   type SlotRange,
@@ -250,6 +251,8 @@ export type HomeMatch = {
   venue: string | null;
   // The result, once recorded (#28).
   result: ResultState;
+  // Its round's set format (D173), for the walkover score in the status.
+  setGames: SetGames;
 };
 
 export type HomeGroup = {
@@ -300,6 +303,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       leagueSlug: leagues.slug,
       startsAt: seasonPhases.startsAt,
       deadline: seasonPhases.deadline,
+      setGames: seasonPhases.setGames,
     })
     .from(groupPairs)
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
@@ -352,6 +356,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       const table = groupTable(
         pairsOf.map((p) => ({ id: p.pairId, elo: p.elo, withdrawn: p.withdrawn })),
         groupMatches.map((m) => ({ a: m.pairA, b: m.pairB, outcome: countedOutcome(m) })),
+        g.setGames,
       );
       const ranked = isRanked(table);
       const groupCountNow = await groupCount(g.seasonId, g.phase);
@@ -386,11 +391,11 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
               week: m.week,
               status: m.status,
               scheduledAt: m.scheduledAt,
-              outcome: counted && isValidOutcome(counted) ? counted : null,
+              outcome: counted && isValidOutcome(counted, g.setGames) ? counted : null,
               venue: venueOf(m),
             };
           }),
-          { phaseStartsAt: g.startsAt, currentWeek: started && !extension ? week : null, mine: g.pairId },
+          { phaseStartsAt: g.startsAt, currentWeek: started && !extension ? week : null, mine: g.pairId, setGames: g.setGames },
         ),
         withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
         matches: own.map((m) => {
@@ -409,6 +414,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
             state,
             venue: venueOf(m),
             result,
+            setGames: g.setGames,
           };
         }),
       };
@@ -499,6 +505,8 @@ export type MatchContext = {
   seasonId: number;
   phase: number;
   phaseStartsAt: Date;
+  // The round's set format (D173, #396): what its results are checked against.
+  setGames: SetGames;
   pairs: { a: PairPlayers; b: PairPlayers };
   events: StoredEvent[];
   // A pair of the match was withdrawn mid-phase (#34): it doesn't count and
@@ -519,6 +527,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
       leagueSlug: leagues.slug,
       city: leagues.city,
       phaseStartsAt: seasonPhases.startsAt,
+      setGames: seasonPhases.setGames,
     })
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
@@ -543,6 +552,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     seasonId: row.seasonId,
     phase: row.phase,
     phaseStartsAt: row.phaseStartsAt,
+    setGames: row.setGames,
     pairs: { a, b },
     events: (await eventsOf([matchId])).get(matchId) ?? [],
     voided: a.withdrawn || b.withdrawn,
@@ -566,6 +576,8 @@ export type MatchPage = {
   deadline: Date;
   phase: number;
   phaseStartsAt: Date;
+  // The round's set format (D173, #396): the result form's hint and checks.
+  setGames: SetGames;
   league: string;
   season: string;
   groupNumber: number;
@@ -677,7 +689,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
       ours: false,
       by: d.kind === "organizer" ? ("organizer" as const) : ("auto" as const),
-      text: decisionText(d, side),
+      text: decisionText(d, side, ctx.setGames),
     })),
   ]
     // By time; at the same second, in the order they were written.
@@ -689,6 +701,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     deadline: ctx.match.deadline,
     phase: ctx.phase,
     phaseStartsAt: ctx.phaseStartsAt,
+    setGames: ctx.setGames,
     league: ctx.league,
     season: ctx.season,
     groupNumber: ctx.groupNumber,

@@ -1,3 +1,4 @@
+import { SHORT_SETS } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,6 +30,7 @@ const input = (over: Partial<ProfileMatchInput>): ProfileMatchInput => ({
   season: "2026/27 tél",
   phase: 1,
   startsAt: new Date("2026-11-08T23:00:00Z"),
+  setGames: SHORT_SETS,
   week: 1,
   scheduledAt: null,
   status: "final",
@@ -75,6 +77,14 @@ describe("matchViews", () => {
     expect(matchViews(new Set([2]), [wo], fmt)[0]).toMatchObject({ verdict: "Győzelem", result: "Játék nélkül (4:0, 4:0)" });
     const both = input({ outcome: { kind: "both-inactive" } });
     expect(matchViews(new Set([1]), [both], fmt)[0]).toMatchObject({ verdict: "Vereség", result: "Mindkét pár vereséget kap (0:4, 0:4)" });
+  });
+
+  it("a sets-to-6 round's walkover reads 6:0, 6:0 and 0:6, 0:6 (#396)", () => {
+    const wo = input({ outcome: { kind: "walkover", winner: "b" }, setGames: 6 });
+    expect(matchViews(new Set([2]), [wo], fmt)[0]).toMatchObject({ verdict: "Győzelem", result: "Játék nélkül (6:0, 6:0)" });
+    expect(matchViews(new Set([1]), [wo], fmt)[0]).toMatchObject({ verdict: "Vereség", result: "Játék nélkül (0:6, 0:6)" });
+    const both = input({ outcome: { kind: "both-inactive" }, setGames: 6 });
+    expect(matchViews(new Set([1]), [both], fmt)[0]).toMatchObject({ verdict: "Vereség", result: "Mindkét pár vereséget kap (0:6, 0:6)" });
   });
 
   it("leaves out matches that are not final, unplayed, or not the pair's", () => {

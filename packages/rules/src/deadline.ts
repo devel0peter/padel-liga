@@ -63,10 +63,10 @@ export function activeAtDeadline(events: readonly SchedulingEvent[], deadline: D
 
 /**
  * The outcome of an unplayed match at the deadline (spec 8):
- * - one side active: a 4-0 4-0 walkover for it, a strike for the other;
+ * - one side active: a walkover (6-0 6-0; 4-0 4-0 in a short-set round) for it, a strike for the other;
  * - both active: unplayed (no points, no strike; the organizer may still
  *   award a walkover through an override);
- * - neither active: a 0-4 0-4 loss for both, a strike for both.
+ * - neither active: a 0-6 0-6 (short sets: 0-4 0-4) loss for both, a strike for both.
  */
 export function resolveAtDeadline(events: readonly SchedulingEvent[], deadline: Date): DeadlineResolution {
   const active = activeAtDeadline(events, deadline);

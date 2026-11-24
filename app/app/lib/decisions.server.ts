@@ -1,9 +1,9 @@
-import { decisionErrors, type MatchOutcome, type ResultState, type Side } from "@padel-liga/rules";
+import { decisionErrors, type MatchOutcome, type ResultState, type SetGames, type Side } from "@padel-liga/rules";
 import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, matchDecisions, matches, pairs, seasons, users } from "~/db/schema";
+import { groups, matchDecisions, matches, pairs, seasonPhases, seasons, users } from "~/db/schema";
 import { auditEntry } from "~/lib/audit.server";
 import { matchDecidedMessage } from "~/lib/notifications";
 import { notifyPlayers } from "~/lib/notifications.server";
@@ -97,7 +97,7 @@ export type Dispute = LeagueMatch & {
   disputedAt: Date;
 };
 
-function organizerLabel(m: { result: ResultState; status: string; a: string; b: string }): string {
+function organizerLabel(m: { result: ResultState; status: string; a: string; b: string; setGames: SetGames }): string {
   const r = m.result;
   switch (r.status) {
     case "recorded":
@@ -105,7 +105,7 @@ function organizerLabel(m: { result: ResultState; status: string; a: string; b: 
     case "disputed":
       return "Vitatott eredmény";
     case "final":
-      return `${finalLabel(r.how)}: ${neutralOutcomeText(r.outcome, m)}`;
+      return `${finalLabel(r.how)}: ${neutralOutcomeText(r.outcome, m, m.setGames)}`;
     case "none":
       return m.status === "scheduled" ? "Lefixálva" : "Egyeztetés alatt";
   }
@@ -128,10 +128,12 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
       phase: groups.phase,
       groupNumber: groups.number,
       live: sql<number>`${noWithdrawnPair}`,
+      setGames: seasonPhases.setGames,
     })
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(inLeague)
     .orderBy(desc(seasons.id), asc(groups.phase), asc(groups.number), asc(matches.week), asc(matches.id));
   // Every season of the league: more ids than D1 binds (100), so the log is
@@ -149,7 +151,7 @@ export async function leagueMatches(leagueId: number): Promise<{ disputes: Dispu
     const players = { a: names.get(r.pairA)?.players ?? [], b: names.get(r.pairB)?.players ?? [] };
     const result = results.get(r.id)?.state ?? { status: "none" };
     const voided = !r.live;
-    const label = voided ? VOIDED_LABEL : organizerLabel({ result, status: r.status, a, b });
+    const label = voided ? VOIDED_LABEL : organizerLabel({ result, status: r.status, a, b, setGames: r.setGames });
     return { id: r.id, season: r.season, phase: r.phase, groupNumber: r.groupNumber, week: r.week, a, b, players, result, label, voided };
   });
   const disputes = list.flatMap((m): Dispute[] => {
@@ -191,6 +193,8 @@ export type DecisionPage = {
   // The prefill of the form: the current outcome, or the recorded score.
   current: MatchOutcome | null;
   log: { key: string; at: Date; who: string; whoId: string | null; role: string; text: string }[];
+  // The round's set format (D173, #396): the outcome texts and the score check.
+  setGames: SetGames;
   // A pair of it was withdrawn mid-phase (#34): nothing to decide.
   voided: boolean;
 };
@@ -231,7 +235,7 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
       whoId: d.kind === "organizer" ? d.userId : null,
       role: d.kind === "organizer" ? "szervező" : "automatikus",
-      text: neutralDecisionText(d, names),
+      text: neutralDecisionText(d, names, ctx.setGames),
     })),
   ]
     .sort((x, y) => x.at.getTime() - y.at.getTime() || x.id - y.id)
@@ -251,7 +255,8 @@ export async function decisionPage(leagueId: number, matchId: number): Promise<D
       b: ctx.pairs.b.players.map((p) => ({ id: p.id, name: p.name })),
     },
     result,
-    label: ctx.voided ? VOIDED_LABEL : organizerLabel({ result, status: ctx.match.status, ...names }),
+    label: ctx.voided ? VOIDED_LABEL : organizerLabel({ result, status: ctx.match.status, ...names, setGames: ctx.setGames }),
+    setGames: ctx.setGames,
     note,
     current: result.status === "final" ? result.outcome : result.status === "none" ? null : { kind: "played", score: result.score },
     log,
@@ -281,7 +286,7 @@ export async function decideMatch(
   const ctx = await loadMatch(matchId);
   if (!ctx) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
   if (ctx.voided) return { ok: false, error: VOIDED };
-  const errors = decisionErrors(outcome, reason);
+  const errors = decisionErrors(outcome, reason, ctx.setGames);
   if (errors.length > 0) return { ok: false, error: errors.join(" ") };
   const revision = ctx.match.revision;
   try {
@@ -304,7 +309,7 @@ export async function decideMatch(
         actorId: userId,
         action: "match.decide",
         target: `match:${matchId}`,
-        detail: neutralOutcomeText(outcome, SIDES),
+        detail: neutralOutcomeText(outcome, SIDES, ctx.setGames),
         leagueId,
       }),
     ]);
@@ -318,7 +323,7 @@ export async function decideMatch(
     await notifyPlayers(
       "match_decided",
       (["a", "b"] as const).flatMap((side) =>
-        ctx.pairs[side].players.map((p) => ({ userId: p.id, message: matchDecidedMessage({ matchId, outcome: outcomeText(outcome, side) }) })),
+        ctx.pairs[side].players.map((p) => ({ userId: p.id, message: matchDecidedMessage({ matchId, outcome: outcomeText(outcome, side, ctx.setGames) }) })),
       ),
     );
   } catch (error) {

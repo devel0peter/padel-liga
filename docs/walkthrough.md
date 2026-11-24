@@ -411,6 +411,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Do: under "Eredmény rögzítése" fill 4:3 and 4:1 ("Ti" first) and press "Rögzítem az eredményt"; then 4:1, 2:4 and the super tie-break 10:8, and send again. As the opponent, press "Megerősítem".
 - Expect:
   - Before the result, the group card on Kezdőlap lists the pairs ("(ti)" marks yours) without numbers.
+  - The hint above the fields says "egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4)": the seed season's round 1 keeps short sets, like Győr's (D173). From round 2 the same form says "egy szett 6 nyert játékig (7:5, vagy tie-break után 7:6)", refuses 4:2, 4:1 and takes 6:4, 7:6 (`app/e2e/99-round-switch.spec.ts`).
   - The first try is refused: "1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.

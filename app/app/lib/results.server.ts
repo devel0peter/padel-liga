@@ -91,7 +91,7 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
   switch (input.kind) {
     case "record": {
       if (!can.record) return { ok: false, error: NOTHING_TO_DO };
-      const v = validateScore(input.score);
+      const v = validateScore(input.score, ctx.setGames);
       if (!v.ok) return { ok: false, error: v.errors.map((e) => e.message).join(" ") };
       if (await venueAsked(ctx, stateOf(ctx, now))) {
         const clubId = input.clubId ?? null;
@@ -113,7 +113,7 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
       break;
     case "dispute": {
       if (!can.dispute || before.state.status !== "recorded") return { ok: false, error: NOTHING_TO_DO };
-      const errors = disputeErrors(before.state.score, input.score);
+      const errors = disputeErrors(before.state.score, input.score, ctx.setGames);
       if (errors.length > 0) return { ok: false, error: errors.join(" ") };
       const n = input.note.trim();
       if (n.length > NOTE_MAX) return { ok: false, error: `A megjegyzés legfeljebb ${NOTE_MAX} karakter legyen.` };

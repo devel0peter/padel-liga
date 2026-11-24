@@ -1,20 +1,23 @@
-import { budapestTime, validateScore, type MatchScore } from "@padel-liga/rules";
+import { budapestTime, SETS_TO_SIX, SHORT_SETS, validateScore, type MatchScore } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
   autoAcceptLine,
   decisionText,
-  MATCH_LOST_BOTH_TEXT,
+  bothLostText,
   neutralDecisionText,
   neutralOutcomeText,
   outcomeText,
   parseOutcome,
   parseScore,
   resultEventText,
+  resultHelp,
   resultStatusView,
   resultTodo,
   scoreText,
   versusText,
+  walkoverScoreText,
+  walkoverScoreTo,
   winnerOf,
 } from "./results";
 
@@ -55,7 +58,7 @@ describe("parseScore (#28: two integers per set before validateScore)", () => {
     expect(s.sets[0]![0]).toBeNaN();
     expect(s.sets[1]![1]).toBeNaN();
     expect(s.superTieBreak![1]).toBeNaN();
-    const v = validateScore(s);
+    const v = validateScore(s, SHORT_SETS);
     expect(v.ok ? [] : v.errors.map((e) => e.message)).toEqual([
       "1. szett: a játékok száma 0 vagy pozitív egész szám.",
       "2. szett: a játékok száma 0 vagy pozitív egész szám.",
@@ -85,20 +88,50 @@ describe("score and outcome texts (#28, #29)", () => {
   });
 
   it("every outcome from each side", () => {
-    expect(outcomeText({ kind: "played", score: SPLIT }, "a")).toBe("4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
-    expect(outcomeText({ kind: "played", score: SPLIT }, "b")).toBe("1:4, 4:2, szuper tie-break 8:10 (kikaptatok)");
-    expect(outcomeText({ kind: "walkover", winner: "a" }, "a")).toBe("Játék nélküli győzelem nektek (4:0, 4:0)");
-    expect(outcomeText({ kind: "walkover", winner: "a" }, "b")).toBe("Játék nélküli vereség (0:4, 0:4)");
-    expect(outcomeText({ kind: "both-inactive" }, "a")).toBe("Mindkét pár vereséget kap (0:4, 0:4)");
-    expect(outcomeText({ kind: "unplayed" }, "b")).toBe("Elmaradt: nem számít bele a tabellába");
+    expect(outcomeText({ kind: "played", score: SPLIT }, "a", SHORT_SETS)).toBe("4:1, 2:4, szuper tie-break 10:8 (nyertetek)");
+    expect(outcomeText({ kind: "played", score: SPLIT }, "b", SHORT_SETS)).toBe("1:4, 4:2, szuper tie-break 8:10 (kikaptatok)");
+    expect(outcomeText({ kind: "walkover", winner: "a" }, "a", SHORT_SETS)).toBe("Játék nélküli győzelem nektek (4:0, 4:0)");
+    expect(outcomeText({ kind: "walkover", winner: "a" }, "b", SHORT_SETS)).toBe("Játék nélküli vereség (0:4, 0:4)");
+    expect(outcomeText({ kind: "both-inactive" }, "a", SHORT_SETS)).toBe("Mindkét pár vereséget kap (0:4, 0:4)");
+    expect(outcomeText({ kind: "unplayed" }, "b", SHORT_SETS)).toBe("Elmaradt: nem számít bele a tabellába");
   });
 
   it("for the organizer, with the pairs' names", () => {
     const names = { a: "Anna – Béla", b: "Cili – Dani" };
-    expect(neutralOutcomeText({ kind: "played", score: SPLIT }, names)).toBe("4:1, 2:4, szuper tie-break 10:8 (nyert: Anna – Béla)");
-    expect(neutralOutcomeText({ kind: "walkover", winner: "b" }, names)).toBe("Játék nélküli győzelem: Cili – Dani (4:0, 4:0)");
-    expect(neutralOutcomeText({ kind: "unplayed" }, names)).toBe("Elmaradt: nem számít bele a tabellába");
-    expect(neutralOutcomeText({ kind: "both-inactive" }, names)).toBe(MATCH_LOST_BOTH_TEXT);
+    expect(neutralOutcomeText({ kind: "played", score: SPLIT }, names, SHORT_SETS)).toBe("4:1, 2:4, szuper tie-break 10:8 (nyert: Anna – Béla)");
+    expect(neutralOutcomeText({ kind: "walkover", winner: "b" }, names, SHORT_SETS)).toBe("Játék nélküli győzelem: Cili – Dani (4:0, 4:0)");
+    expect(neutralOutcomeText({ kind: "unplayed" }, names, SHORT_SETS)).toBe("Elmaradt: nem számít bele a tabellába");
+    expect(neutralOutcomeText({ kind: "both-inactive" }, names, SHORT_SETS)).toBe("Mindkét pár vereséget kap (0:4, 0:4)");
+  });
+
+  it("a sets-to-6 round's walkover is 6:0, 6:0 and both losing is 0:6, 0:6 (#396)", () => {
+    const names = { a: "Anna – Béla", b: "Cili – Dani" };
+    expect(outcomeText({ kind: "walkover", winner: "a" }, "a", SETS_TO_SIX)).toBe("Játék nélküli győzelem nektek (6:0, 6:0)");
+    expect(outcomeText({ kind: "walkover", winner: "a" }, "b", SETS_TO_SIX)).toBe("Játék nélküli vereség (0:6, 0:6)");
+    expect(outcomeText({ kind: "both-inactive" }, "a", SETS_TO_SIX)).toBe("Mindkét pár vereséget kap (0:6, 0:6)");
+    expect(neutralOutcomeText({ kind: "walkover", winner: "b" }, names, SETS_TO_SIX)).toBe("Játék nélküli győzelem: Cili – Dani (6:0, 6:0)");
+    expect(bothLostText(SETS_TO_SIX)).toBe("Mindkét pár vereséget kap (0:6, 0:6)");
+    expect(bothLostText(SHORT_SETS)).toBe("Mindkét pár vereséget kap (0:4, 0:4)");
+  });
+
+  it("the walkover score with the ending a sentence needs", () => {
+    expect(walkoverScoreText(SETS_TO_SIX)).toBe("6:0, 6:0");
+    expect(walkoverScoreText(SETS_TO_SIX, false)).toBe("0:6, 0:6");
+    expect(walkoverScoreTo(SETS_TO_SIX)).toBe("6:0, 6:0-ra");
+    expect(walkoverScoreTo(SETS_TO_SIX, false)).toBe("0:6, 0:6-ra");
+    expect(walkoverScoreTo(SHORT_SETS)).toBe("4:0, 4:0-ra");
+    expect(walkoverScoreTo(SHORT_SETS, false)).toBe("0:4, 0:4-re");
+  });
+});
+
+describe("resultHelp: the result form's hint by the round's format (#396)", () => {
+  it("names sets to 6 from round 2, short sets in a short-set round", () => {
+    expect(resultHelp(SETS_TO_SIX)).toBe(
+      "Csak a végeredményt írd be: 2 nyert szettig, egy szett 6 nyert játékig (7:5, vagy tie-break után 7:6); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.",
+    );
+    expect(resultHelp(SHORT_SETS)).toBe(
+      "Csak a végeredményt írd be: 2 nyert szettig, egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.",
+    );
   });
 });
 
@@ -121,22 +154,22 @@ describe("status, Teendő and log lines (#28)", () => {
   const recorded = { status: "recorded", by: "a", score: SPLIT, at: T } as const;
 
   it("no result: the scheduling status applies", () => {
-    expect(resultStatusView({ status: "none" }, "a")).toBeNull();
+    expect(resultStatusView({ status: "none" }, "a", SHORT_SETS)).toBeNull();
     expect(resultTodo({ status: "none" }, "a", "X")).toBeNull();
   });
 
   it("waiting: for the recorder, and for the other pair to confirm", () => {
-    expect(resultStatusView(recorded, "a")).toEqual({ label: "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", tone: "waiting" });
-    expect(resultStatusView(recorded, "b")).toEqual({ label: "Eredmény: 1:4, 4:2, szuper tie-break 8:10, erősítsd meg", tone: "todo" });
+    expect(resultStatusView(recorded, "a", SHORT_SETS)).toEqual({ label: "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", tone: "waiting" });
+    expect(resultStatusView(recorded, "b", SHORT_SETS)).toEqual({ label: "Eredmény: 1:4, 4:2, szuper tie-break 8:10, erősítsd meg", tone: "todo" });
     expect(resultTodo(recorded, "a", "Cili – Dani")).toBeNull();
     expect(resultTodo(recorded, "b", "Anna – Béla")).toBe("Erősítsd meg az eredményt (Anna – Béla)");
   });
 
   it("disputed and final", () => {
     const disputed = { ...recorded, status: "disputed", counter: null, disputedAt: T } as const;
-    expect(resultStatusView(disputed, "b")).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "waiting" });
+    expect(resultStatusView(disputed, "b", SHORT_SETS)).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "waiting" });
     expect(resultTodo(disputed, "b", "X")).toBeNull();
-    expect(resultStatusView({ status: "final", outcome: { kind: "walkover", winner: "b" }, how: "organizer", at: T }, "b")).toEqual({
+    expect(resultStatusView({ status: "final", outcome: { kind: "walkover", winner: "b" }, how: "organizer", at: T }, "b", SHORT_SETS)).toEqual({
       label: "Végeredmény: Játék nélküli győzelem nektek (4:0, 4:0)",
       tone: "done",
     });
@@ -150,10 +183,10 @@ describe("status, Teendő and log lines (#28)", () => {
     expect(resultEventText({ kind: "result_recorded", score: SPLIT }, "b")).toBe("Rögzítette az eredményt: 1:4, 4:2, szuper tie-break 8:10");
     expect(resultEventText({ kind: "result_confirmed" }, "a")).toBe("Megerősítette az eredményt");
     expect(resultEventText({ kind: "result_disputed", score: { sets: [[1, 4], [1, 4]] }, note: null }, "a")).toBe("Vitatta az eredményt, ezt írta be helyette: 1:4, 1:4");
-    expect(decisionText({ kind: "auto_accepted", outcome: { kind: "played", score: SPLIT }, reason: null }, "a")).toBe(
+    expect(decisionText({ kind: "auto_accepted", outcome: { kind: "played", score: SPLIT }, reason: null }, "a", SHORT_SETS)).toBe(
       "48 óra után magától elfogadtuk az eredményt",
     );
-    expect(decisionText({ kind: "organizer", outcome: { kind: "unplayed" }, reason: "Eső" }, "a")).toBe(
+    expect(decisionText({ kind: "organizer", outcome: { kind: "unplayed" }, reason: "Eső" }, "a", SHORT_SETS)).toBe(
       "A szervező döntött: Elmaradt: nem számít bele a tabellába. Indoklás: Eső",
     );
   });
@@ -162,10 +195,10 @@ describe("status, Teendő and log lines (#28)", () => {
 describe("neutralDecisionText (#29)", () => {
   it("names the pairs; the auto-accept has no reason", () => {
     const names = { a: "Anna – Béla", b: "Cili – Dani" };
-    expect(neutralDecisionText({ kind: "organizer", outcome: { kind: "walkover", winner: "a" }, reason: "Nem jöttek el." }, names)).toBe(
+    expect(neutralDecisionText({ kind: "organizer", outcome: { kind: "walkover", winner: "a" }, reason: "Nem jöttek el." }, names, SHORT_SETS)).toBe(
       "Döntés: Játék nélküli győzelem: Anna – Béla (4:0, 4:0). Indoklás: Nem jöttek el.",
     );
-    expect(neutralDecisionText({ kind: "auto_accepted", outcome: { kind: "played", score: SPLIT }, reason: null }, names)).toBe(
+    expect(neutralDecisionText({ kind: "auto_accepted", outcome: { kind: "played", score: SPLIT }, reason: null }, names, SHORT_SETS)).toBe(
       "48 óra után magától elfogadtuk az eredményt",
     );
   });

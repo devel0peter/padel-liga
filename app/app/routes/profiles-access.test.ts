@@ -53,7 +53,7 @@ beforeEach(async () => {
     )
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   h.raw
-    .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?)")
+    .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, 1, ?, ?, 4)")
     .run(sec("2026-11-08T23:00:00Z"), sec("2026-11-29T22:59:00Z"));
   // Players: Anna's pair (1) and two more; "mid" has not finished the first-login page (no sex yet).
   const people: [string, string, string | null][] = [

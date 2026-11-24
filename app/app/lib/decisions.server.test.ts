@@ -55,7 +55,7 @@ async function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('o', 'o@x.hu', 'Org', 'versenyzo', 1)`);
@@ -109,6 +109,7 @@ async function disputed() {
 function otherLeagueMatch(): number {
   h.raw.exec(`insert into leagues (id, city, slug, name) values (2, 'pecs', 'pecs', 'Padelpárbaj Pécs')`);
   h.raw.exec(`insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (2, 2, 'Pécs tél', 1, 2, '2026-11-09')`);
+  h.raw.exec(`insert into season_phases (season_id, number, starts_at, deadline) values (2, 1, 1, ${Math.floor(DEADLINE.getTime() / 1000)})`);
   h.raw.exec(`insert into groups (id, season_id, phase, number, published_at) values (99, 2, 1, 1, 1)`);
   h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (99, 5, 1), (99, 6, 2)`);
   h.raw.exec(`insert into matches (id, group_id, pair_a, pair_b, week, deadline) values (999, 99, 5, 6, 1, ${Math.floor(DEADLINE.getTime() / 1000)})`);

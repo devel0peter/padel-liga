@@ -3,12 +3,12 @@
 // profiles.server.ts reads the database and hands in what is stored. Names,
 // results and ratings only: nothing here can carry an email or phone.
 
-import { DIVISION_NAMES, divisionOf, type MatchOutcome, type Side } from "@padel-liga/rules";
+import { DIVISION_NAMES, divisionOf, type MatchOutcome, type SetGames, type Side } from "@padel-liga/rules";
 
 import { DELETED_NAME } from "./account-deletion";
 import { signed } from "./format";
 import { countedOutcome, groupTable } from "./ladder";
-import { MATCH_LOST_BOTH_TEXT, scoreText, winnerOf } from "./results";
+import { bothLostText, scoreText, walkoverScoreText, winnerOf } from "./results";
 
 /**
  * A player as a profile names them. A deleted or anonymized account has no
@@ -42,6 +42,8 @@ export type GroupInput = {
   position: number;
   groupCount: number;
   startsAt: Date;
+  /** Its round's set format (D173, #396). */
+  setGames: SetGames;
   /** The group's pairs: their rating for the tiebreak, withdrawn mid-phase (#34). */
   pairs: { id: number; elo: number; withdrawn: boolean }[];
   matches: { a: number; b: number; status: string; outcome: MatchOutcome | null }[];
@@ -74,6 +76,7 @@ export function groupHistory(pairId: number, groups: readonly GroupInput[], now:
         const table = groupTable(
           g.pairs,
           g.matches.map((m) => ({ a: m.a, b: m.b, outcome: countedOutcome(m) })),
+          g.setGames,
         );
         place = table.find((r) => r.pairId === pairId)?.rank ?? null;
       }
@@ -95,6 +98,8 @@ export type ProfileMatchInput = {
   phase: number;
   /** The phase's first day: orders the matches. */
   startsAt: Date;
+  /** Its round's set format (D173, #396): a walkover reads 6:0, 6:0 or 4:0, 4:0. */
+  setGames: SetGames;
   week: number;
   scheduledAt: Date | null;
   status: string;
@@ -124,16 +129,16 @@ export type ProfileMatchView = {
   elo: { delta: string; after: number } | null;
 };
 
-function sideText(outcome: MatchOutcome, side: Side): { verdict: string; result: string } | null {
+function sideText(outcome: MatchOutcome, side: Side, setGames: SetGames): { verdict: string; result: string } | null {
   switch (outcome.kind) {
     case "played":
       return { verdict: winnerOf(outcome) === side ? "Győzelem" : "Vereség", result: scoreText(outcome.score, side) };
     case "walkover":
       return outcome.winner === side
-        ? { verdict: "Győzelem", result: "Játék nélkül (4:0, 4:0)" }
-        : { verdict: "Vereség", result: "Játék nélkül (0:4, 0:4)" };
+        ? { verdict: "Győzelem", result: `Játék nélkül (${walkoverScoreText(setGames)})` }
+        : { verdict: "Vereség", result: `Játék nélkül (${walkoverScoreText(setGames, false)})` };
     case "both-inactive":
-      return { verdict: "Vereség", result: MATCH_LOST_BOTH_TEXT };
+      return { verdict: "Vereség", result: bothLostText(setGames) };
     case "unplayed":
       return null;
   }
@@ -160,7 +165,7 @@ export function matchViews(
     const outcome = countedOutcome(m);
     const side: Side | null = ownPairs.has(m.a.id) ? "a" : ownPairs.has(m.b.id) ? "b" : null;
     if (!outcome || !side) continue;
-    const text = sideText(outcome, side);
+    const text = sideText(outcome, side, m.setGames);
     if (!text) continue;
     const change = elo.get(m.id);
     views.push({

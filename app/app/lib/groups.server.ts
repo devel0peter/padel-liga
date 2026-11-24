@@ -1,4 +1,4 @@
-import { movePair, phaseMatches, seedGroups } from "@padel-liga/rules";
+import { movePair, phaseMatches, seedGroups, type SetGames } from "@padel-liga/rules";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -45,7 +45,16 @@ export type GroupPair = {
   withdrawalReason: string | null;
 };
 
-export type StoredGroup = { id: number; number: number; revision: number; basis: string | null; publishedAt: Date | null; pairs: GroupPair[] };
+// `setGames`: its round's set format (D173, #396).
+export type StoredGroup = {
+  id: number;
+  number: number;
+  revision: number;
+  basis: string | null;
+  publishedAt: Date | null;
+  setGames: SetGames;
+  pairs: GroupPair[];
+};
 
 const pairColumns = {
   pairId: pairs.id,
@@ -145,8 +154,16 @@ export async function enteredPairs(seasonId: number): Promise<(GroupPair & { joi
 // A phase's groups (draft or published), 1. csoport first, each by seed.
 export async function phaseGroups(seasonId: number, phase = FIRST_PHASE): Promise<StoredGroup[]> {
   const list = await db
-    .select({ id: groups.id, number: groups.number, revision: groups.revision, basis: groups.basis, publishedAt: groups.publishedAt })
+    .select({
+      id: groups.id,
+      number: groups.number,
+      revision: groups.revision,
+      basis: groups.basis,
+      publishedAt: groups.publishedAt,
+      setGames: seasonPhases.setGames,
+    })
     .from(groups)
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase)))
     .orderBy(asc(groups.number));
   if (list.length === 0) return [];

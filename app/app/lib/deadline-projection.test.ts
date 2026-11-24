@@ -1,3 +1,4 @@
+import { SETS_TO_SIX, SHORT_SETS } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import { projectionIntro, projectionKind, projectionLine, projectionTotals, projectionView } from "./deadline-projection";
@@ -17,12 +18,17 @@ describe("the deadline projection's wording (#362)", () => {
   });
 
   it("one short line per match: the outcome naming the pairs, or why the deadline leaves it alone", () => {
-    expect(projectionLine(resolve({ kind: "walkover", winner: "b" }), NAMES)).toBe("Ha most lenne a határidő: Játék nélküli győzelem: Tóth–Szabó (4:0, 4:0)");
-    expect(projectionLine(resolve({ kind: "both-inactive" }), NAMES)).toBe("Ha most lenne a határidő: Mindkét pár vereséget kap (0:4, 0:4)");
-    expect(projectionLine(resolve({ kind: "unplayed" }), NAMES)).toBe("Ha most lenne a határidő: Elmaradt: nem számít bele a tabellába");
-    expect(projectionLine(leave("result_pending"), NAMES)).toBe("Nem dönt róla a határidő: az eredmény megerősítésre vár, 48 óra után magától elfogadjuk");
-    expect(projectionLine(leave("disputed"), NAMES)).toBe("Nem dönt róla a határidő: vitatott eredmény, te döntesz róla");
-    expect(projectionLine(leave("final"), NAMES)).toBeNull();
+    expect(projectionLine(resolve({ kind: "walkover", winner: "b" }), NAMES, SHORT_SETS)).toBe("Ha most lenne a határidő: Játék nélküli győzelem: Tóth–Szabó (4:0, 4:0)");
+    expect(projectionLine(resolve({ kind: "both-inactive" }), NAMES, SHORT_SETS)).toBe("Ha most lenne a határidő: Mindkét pár vereséget kap (0:4, 0:4)");
+    expect(projectionLine(resolve({ kind: "unplayed" }), NAMES, SHORT_SETS)).toBe("Ha most lenne a határidő: Elmaradt: nem számít bele a tabellába");
+    expect(projectionLine(leave("result_pending"), NAMES, SHORT_SETS)).toBe("Nem dönt róla a határidő: az eredmény megerősítésre vár, 48 óra után magától elfogadjuk");
+    expect(projectionLine(leave("disputed"), NAMES, SHORT_SETS)).toBe("Nem dönt róla a határidő: vitatott eredmény, te döntesz róla");
+    expect(projectionLine(leave("final"), NAMES, SHORT_SETS)).toBeNull();
+  });
+
+  it("names the walkover and the both-lose score of a sets-to-6 round (#396)", () => {
+    expect(projectionLine(resolve({ kind: "walkover", winner: "a" }), NAMES, SETS_TO_SIX)).toBe("Ha most lenne a határidő: Játék nélküli győzelem: Kiss–Nagy (6:0, 6:0)");
+    expect(projectionLine(resolve({ kind: "both-inactive" }), NAMES, SETS_TO_SIX)).toBe("Ha most lenne a határidő: Mindkét pár vereséget kap (0:6, 0:6)");
   });
 
   it("the totals add up to the counting matches, in a fixed order", () => {

@@ -3,7 +3,16 @@
 // D1 side is results.server.ts, the rules are in packages/rules
 // (results.ts, reporting.ts).
 
-import { flipScore, type MatchOutcome, type MatchScore, type ResultEventKind, type ResultState, type RulingKind, type Side } from "@padel-liga/rules";
+import {
+  flipScore,
+  type MatchOutcome,
+  type MatchScore,
+  type ResultEventKind,
+  type ResultState,
+  type RulingKind,
+  type SetGames,
+  type Side,
+} from "@padel-liga/rules";
 
 import { formatDeadline } from "./format";
 import type { StatusView } from "./matches";
@@ -57,8 +66,28 @@ export function winnerOf(outcome: MatchOutcome): Side | null {
   return outcome.score.superTieBreak ? won(outcome.score.superTieBreak) : won(s1 ?? s2);
 }
 
+/**
+ * A walkover's score in the round's set format (D173, #396), from the
+ * winner's side ("6:0, 6:0") or the loser's ("0:6, 0:6"); short sets: 4.
+ */
+export function walkoverScoreText(setGames: SetGames, won = true): string {
+  const set = won ? `${setGames}:0` : `0:${setGames}`;
+  return `${set}, ${set}`;
+}
+
+/** The same with the "-ra/-re" ending a sentence needs: "6:0, 6:0-ra", "0:6, 0:6-ra", "0:4, 0:4-re". */
+export function walkoverScoreTo(setGames: SetGames, won = true): string {
+  return `${walkoverScoreText(setGames, won)}-${!won && setGames === 4 ? "re" : "ra"}`;
+}
+
+/** The result form's hint in the round's set format (D173, #396): sets to 6 from round 2, short sets in Győr's round 1. */
+export function resultHelp(setGames: SetGames): string {
+  const g = setGames;
+  return `Csak a végeredményt írd be: 2 nyert szettig, egy szett ${g} nyert játékig (${g + 1}:${g - 1}, vagy tie-break után ${g + 1}:${g}); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.`;
+}
+
 /** The organizer's "both lose" decision, worded the same everywhere (rules, organizer screen, public page). */
-export const MATCH_LOST_BOTH_TEXT = "Mindkét pár vereséget kap (0:4, 0:4)";
+export const bothLostText = (setGames: SetGames) => `Mindkét pár vereséget kap (${walkoverScoreText(setGames, false)})`;
 
 /**
  * "X a Y ellen": a match named for the organizer, in one order everywhere
@@ -73,29 +102,31 @@ export function article(word: string): "a" | "az" {
   return /^[aáeéiíoóöőuúüű]/i.test(word) ? "az" : "a";
 }
 
-/** An outcome as a player of `side` sees it (#28, #29). */
-export function outcomeText(outcome: MatchOutcome, side: Side): string {
+/** An outcome as a player of `side` sees it (#28, #29), in its round's set format. */
+export function outcomeText(outcome: MatchOutcome, side: Side, setGames: SetGames): string {
   switch (outcome.kind) {
     case "played":
       return `${scoreText(outcome.score, side)} (${winnerOf(outcome) === side ? "nyertetek" : "kikaptatok"})`;
     case "walkover":
-      return outcome.winner === side ? "Játék nélküli győzelem nektek (4:0, 4:0)" : "Játék nélküli vereség (0:4, 0:4)";
+      return outcome.winner === side
+        ? `Játék nélküli győzelem nektek (${walkoverScoreText(setGames)})`
+        : `Játék nélküli vereség (${walkoverScoreText(setGames, false)})`;
     case "both-inactive":
-      return MATCH_LOST_BOTH_TEXT;
+      return bothLostText(setGames);
     case "unplayed":
       return "Elmaradt: nem számít bele a tabellába";
   }
 }
 
-/** An outcome for the organizer, naming the pairs. */
-export function neutralOutcomeText(outcome: MatchOutcome, names: { a: string; b: string }): string {
+/** An outcome for the organizer, naming the pairs, in its round's set format. */
+export function neutralOutcomeText(outcome: MatchOutcome, names: { a: string; b: string }, setGames: SetGames): string {
   switch (outcome.kind) {
     case "played":
       return `${neutralScoreText(outcome.score)} (nyert: ${names[winnerOf(outcome)!]})`;
     case "walkover":
-      return `Játék nélküli győzelem: ${names[outcome.winner]} (4:0, 4:0)`;
+      return `Játék nélküli győzelem: ${names[outcome.winner]} (${walkoverScoreText(setGames)})`;
     case "both-inactive":
-      return MATCH_LOST_BOTH_TEXT;
+      return bothLostText(setGames);
     case "unplayed":
       return "Elmaradt: nem számít bele a tabellába";
   }
@@ -131,7 +162,7 @@ export function parseOutcome(form: { get(name: string): FormDataEntryValue | nul
  * The match's status line once a result exists (#28), as the player of `me`
  * sees it; null while there is none (the scheduling status applies).
  */
-export function resultStatusView(state: ResultState, me: Side): StatusView | null {
+export function resultStatusView(state: ResultState, me: Side, setGames: SetGames): StatusView | null {
   switch (state.status) {
     case "none":
       return null;
@@ -144,7 +175,7 @@ export function resultStatusView(state: ResultState, me: Side): StatusView | nul
     case "final":
       // "Lejátszva" only for a played match; a walkover, both losing or an
       // unplayed match is the final outcome without a game.
-      return { label: `${state.outcome.kind === "played" ? "Lejátszva" : "Végeredmény"}: ${outcomeText(state.outcome, me)}`, tone: "done" };
+      return { label: `${state.outcome.kind === "played" ? "Lejátszva" : "Végeredmény"}: ${outcomeText(state.outcome, me, setGames)}`, tone: "done" };
   }
 }
 
@@ -171,20 +202,21 @@ export function resultEventText(e: { kind: ResultEventKind; score?: MatchScore |
 }
 
 // A log line for a ruling (#28, #29; the deadline's, #11).
-export function decisionText(d: { kind: RulingKind; outcome: MatchOutcome; reason: string | null }, viewer: Side): string {
+export function decisionText(d: { kind: RulingKind; outcome: MatchOutcome; reason: string | null }, viewer: Side, setGames: SetGames): string {
   if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
-  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${outcomeText(d.outcome, viewer)}`;
-  return `A szervező döntött: ${outcomeText(d.outcome, viewer)}. Indoklás: ${d.reason ?? ""}`;
+  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${outcomeText(d.outcome, viewer, setGames)}`;
+  return `A szervező döntött: ${outcomeText(d.outcome, viewer, setGames)}. Indoklás: ${d.reason ?? ""}`;
 }
 
 // A ruling for the organizer, naming the pairs (#29).
 export function neutralDecisionText(
   d: { kind: RulingKind; outcome: MatchOutcome; reason: string | null },
   names: { a: string; b: string },
+  setGames: SetGames,
 ): string {
   if (d.kind === "auto_accepted") return "48 óra után magától elfogadtuk az eredményt";
-  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${neutralOutcomeText(d.outcome, names)}`;
-  return `Döntés: ${neutralOutcomeText(d.outcome, names)}. Indoklás: ${d.reason ?? ""}`;
+  if (d.kind === "deadline") return `Lejárt a határidő, a meccsnaplóból döntöttünk: ${neutralOutcomeText(d.outcome, names, setGames)}`;
+  return `Döntés: ${neutralOutcomeText(d.outcome, names, setGames)}. Indoklás: ${d.reason ?? ""}`;
 }
 
 // How a final match is labelled for the organizer: decided by them, settled

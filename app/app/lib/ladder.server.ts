@@ -3,7 +3,7 @@ import { and, asc, count, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { cities, groupPairs, groups, matches, pairs, seasonEntries, users } from "~/db/schema";
+import { cities, groupPairs, groups, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, isValidOutcome, phaseSpan, type LadderBand, type LadderGroupInput } from "./ladder";
@@ -47,8 +47,9 @@ const playerB = alias(users, "ladder_player_b");
 
 async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupInput[]> {
   const list = await db
-    .select({ id: groups.id, number: groups.number })
+    .select({ id: groups.id, number: groups.number, setGames: seasonPhases.setGames })
     .from(groups)
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase), isNotNull(groups.publishedAt)))
     .orderBy(asc(groups.number));
   if (list.length === 0) return [];
@@ -91,9 +92,10 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
   // A stored outcome the rules engine can't count (D115, #190: a bug or a hand
   // edit; every write is validated) is skipped, so one bad row can't take the
   // public page down: the match counts nowhere on it and shows no result.
+  const setGamesOf = new Map(list.map((g) => [g.id, g.setGames]));
   const invalid = played.filter((m) => {
     const outcome = countedOutcome(m);
-    return outcome !== null && !isValidOutcome(outcome);
+    return outcome !== null && !isValidOutcome(outcome, setGamesOf.get(m.groupId)!);
   });
   if (invalid.length > 0)
     logWarn("league page skipped invalid outcomes", { count: invalid.length, matchIds: invalid.map((m) => m.id) });
@@ -101,6 +103,7 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
   return list.map((g) => ({
     id: g.id,
     number: g.number,
+    setGames: g.setGames,
     pairs: members
       .filter((m) => m.groupId === g.id)
       .map((m) => ({

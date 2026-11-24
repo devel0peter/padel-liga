@@ -82,6 +82,7 @@ async function publicGroups(pairFilter: SQL) {
       phase: groups.phase,
       number: groups.number,
       startsAt: seasonPhases.startsAt,
+      setGames: seasonPhases.setGames,
     })
     .from(groups)
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
@@ -152,6 +153,7 @@ async function groupDetails(list: PublicGroup[]) {
       position: siblings.filter((n) => n <= g.number).length,
       groupCount: siblings.length,
       startsAt: g.startsAt,
+      setGames: g.setGames,
       pairs: members
         .filter((m) => m.groupId === g.id)
         .map((m) => ({
@@ -184,6 +186,7 @@ function matchInputs(
         season: g.season,
         phase: g.phase,
         startsAt: g.startsAt,
+        setGames: g.setGames,
         week: m.week,
         scheduledAt: m.scheduledAt,
         status: m.status,

@@ -13,12 +13,14 @@
 // says. A second league in a second city, with one player who joined it,
 // shows that a league's pages only hold its own players (#331).
 
-import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar } from "@padel-liga/rules";
+import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar, SETS_TO_SIX, SHORT_SETS } from "@padel-liga/rules";
 
 export const SEED_EMAIL_DOMAIN = "example.test";
 export const CITY = { slug: "minta", name: "Mintaváros" } as const;
 export const LEAGUE = { slug: "minta", name: "Padelpárbaj Mintaváros" } as const;
 export const SEASON_NAME = "Teszt szezon";
+/** The seed season's set format by round, like Győr's season 1: short sets in round 1, then sets to 6 (D173). */
+export const seedSetGames = (round: number) => (round === 1 ? SHORT_SETS : SETS_TO_SIX);
 // The second league (#331): listed, no season, one player.
 export const OTHER_CITY = { slug: "pelda", name: "Példaváros" } as const;
 export const OTHER_LEAGUE = { slug: "pelda", name: "Padelpárbaj Példaváros" } as const;
@@ -190,10 +192,12 @@ export function insertStatements(now: Date): string[] {
       `select id, ${q(SEASON_NAME)}, ${secs(opensAt)}, ${secs(closesAt)}, ${q(start)}, '[]' ` +
       `from leagues where slug = ${q(LEAGUE.slug)}`,
   );
+  // The season stands for Győr's first one: its round 1 keeps short sets,
+  // every later round plays sets to 6 (D173, #396).
   for (const p of phases)
     out.push(
-      `insert into season_phases (season_id, number, starts_at, deadline) ` +
-        `select s.id, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)} from seasons s ` +
+      `insert into season_phases (season_id, number, starts_at, deadline, set_games) ` +
+        `select s.id, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)}, ${seedSetGames(p.number)} from seasons s ` +
         `join leagues l on l.id = s.league_id where l.slug = ${q(LEAGUE.slug)} and s.name = ${q(SEASON_NAME)}`,
     );
   return out;

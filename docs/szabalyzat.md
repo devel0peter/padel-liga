@@ -1,6 +1,6 @@
 # Padelpárbaj – Szabályzat
 
-*Hatályos: 2026. 11. 09.*
+*Hatályos: 2026. 11. 28.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
@@ -30,7 +30,6 @@ A részleteket lent találod.
 - Egy kör **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
 - A kör végén a csoport **első helyezettje feljebb lép**, az **utolsó lejjebb kerül**.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
-- Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
 - Egy szezon **4 körből** áll. A szezon végéről a 10. pontban olvashatsz.
 - **Divíziók:** a csoportok sorrendje egyetlen létra, amelyet három részre osztunk: felül a **Bronz**, középen a **Réz**, alul a **Rookie** divízió.
   - Minden divízió a csoportok harmadát kapja. Ha a csoportok száma nem osztható hárommal, az egy maradék csoport a Réz divízióé, két maradék csoport közül egy a Rézé, egy a Rookie-é.
@@ -54,7 +53,7 @@ A részleteket lent találod.
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
-- A szervező a futó kört **meghosszabbíthatja** (például ha nehéz pályát foglalni): ilyenkor az új határidőről értesítünk, és a későbbi körök is ennyivel később kezdődnek.
+- A szervező a futó kört **meghosszabbíthatja** (például ha nehéz pályát foglalni), így egy kör 3 hétnél hosszabb is lehet. Ilyenkor az új határidőről értesítünk, és a későbbi körök is ennyivel később kezdődnek.
 - **Bármelyik pár kezdeményezhet**, nem kell megvárni a másikat. Minél előbb szóltok, annál könnyebb időpontot találni.
 - **Beszéljétek meg SMS-ben vagy e-mailben.** A meccs oldalán az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és a két ellenfélnek.
 - **Rögzítsétek az időpontot az oldalon** (egész órát), és ha tudjátok, a helyszínt is. A másik pár **24 órán belül** jelezheti, ha nem így beszéltétek (ha a meccs ennél hamarabb kezdődik, a kezdésig). Ha nem jelez, az időpont fix. Megerősíteni hamarabb is lehet.

@@ -1,11 +1,10 @@
 // Extending a running round (#356, D151): the organizer moves the round's
-// deadline to a later Sunday, and every later round moves by the same number
-// of weeks, so each keeps its full length. A later round that would then
-// touch a break starts on the first Monday after it, as in phaseCalendar
-// (a round is never split), and never before the round ahead of it ends.
+// deadline to a later Sunday, and every later round moves by exactly the same
+// number of weeks, so each keeps its full length. No round jumps over a
+// holiday or any other break (D172, #393): the season runs through it.
 // Pure: no I/O.
 
-import { addDays, budapestTime, firstMondayAfter, isDay, isMonday, type Break, type Day, type Phase } from "./calendar";
+import { addDays, budapestTime, isDay, isMonday, type Day, type Phase } from "./calendar";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -24,12 +23,12 @@ export function daysBetween(a: Day, b: Day): number {
 /**
  * The season's rounds after round `number`'s deadline moves to the Sunday
  * `newEnd` (later than its current one). Earlier rounds and the round's own
- * start stay; each later round moves by the same number of weeks, then past
- * any break it would touch, and never starts before the round ahead of it
- * has ended. Throws on a round the season doesn't have, a day that isn't a
- * Sunday, or one not after the current deadline.
+ * start stay; each later round moves by exactly the same number of weeks,
+ * whatever breaks the season was set up with (D172). Throws on a round the
+ * season doesn't have, a day that isn't a Sunday, or one not after the
+ * current deadline.
  */
-export function extendRound(phases: readonly PhaseSpan[], number: number, newEnd: Day, breaks: readonly Break[]): Phase[] {
+export function extendRound(phases: readonly PhaseSpan[], number: number, newEnd: Day): Phase[] {
   const sorted = [...phases].sort((a, b) => a.number - b.number);
   const target = sorted.find((p) => p.number === number);
   if (!target) throw new Error(`No round ${number} in this season`);
@@ -38,30 +37,11 @@ export function extendRound(phases: readonly PhaseSpan[], number: number, newEnd
   if (shift <= 0) throw new Error(`The new deadline must be after ${target.end}: ${newEnd}`);
   if (shift % 7 !== 0) throw new Error(`Round ${number} doesn't end on a Sunday: ${target.end}`);
 
-  const out: Phase[] = [];
-  let previousEnd: Day | null = null;
-  for (const p of sorted) {
-    let start = p.start;
-    let end = p.end;
-    if (p.number === number) end = newEnd;
-    else if (p.number > number) {
-      const length = daysBetween(p.start, p.end) + 1;
-      start = addDays(p.start, shift);
-      if (previousEnd !== null && start <= previousEnd) start = addDays(previousEnd, 1);
-      // Each move goes past a break's end, so this stops after at most one
-      // move per break.
-      for (;;) {
-        const last = addDays(start, length - 1);
-        const hit = breaks.find((b) => b.start <= last && b.end >= start);
-        if (!hit) break;
-        start = firstMondayAfter(hit.end);
-      }
-      end = addDays(start, length - 1);
-    }
-    out.push({ number: p.number, start, end, startsAt: budapestTime(start, 0, 0), deadline: budapestTime(end, 23, 59) });
-    previousEnd = end;
-  }
-  return out;
+  return sorted.map((p) => {
+    const start = p.number > number ? addDays(p.start, shift) : p.start;
+    const end = p.number >= number ? addDays(p.end, shift) : p.end;
+    return { number: p.number, start, end, startsAt: budapestTime(start, 0, 0), deadline: budapestTime(end, 23, 59) };
+  });
 }
 
 /** How many weeks later a round starts after the extension (0 for the extended round and earlier ones). */

@@ -12,11 +12,11 @@ import {
   planExtension,
 } from "./round-extension";
 
-// Győr's first season: rounds from 9 Nov 2026, break 21 Dec – 3 Jan.
+// Győr's first season as set up: rounds from 9 Nov 2026, break 21 Dec – 3 Jan.
 const WINTER = [{ start: "2026-12-21", end: "2027-01-03" }];
 const stored = (breaks: typeof WINTER) => phaseCalendar("2026-11-09", breaks).map(({ number, startsAt, deadline }) => ({ number, startsAt, deadline }));
-const GYOR = { phases: stored(WINTER), breaks: WINTER };
-const PLAIN = { phases: stored([]), breaks: [] };
+const GYOR = { phases: stored(WINTER) };
+const PLAIN = { phases: stored([]) };
 const ROUND_1_DEADLINE = budapestTime("2026-11-29", 23, 59);
 
 describe("extendableRound (#356)", () => {
@@ -74,14 +74,17 @@ describe("planExtension and the confirmation's lines", () => {
     ]);
   });
 
-  it("across a break: each later round's own move, with its new start", () => {
+  it("a season set up with a holiday break: every later round still moves the same week, no jump (D172)", () => {
     const plan = planExtension(GYOR, 1, "2026-12-06");
+    expect(plan.later.map((p) => [p.number, p.weeks])).toEqual([
+      [2, 1],
+      [3, 1],
+      [4, 1],
+    ]);
+    expect(plan.later[0]!.startsAt).toEqual(budapestTime("2026-12-07", 0, 0));
     expect(extensionSummary(1, ROUND_1_DEADLINE, plan)).toEqual([
       "Az 1. kör határideje: nov. 29., vasárnap 23:59 → dec. 6., vasárnap 23:59.",
-      "A szünet miatt a későbbi körök nem egyformán tolódnak:",
-      "A 2. kör 5 héttel később kezdődik (jan. 4.).",
-      "A 3. kör 3 héttel később kezdődik (jan. 25.).",
-      "A 4. kör 3 héttel később kezdődik (febr. 15.).",
+      "A 2–4. kör 1 héttel később kezdődik.",
     ]);
   });
 

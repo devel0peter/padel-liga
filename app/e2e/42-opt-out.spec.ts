@@ -88,8 +88,12 @@ test("42. Nem folytatom on Ligáim: the confirmation, the partner's notice, Pár
   } finally {
     // Whatever happened above: default in again, and round 1's own first day,
     // so 99-round-switch drafts the pair as before.
-    d1Update(`update season_entries set opt_out_phase = null, opted_out_by = null, opted_out_at = null where season_id = ${id} and pair_id = ${pair!.id}`);
-    d1Update(`update season_phases set starts_at = ${before!.starts_at} where season_id = ${id} and number = 1`);
-    await org.context.close();
+    // The date first: it never depends on the pair lookup.
+    try {
+      d1Update(`update season_phases set starts_at = ${before!.starts_at} where season_id = ${id} and number = 1`);
+      if (pair) d1Update(`update season_entries set opt_out_phase = null, opted_out_by = null, opted_out_at = null where season_id = ${id} and pair_id = ${pair.id}`);
+    } finally {
+      await org.context.close();
+    }
   }
 });

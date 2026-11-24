@@ -128,7 +128,7 @@ export const TAKEN_OUT_TEXT =
 // What a player sees for one season: the entry's status, the "Nevezünk"
 // button, why they can't apply yet, or nothing (not open, no entry).
 export type EntryView =
-  | { kind: "status"; status: EntryStatus; text: string; note: string | null }
+  | { kind: "status"; status: EntryStatus; text: string; note: string | null; joinsPhase: number | null }
   | { kind: "apply"; late: boolean }
   | { kind: "blocked"; reason: EntryRefusal; text: string };
 
@@ -141,7 +141,7 @@ export function entryView(input: {
   entry: { status: EntryStatus; joinsPhase: number | null; note: string | null } | null;
 }): EntryView | null {
   const { entry } = input;
-  if (entry) return { kind: "status", status: entry.status, text: entryStatusText(entry), note: entry.note };
+  if (entry) return { kind: "status", status: entry.status, text: entryStatusText(entry), note: entry.note, joinsPhase: entry.joinsPhase };
   const open = entryOpen(input.season, input.now);
   if (!open) return null;
   const refusal = checkEntry({ ...input, open, entered: false });

@@ -393,3 +393,38 @@ export async function hasProfile(userId: string): Promise<boolean> {
     .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
   return (await profilePairIds(theirs.map((p) => p.id))).size > 0;
 }
+
+/**
+ * The player's own record in each of `seasonIds` (Ligáim, #394): the final
+ * matches and the wins of their pairs there, counted as their profile's
+ * summary counts them (matchViews, playerStats, D136). A season without a
+ * published group of theirs is left out; before the league starts nothing
+ * counts (spec 17).
+ */
+export async function seasonRecords(
+  userId: string,
+  seasonIds: number[],
+  now = new Date(),
+): Promise<Map<number, { matches: number; wins: number }>> {
+  const out = new Map<number, { matches: number; wins: number }>();
+  if (seasonIds.length === 0) return out;
+  const theirPairs = db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  const wanted = new Set(seasonIds);
+  const list = (await publicGroups(inArray(groupPairs.pairId, theirPairs))).filter((g) => wanted.has(g.seasonId));
+  if (list.length === 0) return out;
+  const [details, started] = await Promise.all([groupDetails(list), startedLeagues([...new Set(list.map((g) => g.leagueId))], now)]);
+  const own = new Set(
+    [...details.pairById.values()].filter((p) => p.players.some((pl) => pl.id === userId)).map((p) => p.id),
+  );
+  for (const seasonId of wanted) {
+    const groupIds = new Set(list.filter((g) => g.seasonId === seasonId).map((g) => g.id));
+    if (groupIds.size === 0) continue;
+    const scoped = { ...details, matchRows: details.matchRows.filter((m) => groupIds.has(m.groupId)) };
+    const stats = playerStats([], matchViews(own, matchInputs(own, list, scoped, started), formatShortDate), now);
+    out.set(seasonId, { matches: stats.matches, wins: stats.wins });
+  }
+  return out;
+}

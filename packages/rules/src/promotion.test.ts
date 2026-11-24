@@ -4,6 +4,8 @@ import {
   DEFAULT_FAST_SWITCHES,
   entryGroup,
   isFastSwitch,
+  leaveReason,
+  optedOutAfter,
   placeNewPairs,
   promoteAndRelegate,
   recut,
@@ -339,5 +341,65 @@ describe("roundSwitchDraft (spec 10)", () => {
       newPairs: [1, 2, 3].map((i) => p(`N${i}`, 1000 + i)),
     });
     expect(ids(draft)).toEqual([["N3", "N2", "N1"]]);
+  });
+});
+
+describe("default in and opting out (#395: opted-out pairs leave as \"Nem folytatja\", pairs below move up)", () => {
+  const stays = { strikes: false, optedOut: false, active: true, entered: true };
+
+  it("keeps every pair that does nothing: default in", () => {
+    expect(leaveReason(stays)).toBeNull();
+    const draft = roundSwitchDraft({ tables: tables(4, 4, 4), fast: false, leaves: () => leaveReason(stays) !== null, newPairs: [] });
+    expect(draft.flat()).toHaveLength(12);
+  });
+
+  it("names an opted-out pair's reason, after a 3rd strike and before a dissolved pair or a taken-out entry", () => {
+    expect(leaveReason({ ...stays, optedOut: true })).toBe("opted_out");
+    expect(leaveReason({ ...stays, optedOut: true, strikes: true })).toBe("strikes");
+    // Opted out, then dissolved after the deadline to form new pairs.
+    expect(leaveReason({ ...stays, optedOut: true, active: false })).toBe("opted_out");
+    expect(leaveReason({ ...stays, optedOut: true, entered: false })).toBe("opted_out");
+    expect(leaveReason({ ...stays, active: false })).toBe("dissolved");
+    expect(leaveReason({ ...stays, entered: false })).toBe("taken_out");
+  });
+
+  it("ends the season after the phase the pair opted out in, not before", () => {
+    expect(optedOutAfter(null, 1)).toBe(false);
+    expect(optedOutAfter(1, 1)).toBe(true);
+    expect(optedOutAfter(2, 1)).toBe(false);
+    expect(optedOutAfter(1, 2)).toBe(true);
+  });
+
+  it("leaves out two pairs of one group that opt out, and the pairs below move up: 12 become 4+3+3", () => {
+    const out = new Set(["G2P2", "G2P3"]);
+    const draft = roundSwitchDraft({ tables: tables(4, 4, 4), fast: false, leaves: (x) => out.has(x.id), newPairs: [] });
+    expect(ids(draft)).toEqual([
+      ["G1P1", "G1P2", "G1P3", "G2P1"],
+      ["G1P4", "G2P4", "G3P1"],
+      ["G3P2", "G3P3", "G3P4"],
+    ]);
+  });
+
+  it("leaves out a group's winner and last that opt out, after promotion: the relegated pair stays up in the hole", () => {
+    const out = new Set(["G2P1", "G2P4"]);
+    const draft = roundSwitchDraft({ tables: tables(4, 4, 4), fast: false, leaves: (x) => out.has(x.id), newPairs: [] });
+    expect(ids(draft)).toEqual([
+      ["G1P1", "G1P2", "G1P3", "G1P4"],
+      ["G2P2", "G2P3", "G3P1"],
+      ["G3P2", "G3P3", "G3P4"],
+    ]);
+  });
+
+  it("places the staying partner's new pair by the new-pair rules, not into the old pair's spot (D107f)", () => {
+    const draft = roundSwitchDraft({
+      tables: tables(4, 4),
+      fast: false,
+      leaves: (x) => x.id === "G1P2",
+      newPairs: [p("New", 1985)],
+    });
+    expect(ids(draft)).toEqual([
+      ["G1P1", "G1P3", "G1P4", "G2P1"],
+      ["New", "G2P2", "G2P3", "G2P4"],
+    ]);
   });
 });

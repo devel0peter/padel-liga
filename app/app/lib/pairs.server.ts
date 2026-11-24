@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { rowSelect } from "~/db/insert-select";
-import { groupPairs, groups, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
+import { groupPairs, groups, pairs, partnerChanges, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { listedLeagues, memberOf, pairMemberStatements } from "~/lib/league-members.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { auditEntry, auditIfChanged } from "~/lib/audit.server";
@@ -34,10 +34,20 @@ export async function pairLeagues(): Promise<PairLeague[]> {
   return (await listedLeagues()).map(({ id, name }) => ({ id, name }));
 }
 
-// Either player in an active pair of the league.
+// Either player in an active pair of the league, or committed to one: the
+// new partner of a final permanent partner change there (#402, D178), whose
+// pair starts at the next round switch. Every way of forming a pair checks
+// this, so such a player can't be paired elsewhere in the meantime.
 export function activePairWith(leagueId: number, userIds: string[]) {
-  return sql`exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
-    and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))`;
+  return sql`(exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
+    and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))
+    or ${committedPartner(leagueId, userIds)})`;
+}
+
+// The new partner of a final permanent partner change in the league (#402).
+export function committedPartner(leagueId: number, userIds: string[] | SQL) {
+  const who = Array.isArray(userIds) ? sql`(${sql.join(userIds.map((u) => sql`${u}`), sql`, `)})` : sql`(${userIds})`;
+  return sql`exists (select 1 from ${partnerChanges} pc where pc.league_id = ${leagueId} and pc.status = 'final' and pc.partner_id in ${who})`;
 }
 
 export type PairOverview = {
@@ -217,6 +227,7 @@ export async function pairCandidates(league: { id: number }): Promise<PairCandid
         memberOf(league.id, users.id),
         sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
           and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+        sql`not ${committedPartner(league.id, sql`${users.id}`)}`,
       ),
     )
     .orderBy(asc(users.name), asc(users.id));

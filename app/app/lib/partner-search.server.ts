@@ -7,7 +7,7 @@ import { auditEntry } from "~/lib/audit.server";
 import type { User } from "./auth/session.server";
 import { isSeeking } from "./partner-search";
 import { memberOf } from "./league-members.server";
-import { createPair, type PairLeague } from "./pairs.server";
+import { committedPartner, createPair, type PairLeague } from "./pairs.server";
 import { LEVELS } from "./interest";
 import { formatPhone } from "./phone";
 
@@ -90,6 +90,8 @@ export async function leagueSeekers(league: { id: number }): Promise<Seeker[]> {
         memberOf(league.id, users.id),
         sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
           and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+        // Not the new partner of a final permanent partner change (#402).
+        sql`not ${committedPartner(league.id, sql`${users.id}`)}`,
       ),
     );
   return rows

@@ -483,7 +483,11 @@ export type PartnerChangeNotice =
   | { kind: "declined"; league: League; partner: string }
   | { kind: "final_leaving"; league: League; staying: string; partner: string; from: number | "now" | null }
   | { kind: "final_staying"; league: League; partner: string; from: number | "now" | null }
-  | { kind: "undone"; league: League; staying: string; leaving: string; partner: string };
+  | { kind: "undone"; league: League; staying: string; leaving: string; partner: string }
+  // It couldn't start at its round switch (the old pair was no longer there).
+  | { kind: "not_started"; league: League; staying: string; leaving: string; partner: string }
+  // A player of it deleted their account (section 3).
+  | { kind: "ended"; league: League };
 
 export function partnerChangeMessage(n: PartnerChangeNotice): Message {
   const url = leagueCard(n.league);
@@ -509,6 +513,14 @@ export function partnerChangeMessage(n: PartnerChangeNotice): Message {
             : `${n.partner} elfogadta: a kör hátralévő meccsein ő játszik, ${changeFrom(n.from)} pedig ő a párod (${n.league.name}).`,
         url,
       };
+    case "not_started":
+      return {
+        title: "Nem indult el a partnercsere",
+        body: `Az állandó partnercsere nem indult el a körváltáskor: ${n.partner} nem lett ${n.staying} párja ${n.leaving} helyett (${n.league.name}). Kérdés esetén írj a szervezőnek.`,
+        url,
+      };
+    case "ended":
+      return { title: "Véget ért a partnercsere", body: `Az állandó partnercsere véget ért, mert az egyik játékos törölte a fiókját (${n.league.name}).`, url };
     case "undone":
       return {
         title: "Visszavont partnercsere",

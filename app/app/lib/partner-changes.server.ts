@@ -1,11 +1,11 @@
 import { absenceClosesAt, absenceOpen } from "@padel-liga/rules";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { rowSelect } from "~/db/insert-select";
-import { groupPairs, groups, leagues, matchAbsences, matches, pairs, partnerChanges, seasonEntries, users } from "~/db/schema";
+import { groupPairs, groups, leagues, matchAbsences, matches, pairs, partnerChanges, partnerSearches, seasonEntries, users } from "~/db/schema";
 
 import { auditEntry, auditIfChanged } from "./audit.server";
 import type { User } from "./auth/session.server";
@@ -385,6 +385,18 @@ export async function acceptPartnerChange(user: Pick<User, "id">, changeId: numb
         detail: `pair:${c.pairId}; starts ${startsPhase === null ? "next season" : `phase ${startsPhase}`}`,
         leagueId: c.leagueId,
       }),
+      // Committed now: no longer listed as looking for a partner (D59).
+      db
+        .update(partnerSearches)
+        .set({ seeking: false, updatedAt: now })
+        .where(
+          and(
+            eq(partnerSearches.leagueId, c.leagueId),
+            eq(partnerSearches.userId, c.partnerId),
+            eq(partnerSearches.seeking, true),
+            sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${changeId} and ${partnerChanges.status} = 'final')`,
+          ),
+        ),
     ]);
     if (done.length === 0) return refused("not_open");
   } catch (e) {
@@ -474,12 +486,18 @@ function startStatements(
           sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${c.id} and ${partnerChanges.status} = 'final')`,
         ),
       ),
+    // Started before the pair's insert: while final, the new partner counts
+    // as committed (activePairWith), which the insert refuses.
+    db
+      .update(partnerChanges)
+      .set({ status: "started", endedAt: now })
+      .where(and(eq(partnerChanges.id, c.id), eq(partnerChanges.status, "final"))),
     insertPairIfFree(c.leagueId, players[0], players[1], "change"),
     entryInsert,
     withdrawEntries(c.pairId, now),
     db
       .update(partnerChanges)
-      .set({ status: "started", newPairId: sql<number>`${newPair}`, endedAt: now })
+      .set({ newPairId: sql<number>`${newPair}` })
       .where(eq(partnerChanges.id, c.id)),
     ...pairMemberStatements(c.leagueId, players[0], players[1], () => "pair"),
   ];
@@ -585,7 +603,18 @@ async function markRemaining(c: Pick<ChangeRow, "id" | "pairId" | "seasonId" | "
       now,
       partnerChangeId: c.id,
     });
-    if (done) marked.push(m.id);
+    if (done) {
+      marked.push(m.id);
+      continue;
+    }
+    // Marked by the pair already (#400, likely for an injured player): the
+    // mark now names the new partner, as one made by the change would.
+    const linked = await db
+      .update(matchAbsences)
+      .set({ partnerChangeId: c.id })
+      .where(and(eq(matchAbsences.matchId, m.id), eq(matchAbsences.absentId, c.leavingId), isNull(matchAbsences.partnerChangeId)))
+      .returning({ id: matchAbsences.id });
+    if (linked.length > 0) marked.push(m.id);
   }
   return marked;
 }
@@ -738,8 +767,7 @@ export async function undoPartnerChange(actorId: string, leagueId: number, chang
   const unplayed = await db
     .select({ id: matchAbsences.matchId })
     .from(matchAbsences)
-    .innerJoin(matches, eq(matches.id, matchAbsences.matchId))
-    .where(and(eq(matchAbsences.partnerChangeId, changeId), inArray(matches.status, ["open", "scheduled"])));
+    .where(and(eq(matchAbsences.partnerChangeId, changeId), windowStillOpen(now)));
   const ids = unplayed.map((u) => u.id);
   const [done] = await db.batch([
     db
@@ -748,16 +776,8 @@ export async function undoPartnerChange(actorId: string, leagueId: number, chang
       .where(and(eq(partnerChanges.id, changeId), eq(partnerChanges.status, "final")))
       .returning({ id: partnerChanges.id }),
     auditIfChanged({ actorId, action: "partner_change.undo", target: `partner_change:${changeId}`, detail: `pair:${c.pairId}; ${ids.length} matches`, leagueId }),
-    // Only once the change is undone, and only on matches still without a result.
-    db
-      .delete(matchAbsences)
-      .where(
-        and(
-          eq(matchAbsences.partnerChangeId, changeId),
-          sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${changeId} and ${partnerChanges.status} = 'undone')`,
-          sql`exists (select 1 from ${matches} m where m.id = ${matchAbsences.matchId} and m.status in ('open', 'scheduled'))`,
-        ),
-      ),
+    // Only once the change is undone.
+    marksStillOpen(changeId, now),
   ]);
   if (done.length === 0) return refused("not_final");
   logInfo("partner change undone", { leagueId, pairId: c.pairId });
@@ -771,6 +791,92 @@ export async function undoPartnerChange(actorId: string, leagueId: number, chang
   );
   await tellOpponents(c, ids, true);
   return { ok: true, notice: "Visszavontad a partnercserét." };
+}
+
+/**
+ * A mark's match is still before its window closes (#400: before the agreed
+ * start, or the deadline while none is agreed) and has no result: the new
+ * partner hasn't played it. A match already started or played keeps who
+ * played.
+ */
+export function windowStillOpen(now: Date) {
+  return sql`exists (select 1 from ${matches} m where m.id = ${matchAbsences.matchId} and m.status in ('open', 'scheduled')
+    and (case when m.status = 'scheduled' and m.scheduled_at is not null then m.scheduled_at else m.deadline end) > ${Math.floor(now.getTime() / 1000)})`;
+}
+
+// The marks a change made on matches still open (windowStillOpen), deleted
+// once the change is undone (its status checked inside the batch).
+function marksStillOpen(changeId: number, now: Date) {
+  return db
+    .delete(matchAbsences)
+    .where(
+      and(
+        eq(matchAbsences.partnerChangeId, changeId),
+        sql`exists (select 1 from ${partnerChanges} where ${partnerChanges.id} = ${changeId} and ${partnerChanges.status} = 'undone')`,
+        windowStillOpen(now),
+      ),
+    );
+}
+
+// --- Account deletion (section 3) ----------------------------------------------
+
+// The changes a deletion ends (partnerChangeDeletion): every open one of the
+// account, and every final one where it isn't the leaving player. A final
+// change whose leaving player goes keeps going: the old pair is dissolved
+// anyway, and the staying player keeps the spot (#403, switchChanges).
+function endedByDeletion(userId: string) {
+  return and(
+    or(
+      eq(partnerChanges.status, "open"),
+      and(eq(partnerChanges.status, "final"), or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.partnerId, userId))),
+    ),
+    or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId)),
+  );
+}
+
+export type EndedChange = ChangeRow & { matches: number[] };
+
+/** Before a deletion: the changes it will end, with the matches whose marks go, for the notices. */
+export async function changesEndedByDeletion(userId: string, now: Date): Promise<EndedChange[]> {
+  const rows = await changesQuery().where(endedByDeletion(userId));
+  const out: EndedChange[] = [];
+  for (const c of rows) {
+    const marks =
+      c.status === "final"
+        ? await db.select({ id: matchAbsences.matchId }).from(matchAbsences).where(and(eq(matchAbsences.partnerChangeId, c.id), windowStillOpen(now)))
+        : [];
+    out.push({ ...c, matches: marks.map((m) => m.id) });
+  }
+  return out;
+}
+
+/**
+ * The deletion's statements for its batch (`guard`: only once the account is
+ * gone): the marks of the ended final changes on matches still open go (as
+ * an organizer's undo), then an open change is withdrawn and a final one
+ * undone. Started ones are history.
+ */
+export function partnerChangeDeletion(userId: string, now: Date, guard: SQL) {
+  const ended = db.select({ id: partnerChanges.id }).from(partnerChanges).where(and(endedByDeletion(userId), eq(partnerChanges.status, "final")));
+  return [
+    db.delete(matchAbsences).where(and(inArray(matchAbsences.partnerChangeId, ended), windowStillOpen(now), guard)),
+    db
+      .update(partnerChanges)
+      .set({ status: sql`case when ${partnerChanges.status} = 'open' then 'withdrawn' else 'undone' end`, endedAt: now })
+      .where(and(endedByDeletion(userId), guard)),
+  ] as const;
+}
+
+/** After a deletion: the change's other players are told in the app, and the opponents whose marks went. */
+export async function tellChangesEnded(ended: readonly EndedChange[], userId: string): Promise<void> {
+  for (const c of ended) {
+    const league = await leagueSlug(c.leagueId);
+    await notifyPlayers(
+      "partner_change",
+      [c.startedBy, c.leavingId, c.partnerId].filter((id) => id !== userId).map((id) => ({ userId: id, message: partnerChangeMessage({ kind: "ended", league }) })),
+    );
+    await tellOpponents(c, c.matches, true);
+  }
 }
 
 // --- The round switch (#403) ---------------------------------------------------
@@ -806,6 +912,7 @@ export async function switchChanges(seasonId: number, phase: number): Promise<Sw
       partnerElo: partner.elo,
       partnerEmail: partner.email,
       pairStatus: pairs.status,
+      leavingDeleted: leaving.deletedAt,
     })
     .from(partnerChanges)
     .innerJoin(staying, eq(staying.id, partnerChanges.startedBy))
@@ -815,7 +922,9 @@ export async function switchChanges(seasonId: number, phase: number): Promise<Sw
     .where(and(eq(partnerChanges.seasonId, seasonId), eq(partnerChanges.startsPhase, phase), inArray(partnerChanges.status, ["final", "started"])))
     .orderBy(asc(partnerChanges.answeredAt), asc(partnerChanges.id));
   return rows
-    .filter((r) => (r.status === "final" ? r.pairStatus === "active" : r.newPairId !== null))
+    // A final one whose old pair is gone has nothing to start from, unless
+    // the leaving player's account was deleted (its pair dissolved by that).
+    .filter((r) => (r.status === "final" ? r.pairStatus === "active" || r.leavingDeleted !== null : r.newPairId !== null))
     .map((r) => ({
       id: r.id,
       oldPairId: r.pairId,
@@ -827,18 +936,17 @@ export async function switchChanges(seasonId: number, phase: number): Promise<Sw
     }));
 }
 
-
 /**
  * At the publish of the round switch into `phase` (#403 req 2): each final
- * change starting there whose old pair is in the draft becomes the new pair
- * (startStatements), which takes the old pair's row in the draft, one batch
- * per change. A change that can't start (the new partner got a pair in the
- * meantime) stays final and its old pair plays on, with a warning in the
- * log. Before publishPhase, which then creates the matches with the new
- * pairs. Returns how many started.
+ * change starting there (or earlier and left over) whose old pair is in the
+ * draft becomes the new pair (startStatements), which takes the old pair's
+ * row in the draft, one batch per change. Before publishPhase, which then
+ * creates the matches with the new pairs. A change that can't start (its old
+ * pair is gone from the draft, dissolved or taken out by the organizer, or
+ * the batch fails) doesn't stay final: it is ended and its three players are
+ * told in the app (endUnstarted). Returns how many started.
  */
 export async function startChangesAtPublish(seasonId: number, phase: number, actorId: string, now = new Date()): Promise<number> {
-  // The draft's rows, by pair: only a change whose old pair is there starts.
   const rows = await db
     .select({ groupId: groupPairs.groupId, pairId: groupPairs.pairId })
     .from(groupPairs)
@@ -847,11 +955,15 @@ export async function startChangesAtPublish(seasonId: number, phase: number, act
   if (rows.length === 0) return 0;
   const draftIds = [...new Set(rows.map((r) => r.groupId))];
   const inDraft = new Set(rows.map((r) => r.pairId));
-  const changes = (await switchChanges(seasonId, phase)).filter((c) => c.status === "final" && inDraft.has(c.oldPairId));
+  const due = await changesQuery().where(
+    and(eq(partnerChanges.seasonId, seasonId), eq(partnerChanges.status, "final"), sql`${partnerChanges.startsPhase} <= ${phase}`),
+  );
   let started = 0;
-  for (const s of changes) {
-    const c = await changeById(s.id);
-    if (!c) continue;
+  for (const c of due) {
+    if (!inDraft.has(c.pairId)) {
+      await endUnstarted(c, actorId, now);
+      continue;
+    }
     const players = await newPairPlayers(c);
     const newPair = activePairIdOf(c.leagueId, players[0], players[1]);
     try {
@@ -873,11 +985,38 @@ export async function startChangesAtPublish(seasonId: number, phase: number, act
       started++;
     } catch (e) {
       if (!/NOT NULL|UNIQUE/i.test(`${e} ${(e as Error)?.cause ?? ""}`)) throw e;
-      logWarn("partner change could not start", { changeId: c.id, phase });
+      await endUnstarted(c, actorId, now);
     }
   }
   return started;
 }
+
+// A final change that can't start at its switch: ended (status "undone", by
+// the publishing organizer, audited), its marks on matches still open go,
+// and the three players are told in the app and by push. The old pair plays
+// on as it is.
+async function endUnstarted(c: ChangeRow, actorId: string | null, now: Date): Promise<void> {
+  logWarn("partner change could not start", { changeId: c.id });
+  const [done] = await db.batch([
+    db
+      .update(partnerChanges)
+      .set({ status: "undone", endedBy: actorId, endedAt: now })
+      .where(and(eq(partnerChanges.id, c.id), eq(partnerChanges.status, "final")))
+      .returning({ id: partnerChanges.id }),
+    auditIfChanged({ actorId, action: "partner_change.undo", target: `partner_change:${c.id}`, detail: `pair:${c.pairId}; could not start`, leagueId: c.leagueId }),
+    marksStillOpen(c.id, now),
+  ]);
+  if (done.length === 0) return;
+  const league = await leagueSlug(c.leagueId);
+  await notifyPlayers(
+    "partner_change",
+    [c.startedBy, c.leavingId, c.partnerId].map((userId) => ({
+      userId,
+      message: partnerChangeMessage({ kind: "not_started", league, staying: c.stayingName, leaving: c.leavingName, partner: c.partnerName }),
+    })),
+  );
+}
+
 
 /**
  * After a round switch publish (#402 req 6): a final change that starts at

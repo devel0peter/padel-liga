@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL, type SQLWra
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { changesEndedByDeletion, partnerChangeDeletion, tellChangesEnded } from "~/lib/partner-changes.server";
 import {
   accountInvites,
   auditLog,
@@ -15,7 +16,6 @@ import {
   loginCodes,
   matchDecisions,
   matches,
-  matchAbsences,
   matchSubstitutes,
   noShowReports,
   notificationOptOuts,
@@ -208,7 +208,10 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
   // Both write their audit entries in their batch (#225): who and when only,
   // no name or email of the deleted person; the pairs an anonymize
   // dissolved are logged as any dissolve.
+  // The permanent partner changes the deletion ends, read first for their notices (#402).
+  const ending = await changesEndedByDeletion(userId, now);
   const done = plan.mode === "remove" ? await remove(actorId, userId, email, mail) : await anonymize(actorId, userId, email, mail, now);
+  if (done) await tellChangesEnded(ending, userId);
   if (!done) {
     // Something changed since the check: say why from the state now.
     const again = await planDeletion(actorId, userId, now, by);
@@ -233,35 +236,6 @@ export function deleteOwnAccount(userId: string, now = new Date()): Promise<Dele
 // disappears from the match page and Helyettesek; the pair can ask for
 // someone else); an approval in the meantime stays and fails the delete the
 // same way (restrict).
-// A permanent partner change (#402) the account takes part in can't go on
-// without it: an open one is withdrawn, a final one undone, and the marks a
-// final one made on matches not played yet go (as an organizer's undo).
-// Started ones are history. `guard`: only once the account is gone.
-function endPartnerChanges(userId: string, now: Date, guard: SQL) {
-  const involved = sql`(pc.started_by = ${userId} or pc.leaving_id = ${userId} or pc.partner_id = ${userId})`;
-  return [
-    db
-      .delete(matchAbsences)
-      .where(
-        and(
-          sql`${matchAbsences.partnerChangeId} in (select pc.id from partner_changes pc where pc.status = 'final' and ${involved})`,
-          sql`exists (select 1 from matches m where m.id = ${matchAbsences.matchId} and m.status in ('open', 'scheduled'))`,
-          guard,
-        ),
-      ),
-    db
-      .update(partnerChanges)
-      .set({ status: sql`case when ${partnerChanges.status} = 'open' then 'withdrawn' else 'undone' end`, endedAt: now })
-      .where(
-        and(
-          inArray(partnerChanges.status, ["open", "final"]),
-          or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId)),
-          guard,
-        ),
-      ),
-  ];
-}
-
 async function remove(actorId: string, userId: string, email: string, mail: MailContext): Promise<boolean> {
   const theirPairs = db
     .select({ id: pairs.id })
@@ -285,7 +259,7 @@ async function remove(actorId: string, userId: string, email: string, mail: Mail
         ),
       db.delete(matchSubstitutes).where(and(eq(matchSubstitutes.substituteId, userId), ne(matchSubstitutes.status, "approved"))),
       // Its partner changes (#402): no history without a published group.
-      ...endPartnerChanges(userId, new Date(), sql`1`),
+      ...partnerChangeDeletion(userId, new Date(), sql`1`),
       db
         .delete(partnerChanges)
         .where(or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId))),
@@ -400,7 +374,7 @@ async function anonymize(
     ...personalDataStatements(userId, email, mail, gone),
     ...withdrawalReasonStatements(userId, gone),
     ...clearStrikeReasons(userId, gone),
-    ...endPartnerChanges(userId, now, gone),
+    ...partnerChangeDeletion(userId, now, gone),
   ]);
   return updated.length > 0 ? active : false;
 }

@@ -2,7 +2,19 @@ import { and, count, eq, isNotNull, isNull, max, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { cities, leagueMembers, leagues, pairLinks, pairs, partnerSearches, seasonEntries, stuckReminderPeople, stuckReminders, users } from "~/db/schema";
+import {
+  cities,
+  leagueMembers,
+  leagues,
+  pairLinks,
+  pairs,
+  partnerChanges,
+  partnerSearches,
+  seasonEntries,
+  stuckReminderPeople,
+  stuckReminders,
+  users,
+} from "~/db/schema";
 import { randomToken } from "~/lib/auth/tokens";
 import { hideAddresses } from "~/lib/email/outbox-view";
 import { emailSwitchedOff, stuckReminderInserts, suppressedSet } from "~/lib/email/outbox.server";
@@ -35,7 +47,7 @@ import { logWarn } from "~/lib/log";
 
 // Everything reminders.ts needs, read now.
 export async function reminderInput(now = new Date()): Promise<ReminderInput> {
-  const [leagueRows, seasonList, accounts, members, emailOff, pairRows, entries, searches, suppressed, sent, reminded] =
+  const [leagueRows, seasonList, accounts, members, emailOff, pairRows, entries, searches, suppressed, sent, reminded, committed] =
     await Promise.all([
       db
         .select({ id: leagues.id, city: leagues.city, name: leagues.name })
@@ -73,6 +85,10 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
       suppressedSet(),
       db.select({ key: stuckReminders.key }).from(stuckReminders),
       db.select({ seasonId: stuckReminderPeople.seasonId, email: stuckReminderPeople.email }).from(stuckReminderPeople),
+      db
+        .select({ leagueId: partnerChanges.leagueId, userId: partnerChanges.partnerId })
+        .from(partnerChanges)
+        .where(eq(partnerChanges.status, "final")),
     ]);
   return {
     now,
@@ -86,6 +102,7 @@ export async function reminderInput(now = new Date()): Promise<ReminderInput> {
     pairs: pairRows,
     entries,
     partnerSearches: searches,
+    committed,
     suppressed,
     sent: new Set(sent.map((r) => r.key)),
     reminded: new Set(reminded.map((r) => personKey(r.seasonId, r.email))),

@@ -385,10 +385,11 @@ export async function acceptPartnerChange(user: Pick<User, "id">, changeId: numb
         detail: `pair:${c.pairId}; starts ${startsPhase === null ? "next season" : `phase ${startsPhase}`}`,
         leagueId: c.leagueId,
       }),
-      // Committed now: no longer listed as looking for a partner (D59).
+      // Committed now: no longer looking for a partner (D59), nor listed on
+      // Párkereső (D177: switching off clears the listing).
       db
         .update(partnerSearches)
-        .set({ seeking: false, updatedAt: now })
+        .set({ seeking: false, listed: false, updatedAt: now })
         .where(
           and(
             eq(partnerSearches.leagueId, c.leagueId),

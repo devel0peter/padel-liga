@@ -15,6 +15,9 @@ vi.mock("~/lib/email/outbox.server", () => ({
   queueStrikeWarnings: async () => {},
   queuePartnerChangeEmail: async (toEmail: string, input: any) => h.mails.push({ toEmail, ...input }),
   dailyLimit: () => 100,
+  suppressedSet: async () => new Set(),
+  emailSwitchedOff: async () => new Set(),
+  stuckReminderInserts: () => [],
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
@@ -386,5 +389,32 @@ describe("account deletion (review L5)", () => {
     expect(await D.deleteOwnAccount("a1", DURING)).toMatchObject({ ok: true, mode: "anonymize" });
     expect(change().status).toBe("undone");
     expect(notices("partner_change").map((n) => n.user_id)).toEqual(["b1", "q"]);
+  });
+});
+
+describe("no other email for the new partner (review round 2, M3)", () => {
+  beforeEach(world);
+
+  it("accepting sends only the two change emails, and the stuck reminder no longer counts the new partner as without a pair", async () => {
+    const { dueReminders } = await import("~/lib/reminders");
+    const { reminderInput } = await import("~/lib/reminders.server");
+    const later = new Date(DURING.getTime() + 3 * 86_400_000);
+    const remindedC = async () =>
+      dueReminders(await reminderInput(later), [1])
+        .filter((r) => r.situation === "C")
+        .flatMap((r) => r.recipients.map((p) => p.userId));
+    expect(await remindedC()).toContain("q");
+    h.raw.exec(`insert into partner_searches (league_id, user_id, seeking) values (1, 'q', 1)`);
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    // The accept switched "Párt keresek" off (and the listing on Párkereső, D177), which alone would make q due for C.
+    expect(one("select seeking, listed from partner_searches where user_id = 'q'")).toEqual({ seeking: 0, listed: 0 });
+    expect(await remindedC()).not.toContain("q");
+    // Exactly the two emails #402 names: asked (q) and final (b1); nothing else is queued.
+    expect(h.mails.map((m) => [m.toEmail, m.kind])).toEqual([
+      ["q@x.hu", "asked"],
+      ["b1@x.hu", "final"],
+    ]);
+    expect(one("select count(*) n from email_messages").n).toBe(0);
   });
 });

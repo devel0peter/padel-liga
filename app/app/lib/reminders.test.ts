@@ -73,6 +73,7 @@ function input(v: Partial<ReminderInput> = {}): ReminderInput {
     pairs: [],
     entries: [],
     partnerSearches: [],
+    committed: [],
     suppressed: new Set(),
     sent: new Set(),
     reminded: new Set(),
@@ -170,6 +171,11 @@ describe("C: registered, no pair", () => {
   it("is reminded 2 days after registering", () => {
     expect(who({ accounts: [account("cili")] })).toEqual(["C cili@x.hu"]);
     expect(who({ accounts: [account("cili", { consentAt: ago(DAY) })] })).toEqual([]);
+  });
+
+  it("not the new partner of a final permanent partner change (#402): committed to a pair, only in that league", () => {
+    expect(who({ accounts: [account("cili")], committed: [{ leagueId: 1, userId: "cili" }] })).toEqual([]);
+    expect(who({ accounts: [account("cili")], committed: [{ leagueId: 2, userId: "cili" }] })).toEqual(["C cili@x.hu"]);
   });
 
   it("only in the leagues the player belongs to (D128): joined, or a pair there", () => {

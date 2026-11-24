@@ -12,23 +12,47 @@ import { expect, test } from "@playwright/test";
 import { LEAGUE } from "../app/lib/seed";
 import { ORGANIZER, OUTSIDER, as, content, d1, d1Delete, d1Insert, logOffset, visit, waitForEmails } from "./support";
 
-// A pair of Mintaváros with an open match of the running round that counts
-// and has no marks yet, and that match.
+// A pair of Mintaváros in a published group of the running round, both
+// players' accounts kept, not withdrawn, with no change going on.
 function runningPair() {
-  const [m] = d1(`select m.id, p.id pair_id, ua.email starter, ua.name starter_name, ub.id leaving_id, ub.name leaving
-      from matches m join groups g on g.id = m.group_id join seasons s on s.id = g.season_id join leagues l on l.id = s.league_id
-      join pairs p on p.id = m.pair_a join users ua on ua.id = p.player_a join users ub on ub.id = p.player_b
-      where l.slug = '${LEAGUE.slug}' and m.status = 'open' and m.deadline > unixepoch() and p.status = 'active'
+  const [p] = d1(`select p.id pair_id, g.id group_id, sp.deadline, ua.email starter, ua.name starter_name, ub.id leaving_id, ub.name leaving
+      from group_pairs gp join groups g on g.id = gp.group_id join seasons s on s.id = g.season_id join leagues l on l.id = s.league_id
+      join season_phases sp on sp.season_id = g.season_id and sp.number = g.phase
+      join pairs p on p.id = gp.pair_id join users ua on ua.id = p.player_a join users ub on ub.id = p.player_b
+      where l.slug = '${LEAGUE.slug}' and g.published_at is not null and sp.deadline > unixepoch() and gp.withdrawn_at is null
+        and p.status = 'active' and ua.deleted_at is null and ub.deleted_at is null
+        and not exists (select 1 from partner_changes c where c.pair_id = p.id and c.status in ('open', 'final'))
+      order by g.number, gp.seed limit 1`);
+  expect(p, "a pair in the running round").toBeTruthy();
+  return p as { pair_id: number; group_id: number; deadline: number; starter: string; starter_name: string; leaving_id: string; leaving: string };
+}
+
+// A match of the pair still before its start (open, or scheduled later), no
+// marks yet. Late in the suite most matches are played, so when there is
+// none the spec brings its own: an open match against another pair of the
+// group (deleted again at the end, so later specs see the walkthrough's state).
+function openMatchOf(p: ReturnType<typeof runningPair>): { id: number; fixture: boolean } {
+  const [m] = d1(`select m.id from matches m
+      where m.group_id = ${p.group_id} and ${p.pair_id} in (m.pair_a, m.pair_b)
+        and (m.status = 'open' or (m.status = 'scheduled' and m.scheduled_at > unixepoch())) and m.deadline > unixepoch()
         and not exists (select 1 from group_pairs gp where gp.group_id = m.group_id and gp.pair_id in (m.pair_a, m.pair_b) and gp.withdrawn_at is not null)
         and not exists (select 1 from match_absences x where x.match_id = m.id)
-        and not exists (select 1 from partner_changes c where c.pair_id = p.id and c.status in ('open', 'final'))
-      order by m.id limit 1`);
-  expect(m, "an open match of a pair in the running round").toBeTruthy();
-  return m as { id: number; pair_id: number; starter: string; starter_name: string; leaving_id: string; leaving: string };
+      order by m.id limit 1`) as { id: number }[];
+  if (m) return { id: m.id, fixture: false };
+  const [other] = d1(`select gp.pair_id, exists (select 1 from matches m where m.group_id = gp.group_id and m.pair_a = ${p.pair_id} and m.pair_b = gp.pair_id) as taken
+      from group_pairs gp where gp.group_id = ${p.group_id} and gp.pair_id <> ${p.pair_id} and gp.withdrawn_at is null
+      order by gp.seed limit 1`) as { pair_id: number; taken: number }[];
+  expect(other, "another pair of the group").toBeTruthy();
+  // The round has one match per two pairs, in one order: the fixture takes the other order.
+  const [a, b] = other!.taken ? [other!.pair_id, p.pair_id] : [p.pair_id, other!.pair_id];
+  d1Insert(`insert into matches (group_id, pair_a, pair_b, week, deadline) values (${p.group_id}, ${a}, ${b}, 3, ${p.deadline})`);
+  const [made] = d1(`select id from matches where group_id = ${p.group_id} and pair_a = ${a} and pair_b = ${b}`) as { id: number }[];
+  return { id: made!.id, fixture: true };
 }
 
 test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner plays the rest of the round; the Szervező undoes it", async ({ browser }) => {
   const m = runningPair();
+  const match = openMatchOf(m);
   const [{ id: leagueId }] = d1(`select id from leagues where slug = '${LEAGUE.slug}'`) as { id: number }[];
   d1Insert(`insert or ignore into league_members (league_id, user_id, source) values (${leagueId}, '${OUTSIDER.id}', 'chosen')`);
   try {
@@ -63,7 +87,7 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     expect(final!.text).toContain(`helyetted ${OUTSIDER.name} játszik`);
 
     // The match page: the leaving player doesn't play, the new partner does.
-    await visit(starter.page, `/matches/${m.id}`);
+    await visit(starter.page, `/matches/${match.id}`);
     await expect(content(starter.page)).toContainText(`${m.leaving} helyett ${OUTSIDER.name} játszik`);
 
     // The Szervező undoes it on Párok: the mark goes.
@@ -74,12 +98,13 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     await changes.getByRole("button", { name: "Visszavonás" }).click();
     await org.page.getByRole("alertdialog").getByRole("button", { name: "Visszavonás" }).click();
     await expect(changes.getByRole("button", { name: "Visszavonás" })).toHaveCount(0);
-    expect(d1(`select count(*) n from match_absences where match_id = ${m.id}`)[0]!.n).toBe(0);
-    await visit(starter.page, `/matches/${m.id}`);
+    expect(d1(`select count(*) n from match_absences where match_id = ${match.id}`)[0]!.n).toBe(0);
+    await visit(starter.page, `/matches/${match.id}`);
     await expect(content(starter.page)).not.toContainText(`${m.leaving} helyett`);
 
     await Promise.all([starter.context.close(), partner.context.close(), org.context.close()]);
   } finally {
     d1Delete(`delete from league_members where league_id = ${leagueId} and user_id = '${OUTSIDER.id}' and source = 'chosen'`);
+    if (match.fixture) d1Delete(`delete from matches where id = ${match.id}`);
   }
 });

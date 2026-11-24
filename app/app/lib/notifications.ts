@@ -14,7 +14,6 @@ import { walkoverScoreTo } from "./results";
 const capitalArticle = (n: number) => withArticle(n).replace(/^a/, "A");
 import { PAIR_SECTION_PATH } from "./pairs";
 import { WAITING_START } from "./season-entries";
-import { substitutesEnabled } from "./substitutes";
 
 // The kinds a user can switch off on the profile page. "test" (the profile's
 // "Próba" button) is always on.
@@ -22,10 +21,6 @@ export const NOTIFICATION_KINDS = {
   result_disputed: {
     label: "Vitatott eredmény",
     description: "Ha egy pár vitatja a ligád egy meccsének eredményét, és te döntesz róla.",
-  },
-  substitute_requested: {
-    label: "Helyettes kérés",
-    description: "Ha egy pár helyettest kér a ligád egy meccsére, és te hagyod jóvá.",
   },
   no_show_reported: {
     label: "Nem jöttek el",
@@ -70,12 +65,10 @@ export type PlayerKind =
   // sends the warning email (strike_warning). Not a digest item: that email
   // is its own.
   | "strike"
-  // Substitutes (#37, D109), in the app and by push only, never by email:
-  // the asking pair on approval, rejection and revocation; the opponents on
-  // approval and revocation. The organizers' kind is `substitute_requested`.
-  | "substitute_approved"
-  | "substitute_rejected"
-  | "substitute_revoked"
+  // A temporary substitute (#400, D175): a player marked as not playing a
+  // match, or the mark taken back; to the match's other three players, in
+  // the app and by push only, never by email.
+  | "absence_marked"
   // No-shows (#33, D108): the organizer's decision on a report, to both
   // pairs, in the app and by push only, never by email. The organizers' kind
   // is `no_show_reported`; the strike's notice is its own kind.
@@ -114,7 +107,7 @@ export const PUSH_TOPICS = {
   },
   absences: {
     label: "Helyettesek és mulasztások",
-    description: "Ha jóváhagyják, elutasítják vagy visszavonják a helyettest, döntés egy „nem jöttek el” bejelentésről, fekete pontok.",
+    description: "Ha helyettes játszik valaki helyett a meccseden, döntés egy „nem jöttek el” bejelentésről, fekete pontok.",
   },
 } as const;
 
@@ -142,21 +135,11 @@ export const KIND_TOPIC: Readonly<Record<PlayerKind, PushTopic>> = {
   pair_intro: "season",
   pair_withdrawn: "season",
   round_extended: "season",
-  substitute_approved: "absences",
-  substitute_rejected: "absences",
-  substitute_revoked: "absences",
+  absence_marked: "absences",
   no_show_confirmed: "absences",
   no_show_rejected: "absences",
   strike: "absences",
 };
-
-// The topic's name and text on the profile. No substitutes in the first
-// season (D145): that topic is about no-shows and strikes only.
-export function pushTopic(topic: PushTopic): { label: string; description: string } {
-  if (topic === "absences" && !substitutesEnabled())
-    return { label: "Mulasztások", description: "Döntés egy „nem jöttek el” bejelentésről, fekete pontok." };
-  return PUSH_TOPICS[topic];
-}
 
 export function isPushTopic(value: unknown): value is PushTopic {
   return typeof value === "string" && Object.hasOwn(PUSH_TOPICS, value);
@@ -204,8 +187,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
   if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
-  // No substitutes in the first season (D145): no switch for their requests.
-  return substitutesEnabled() ? ["result_disputed", "substitute_requested", "no_show_reported"] : ["result_disputed", "no_show_reported"];
+  return ["result_disputed", "no_show_reported"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -462,51 +444,17 @@ export function resultDisputedMessage(input: { matchId: number; leagueSlug: stri
   };
 }
 
-// --- Substitutes (#37, D109) ------------------------------------------------
+// --- Temporary substitutes (#400, D175) --------------------------------------
 
-// To the league's Szervezők and the Admins (app and push, never email), the
-// asking player left out. No names: the list shows them.
-export function substituteRequestedMessage(input: { leagueSlug: string; leagueName: string; week: number }): Message {
+// To the match's other three players when a player is marked as not playing
+// (`played`: marked with the result, after the match) or the mark is taken back.
+export function absenceMarkedMessage(input: { matchId: number; name: string; played?: boolean; withdrawn?: boolean }): Message {
+  if (input.withdrawn) return { title: "Mégsem jön helyettes", body: `Mégis ${input.name} játszik a meccseteken.`, url: matchUrl(input.matchId) };
   return {
-    title: `Helyettes kérés · ${input.leagueName}`,
-    body: `Egy pár helyettest kér ${withArticle(input.week)} heti meccsére. A jóváhagyás rád vár.`,
-    url: `/admin/leagues/${input.leagueSlug}/substitutes`,
-  };
-}
-
-export type SubstituteNotice = { matchId: number; substitute: string; absent: string };
-
-// The organizer's answer to the asking pair. The reason is on the match page only.
-export function substituteDecidedMessage(input: SubstituteNotice & { approved: boolean }): Message {
-  return input.approved
-    ? {
-        title: "Jóváhagyták a helyettest",
-        body: `${input.substitute} játszhat ${input.absent} helyett. Az ellenfeleitek is látják.`,
-        url: matchUrl(input.matchId),
-      }
-    : {
-        title: "Nem hagyták jóvá a helyettest",
-        body: `${input.substitute} nem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`,
-        url: matchUrl(input.matchId),
-      };
-}
-
-// To the opponents once a substitute is approved.
-export function substituteAnnouncedMessage(input: SubstituteNotice): Message {
-  return {
-    title: "Helyettes az ellenfeleteknél",
-    body: `${input.absent} helyett ${input.substitute} játszik a meccseteken.`,
-    url: matchUrl(input.matchId),
-  };
-}
-
-// An approval revoked before the match: to both pairs.
-export function substituteRevokedMessage(input: SubstituteNotice & { ours: boolean }): Message {
-  return {
-    title: "Visszavonták a helyettest",
-    body: input.ours
-      ? `${input.substitute} mégsem játszhat ${input.absent} helyett. A részleteket a meccs oldalán látod.`
-      : `${input.absent} helyett mégsem ${input.substitute} játszik a meccseteken.`,
+    title: "Helyettes a meccseteken",
+    body: input.played
+      ? `${input.name} helyett helyettes játszott a meccseteken. Az eredménnyel együtt ezt is megerősítitek.`
+      : `${input.name} helyett helyettes játszik a meccseteken.`,
     url: matchUrl(input.matchId),
   };
 }

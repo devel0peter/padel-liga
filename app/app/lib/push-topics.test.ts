@@ -1,12 +1,6 @@
 // Push topics (#349, D159): every player kind in exactly one topic, and the
 // one rule every push path applies (pushWanted).
-import { describe, expect, it, vi } from "vitest";
-
-const flags = vi.hoisted(() => ({ substitutes: false }));
-vi.mock("~/lib/substitutes", async (original) => ({
-  ...(await original<typeof import("~/lib/substitutes")>()),
-  substitutesEnabled: () => flags.substitutes,
-}));
+import { describe, expect, it } from "vitest";
 
 const { notifications } = await import("~/db/schema");
 const {
@@ -15,7 +9,6 @@ const {
   NOTIFICATION_KINDS,
   PUSH_TOPICS,
   isPushTopic,
-  pushTopic,
   pushWanted,
   topicEnabled,
   topicKey,
@@ -81,12 +74,9 @@ describe("push topics (#349)", () => {
     expect(isPushTopic("toString")).toBe(false);
   });
 
-  it("without substitutes (D145) the last topic is only about no-shows and strikes", () => {
-    flags.substitutes = false;
-    expect(pushTopic("absences").label).toBe("Mulasztások");
-    expect(pushTopic("absences").description).not.toMatch(/helyettes/i);
-    flags.substitutes = true;
-    expect(pushTopic("absences")).toEqual(PUSH_TOPICS.absences);
-    expect(pushTopic("reminders")).toEqual(PUSH_TOPICS.reminders);
+  it("the last topic is about temporary substitutes too, since #400 (named back from Mulasztások, D145)", () => {
+    expect(PUSH_TOPICS.absences.label).toBe("Helyettesek és mulasztások");
+    expect(PUSH_TOPICS.absences.description).toMatch(/helyettes/);
+    expect(KIND_TOPIC.absence_marked).toBe("absences");
   });
 });

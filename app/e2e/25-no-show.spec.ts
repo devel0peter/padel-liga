@@ -3,8 +3,8 @@
 // one pair reports on the match page that the other didn't come; the
 // Szervező is told, finds it on "Viták" and confirms it on the decision page:
 // a 4-0 4-0 walkover for the reporting pair, a strike for the other pair's
-// players, both pairs told. No email goes out. Takes an open match nobody
-// asked a substitute for.
+// players, both pairs told. No email goes out. Takes an open match with no
+// player marked absent (#400).
 import { expect, test } from "@playwright/test";
 
 import { ORGANIZER, as, content, d1, d1Insert, d1Update, visit } from "./support";
@@ -16,7 +16,7 @@ test("Nem jöttek el: a player reports after the slot, the Szervező confirms th
       join users uc on uc.id = pb.player_a join users ud on ud.id = pb.player_b
       where m.status = 'open' and m.deadline > unixepoch()
         and not exists (select 1 from group_pairs gp where gp.group_id = m.group_id and gp.pair_id in (m.pair_a, m.pair_b) and gp.withdrawn_at is not null)
-        and not exists (select 1 from match_substitutes s where s.match_id = m.id)
+        and not exists (select 1 from match_absences s where s.match_id = m.id)
       order by m.id desc limit 1`);
   expect(m, "an open match to report a no-show on").toBeTruthy();
   const now = Math.floor(Date.now() / 1000);

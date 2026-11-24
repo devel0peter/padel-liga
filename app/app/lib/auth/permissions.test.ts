@@ -1,8 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-// Substitutes are hidden in the first season (D145); one test switches them on.
-const h = vi.hoisted(() => ({ subs: false }));
-vi.mock("../substitutes", async (original) => ({ ...(await original<typeof import("../substitutes")>()), substitutesEnabled: () => h.subs }));
+import { describe, expect, it } from "vitest";
 
 import { adminHome, appNav, can, navLeagues, roleLabel, type Actor, type Permission } from "./permissions";
 
@@ -107,7 +103,6 @@ describe("sidebar", () => {
       "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
-      // No "Helyettesek" in the first season (D145).
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -154,14 +149,8 @@ describe("sidebar", () => {
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 
-  it("offers Helyettesek only while substitutes are on (D145)", () => {
-    h.subs = true;
-    try {
-      const items = appNav(organizer, [gyor])[1]!.items;
-      expect(items.at(-1)).toMatchObject({ label: "Helyettesek", to: "/admin/leagues/gyor/substitutes" });
-    } finally {
-      h.subs = false;
-    }
+  it("has no Helyettesek page: a temporary substitute needs no approval (#400, D175)", () => {
+    expect(appNav(superadmin, [gyor]).flatMap((s) => s.items).some((i) => i.to.endsWith("/substitutes"))).toBe(false);
   });
 
   it("Viták (#29): the league's Szervező and the Admin, not another league's Szervező or a player", () => {

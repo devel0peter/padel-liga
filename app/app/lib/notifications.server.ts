@@ -11,7 +11,6 @@ import {
   KIND_TOPIC,
   isEnabled,
   resultDisputedMessage,
-  substituteRequestedMessage,
   noShowReportedMessage,
   pushPayload,
   pushWanted,
@@ -438,24 +437,6 @@ async function leagueStaff(leagueId: number, except: string): Promise<string[]> 
       .where(and(eq(users.platformRole, "superadmin"), isNull(users.deletedAt))),
   ]);
   return disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), except);
-}
-
-// A pair asked for a substitute (#37, D109): tell the league's Szervezők and
-// the Admins, in the app and by push, never by email; the asking player left
-// out. Never throws: the request is already saved.
-export async function notifySubstituteRequested(input: {
-  leagueId: number;
-  leagueSlug: string;
-  leagueName: string;
-  week: number;
-  requestedBy: string;
-}): Promise<void> {
-  try {
-    const message = substituteRequestedMessage(input);
-    await notify("substitute_requested", (await leagueStaff(input.leagueId, input.requestedBy)).map((userId) => ({ userId, message })));
-  } catch (error) {
-    logError("notification failed", { kind: "substitute_requested", error });
-  }
 }
 
 // A pair reported a no-show (#33, D108): tell the league's Szervezők and the

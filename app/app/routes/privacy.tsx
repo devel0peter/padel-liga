@@ -229,15 +229,10 @@ export default function Privacy() {
                 amit mindkét pár lát.
               </li>
               <li>
-                <strong>A helyettes kérést</strong> (ki kérte, ki helyett ki
-                játszana, és a szervező döntése) a pár és a liga szervezője meg
-                az oldal adminja látja; a szervező a két játékos Élő-pontját is,
-                hogy dönthessen. A jóváhagyott helyettes nevét az ellenfeleid is
-                látják a meccs oldalán. A szervező indoklását csak a pár látja,
-                és ha törlöd a fiókodat, töröljük. Ha regisztráltál, a neved
-                (csak a neved, soha az e-mail-címed vagy a telefonszámod)
-                megjelenhet a ligád játékosainak helyettes-választó listájában,
-                amikor egy meccsükre helyettest kérnek.
+                <strong>Ha helyettes játszik helyetted</strong>, azt tároljuk,
+                hogy melyik meccsen nem játszottál, ki jelölte és mikor. A meccs
+                négy játékosa látja. A helyettes nevét nem kérjük és nem
+                tároljuk.
               </li>
               <li>
                 <strong>A „nem jöttek el” bejelentést</strong> (melyik pár
@@ -363,8 +358,8 @@ export default function Privacy() {
               <li>
                 <strong>Fiókok:</strong> amíg nem törlöd (a Profil oldalon) vagy
                 nem kéred a törlést. Ha még nem
-                játszottál kihirdetett csoportban, és jóváhagyott helyettes sem
-                voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
+                játszottál kihirdetett csoportban, és korábban jóváhagyott
+                helyettes sem voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
                 játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
                 lehessen hozzád kötni őket. Az e-mail-címedet, a
                 telefonszámodat, a nemedet, a belépéseidet és az eszközeidet

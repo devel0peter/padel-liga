@@ -24,7 +24,6 @@ import { entryCounts } from "~/lib/season-entries.server";
 import { CONTACT_EMAIL, organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
-import { substitutesEnabled } from "~/lib/substitutes";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -119,10 +118,8 @@ const FAQ = [
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
   [
     "Mi van, ha megsérül a párom?",
-    // No substitutes in the first season (D145).
-    substitutesEnabled()
-      ? "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."
-      : "Ebben a szezonban még nincs helyettes. Ha nem tudjátok folytatni, szólj a szervezőnek. A pár két kör között cserélhető.",
+    // A temporary substitute, unnamed, no approval (#400, D175).
+    "Egy-egy meccsen helyettes játszhat helyette, bárki, jóváhagyás nélkül: a meccs oldalán jelöld, hogy ő nem játszik. A pár csak két kör között cserélhető végleg.",
   ],
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];

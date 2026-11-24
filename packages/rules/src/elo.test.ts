@@ -152,10 +152,10 @@ describe("matchEloChanges (spec 11)", () => {
     expect(changes.map((c) => c.k)).toEqual([30, 30, 20, 20]);
   });
 
-  it("changes only the four players who played (a substitute instead of the absent partner)", () => {
-    const st = states({ p: fresh(1200), sub: fresh(1000), r: fresh(1200), s: fresh(1200) });
-    const changes = matchEloChanges(m(1, ["p", "sub"], ["r", "s"]), st);
-    expect(changes.map((c) => c.playerId).sort()).toEqual(["p", "r", "s", "sub"]);
+  it("changes the four players, except one marked absent (a temporary substitute played instead, #400)", () => {
+    const st = states({ p: fresh(1200), q: fresh(1000), r: fresh(1200), s: fresh(1200) });
+    expect(matchEloChanges(m(1, ["p", "q"], ["r", "s"]), st).map((c) => c.playerId).sort()).toEqual(["p", "q", "r", "s"]);
+    expect(matchEloChanges({ ...m(1, ["p", "q"], ["r", "s"]), absent: ["q"] }, st).map((c) => c.playerId).sort()).toEqual(["p", "r", "s"]);
   });
 });
 

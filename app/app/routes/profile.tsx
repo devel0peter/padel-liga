@@ -40,7 +40,6 @@ import {
   kindsFor,
   NOTIFICATION_KINDS,
   PUSH_TOPICS,
-  pushTopic,
   topicEnabled,
   type PushTopic,
 } from "~/lib/notifications";
@@ -104,7 +103,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     emailOn: channelEnabled(disabled, "email"),
     pushOn: channelEnabled(disabled, "push"),
     // One push switch per topic (#349), for every account: anyone may play.
-    topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...pushTopic(topic), enabled: topicEnabled(disabled, topic) })),
+    topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...PUSH_TOPICS[topic], enabled: topicEnabled(disabled, topic) })),
     kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
   };
 }

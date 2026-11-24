@@ -57,7 +57,7 @@ async function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('o', 'o@x.hu', 'Org', 'versenyzo', 1)`);
@@ -113,6 +113,43 @@ function setup() {
   const b = a === 1 ? 3 : 1;
   return { id, a, b, rec: `p${a}a`, recPartner: `p${a}b`, opp: `p${b}a`, oppPartner: `p${b}b` };
 }
+
+describe("the round's set format (#396, D173)", () => {
+  beforeEach(freshDb);
+  const sixes = () => h.raw.exec("update season_phases set set_games = 6 where season_id = 1 and number = 1");
+
+  it("a sets-to-6 round accepts 6:4 7:6 and refuses 4:2 4:1 with a Hungarian message", async () => {
+    sixes();
+    const { id, rec } = setup();
+    expect((await M.matchPage(id, rec, PLAYED))!.setGames).toBe(6);
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[4, 2], [4, 1]]) }, PLAYED)).toEqual({
+      ok: false,
+      error:
+        "1. szett: 4:2 nem lehet. Lehet 6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6. " +
+        "2. szett: 4:1 nem lehet. Lehet 6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6.",
+    });
+    expect(resultEvents(id)).toEqual([]);
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[6, 4], [7, 6]]) }, PLAYED)).toEqual({
+      ok: true,
+      notice: "Rögzítettük. A másik pár megerősíti.",
+    });
+  });
+
+  it("a sets-to-6 round's dispute is checked against sets to 6", async () => {
+    sixes();
+    const { id, rec, opp } = setup();
+    await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[6, 4], [7, 6]]) }, PLAYED);
+    expect(await R.resultStep(opp, id, { kind: "dispute", score: score([[4, 2], [4, 1]]), note: "" }, PLAYED)).toMatchObject({ ok: false });
+    expect(await R.resultStep(opp, id, { kind: "dispute", score: score([[4, 6], [6, 7]]), note: "" }, PLAYED)).toMatchObject({ ok: true });
+  });
+
+  it("a short-set round (Győr round 1) still accepts 4:2 5:3 and refuses 6:4 6:3", async () => {
+    const { id, rec } = setup();
+    expect((await M.matchPage(id, rec, PLAYED))!.setGames).toBe(4);
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[6, 4], [6, 3]]) }, PLAYED)).toMatchObject({ ok: false });
+    expect(await R.resultStep(rec, id, { kind: "record", clubId: 1, score: score([[4, 2], [5, 3]]) }, PLAYED)).toMatchObject({ ok: true });
+  });
+});
 
 describe("recording a result (#28)", () => {
   beforeEach(freshDb);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { MatchOutcome } from "@padel-liga/rules";
+import { type MatchOutcome, SETS_TO_SIX, SHORT_SETS } from "@padel-liga/rules";
 
 import { formatSlot } from "./format";
 
@@ -12,7 +12,7 @@ const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játé
 /** A group of 3 pairs with ids base+1..base+3 and no matches. */
 function group(number: number, matches: LadderMatch[] = []): LadderGroupInput {
   const base = number * 10;
-  return { id: number, number, pairs: [pair(base + 1), pair(base + 2), pair(base + 3)], matches };
+  return { id: number, number, pairs: [pair(base + 1), pair(base + 2), pair(base + 3)], matches, setGames: SHORT_SETS };
 }
 
 const played = (id: number, a: number, b: number, week: number, sets: [number, number][]): LadderMatch => ({
@@ -301,6 +301,7 @@ describe("buildLadder: a pair withdrawn mid-phase (#34, rules 2)", () => {
   const withdrawnGroup = (): LadderGroupInput => ({
     id: 1,
     number: 1,
+    setGames: SHORT_SETS,
     pairs: [pair(11), pair(12), pair(13), { ...pair(14), withdrawn: true }],
     matches: [
       played(1, 11, 12, 1, [
@@ -370,9 +371,10 @@ describe("groupTable: a pair withdrawn mid-phase (#34), for the ladder and Kezd�
     const without = groupTable(
       pairs.slice(0, 3),
       matches.filter((m) => m.a !== 4 && m.b !== 4),
+      SHORT_SETS,
     );
-    expect(groupTable(pairs, matches)).toEqual(without);
-    expect(groupTable(pairs, matches).map((r) => r.pairId)).not.toContain(4);
+    expect(groupTable(pairs, matches, SHORT_SETS)).toEqual(without);
+    expect(groupTable(pairs, matches, SHORT_SETS).map((r) => r.pairId)).not.toContain(4);
   });
 });
 
@@ -434,7 +436,7 @@ describe("isValidOutcome: what the public league page can count (#190, D115)", (
       { kind: "both-inactive" },
       { kind: "unplayed" },
     ])
-      expect(isValidOutcome(outcome), JSON.stringify(outcome)).toBe(true);
+      expect(isValidOutcome(outcome, SHORT_SETS), JSON.stringify(outcome)).toBe(true);
   });
 
   it("rejects a score, kind or shape the rules engine would throw on", () => {
@@ -498,7 +500,7 @@ describe("isValidOutcome: what the public league page can count (#190, D115)", (
         },
       },
     ])
-      expect(isValidOutcome(outcome), JSON.stringify(outcome)).toBe(false);
+      expect(isValidOutcome(outcome, SHORT_SETS), JSON.stringify(outcome)).toBe(false);
   });
 
   it("a valid outcome never makes groupTable throw", () => {
@@ -511,7 +513,37 @@ describe("isValidOutcome: what the public league page can count (#190, D115)", (
         ],
       },
     };
-    expect(isValidOutcome(outcome)).toBe(true);
-    expect(groupTable([pair(1), pair(2)], [{ a: 1, b: 2, outcome }])[0]).toMatchObject({ pairId: 1, points: 3 });
+    expect(isValidOutcome(outcome, SHORT_SETS)).toBe(true);
+    expect(groupTable([pair(1), pair(2)], [{ a: 1, b: 2, outcome }], SHORT_SETS)[0]).toMatchObject({ pairId: 1, points: 3 });
+  });
+
+  it("checks a played score against its round's format (#396): round 1 short sets, later rounds sets to 6", () => {
+    const short: MatchOutcome = { kind: "played", score: { sets: [[4, 2], [5, 3]] } };
+    const six: MatchOutcome = { kind: "played", score: { sets: [[6, 4], [7, 6]] } };
+    expect(isValidOutcome(short, SHORT_SETS)).toBe(true);
+    expect(isValidOutcome(six, SHORT_SETS)).toBe(false);
+    expect(isValidOutcome(six, SETS_TO_SIX)).toBe(true);
+    expect(isValidOutcome(short, SETS_TO_SIX)).toBe(false);
+  });
+});
+
+describe("groupTable and buildLadder by the round's set format (#396)", () => {
+  it("a sets-to-6 group counts a walkover 6:0, 6:0 in the games", () => {
+    const rows = groupTable([pair(1), pair(2)], [{ a: 1, b: 2, outcome: { kind: "walkover", winner: "a" } }], SETS_TO_SIX);
+    expect(rows[0]).toMatchObject({ pairId: 1, points: 3, gamesWon: 12, gamesLost: 0 });
+  });
+
+  it("a sets-to-6 round's ladder ranks its played results", () => {
+    const g: LadderGroupInput = {
+      ...group(1, [
+        played(1, 11, 12, 1, [
+          [6, 4],
+          [7, 6],
+        ]),
+      ]),
+      setGames: SETS_TO_SIX,
+    };
+    const [band] = buildLadder([g], 1, START);
+    expect(band!.groups[0]!.rows[0]).toMatchObject({ pairId: 11, points: 3, gamesWon: 13, gamesLost: 10 });
   });
 });

@@ -1,4 +1,4 @@
-import { flipScore, type MatchScore, type ResultState, type Side } from "@padel-liga/rules";
+import { flipScore, type MatchScore, type ResultState, type SetGames, type Side } from "@padel-liga/rules";
 import { ChevronRight } from "lucide-react";
 import { Form, useNavigation } from "react-router";
 
@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { NOTE_MAX, autoAcceptLine, outcomeText, scoreText } from "~/lib/results";
+import { NOTE_MAX, autoAcceptLine, outcomeText, resultHelp, scoreText } from "~/lib/results";
 import { cn } from "~/lib/utils";
 
 // The result on the match page (#28, D133): record it, correct your own while
@@ -133,6 +133,8 @@ type View = {
   result: ResultState;
   resultActions: { record: boolean; confirm: boolean; dispute: boolean };
   autoAcceptAt: Date | null;
+  // The round's set format (D173, #396).
+  setGames: SetGames;
 };
 
 // The result as it stands (D77): ours waiting, disputed or final. Nothing to do.
@@ -155,7 +157,7 @@ export function ResultStatus({ m }: { m: View }) {
   if (r.status === "final")
     return (
       <p className="text-sm">
-        <span className="font-semibold">Végeredmény:</span> {outcomeText(r.outcome, m.side)}
+        <span className="font-semibold">Végeredmény:</span> {outcomeText(r.outcome, m.side, m.setGames)}
         {r.how === "auto_accepted"
           ? " (48 óra után magától elfogadva)"
           : r.how === "organizer"
@@ -220,9 +222,6 @@ export function ConfirmResult({ m, feedback }: { m: View; feedback: Feedback }) 
   );
 }
 
-export const RESULT_HELP =
-  "Csak a végeredményt írd be: 2 nyert szettig, egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.";
-
 // Recording the result, or correcting ours while it waits (D77). `children`:
 // more fields above the button (the match page's venue, D146).
 export function RecordResult({ m, feedback, children }: { m: View; feedback: Feedback; children?: React.ReactNode }) {
@@ -230,7 +229,7 @@ export function RecordResult({ m, feedback, children }: { m: View; feedback: Fee
   const correcting = m.result.status === "recorded";
   return (
     <Form method="post" className="grid gap-3">
-      <p className="text-sm text-muted-foreground">{RESULT_HELP}</p>
+      <p className="text-sm text-muted-foreground">{resultHelp(m.setGames)}</p>
       <input type="hidden" name="intent" value="result-record" />
       <ScoreFields id="record" columns={["Ti", "Ők"]} />
       {children}

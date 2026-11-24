@@ -74,7 +74,7 @@ function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   for (const p of [1, 2, 3, 4])
@@ -126,6 +126,12 @@ describe("updateElo after a confirmed result (#13)", () => {
         at: sec("2026-11-10T18:00:00Z"),
       })),
     );
+  });
+
+  it("rates a sets-to-6 round's result the same way, only by who won (#396)", async () => {
+    h.raw.exec("update season_phases set set_games = 6 where season_id = 1");
+    await confirmed(1, { sets: [[6, 4], [7, 6]] }, T1);
+    expect([elo("a"), elo("b"), elo("c"), elo("d")]).toEqual([1420, 1420, 1380, 1380]);
   });
 
   it("doesn't change anything for a result only recorded", async () => {

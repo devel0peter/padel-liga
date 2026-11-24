@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SETS_TO_SIX, SHORT_SETS } from "./results";
 import {
   currentElo,
   expectedScore,
@@ -85,19 +86,29 @@ describe("playerK and sideK (spec 11, D104)", () => {
 
 describe("ratedWinner (spec 8, 11)", () => {
   it("rates only a played match, by who won it", () => {
-    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [4, 2]] } })).toBe("a");
-    expect(ratedWinner({ kind: "played", score: { sets: [[1, 4], [2, 4]] } })).toBe("b");
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [4, 2]] } }, SHORT_SETS)).toBe("a");
+    expect(ratedWinner({ kind: "played", score: { sets: [[1, 4], [2, 4]] } }, SHORT_SETS)).toBe("b");
   });
 
   it("decides a 1-1 match by the super tie-break", () => {
-    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [8, 10] } })).toBe("b");
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [8, 10] } }, SHORT_SETS)).toBe("b");
   });
 
   it("doesn't rate a walkover, a both-inactive or an unplayed match, or none at all", () => {
-    expect(ratedWinner({ kind: "walkover", winner: "a" })).toBeNull();
-    expect(ratedWinner({ kind: "both-inactive" })).toBeNull();
-    expect(ratedWinner({ kind: "unplayed" })).toBeNull();
-    expect(ratedWinner(null)).toBeNull();
+    expect(ratedWinner({ kind: "walkover", winner: "a" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "both-inactive" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "unplayed" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner(null, SHORT_SETS)).toBeNull();
+  });
+
+  it("rates a sets-to-6 match the same way, only by who won (#396)", () => {
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [7, 6]] } }, SETS_TO_SIX)).toBe("a");
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [5, 7]], superTieBreak: [9, 11] } }, SETS_TO_SIX)).toBe("b");
+  });
+
+  it("rates nothing for a score its round's format can't produce", () => {
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [6, 3]] } }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 2], [4, 1]] } }, SETS_TO_SIX)).toBeNull();
   });
 });
 

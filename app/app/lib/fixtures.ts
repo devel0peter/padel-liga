@@ -3,11 +3,11 @@
 // for the public league page and the player's Kezdőlap. Pure (no I/O); the
 // loaders hand in what is stored. Names only.
 
-import { DIVISION_NAMES, PHASES_PER_SEASON, divisionOf, type MatchOutcome } from "@padel-liga/rules";
+import { DIVISION_NAMES, PHASES_PER_SEASON, divisionOf, type MatchOutcome, type SetGames } from "@padel-liga/rules";
 
 import { formatSlot } from "./format";
 import { weekRange } from "./groups";
-import { MATCH_LOST_BOTH_TEXT, winnerOf } from "./results";
+import { bothLostText, walkoverScoreText, winnerOf } from "./results";
 
 /**
  * Where a match stands, for lists: "final" counts in the table, "pending" waits
@@ -74,14 +74,14 @@ const stateOf = (m: FixtureInput): FixtureState => {
   }
 };
 
-function noteOf(outcome: MatchOutcome): string | null {
+function noteOf(outcome: MatchOutcome, setGames: SetGames): string | null {
   switch (outcome.kind) {
     case "played":
       return null;
     case "walkover":
-      return "Játék nélküli győzelem (4:0, 4:0)";
+      return `Játék nélküli győzelem (${walkoverScoreText(setGames)})`;
     case "both-inactive":
-      return MATCH_LOST_BOTH_TEXT;
+      return bothLostText(setGames);
     case "unplayed":
       return "Elmaradt, nem számít";
   }
@@ -100,6 +100,8 @@ export function fixtureWeeks(
     phaseStartsAt: Date;
     currentWeek: number | null;
     mine?: number | null;
+    /** The round's set format (D173): a walkover reads 6:0, 6:0 or 4:0, 4:0. */
+    setGames: SetGames;
   },
 ): FixtureWeek[] {
   const byId = new Map(pairs.map((p) => [p.id, p]));
@@ -129,7 +131,7 @@ export function fixtureWeeks(
           sets: played ? played.sets.map(([x, y]) => [x, y] as [number, number]) : null,
           superTieBreak: played?.superTieBreak ? [played.superTieBreak[0], played.superTieBreak[1]] : null,
           winner: m.outcome ? winnerOf(m.outcome) : null,
-          note: m.outcome ? noteOf(m.outcome) : null,
+          note: m.outcome ? noteOf(m.outcome, opts.setGames) : null,
           href: opts.mine != null && (m.a === opts.mine || m.b === opts.mine) ? `/matches/${m.id}` : null,
         };
       }),

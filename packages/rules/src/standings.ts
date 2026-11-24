@@ -4,7 +4,7 @@
 // With 3+ tied, set difference, game difference and Elo apply in order; as soon as only
 // 2 are still tied with each other, head-to-head decides between them.
 
-import { BOTH_INACTIVE_SIDE, type MatchScore, type MatchTotals, type Side, validateScore, walkoverTotals } from "./results";
+import { bothInactiveSide, type MatchScore, type MatchTotals, type SetGames, type Side, validateScore, walkoverTotals } from "./results";
 
 export const POINTS = { win: 3, playedLoss: 1, walkoverLoss: 0, bothInactiveLoss: 0 } as const;
 
@@ -12,7 +12,7 @@ export const POINTS = { win: 3, playedLoss: 1, walkoverLoss: 0, bothInactiveLoss
 export type MatchOutcome =
   | { readonly kind: "played"; readonly score: MatchScore }
   | { readonly kind: "walkover"; readonly winner: Side }
-  /** Neither side active: a 0-4 0-4 loss for both. */
+  /** Neither side active: a 0-4 0-4 (sets to 6: 0-6 0-6) loss for both. */
   | { readonly kind: "both-inactive" }
   /** Both active but no agreement: no points, not in set or game difference. */
   | { readonly kind: "unplayed" };
@@ -62,19 +62,19 @@ interface Tally {
 }
 
 /** What each side of a match gets in the table; null when the match doesn't count. */
-function sideResults(outcome: MatchOutcome): readonly [Tally, Tally] | null {
+function sideResults(outcome: MatchOutcome, setGames: SetGames): readonly [Tally, Tally] | null {
   if (outcome.kind === "unplayed") return null;
   if (outcome.kind === "both-inactive") {
-    const loss: Tally = { points: POINTS.bothInactiveLoss, matches: 1, wins: 0, losses: 1, ...BOTH_INACTIVE_SIDE };
+    const loss: Tally = { points: POINTS.bothInactiveLoss, matches: 1, wins: 0, losses: 1, ...bothInactiveSide(setGames) };
     return [loss, { ...loss }];
   }
   let totals: MatchTotals;
   let loserPoints: number;
   if (outcome.kind === "walkover") {
-    totals = walkoverTotals(outcome.winner);
+    totals = walkoverTotals(outcome.winner, setGames);
     loserPoints = POINTS.walkoverLoss;
   } else {
-    const v = validateScore(outcome.score);
+    const v = validateScore(outcome.score, setGames);
     if (!v.ok) throw new Error(`Invalid match score: ${v.errors.map((e) => e.kind).join(", ")}`);
     totals = v.totals;
     loserPoints = POINTS.playedLoss;
@@ -101,9 +101,10 @@ const emptyTally = (): Tally => ({ points: 0, matches: 0, wins: 0, losses: 0, se
 /**
  * Ranks a group of 3 or 4 pairs (any size works). Pairs should be given in seed order:
  * pairs equal on every rule keep that order. Withdrawn pairs and all their matches are
- * left out; unplayed matches give nothing.
+ * left out; unplayed matches give nothing. `setGames` is the round's set format (D173):
+ * every match of a group is in the same round, so one table never mixes formats.
  */
-export function groupStandings(pairs: readonly StandingPair[], matches: readonly GroupMatch[]): StandingRow[] {
+export function groupStandings(pairs: readonly StandingPair[], matches: readonly GroupMatch[], setGames: SetGames): StandingRow[] {
   const known = new Set(pairs.map((p) => p.id));
   if (known.size !== pairs.length) throw new Error("Duplicate pair id in the group");
   for (const m of matches) {
@@ -117,7 +118,7 @@ export function groupStandings(pairs: readonly StandingPair[], matches: readonly
 
   const tallies = new Map(active.map((p) => [p.id, emptyTally()]));
   for (const m of counted) {
-    const results = sideResults(m.outcome);
+    const results = sideResults(m.outcome, setGames);
     if (!results) continue;
     add(tallies.get(m.a)!, results[0]);
     add(tallies.get(m.b)!, results[1]);
@@ -133,7 +134,7 @@ export function groupStandings(pairs: readonly StandingPair[], matches: readonly
   const directWins = (x: Row, y: Row) =>
     counted.filter((m) => {
       if (!((m.a === x.id && m.b === y.id) || (m.a === y.id && m.b === x.id))) return false;
-      const r = sideResults(m.outcome);
+      const r = sideResults(m.outcome, setGames);
       return r !== null && r[m.a === x.id ? 0 : 1].wins === 1;
     }).length;
 

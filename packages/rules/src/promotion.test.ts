@@ -11,6 +11,7 @@ import {
   switchSizes,
   targetGroup,
 } from "./promotion";
+import { SHORT_SETS } from "./results";
 import { groupStandings, type GroupMatch } from "./standings";
 
 interface Pair {
@@ -124,6 +125,7 @@ describe("promoteAndRelegate (spec 10: 1st up, last down)", () => {
     const table = groupStandings(
       ["A", "B", "C"].map((id) => ({ id, elo: elo[id]! })),
       matches,
+      SHORT_SETS,
     ).map((r) => p(r.id, r.elo));
     const above = [p("X1"), p("X2"), p("X3")];
     expect(ids(promoteAndRelegate([above, table], false))).toEqual([["X1", "X2", "C"], ["X3", "B", "A"]]);

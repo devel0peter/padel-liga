@@ -16,7 +16,7 @@ import {
   type SchedulingEvent,
 } from "@padel-liga/rules";
 
-import { resetStatements, SEED_EMAIL_DOMAIN } from "./seed";
+import { resetStatements, SEED_EMAIL_DOMAIN, seedSetGames } from "./seed";
 import { runningStart, SEASON_GROUPS, seasonElo, seasonPairs, seasonPlan, seasonSeedSql, seasonStatements } from "./seed-season";
 
 // Saturday 2026-11-07 and every other weekday of that week, at two times of day.
@@ -99,7 +99,7 @@ describe("seasonPlan", () => {
 
   it("records only valid scores", () => {
     for (const m of seasonPlan(NOW).matches)
-      for (const e of m.events) if (e.score) expect(validateScore(e.score).ok, `${m.a}-${m.b} ${e.kind}`).toBe(true);
+      for (const e of m.events) if (e.score) expect(validateScore(e.score, seedSetGames(1)).ok, `${m.a}-${m.b} ${e.kind}`).toBe(true);
   });
 });
 

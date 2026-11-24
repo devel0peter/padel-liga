@@ -2,7 +2,7 @@
 // totals of the deadline projection. Pure; the D1 side is
 // deadline-projection.server.ts, the rule packages/rules deadlineDecision.
 
-import type { DeadlineDecision, DeadlineSkip } from "@padel-liga/rules";
+import type { DeadlineDecision, DeadlineSkip, SetGames } from "@padel-liga/rules";
 
 import { neutralOutcomeText } from "./results";
 
@@ -41,11 +41,12 @@ const LEFT_TEXT: Record<Exclude<DeadlineSkip, "final" | "withdrawn">, string> = 
 
 /**
  * The match's line under its status on Meccsek: "Ha most lenne a
- * határidő: Játék nélküli győzelem: Kiss–Nagy (4:0, 4:0)", or why the
+ * határidő: Játék nélküli győzelem: Kiss–Nagy (6:0, 6:0)" (in the round's set
+ * format, D173), or why the
  * deadline leaves it alone; null for a final match (its status says it all).
  */
-export function projectionLine(d: DeadlineDecision, names: { a: string; b: string }): string | null {
-  if (d.kind === "resolve") return `Ha most lenne a határidő: ${neutralOutcomeText(d.resolution.outcome, names)}`;
+export function projectionLine(d: DeadlineDecision, names: { a: string; b: string }, setGames: SetGames): string | null {
+  if (d.kind === "resolve") return `Ha most lenne a határidő: ${neutralOutcomeText(d.resolution.outcome, names, setGames)}`;
   if (d.reason === "final" || d.reason === "withdrawn") return null;
   return `Nem dönt róla a határidő: ${LEFT_TEXT[d.reason]}`;
 }

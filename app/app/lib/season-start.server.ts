@@ -3,7 +3,7 @@
 // is packages/rules firstSeasonStart; this module fixes it in D1 and tells
 // the entered players.
 
-import { addDays, budapestTime, firstSeasonStart, phaseCalendar } from "@padel-liga/rules";
+import { addDays, budapestTime, firstSeasonStart, phaseCalendar, SETS_TO_SIX } from "@padel-liga/rules";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
@@ -55,6 +55,8 @@ export function fixStartStatements(season: Pick<Season, "id" | "breaks">, now: D
           number: sql`${p.number}`,
           startsAt: sql`${Math.floor(p.startsAt.getTime() / 1000)}`,
           deadline: sql`${Math.floor(p.deadline.getTime() / 1000)}`,
+          // A new round plays sets to 6 (D173).
+          setGames: sql`${SETS_TO_SIX}`,
         },
         sql`where exists (select 1 from ${seasons} where ${seasons.id} = ${season.id} and ${seasons.startFixedAt} = ${seconds} and ${seasons.firstPhaseStart} = ${start})
           and not exists (select 1 from ${seasonPhases} where ${seasonPhases.seasonId} = ${season.id} and ${seasonPhases.number} = ${p.number})`,

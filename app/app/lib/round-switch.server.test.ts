@@ -62,7 +62,7 @@ function addSeason(id: number, league = 1) {
     .run(id, league, `Szezon ${id}`, sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (?, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (?, ?, ?, ?, 4)")
       .run(id, i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
 }

@@ -101,7 +101,7 @@ function LeagueBody({ o, entries, wide }: { o: Overview; entries: Entry[]; wide:
     <div className={columns}>
       {o.link && <PairLinkBox url={o.link} bare />}
       <div className="grid content-start gap-4">
-        {o.seeking != null && <PartnerSearchBox leagueId={o.league.id} seeking={o.seeking} bare />}
+        {o.search != null && <PartnerSearchBox leagueId={o.league.id} search={o.search} finder={o.finder} bare />}
         <NoPair />
       </div>
     </div>

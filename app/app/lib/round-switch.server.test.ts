@@ -502,6 +502,11 @@ describe("permanent partner changes at the round switch (#403, D179)", () => {
     const s = (await R.roundSwitch(1, 2, AFTER))!;
     expect(ids(s.draft)[1]).toContain(4);
     expect(s.origins.get(4)).toEqual({ kind: "continuing", group: 1, place: 4 });
+    // Pair 4's row stands for the new pair: its players and its rating (4A haladó 1400, Q kezdő 1000).
+    const placed = s.draft[1]!.find((p) => p.pairId === 4)!;
+    expect(placed.players.map((p) => p.id)).toEqual(["p4a", "q"]);
+    expect(placed.averageElo).toBe(1200);
+    expect(s.changes.get(4)).toEqual({ leaving: "Játékos 4B", partner: "Játékos Q" });
   });
 
   it("two pairs of a group change partners: both keep their spots", async () => {

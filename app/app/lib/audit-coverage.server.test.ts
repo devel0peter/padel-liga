@@ -213,6 +213,26 @@ const STEPS: Step[] = [
     },
   },
   {
+    // The new pair of a final change starts when the organizer publishes the
+    // round switch it starts at (#403): here the start alone, on a round 2
+    // draft that holds the old pair.
+    action: "partner_change.start",
+    actor: ORG,
+    run: async () => {
+      h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('r4', 'r4@x.hu', 'Játékos r4', 'halado', 1)`);
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, starts_phase, created_at) values (1, 1, 3, 'p3a', 'p3b', 'r4', 'final', 2, ?)",
+        )
+        .run(sec("2026-11-10T10:00:00Z"));
+      h.raw.exec(`insert into groups (season_id, phase, number) values (1, 2, 1)`);
+      h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) select id, 3, 1 from groups where phase = 2`);
+      expect(await CHANGES.startChangesAtPublish(1, 2, ORG, IN_PHASE)).toBe(1);
+      // The draft is the fixture's: gone again for the steps after.
+      h.raw.exec(`delete from groups where phase = 2`);
+    },
+  },
+  {
     action: "strike.cancel",
     actor: ORG,
     run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
@@ -282,13 +302,12 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
 // and partner search, joining a league, and a permanent partner change's
-// steps and its start at a round switch publish (#402, #403; their own tests
-// check the entries).
+// steps (#402; their own tests check the entries).
 // RETIRED: written by flows that went with the interest list (#333, D129)
 // and with the organizer's approval of named substitutes (#400, D175);
 // Napló still names their old entries, nothing writes new ones.
 const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join",
-  "partner_change.request", "partner_change.withdraw", "partner_change.accept", "partner_change.decline", "partner_change.start"];
+  "partner_change.request", "partner_change.withdraw", "partner_change.accept", "partner_change.decline"];
 const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send", "substitute.approve", "substitute.reject", "substitute.revoke"];
 
 // Every admin page with an action, and the audit actions its action writes.
@@ -304,7 +323,7 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.outbox.tsx": ["outbox.retry"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
-  "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
+  "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish", "partner_change.start"],
   "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
   "admin.user.tsx": ["user.update", "partner_search.on", "partner_search.off"],

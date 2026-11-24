@@ -347,8 +347,8 @@ export const ROUND_LOOKUP_QUERIES = 1;
 
 // One run drafts at most one switch: the Elo replay, the switch's reads
 // (season 2, groups 2, league, first season, matches, entries, strikes 2,
-// recorded results, no-show reports), the write batch and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
+// recorded results, no-show reports, partner changes #403), the write batch and the job mark.
+export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 13 + 2, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 

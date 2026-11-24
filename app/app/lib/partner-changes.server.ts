@@ -532,6 +532,10 @@ function startStatements(
               joinsPhase: sql`${seasonEntries.joinsPhase}`,
               updatedAt: sql`${sec(now)}`,
               createdAt: sql`${seasonEntries.createdAt}`,
+              // The old pair's opt-out (#395) is not the new pair's.
+              optOutPhase: sql`null`,
+              optedOutBy: sql`null`,
+              optedOutAt: sql`null`,
             },
             sql`from ${seasonEntries} where ${seasonEntries.seasonId} = ${c.seasonId} and ${seasonEntries.pairId} = ${c.pairId} and ${seasonEntries.status} = 'approved'`,
           ),

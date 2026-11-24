@@ -1,5 +1,6 @@
 import { Form, Link, useNavigation } from "react-router";
 
+import { OptOutForm } from "~/components/opt-out-section";
 import { PartnerFinderView } from "~/components/partner-finder";
 import { SeasonEntry } from "~/components/season-entry";
 import { Button } from "~/components/ui/button";
@@ -262,6 +263,16 @@ export function PartnerChangeSection({ card, actionData }: SectionProps) {
   );
 }
 
+/** Default in, and "Nem folytatom" / "Mégis folytatom" until the deadline (#395); nothing when there's nothing to say. */
+export function NextRoundSection({ card }: SectionProps) {
+  if (!card.season || !card.optOut) return null;
+  return (
+    <CardSection title="Következő kör">
+      <OptOutForm seasonId={card.season.id} view={card.optOut} />
+    </CardSection>
+  );
+}
+
 /** The card's sections, in order. A later item adds its section here. */
 export const SECTIONS: React.ComponentType<SectionProps>[] = [
   RoundSection,
@@ -269,6 +280,7 @@ export const SECTIONS: React.ComponentType<SectionProps>[] = [
   FinderSection,
   PartnerChangeSection,
   PlaceSection,
+  NextRoundSection,
   SummarySection,
   OwnSeasonSection,
   LinksSection,

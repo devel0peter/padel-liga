@@ -2,14 +2,18 @@
 // spec 10, D107). Pure, so every rule is unit tested; the D1 side is
 // round-switch.server.ts.
 
+import type { LeaveReason } from "@padel-liga/rules";
+
 import { withArticle } from "./groups";
 
-/** Why a pair of the ending phase is not in the next phase's draft. */
-export type LeaveReason = "withdrawn" | "strikes" | "dissolved" | "taken_out";
+/** Why a pair of the ending phase is not in the next phase's draft (packages/rules leaveReason). */
+export type { LeaveReason };
 
 export const LEAVE_REASONS: Record<LeaveReason, string> = {
   withdrawn: "visszalépett a kör közben",
   strikes: "3 fekete pont",
+  // A player opted out on Ligáim before the deadline (#395).
+  opted_out: "nem folytatja",
   dissolved: "a pár megszűnt",
   taken_out: "kivetted a szezonból",
 };

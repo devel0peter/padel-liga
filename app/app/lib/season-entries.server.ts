@@ -196,6 +196,9 @@ async function enter(
           decidedBy: sql`${decidedBy}`,
           decidedAt: sql`${seconds}`,
           joinsPhase: sql`${phase}`,
+          optOutPhase: sql`null`,
+          optedOutBy: sql`null`,
+          optedOutAt: sql`null`,
           updatedAt: sql`${seconds}`,
           createdAt: sql`unixepoch()`,
         },
@@ -220,6 +223,10 @@ async function enter(
         decidedAt: sql`excluded.decided_at`,
         updatedAt: sql`excluded.updated_at`,
         note: null,
+        // Entered again: default in, an old opt-out (#395) is gone.
+        optOutPhase: null,
+        optedOutBy: null,
+        optedOutAt: null,
       },
       setWhere: eq(seasonEntries.status, "withdrawn"),
     })

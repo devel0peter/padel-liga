@@ -404,7 +404,14 @@
     {
       "idx": 57,
       "version": "6",
-      "when": 1795563551630,
+      "when": 1795561598973,
+      "tag": "0070_season_entry_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1795564290580,
       "tag": "0071_partner_changes",
       "breakpoints": true
     }

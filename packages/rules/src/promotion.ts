@@ -1,6 +1,6 @@
 // The round switch (spec section 10, szabalyzat section 7, #12): promotion
 // and relegation of the continuing pairs, the pairs that leave (withdrawn,
-// a 3rd strike, dissolved, taken out) removed afterwards with the groups
+// a 3rd strike, opted out, dissolved, taken out) removed afterwards with the groups
 // re-cut top-down, then the new pairs placed one by one. Pure: no I/O.
 import { divisionOf } from "./divisions";
 import { seedOrder } from "./groups";
@@ -194,12 +194,55 @@ function fitToPlan<T extends SeedablePair>(groups: T[][], sizes: readonly number
   }
 }
 
+/**
+ * Why a pair of the ending phase is not in the next phase's draft (spec 8,
+ * 10): withdrawn mid-phase (out of the tables already), a 3rd strike, opted
+ * out ("Nem folytatja", #395), dissolved, or taken out of the season.
+ */
+export type LeaveReason = "withdrawn" | "strikes" | "opted_out" | "dissolved" | "taken_out";
+
+/** What decides whether a pair of the final tables leaves at the switch. */
+export interface LeaverFacts {
+  /** Its 3rd strike sends it off after the phase (spec 8). */
+  readonly strikes: boolean;
+  /** A player of the pair opted out of the next phase before the deadline (#395). */
+  readonly optedOut: boolean;
+  /** The pair is still active (not dissolved). */
+  readonly active: boolean;
+  /** Its season entry still counts (not taken out). */
+  readonly entered: boolean;
+}
+
+/**
+ * The reason a pair of the final tables leaves after promotion and
+ * relegation, or null when it plays on (default in, #395): a 3rd strike
+ * first, then an opt-out, then a dissolved pair, then an entry taken out.
+ * An opted-out pair that dissolves after the deadline (to form new pairs)
+ * still leaves as "Nem folytatja".
+ */
+export function leaveReason(f: LeaverFacts): Exclude<LeaveReason, "withdrawn"> | null {
+  if (f.strikes) return "strikes";
+  if (f.optedOut) return "opted_out";
+  if (!f.active) return "dissolved";
+  if (!f.entered) return "taken_out";
+  return null;
+}
+
+/**
+ * Whether an opt-out made in `optOutPhase` (null: none) ends the pair's
+ * season after `endingPhase` (#395): the pair plays the phase it opted out
+ * in to the end and leaves at the switch after it.
+ */
+export function optedOutAfter(optOutPhase: number | null, endingPhase: number): boolean {
+  return optOutPhase !== null && optOutPhase <= endingPhase;
+}
+
 export interface RoundSwitchInput<T extends SeedablePair> {
   /** The ending phase's final tables, top group first, each in table order (withdrawn pairs left out). */
   readonly tables: readonly (readonly T[])[];
   /** Whether this is a fast-calibration switch (isFastSwitch). */
   readonly fast: boolean;
-  /** Pairs of the tables that leave after promotion and relegation: a 3rd strike, dissolved, taken out. */
+  /** Pairs of the tables that leave after promotion and relegation: a 3rd strike, opted out, dissolved, taken out (leaveReason). */
   readonly leaves: (pair: T) => boolean;
   /** New pairs (late entries, re-formed pairs, returning players), in entry order: it breaks rating ties. */
   readonly newPairs: readonly T[];

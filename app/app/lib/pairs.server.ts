@@ -111,6 +111,9 @@ export type LeaguePairRow = {
   lockedIn: number[];
   // The entry in the league's current (or next) season, if any.
   entry: { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null;
+  // That entry's opt-out on Ligáim (#395): the round it ends after, and
+  // whether that round's deadline has passed; null: default in.
+  optOut: { round: number; ended: boolean } | null;
   // "Benevezés" or "Kivétel a szezonból" for an active pair (#154), or none.
   entryAction: OrganizerEntryAction | null;
   // The league's first home season (current or next), so "not entered" can
@@ -180,6 +183,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
             seasonId: seasonEntries.seasonId,
             status: seasonEntries.status,
             joinsPhase: seasonEntries.joinsPhase,
+            optOutPhase: seasonEntries.optOutPhase,
           })
           .from(seasonEntries)
           .where(
@@ -192,6 +196,8 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
   ]);
   return rows.map((r) => {
     const entry = homeEntry(seasons, entries, r.id);
+    const optOutPhase = entry ? (entries.find((e) => e.pairId === r.id && e.seasonId === entry.seasonId)?.optOutPhase ?? null) : null;
+    const optOutEnd = seasons.find((s) => s.id === entry?.seasonId)?.phases.find((p) => p.number === optOutPhase)?.deadline;
     return {
       id: r.id,
       players: [
@@ -204,6 +210,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       locked: locked.has(r.id),
       lockedIn: locked.get(r.id) ?? [],
       entry,
+      optOut: entry?.status === "approved" && optOutPhase !== null ? { round: optOutPhase, ended: !!optOutEnd && optOutEnd < now } : null,
       entryAction: r.status === "active" ? organizerEntryAction(seasons, entry, now) : null,
       season: seasons[0]?.name ?? null,
     };

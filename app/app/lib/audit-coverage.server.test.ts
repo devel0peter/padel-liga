@@ -13,9 +13,6 @@ import { AUDIT_ACTIONS, isSystemAction, type AuditAction } from "~/lib/audit";
 const h = vi.hoisted(() => ({ raw: null as any, sent: [] as any[] }));
 
 vi.mock("cloudflare:workers", () => ({ env: { EMAIL_DAILY_LIMIT: "100" } }));
-// Substitutes are hidden in the first season (D145); their audit entries are
-// covered with the feature on.
-vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => true }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/background.server", () => import("~/test/background"));
 vi.mock("~/lib/email/send.server", () => ({
@@ -44,7 +41,6 @@ const OUTBOX = await import("~/lib/email/outbox.server");
 const DELETION = await import("~/lib/account-deletion.server");
 const DEADLINE = await import("~/lib/deadline.server");
 const STRIKES = await import("~/lib/strikes.server");
-const SUBSTITUTES = await import("~/lib/substitutes.server");
 const NOSHOWS = await import("~/lib/no-shows.server");
 const MATCHES = await import("~/lib/matches.server");
 const AUTOFIX = await import("~/lib/agreed-auto-fix.server");
@@ -156,9 +152,6 @@ const STEPS: Step[] = [
   { action: "groups.draft", actor: ORG, run: () => expectOk(GROUPS.generateDraft(1, ORG)) },
   { action: "groups.move", actor: ORG, run: () => expectOk(GROUPS.moveDraftPair(1, firstPairOfGroup(1), 2, ORG)) },
   { action: "groups.publish", actor: ORG, run: () => expectOk(GROUPS.publishGroups(1, ORG, PUBLISHED)) },
-  { action: "substitute.approve", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "approve", "", IN_PHASE))) },
-  { action: "substitute.revoke", actor: ORG, run: () => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, lastRequest(), "revoke", "Mégsem.", IN_PHASE)) },
-  { action: "substitute.reject", actor: ORG, run: () => substituteRequest().then((id) => expectOk(SUBSTITUTES.decideSubstitute(ORG, 1, id, "reject", "", IN_PHASE))) },
   { action: "match.no_show_confirm", actor: ORG, run: () => noShowReport(3).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "confirm", "", IN_PHASE))) },
   { action: "match.no_show_reject", actor: ORG, run: () => noShowReport(4).then((id) => expectOk(NOSHOWS.decideNoShow(ORG, 1, id, "reject", "", IN_PHASE))) },
   {
@@ -258,15 +251,6 @@ const firstId = () => one("select id from seasons where name like 'Első%'").id 
 const pairOf = (player: string) => one("select id from pairs where player_a = ? order by id desc", player).id as number;
 const firstPairOfGroup = (n: number) => one("select gp.pair_id from group_pairs gp join groups g on g.id = gp.group_id where g.number = ? order by gp.seed", n).pair_id as number;
 const matchIds = () => all("select id from matches order by id").map((r: any) => r.id as number);
-// A player of the third match's first pair asks for q1 (free, no signup)
-// instead of their partner; no entry of its own (a player's step).
-const lastRequest = () => one("select max(id) as id from match_substitutes").id as number;
-async function substituteRequest(): Promise<number> {
-  const id = matchIds()[2]!;
-  const p = one("select p.player_a, p.player_b from matches m join pairs p on p.id = m.pair_a where m.id = ?", id);
-  await expectOk(SUBSTITUTES.requestSubstitute(p.player_a, id, { absentId: p.player_b, substituteId: "q1" }, IN_PHASE));
-  return lastRequest();
-}
 // A player of the nth match's first pair reports, after its agreed slot
 // (PLAYED), that the other pair didn't come; no entry of its own (a player's step).
 async function noShowReport(n: number): Promise<number> {
@@ -283,10 +267,11 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
 // and partner search, and joining a league (their own tests check the entry).
-// RETIRED: written by flows that went with the interest list (#333, D129);
+// RETIRED: written by flows that went with the interest list (#333, D129)
+// and with the organizer's approval of named substitutes (#400, D175);
 // Napló still names their old entries, nothing writes new ones.
 const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
-const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send"];
+const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send", "substitute.approve", "substitute.reject", "substitute.revoke"];
 
 // Every admin page with an action, and the audit actions its action writes.
 const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
@@ -302,7 +287,6 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.outbox.tsx": ["outbox.retry"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
   "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
-  "admin.league-substitutes.tsx": ["substitute.approve", "substitute.reject", "substitute.revoke"],
   "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
   "admin.user.tsx": ["user.update", "partner_search.on", "partner_search.off"],

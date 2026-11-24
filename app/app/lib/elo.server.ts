@@ -1,9 +1,9 @@
-import { currentElo, playedBy, ratedWinner, replayElo, STARTING_ELO, type EloChange, type RatedMatch } from "@padel-liga/rules";
+import { currentElo, ratedWinner, replayElo, STARTING_ELO, type EloChange, type RatedMatch } from "@padel-liga/rules";
 import { and, eq, isNotNull, or, sql } from "drizzle-orm";
 import { alias, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { eloChanges, jobRuns, matchDecisions, matches, matchSubstitutes, pairs, users } from "~/db/schema";
+import { eloChanges, jobRuns, matchAbsences, matchDecisions, matches, pairs, users } from "~/db/schema";
 import { logError, logWarn } from "~/lib/log";
 
 // Player Elo after every played match (#13, spec 11, D104). The ratings are
@@ -26,12 +26,13 @@ const pairB = alias(pairs, "elo_pair_b");
 
 const ratedMatch = and(eq(matches.status, "final"), sql`json_extract(${matches.outcome}, '$.kind') = 'played'`);
 
-// The approved substitute (#37, D109) of a player in the match, or null. An
-// approval can't change once the match has a result (substitutes.ts), so the
-// fingerprint below still covers it.
-const substituteOf = (player: AnySQLiteColumn) =>
-  sql<string | null>`(select ${matchSubstitutes.substituteId} from ${matchSubstitutes}
-    where ${matchSubstitutes.matchId} = ${matches.id} and ${matchSubstitutes.absentId} = ${player} and ${matchSubstitutes.status} = 'approved')`;
+// Whether a player of the match was marked as not playing it (a temporary
+// substitute played instead, #400). A mark can't change once the match is
+// final (before the match on the match page, after it only with a result
+// that isn't final yet: substitutes.server.ts), so the fingerprint below
+// still covers it.
+const absentFrom = (player: AnySQLiteColumn) =>
+  sql<number>`exists (select 1 from ${matchAbsences} where ${matchAbsences.matchId} = ${matches.id} and ${matchAbsences.absentId} = ${player})`;
 
 // A player without a level can't enter (D18), so never in a rated match;
 // should one be, they start as kezdő.
@@ -58,10 +59,10 @@ async function ratedMatches(): Promise<{ match: RatedMatch; at: number }[]> {
       a2: pairA.playerB,
       b1: pairB.playerA,
       b2: pairB.playerB,
-      sa1: substituteOf(pairA.playerA),
-      sa2: substituteOf(pairA.playerB),
-      sb1: substituteOf(pairB.playerA),
-      sb2: substituteOf(pairB.playerB),
+      xa1: absentFrom(pairA.playerA),
+      xa2: absentFrom(pairA.playerB),
+      xb1: absentFrom(pairB.playerA),
+      xb2: absentFrom(pairB.playerB),
       ruledAt: sql<number | null>`(select min(${matchDecisions.at}) from ${matchDecisions} where ${matchDecisions.matchId} = ${matches.id})`,
       confirmedAt: sql<number | null>`(select min(e.at) from match_events e where e.match_id = ${matches.id} and e.kind = 'result_confirmed')`,
     })
@@ -74,18 +75,20 @@ async function ratedMatches(): Promise<{ match: RatedMatch; at: number }[]> {
     const winner = ratedWinner(r.outcome);
     if (!winner) continue;
     const times = [r.ruledAt, r.confirmedAt].filter((t): t is number => t !== null);
-    // The players who actually played: an approved substitute (#37) takes
-    // the absent player's place, whose rating doesn't change (spec 11).
-    const subs = new Map(
+    // A player marked absent (#400): their Elo stands in for the substitute
+    // and doesn't change (spec 11).
+    const absent = (
       [
-        [r.a1, r.sa1],
-        [r.a2, r.sa2],
-        [r.b1, r.sb1],
-        [r.b2, r.sb2],
-      ].filter((e): e is [string, string] => e[1] !== null),
-    );
+        [r.a1, r.xa1],
+        [r.a2, r.xa2],
+        [r.b1, r.xb1],
+        [r.b2, r.xb2],
+      ] as const
+    )
+      .filter(([, x]) => !!x)
+      .map(([id]) => id);
     list.push({
-      match: { id: r.id, a: playedBy([r.a1, r.a2], subs), b: playedBy([r.b1, r.b2], subs), winner },
+      match: { id: r.id, a: [r.a1, r.a2], b: [r.b1, r.b2], winner, ...(absent.length > 0 ? { absent } : {}) },
       at: times.length > 0 ? Math.min(...times) : Infinity,
     });
   }
@@ -123,9 +126,6 @@ async function replayOnce(now: Date): Promise<boolean> {
         isNotNull(users.elo),
         sql`exists (select 1 from ${matches} join ${pairs} on ${pairs.id} in (${matches.pairA}, ${matches.pairB})
           where ${ratedMatch} and ${users.id} in (${pairs.playerA}, ${pairs.playerB}))`,
-        // A substitute who played a rated match (#37).
-        sql`exists (select 1 from ${matchSubstitutes} join ${matches} on ${matches.id} = ${matchSubstitutes.matchId}
-          where ${ratedMatch} and ${matchSubstitutes.status} = 'approved' and ${matchSubstitutes.substituteId} = ${users.id})`,
       ),
     );
   const stored = await db.select().from(eloChanges);

@@ -35,8 +35,8 @@ import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/
 import { parseScore, resultStatusView } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
-import { substituteLine, substitutesEnabled } from "~/lib/substitutes";
-import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
+import { absenceLine } from "~/lib/substitutes";
+import { absencePanel, markAbsence, unmarkAbsence, type AbsencePanel } from "~/lib/substitutes.server";
 import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
 // A match (#25, #26, D133): a summary (state, when, where, score, phones,
@@ -59,10 +59,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const ctx = await loadMatch(matchId(params));
   const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
-  // Substitutes (#37) and no-shows (#33): only for the four players, like the
-  // rest of the page. No substitutes in the first season (D145).
+  // Temporary substitutes (#400) and no-shows (#33): only for the four
+  // players, like the rest of the page.
   const [substitutes, noShow] = await Promise.all([
-    substitutesEnabled() ? substitutePanel(ctx, page.side, user.id, now) : null,
+    absencePanel(ctx, page.side, now, page.resultActions.record),
     noShowPanel(ctx, page.side, user.id, now),
   ]);
   // A fixed time that has started: recording the result becomes the main step (D133).
@@ -106,7 +106,14 @@ export async function action({ request, params }: Route.ActionArgs) {
         ? { kind: "confirm" }
         : intent === "result-record"
           ? // Where it was played: read only while no club is known (D146).
-            { kind: "record", score: parseScore(form, page.side), clubId: clubId(form) ?? null, court: String(form.get("court") ?? "") }
+            {
+              kind: "record",
+              score: parseScore(form, page.side),
+              clubId: clubId(form) ?? null,
+              court: String(form.get("court") ?? ""),
+              // The result form's ticks (#400); a form without them leaves the marks.
+              absent: form.has("absent-part") ? form.getAll("absent").map(String) : undefined,
+            }
           : {
               kind: "dispute",
               score: parseScore(form, page.side),
@@ -118,16 +125,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     return fail(done.error);
   }
 
-  // A substitute for an absent player of the pair (#37, D109); while hidden
-  // (D145) both steps refuse.
-  if (intent === "substitute-request" || intent === "substitute-withdraw") {
-    const done =
-      intent === "substitute-request"
-        ? await requestSubstitute(user.id, id, {
-            absentId: String(form.get("absent") ?? ""),
-            substituteId: String(form.get("substitute") ?? ""),
-          })
-        : await withdrawSubstitute(user.id, id, Number(form.get("request")));
+  // A temporary substitute (#400): a player of the own pair marked as not
+  // playing, or the mark taken back, before the match.
+  if (intent === "absence-mark" || intent === "absence-unmark") {
+    const absentId = String(form.get("absent") ?? "");
+    const done = intent === "absence-mark" ? await markAbsence(user.id, id, absentId) : await unmarkAbsence(user.id, id, absentId);
     if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
     if (done.notFound) throw new Response(NOT_FOUND, { status: 404 });
     return fail(done.error);
@@ -453,100 +455,96 @@ function CancelButton({ late }: { late: boolean }) {
   );
 }
 
-// Helyettes (#37, spec 4, D109): either player of the pair asks for a
-// substitute for an absent player until the match starts; the organizer
-// approves. Approved substitutes show to all four players; the pair's own
-// requests (with the organizer's reason) only to the pair.
-function SubstituteBody({ s, deadline, result }: { s: SubstitutePanel; deadline: Date; result?: ActionResult }) {
+// Helyettes (#400, spec 4, D175): either player of a pair marks a player of
+// their own pair as not playing until the match starts, and anyone plays
+// instead; no name, no approval. All four players see every mark; the own
+// pair can take its marks back until the start.
+function AbsenceBody({ s, deadline, result }: { s: AbsencePanel; deadline: Date; result?: ActionResult }) {
   const busy = useNavigation().state !== "idle";
   return (
     <>
-      {s.approved.length > 0 && (
-        <ul className="grid gap-1 text-sm" aria-label="Jóváhagyott helyettesek">
-          {s.approved.map((a) => (
-            <li key={a.id}>
-              <span className="font-medium">{substituteLine(a)}</span> játszik {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
-            </li>
-          ))}
-        </ul>
-      )}
-      {s.ours.length > 0 && (
-        <ul className="grid gap-2 text-sm" aria-label="Kéréseitek">
-          {s.ours.map((r) => (
-            <li key={r.id} className="grid gap-1 rounded-md border p-3">
-              <span className="break-words">
-                {substituteLine(r)}: <span className="font-medium">{r.label}</span>
-              </span>
-              {r.reason && <span className="break-words text-muted-foreground">A szervező indoklása: {r.reason}</span>}
-              {r.canWithdraw && (
-                <Form method="post">
-                  <input type="hidden" name="intent" value="substitute-withdraw" />
-                  <input type="hidden" name="request" value={r.id} />
-                  <Button type="submit" variant="outline" size="sm" disabled={busy}>
-                    Visszavonom a kérést
-                  </Button>
-                </Form>
-              )}
-            </li>
-          ))}
-        </ul>
+      {s.marked.length > 0 && <AbsenceLines s={s} />}
+      {s.marked.some((a) => a.canUnmark) && (
+        <div className="flex flex-wrap gap-2">
+          {s.marked
+            .filter((a) => a.canUnmark)
+            .map((a) => (
+              <Form key={a.absentId} method="post">
+                <input type="hidden" name="intent" value="absence-unmark" />
+                <input type="hidden" name="absent" value={a.absentId} />
+                <Button type="submit" variant="outline" size="sm" disabled={busy}>
+                  Mégis {a.name} játszik
+                </Button>
+              </Form>
+            ))}
+        </div>
       )}
       {s.form && (
         <Form method="post" className="grid gap-3">
           <p className="text-sm text-muted-foreground">
-            Ha valamelyikőtök nem tud játszani, kérjetek helyettest {s.closesAt.getTime() === deadline.getTime() ? "a határidőig" : "a meccs kezdetéig"}. A
-            szervező hagyja jóvá. A helyettes legyen nagyjából azonos vagy gyengébb szintű, és nem játszhat másik párban a csoportban.
+            Ha valamelyikőtök nem tud játszani, bárki beállhat helyette, jóváhagyás nélkül. Jelöld{" "}
+            {s.closesAt.getTime() === deadline.getTime() ? "a határidőig" : "a meccs kezdetéig"}, hogy ki nem játszik: az ő Élő-pontja nem változik.
           </p>
-          <input type="hidden" name="intent" value="substitute-request" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="substitute-absent">Ki nem tud játszani?</Label>
-              <Select name="absent" defaultValue={s.form.absent.length === 1 ? s.form.absent[0]!.id : undefined} required>
-                <SelectTrigger id="substitute-absent" className="w-full">
-                  <SelectValue placeholder="Válassz" />
-                </SelectTrigger>
-                <SelectContent>
-                  {s.form.absent.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="substitute-player">Ki helyettesít?</Label>
-              {s.form.candidates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Most nincs olyan regisztrált játékos, aki helyettesíthetne.</p>
-              ) : (
-                <Select name="substitute" required>
-                  <SelectTrigger id="substitute-player" className="w-full">
-                    <SelectValue placeholder="Válassz játékost" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {s.form.candidates.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+          <input type="hidden" name="intent" value="absence-mark" />
+          <div className="grid gap-1.5 sm:max-w-xs">
+            <Label htmlFor="absence-player">Ki nem tud játszani?</Label>
+            <Select name="absent" defaultValue={s.form.length === 1 ? s.form[0]!.id : undefined} required>
+              <SelectTrigger id="absence-player" className="w-full">
+                <SelectValue placeholder="Válassz" />
+              </SelectTrigger>
+              <SelectContent>
+                {s.form.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-xs text-muted-foreground">Csak regisztrált játékost választhatsz. Ha nincs a listán, előbb regisztráljon.</p>
-          <Feedback result={result} intent="substitute-request" />
+          <Feedback result={result} intent="absence-mark" />
           <div>
-            <Button type="submit" variant="outline" disabled={busy || s.form.candidates.length === 0}>
-              Helyettest kérek
+            <Button type="submit" variant="outline" disabled={busy}>
+              Helyettes jön helyette
             </Button>
           </div>
         </Form>
       )}
-      <Feedback result={result} intent="substitute-withdraw" />
+      <Feedback result={result} intent="absence-unmark" />
     </>
   );
 }
+
+// Who doesn't (or didn't) play, for all four players (#400).
+function AbsenceLines({ s }: { s: AbsencePanel }) {
+  return (
+    <ul className="grid gap-1 text-sm" aria-label="Helyettesek">
+      {s.marked.map((a) => (
+        <li key={a.absentId} className="break-words">
+          <span className="font-medium">{absenceLine(a.name, a.afterMatch || !s.open)}</span> {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// "Helyettes játszott?" on the result form (#400): after a sudden injury, the
+// recording pair ticks who of them didn't play; a correction can change it.
+function AbsenceTicks({ players }: { players: NonNullable<AbsencePanel["resultForm"]> }) {
+  return (
+    <fieldset className="grid gap-2 rounded-lg border p-3">
+      <legend className="px-1 text-sm font-semibold">Helyettes játszott valamelyikőtök helyett?</legend>
+      <input type="hidden" name="absent-part" value="1" />
+      {players.map((p) => (
+        <label key={p.id} className="flex min-h-11 items-center gap-3 text-sm">
+          <input type="checkbox" name="absent" value={p.id} defaultChecked={p.marked} className="size-5 accent-nav-active" />
+          {p.name} nem játszott, helyettes állt be
+        </label>
+      ))}
+      <p className="text-xs text-muted-foreground">Bárki lehetett. Az ő Élő-pontja nem változik, az ellenfél az eredménnyel együtt ezt is megerősíti.</p>
+    </fieldset>
+  );
+}
+
 
 // Nem jöttek el (#33, spec 8, D108): after the agreed slot's start a player
 // of the pair that showed up reports it; the organizer confirms (4-0 4-0 and
@@ -703,7 +701,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   const talk = m.actions.propose && !!m.message && m.message.to.length > 0;
   const agreedOpen = m.actions.recordAgreed && !theirs && m.state.status !== "agreed_time";
   const subs = m.substitutes;
-  const substitutesShown = !!subs && (subs.approved.length > 0 || subs.ours.length > 0);
+  const substitutesShown = subs.marked.length > 0;
+  // Who didn't play, ticked on the result form (#400).
+  const ticks = subs.resultForm ? <AbsenceTicks players={subs.resultForm} /> : null;
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
 
   return (
@@ -764,6 +764,8 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               className="grid max-w-2xl scroll-mt-20 gap-3 rounded-xl border border-nav-active bg-card p-4 ring-1 ring-nav-active/30 sm:p-5"
             >
               <h2 className="sr-only">Eredmény</h2>
+              {/* Confirmed together with who didn't play (#400). */}
+              {substitutesShown && <AbsenceLines s={subs} />}
               <ConfirmResult key={`r${keyed}`} m={m} feedback={result} />
             </section>
           )}
@@ -779,6 +781,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main">
               <RecordResult key={`r${keyed}`} m={m} feedback={result}>
                 {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+                {ticks}
               </RecordResult>
             </Panel>
           )}
@@ -871,9 +874,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Panel>
           )}
 
-          {subs && substitutesShown && (
+          {substitutesShown && (
             <Panel title="Helyettes">
-              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
+              <AbsenceBody key={`s${subs.marked.length}`} s={subs} deadline={m.deadline} result={result} />
             </Panel>
           )}
 
@@ -909,6 +912,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             >
               <RecordResult key={`r${keyed}`} m={m} feedback={result}>
                 {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+                {ticks}
               </RecordResult>
             </Fold>
           )}
@@ -925,9 +929,9 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Fold>
           )}
 
-          {subs?.form && !substitutesShown && (
-            <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani." open={failed("substitute-request")}>
-              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
+          {subs.form && !substitutesShown && (
+            <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani, bárki beállhat." open={failed("absence-mark")}>
+              <AbsenceBody key={`s${subs.marked.length}`} s={subs} deadline={m.deadline} result={result} />
             </Fold>
           )}
 

@@ -219,12 +219,11 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     expect(page!.result).toMatchObject({ status: "final", how: "organizer" });
   });
 
-  it("confirming gives the absent pair's two players a strike with source no_show, never a substitute", async () => {
+  it("confirming gives the absent pair's two players a strike with source no_show, also one marked absent (#400)", async () => {
     const { id, report } = await reported();
-    // An approved substitute stood in for p3b.
-    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'Helyettes', 'halado', 1)`);
+    // A temporary substitute was to stand in for p3b.
     h.raw
-      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (?, 3, 'p3b', 's', 'approved', ?)")
+      .prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 3, 'p3b', 'p3a', ?)")
       .run(id, sec(NOW.toISOString()));
     await N.decideNoShow("o", 1, report, "confirm", "Az ellenfél is megerősítette.", at("2026-11-13", 9));
     expect(all("select user_id, pair_id, source, match_id, season_id from strikes order by user_id")).toEqual([

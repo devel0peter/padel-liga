@@ -1,16 +1,13 @@
-// Substitutes (#37, spec 4, D109) on a real SQLite with every migration
-// applied (~/test/sqlite): asking from the match page, who may stand in, the
-// organizer's approval, rejection and revocation (audited, D91), the notices
-// (in the app only here: no VAPID keys, no email), and Elo from who actually
-// played (spec 11). Email is stubbed; nothing here sends any.
+// Temporary substitutes (#400, spec 4, D175) on a real SQLite with every
+// migration applied (~/test/sqlite): a player marked as not playing before
+// the match on the match page or after it on the result form, the notices
+// (in the app only here: no VAPID keys, no email), and Elo (spec 11: the
+// absent player's doesn't change). Email is stubbed; nothing here sends any.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// `subs`: the feature is hidden in the first season (D145); these tests drive
-// it switched on, one checks it refuses while off.
-const h = vi.hoisted(() => ({ raw: null as any, subs: true }));
+const h = vi.hoisted(() => ({ raw: null as any }));
 
 vi.mock("cloudflare:workers", () => ({ env: {} }));
-vi.mock("~/lib/substitutes", async (original) => ({ ...(await original<typeof import("~/lib/substitutes")>()), substitutesEnabled: () => h.subs }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/email/outbox.server", () => ({
   queueSeasonEntered: async () => {},
@@ -23,7 +20,7 @@ const { migratedDatabase } = await import("~/test/sqlite");
 const S = await import("~/lib/substitutes.server");
 const M = await import("~/lib/matches.server");
 const R = await import("~/lib/results.server");
-const { SUBSTITUTE_REFUSALS } = await import("~/lib/substitutes");
+const { ABSENCE_REFUSALS } = await import("~/lib/substitutes");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const at = (iso: string) => new Date(iso);
@@ -36,10 +33,8 @@ const AFTER = at("2026-11-12T20:00:00Z");
 const WIN_A = { sets: [[4, 1], [4, 2]] } as const;
 
 // League 1 (Győr), group 1: pairs 1 (a–b), 2 (c–d), 3 (e–f), 4 (g–h).
-// Match 1: pair 1 – pair 2, open. Outsiders who joined league 1 (D128): s
-// (kezdő), t, x (first login not done); w joined league 2 only; z (deleted).
-// o: the Szervező, adm: an Admin, q: Szervező of league 2; all three joined
-// league 1 too.
+// Match 1: pair 1 – pair 2, open; match 2: pair 3 – pair 4. o: the
+// Szervező, adm: an Admin (they decide nothing here: no approval, #400).
 function freshDb() {
   h.raw = migratedDatabase();
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1), ('budapest', 'Budapest', 1)`);
@@ -66,289 +61,158 @@ function freshDb() {
 }
 
 beforeEach(() => {
-  h.subs = true;
   freshDb();
 });
 
 const one = (q: string, ...p: unknown[]) => h.raw.prepare(q).get(...p);
 const all = (q: string, ...p: unknown[]) => h.raw.prepare(q).all(...p);
 const notices = (kind: string) => all("select user_id, title, body, url from notifications where kind = ? order by user_id", kind) as any[];
-const requestId = () => (one("select max(id) id from match_substitutes") as { id: number }).id;
+const marks = () => all("select match_id, pair_id, absent_id, marked_by, after_match from match_absences order by id") as any[];
 
-async function panel(userId: string, now = NOW) {
+async function panel(userId: string, now = NOW, canRecord = false) {
   const ctx = (await M.loadMatch(1))!;
-  return S.substitutePanel(ctx, M.sideOf(ctx, userId)!, userId, now);
+  return S.absencePanel(ctx, M.sideOf(ctx, userId)!, now, canRecord);
 }
 
-async function asked(absentId = "b", substituteId = "s", by = "a") {
-  expect(await S.requestSubstitute(by, 1, { absentId, substituteId }, NOW)).toMatchObject({ ok: true });
-  return requestId();
-}
+const elo = (id: string) => (one("select elo from users where id = ?", id) as { elo: number | null }).elo;
 
-describe("asking for a substitute (#37 requirement 1)", () => {
-  it("saves the request and tells the league's Szervező and the Admins, never the asker", async () => {
-    await asked();
-    expect(one("select pair_id, absent_id, substitute_id, status, requested_by from match_substitutes")).toEqual({
-      pair_id: 1,
-      absent_id: "b",
-      substitute_id: "s",
-      status: "requested",
-      requested_by: "a",
-    });
-    expect(notices("substitute_requested").map((n) => n.user_id)).toEqual(["adm", "o"]);
-    expect(notices("substitute_requested")[0]).toMatchObject({ url: "/admin/leagues/gyor/substitutes" });
-    // No names in the organizers' notice.
-    expect(JSON.stringify(notices("substitute_requested"))).not.toMatch(/Játékos/);
+describe("marking a player as not playing before the match (#400)", () => {
+  it("marks a player of the own pair, no name and no approval; the other three are told", async () => {
+    expect(await S.markAbsence("a", 1, "b", NOW)).toEqual({ ok: true, notice: "Rendben, helyettes jön helyette. A többiek is látják." });
+    expect(marks()).toEqual([{ match_id: 1, pair_id: 1, absent_id: "b", marked_by: "a", after_match: 0 }]);
+    const told = notices("absence_marked");
+    expect(told.map((n) => n.user_id)).toEqual(["b", "c", "d"]);
+    expect(told[0]).toMatchObject({ body: "Játékos B helyett helyettes játszik a meccseteken.", url: "/matches/1" });
+    // Nothing for the organizers: there is nothing to approve.
+    expect(all("select * from notifications where user_id in ('o', 'adm')")).toEqual([]);
+    expect(all("select * from audit_log")).toEqual([]);
   });
 
-  it("leaves out a Szervező who asks for their own pair", async () => {
-    h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'a')`);
-    await asked();
-    expect(notices("substitute_requested").map((n) => n.user_id)).toEqual(["adm", "o"]);
+  it("shows every mark to all four players; only the own pair can take it back", async () => {
+    await S.markAbsence("a", 1, "b", NOW);
+    expect((await panel("c")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: false, canUnmark: false }]);
+    expect((await panel("a")).marked).toEqual([{ pairId: 1, absentId: "b", name: "Játékos B", afterMatch: false, ours: true, canUnmark: true }]);
+    expect((await panel("a")).form).toEqual([{ id: "a", name: "Játékos A" }]);
+    expect((await panel("c")).form).toEqual([
+      { id: "c", name: "Játékos C" },
+      { id: "d", name: "Játékos D" },
+    ]);
   });
 
-  it("offers the league's registered players, minus the group's players, by name only", async () => {
-    const p = await panel("a");
-    expect(p.open).toBe(true);
-    expect(p.form!.absent.map((x) => x.id)).toEqual(["a", "b"]);
-    const ids = p.form!.candidates.map((c) => c.id);
-    // s and t and the staff (joined league 1, D128); never the group's
-    // players, w (league 2 only), x (not registered) or z (deleted).
-    expect(ids).toEqual(expect.arrayContaining(["s", "t", "o", "adm", "q"]));
-    for (const id of ["a", "b", "c", "d", "e", "f", "g", "h", "w", "x", "z"]) expect(ids).not.toContain(id);
-    expect(Object.keys(p.form!.candidates[0]!).sort()).toEqual(["id", "name"]);
-  });
-
-  it("offers a player of a pair withdrawn from the group", async () => {
-    h.raw.exec(`update group_pairs set withdrawn_at = 1 where pair_id = 3`);
-    expect((await panel("a")).form!.candidates.map((c) => c.id)).toEqual(expect.arrayContaining(["e", "f"]));
-    await asked("b", "e");
-  });
-
-  it("refuses a player of the same group (#37 acceptance)", async () => {
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "e" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.group_player });
-  });
-
-  it("refuses one of the four players", async () => {
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "c" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.match_player });
-  });
-
-  it("refuses an account that isn't a registered player of the league", async () => {
-    for (const id of ["x", "z", "w", "nobody"])
-      expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: id }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_registered });
-  });
-
-  it("refuses an absent player of the other pair", async () => {
-    expect(await S.requestSubstitute("a", 1, { absentId: "c", substituteId: "s" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_absent });
-  });
-
-  it("allows one live substitute per absent player, and the same substitute once a match", async () => {
-    await asked("b", "s");
-    expect(await S.requestSubstitute("b", 1, { absentId: "b", substituteId: "t" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.already });
-    expect(await S.requestSubstitute("c", 1, { absentId: "d", substituteId: "s" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.taken });
-    // Both players of a pair may be replaced.
-    await asked("a", "t", "a");
+  it("lets both players of a pair be marked, a player mark themself, but not twice", async () => {
+    await S.markAbsence("a", 1, "a", NOW);
+    expect(await S.markAbsence("b", 1, "a", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.already });
+    expect(await S.markAbsence("b", 1, "b", NOW)).toMatchObject({ ok: true });
     expect((await panel("a")).form).toBeNull();
   });
 
-  it("closes at the agreed start, or at the deadline without one", async () => {
-    h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = 1").run(sec(SLOT.toISOString()));
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "s" }, SLOT)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.closed });
-    expect((await panel("a", SLOT)).form).toBeNull();
-    h.raw.exec("update matches set status = 'open', scheduled_at = null where id = 1");
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "s" }, new Date(DEADLINE * 1000))).toMatchObject({ ok: false });
-    await asked();
+  it("refuses a player of the other pair, and anyone outside the match", async () => {
+    expect(await S.markAbsence("a", 1, "c", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.not_own });
+    expect(await S.markAbsence("e", 1, "e", NOW)).toMatchObject({ ok: false, notFound: true });
   });
 
-  it("closes once a result is recorded", async () => {
+  it("closes at the agreed start, or the deadline without one, and once a result is recorded", async () => {
+    h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = 1").run(sec(SLOT.toISOString()));
+    expect(await S.markAbsence("a", 1, "b", SLOT)).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
+    expect((await panel("a", SLOT)).form).toBeNull();
+    h.raw.exec("update matches set status = 'open', scheduled_at = null where id = 1");
+    expect(await S.markAbsence("a", 1, "b", new Date(DEADLINE * 1000))).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
     expect(await R.resultStep("a", 1, { kind: "record", score: WIN_A } as any, NOW)).toMatchObject({ ok: true });
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "s" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.closed });
+    expect(await S.markAbsence("a", 1, "b", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
   });
 
   it("is closed on a withdrawn pair's match", async () => {
     h.raw.exec(`update group_pairs set withdrawn_at = 1 where pair_id = 2`);
-    expect(await S.requestSubstitute("a", 1, { absentId: "b", substituteId: "s" }, NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.closed });
+    expect(await S.markAbsence("a", 1, "b", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
   });
 
-  it("answers anyone else with not found", async () => {
-    expect(await S.requestSubstitute("e", 1, { absentId: "e", substituteId: "s" }, NOW)).toMatchObject({ ok: false, notFound: true });
-  });
-
-  it("names a person once per match even when two requests race (unique index)", async () => {
-    await asked("b", "s");
-    expect(() =>
-      h.raw.exec("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (1, 2, 'd', 's', 'requested', 1)"),
-    ).toThrow(/UNIQUE constraint failed: match_substitutes/);
-    // A rejected or withdrawn one doesn't hold the name.
-    h.raw.exec("update match_substitutes set status = 'withdrawn'");
-    await asked("d", "s", "c");
-  });
-
-  it("lets only the asker withdraw it, while it waits", async () => {
-    const id = await asked();
-    expect(await S.withdrawSubstitute("b", 1, id)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_requester });
-    expect((await panel("b")).ours[0]!.canWithdraw).toBe(false);
-    expect((await panel("a")).ours[0]!.canWithdraw).toBe(true);
-    expect(await S.withdrawSubstitute("a", 1, id)).toMatchObject({ ok: true });
-    expect(one("select status from match_substitutes")).toEqual({ status: "withdrawn" });
-    // The player can be asked for again.
-    await asked();
-  });
-});
-
-describe("hidden in the first season (D145)", () => {
-  it("refuses asking and withdrawing while off, and writes nothing", async () => {
-    const id = await asked();
-    h.subs = false;
-    const { SUBSTITUTES_OFF } = await import("~/lib/substitutes");
-    expect(await S.requestSubstitute("c", 1, { absentId: "d", substituteId: "t" }, NOW)).toEqual({ ok: false, error: SUBSTITUTES_OFF });
-    expect(await S.withdrawSubstitute("a", 1, id)).toEqual({ ok: false, error: SUBSTITUTES_OFF });
-    expect(all("select absent_id, status from match_substitutes")).toEqual([{ absent_id: "b", status: "requested" }]);
-    // Anyone else still gets not found.
-    expect(await S.requestSubstitute("x", 1, { absentId: "b", substituteId: "s" }, NOW)).toMatchObject({ ok: false, notFound: true });
-  });
-
-  it("is off in the code (no request from the match page this season)", async () => {
-    const { SUBSTITUTES_ENABLED } = await import("~/lib/substitutes");
-    expect(SUBSTITUTES_ENABLED).toBe(false);
-  });
-});
-
-describe("the organizer's list (#37 requirement 2)", () => {
-  it("shows waiting requests with both players' current Elo side by side", async () => {
-    h.raw.exec("update users set elo = 1450.25 where id = 'b'");
-    await asked();
-    const { waiting, approved } = await S.leagueSubstitutes(1, NOW);
-    expect(approved).toEqual([]);
-    expect(waiting).toEqual([
-      expect.objectContaining({
-        matchId: 1,
-        pair: "Játékos A – Játékos B",
-        opponents: "Játékos C – Játékos D",
-        absent: { id: expect.any(String), name: "Játékos B", elo: 1450.25 },
-        substitute: { id: expect.any(String), name: "Játékos S", elo: 1000 },
-        week: 1,
-        groupNumber: 1,
-      }),
-    ]);
-    expect(JSON.stringify(waiting)).not.toMatch(/@/);
-    expect((await S.leagueSubstitutes(2, NOW)).waiting).toEqual([]);
-  });
-
-  it("leaves out lapsed requests and a withdrawn pair's matches", async () => {
-    await asked();
-    expect((await S.leagueSubstitutes(1, new Date(DEADLINE * 1000 + 1000))).waiting).toEqual([]);
-    h.raw.exec(`update group_pairs set withdrawn_at = 1 where pair_id = 2`);
-    expect((await S.leagueSubstitutes(1, NOW)).waiting).toEqual([]);
-  });
-});
-
-describe("approving, rejecting and revoking (#37 requirement 2, D91)", () => {
-  it("approves: audited, the pair and the opponents told, every player of the match sees it", async () => {
-    const id = await asked();
-    expect(await S.decideSubstitute("o", 1, id, "approve", "", NOW)).toMatchObject({ ok: true });
-    expect(one("select status, decided_by from match_substitutes")).toEqual({ status: "approved", decided_by: "o" });
-    expect(all("select actor_id, action, target, detail, league_id from audit_log")).toEqual([
-      { actor_id: "o", action: "substitute.approve", target: "match:1", detail: "user:b -> user:s", league_id: 1 },
-    ]);
-    const told = notices("substitute_approved");
-    expect(told.map((n) => n.user_id)).toEqual(["a", "b", "c", "d"]);
-    expect(told.find((n) => n.user_id === "a").title).toBe("Jóváhagyták a helyettest");
-    expect(told.find((n) => n.user_id === "c").body).toBe("Játékos B helyett Játékos S játszik a meccseteken.");
-    // The substitute gets nothing (D109).
-    expect(all("select * from notifications where user_id = 's'")).toEqual([]);
-    expect((await panel("c")).approved).toEqual([{ id, ours: false, absent: "Játékos B", substitute: "Játékos S" }]);
-    expect((await panel("a")).approved).toEqual([{ id, ours: true, absent: "Játékos B", substitute: "Játékos S" }]);
-    // The opponents don't see the other pair's requests themselves.
-    expect((await panel("c")).ours).toEqual([]);
-    // Nor the asking pair twice: the approval is listed once, in `approved`.
-    expect((await panel("a")).ours).toEqual([]);
-    expect((await S.leagueSubstitutes(1, NOW)).approved).toHaveLength(1);
-  });
-
-  it("checks the substitute again at approval", async () => {
-    const id = await asked();
-    h.raw.exec("update users set deleted_at = 1 where id = 's'");
-    expect(await S.decideSubstitute("o", 1, id, "approve", "", NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_registered });
-    expect(all("select * from audit_log")).toEqual([]);
-  });
-
-  it("refuses to approve after the start", async () => {
-    const id = await asked();
+  it("is taken back by either player of the pair before the start, telling the other three", async () => {
+    await S.markAbsence("a", 1, "b", NOW);
+    expect(await S.unmarkAbsence("c", 1, "b", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.not_own });
+    expect(await S.unmarkAbsence("b", 1, "b", NOW)).toMatchObject({ ok: true });
+    expect(marks()).toEqual([]);
+    expect(notices("absence_marked").find((n) => n.user_id === "c" && /Mégis/.test(n.body)).body).toBe("Mégis Játékos B játszik a meccseteken.");
+    expect(await S.unmarkAbsence("a", 1, "b", NOW)).toEqual({ ok: false, error: ABSENCE_REFUSALS.not_marked });
+    await S.markAbsence("a", 1, "b", NOW);
     h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = 1").run(sec(SLOT.toISOString()));
-    expect(await S.decideSubstitute("o", 1, id, "approve", "", SLOT)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.closed });
+    expect(await S.unmarkAbsence("a", 1, "b", AFTER)).toEqual({ ok: false, error: ABSENCE_REFUSALS.closed });
   });
 
-  it("rejects with a reason: only the asking pair is told; the reason is on their match page", async () => {
-    const id = await asked();
-    expect(await S.decideSubstitute("o", 1, id, "reject", "  Túl erős helyettes.  ", NOW)).toMatchObject({ ok: true });
-    expect(one("select status, reason from match_substitutes")).toEqual({ status: "rejected", reason: "Túl erős helyettes." });
-    expect(notices("substitute_rejected").map((n) => n.user_id)).toEqual(["a", "b"]);
-    expect(JSON.stringify(notices("substitute_rejected"))).not.toMatch(/Túl erős/);
-    expect((await panel("b")).ours[0]).toMatchObject({ status: "rejected", reason: "Túl erős helyettes.", label: "Elutasítva" });
-    expect(all("select action from audit_log")).toEqual([{ action: "substitute.reject" }]);
-    // A new request for the same player is possible.
-    await asked("b", "t");
-  });
-
-  it("refuses a reason over 300 characters", async () => {
-    const id = await asked();
-    expect(await S.decideSubstitute("o", 1, id, "reject", "x".repeat(301), NOW)).toMatchObject({ ok: false });
-  });
-
-  it("revokes an approval before the start, telling both pairs; not after", async () => {
-    const id = await asked();
-    await S.decideSubstitute("o", 1, id, "approve", "", NOW);
-    expect(await S.decideSubstitute("o", 1, id, "revoke", "", NOW)).toMatchObject({ ok: true });
-    expect(notices("substitute_revoked").map((n) => n.user_id)).toEqual(["a", "b", "c", "d"]);
-    expect(all("select action from audit_log order by id")).toEqual([{ action: "substitute.approve" }, { action: "substitute.revoke" }]);
-    expect((await panel("c")).approved).toEqual([]);
-
-    await asked("b", "t");
-    const again = requestId();
-    await S.decideSubstitute("o", 1, again, "approve", "", NOW);
-    h.raw.prepare("update matches set status = 'scheduled', scheduled_at = ? where id = 1").run(sec(SLOT.toISOString()));
-    expect(await S.decideSubstitute("o", 1, again, "revoke", "", AFTER)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.closed });
-  });
-
-  it("finds nothing for another league's organizer route", async () => {
-    const id = await asked();
-    expect(await S.decideSubstitute("q", 2, id, "approve", "", NOW)).toMatchObject({ ok: false, notFound: true });
-    expect(one("select status from match_substitutes")).toEqual({ status: "requested" });
-  });
-
-  it("won't decide twice", async () => {
-    const id = await asked();
-    await S.decideSubstitute("o", 1, id, "reject", "", NOW);
-    expect(await S.decideSubstitute("o", 1, id, "approve", "", NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_requested });
-    expect(await S.decideSubstitute("o", 1, id, "revoke", "", NOW)).toEqual({ ok: false, error: SUBSTITUTE_REFUSALS.not_approved });
+  it("marks one player on one match on its own (#402 reuses it), once", async () => {
+    const { revision } = one("select revision from matches where id = 1") as { revision: number };
+    const input = { matchId: 1, revision, pairId: 1, absentId: "b", markedBy: null, afterMatch: false, now: NOW };
+    expect(await S.markAbsent(input)).toBe(true);
+    expect(await S.markAbsent(input)).toBe(false);
+    // Not on a match that moved on since it was read.
+    expect(await S.markAbsent({ ...input, absentId: "a", revision: revision + 1 })).toBe(false);
+    expect(marks()).toEqual([{ match_id: 1, pair_id: 1, absent_id: "b", marked_by: null, after_match: 0 }]);
   });
 });
 
-describe("Elo from who actually played (#37 requirement 4, spec 11)", () => {
-  const elo = (id: string) => (one("select elo from users where id = ?", id) as { elo: number | null }).elo;
+describe("marked on the result form after the match (#400: a sudden injury)", () => {
+  const record = (absent: string[] | undefined, by = "a") => R.resultStep(by, 1, { kind: "record", score: WIN_A, absent } as any, AFTER);
+  const status = () => (one("select status from matches where id = 1") as { status: string }).status;
 
-  async function play() {
-    expect(await R.resultStep("a", 1, { kind: "record", score: WIN_A } as any, AFTER)).toMatchObject({ ok: true });
+  it("offers the recording pair its two players as ticks, ticked if marked", async () => {
+    await S.markAbsence("a", 1, "b", NOW);
+    expect((await panel("a", AFTER, true)).resultForm).toEqual([
+      { id: "a", name: "Játékos A", marked: false },
+      { id: "b", name: "Játékos B", marked: true },
+    ]);
+    expect((await panel("a", AFTER, false)).resultForm).toBeNull();
+  });
+
+  it("goes in with the result; the opponents see it and confirm it with the result", async () => {
+    expect(await record(["b"])).toMatchObject({ ok: true });
+    expect(marks()).toEqual([{ match_id: 1, pair_id: 1, absent_id: "b", marked_by: "a", after_match: 1 }]);
+    const told = notices("absence_marked");
+    expect(told.map((n) => n.user_id)).toEqual(["b", "c", "d"]);
+    expect(told[1].body).toBe("Játékos B helyett helyettes játszott a meccseteken. Az eredménnyel együtt ezt is megerősítitek.");
+    expect((await panel("c", AFTER)).marked).toEqual([expect.objectContaining({ name: "Játékos B", afterMatch: true, ours: false })]);
     expect(await R.resultStep("c", 1, { kind: "confirm" }, AFTER)).toMatchObject({ ok: true });
-  }
-
-  it("changes the approved substitute's rating; the absent player's doesn't (#37 acceptance)", async () => {
-    const id = await asked();
-    await S.decideSubstitute("o", 1, id, "approve", "", NOW);
-    await play();
-    expect(elo("b")).toBeNull();
-    expect(elo("s")).toBeGreaterThan(1000);
-    expect(elo("a")).toBeGreaterThan(1400);
-    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "c", "d", "s"].map((user_id) => ({ user_id })));
+    expect(status()).toBe("final");
   });
 
-  it("ignores a request that was never approved, rejected or revoked", async () => {
-    await asked("b", "s");
-    const rejected = await asked("a", "t");
-    await S.decideSubstitute("o", 1, rejected, "reject", "", NOW);
-    await play();
-    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "b", "c", "d"].map((user_id) => ({ user_id })));
-    expect(elo("s")).toBeNull();
+  it("leaves the absent player's Élő-pont alone; the other three are rated as usual", async () => {
+    await record(["b"]);
+    await R.resultStep("c", 1, { kind: "confirm" }, AFTER);
+    expect(elo("b")).toBeNull();
+    expect(elo("a")).toBeGreaterThan(1400);
+    expect(elo("c")).toBeLessThan(1400);
+    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "c", "d"].map((user_id) => ({ user_id })));
+  });
+
+  it("does the same for a mark from before the match, also once auto-accepted after 48 hours", async () => {
+    await S.markAbsence("c", 1, "d", NOW);
+    await record(undefined);
+    expect(await R.autoAcceptResults(new Date(AFTER.getTime() + 49 * 3600_000))).toBe(1);
+    expect(elo("d")).toBeNull();
+    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "b", "c"].map((user_id) => ({ user_id })));
+  });
+
+  it("is set exactly by a correction: added, changed, or dropped; a form without ticks leaves it", async () => {
+    await record(["b"]);
+    await record(["a"]);
+    expect(marks().map((m) => m.absent_id)).toEqual(["a"]);
+    await record([]);
+    expect(marks()).toEqual([]);
+    await record(["b"]);
+    await record(undefined);
+    expect(marks().map((m) => m.absent_id)).toEqual(["b"]);
+  });
+
+  it("can drop a mark from before the match when the player played after all", async () => {
+    await S.markAbsence("a", 1, "b", NOW);
+    await record([]);
+    expect(marks()).toEqual([]);
+  });
+
+  it("only touches the recording pair's own players", async () => {
+    await S.markAbsence("c", 1, "d", NOW);
+    await record(["c", "b"]);
+    expect(marks().map((m) => [m.pair_id, m.absent_id])).toEqual([
+      [2, "d"],
+      [1, "b"],
+    ]);
   });
 });

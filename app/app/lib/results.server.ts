@@ -26,6 +26,7 @@ import { chunks, resultOf, resultsOf, toResultEvent, toRuling, type MatchResults
 import { neutralScoreText, NOTE_MAX, scoreText } from "./results";
 import { logError } from "~/lib/log";
 import { updateElo } from "./elo.server";
+import { absenceLostRace, resultAbsenceSteps, tellResultAbsences } from "./substitutes.server";
 
 // Recording a result, confirming or disputing it (#28), and the 48-hour
 // auto-accept run by the cron. The rules are in packages/rules
@@ -34,9 +35,11 @@ import { updateElo } from "./elo.server";
 // mirrored on the match (status, outcome) for lists and the standings.
 
 // `clubId`/`court`: where it was played, asked only while the match has no
-// club (D146); ignored once it has one.
+// club (D146); ignored once it has one. `absent`: the recording pair's
+// players a temporary substitute played instead of (#400), exactly; left
+// out (the form had no such part) the marks stay as they are.
 export type ResultInput =
-  | { kind: "record"; score: MatchScore; clubId?: number | null; court?: string }
+  | { kind: "record"; score: MatchScore; clubId?: number | null; court?: string; absent?: readonly string[] }
   | { kind: "confirm" }
   | { kind: "dispute"; score: MatchScore; note: string };
 
@@ -88,6 +91,8 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
   // The venue given with the result (D146), when the match had none.
   let venue: { clubId: number; court: string | null } | null = null;
   let notice: string;
+  // The marks the result form sets (#400), in the result's batch.
+  let absences: Awaited<ReturnType<typeof resultAbsenceSteps>> | null = null;
   switch (input.kind) {
     case "record": {
       if (!can.record) return { ok: false, error: NOTHING_TO_DO };
@@ -101,6 +106,7 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
         if (error) return { ok: false, error };
         venue = { clubId, court: court || null };
       }
+      if (input.absent) absences = await resultAbsenceSteps(ctx, side, userId, input.absent, now);
       kind = "result_recorded";
       score = input.score;
       notice = before.state.status === "recorded" ? "Javítottuk. A másik pár megerősíti." : "Rögzítettük. A másik pár megerősíti.";
@@ -144,6 +150,8 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
         court: venue?.court ?? null,
         at: now,
       }),
+      // Before the match's update: they are guarded by the same revision.
+      ...(absences?.statements ?? []),
       db
         .update(matches)
         // The match keeps the club given with the result (D146).
@@ -151,13 +159,14 @@ export async function resultStep(userId: string, matchId: number, input: ResultI
         .where(and(eq(matches.id, matchId), eq(matches.revision, revision))),
     ]);
   } catch (e) {
-    if (lostRace(e)) return { ok: false, error: CHANGED };
+    if (lostRace(e) || absenceLostRace(e)) return { ok: false, error: CHANGED };
     throw e;
   }
 
   // A confirmed result changes the four players' Elo (#13).
   if (after.status === "final") await updateElo(now);
   await tellPairs(ctx, side, kind, after, userId);
+  if (absences && absences.added.length > 0) await tellResultAbsences(ctx, userId, absences.added);
   return { ok: true, notice };
 }
 

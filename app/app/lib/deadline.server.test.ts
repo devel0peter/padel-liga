@@ -338,17 +338,17 @@ describe("strikes (#294)", () => {
     expect(all("select body from notifications where user_id = 'p1a' and kind = 'strike' order by id")[0].body).toMatch(/^Nem jelentetek meg egy lefixált meccsen\. Ebben a szezonban 1 fekete pontod van/);
   });
 
-  it("an approved substitute (#37) never gets a strike: the pair's two players do (spec 8)", async () => {
+  it("a player marked absent (#400) gets the strike with their partner; anyone else never does (spec 8)", async () => {
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('sub', 'sub@x.hu', 'Helyettes', 'halado', 1)`);
     const id = matchOf(1, 3).id;
     h.raw
-      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at) values (?, 3, 'p3a', 'sub', 'approved', 'p3b', ?)")
+      .prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 3, 'p3a', 'p3b', ?)")
       .run(id, sec(NOW.toISOString()));
-    // The deadline: neither side active, all four of the pairs' players, not the substitute.
+    // The deadline: neither side active, all four of the pairs' players, the absent one too.
     await resolveDeadlines(MONDAY_6, undefined, 25);
     expect(all("select user_id from strikes where match_id = ? order by user_id", id).map((r: any) => r.user_id)).toEqual(["p1a", "p1b", "p3a", "p3b"]);
-    // A no-show (#33) passes the pair's two players; a caller that names who was on court
-    // instead (the substitute and the partner) gets the substitute dropped: only p3b is struck.
+    // A no-show (#33) passes the pair's two players; a caller that names anyone
+    // else (a substitute) gets them dropped: only p3b is struck.
     const other = matchOf(3, 4).id;
     // (Pair 3 did nothing all phase: each of its matches gave a strike above.)
     const before = all("select count(*) n from strikes where user_id = 'p3b'")[0].n;

@@ -1,9 +1,9 @@
-import { isFastSwitch, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
-import { and, asc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { isFastSwitch, leaveReason, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
+import { and, asc, eq, gt, inArray, lt, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, jobRuns, leagues, matches, noShowReports, seasonPhases, seasons } from "~/db/schema";
+import { groups, jobRuns, leagues, matches, noShowReports, seasonEntries, seasonPhases, seasons } from "~/db/schema";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import { phaseProjection } from "./deadline-projection.server";
@@ -75,7 +75,7 @@ export async function roundSwitch(
   const stored = await phaseGroups(seasonId, endingPhase);
   if (stored.length === 0 || stored.some((g) => !g.publishedAt)) return null;
 
-  const [[league], [first], rows, entered, strikeLeavers] = await Promise.all([
+  const [[league], [first], rows, entered, strikeLeavers, optedOut] = await Promise.all([
     db.select({ fastSwitches: leagues.fastSwitches }).from(leagues).where(eq(leagues.id, season.leagueId)),
     // The league's first season: the one created first.
     db.select({ id: sql<number>`min(${seasons.id})` }).from(seasons).where(eq(seasons.leagueId, season.leagueId)),
@@ -91,6 +91,12 @@ export async function roundSwitch(
       .orderBy(asc(matches.id)),
     enteredPairs(seasonId),
     projection ? projection.leaving.map((pairId) => ({ pairId })) : pairsLeavingAfterPhase(seasonId, endingPhase),
+    // Opted out on Ligáim for the end of the ending phase or earlier (#395),
+    // whatever happened to the pair or its entry since.
+    db
+      .select({ pairId: seasonEntries.pairId })
+      .from(seasonEntries)
+      .where(and(eq(seasonEntries.seasonId, seasonId), lte(seasonEntries.optOutPhase, endingPhase))),
   ]);
 
   const withdrawn = new Set(stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((p) => p.pairId)));
@@ -138,12 +144,14 @@ export async function roundSwitch(
   });
 
   // A pair of the tables leaves after promotion and relegation (spec 8, 10):
-  // a 3rd strike, dissolved since, or taken out of the season since (its
-  // entry no longer counts).
+  // a 3rd strike, opted out (#395), dissolved since, or taken out of the
+  // season since (its entry no longer counts). Everyone else plays on:
+  // default in (packages/rules leaveReason).
   const entry = new Map(entered.map((p) => [p.pairId, p]));
   const strikes = new Set(strikeLeavers.map((p) => p.pairId));
+  const out = new Set(optedOut.map((p) => p.pairId));
   const reasonOf = (p: GroupPair): LeaveReason | null =>
-    strikes.has(p.pairId) ? "strikes" : !p.active ? "dissolved" : !entry.has(p.pairId) ? "taken_out" : null;
+    leaveReason({ strikes: strikes.has(p.pairId), optedOut: out.has(p.pairId), active: p.active, entered: entry.has(p.pairId) });
   const continuing = new Set(tables.flatMap((t) => t.rows.map((r) => r.pair.pairId)));
   const leaving = [
     ...stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((pair) => ({ pair, reason: "withdrawn" as const }))),
@@ -282,8 +290,9 @@ export const ROUND_LOOKUP_QUERIES = 1;
 
 // One run drafts at most one switch: the Elo replay, the switch's reads
 // (season 2, groups 2, league, first season, matches, entries, strikes 2,
-// recorded results, no-show reports), the write batch and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
+// opt-outs, recorded results, no-show reports), the write batch and the job
+// mark.
+export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 13 + 2, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 

@@ -459,6 +459,7 @@ export const notifications = sqliteTable(
         "match_result_disputed",
         "result_disputed",
         "pair_withdrawn",
+        "pair_opt_out",
         "season_start",
         "round_extended",
         "strike",
@@ -715,6 +716,13 @@ export const seasonEntries = sqliteTable(
     // starts, else the next phase; null when approved during the last phase
     // (it moves into the next season).
     joinsPhase: integer("joins_phase"),
+    // "Nem folytatom" on Ligáim (#395): the running phase a player of the pair
+    // opted out in, so the pair leaves the season after it; null: default in.
+    // Set and cleared ("Mégis folytatom") until that phase's deadline.
+    optOutPhase: integer("opt_out_phase"),
+    // Who opted out: only they can take it back.
+    optedOutBy: text("opted_out_by").references(() => users.id, { onDelete: "set null" }),
+    optedOutAt: integer("opted_out_at", { mode: "timestamp" }),
     updatedAt: integer("updated_at", { mode: "timestamp" }),
     // When the pair applied.
     createdAt: integer("created_at", { mode: "timestamp" })

@@ -643,8 +643,22 @@ The player's leagues, one card each (#394, decision log (`docs/decisions.md`) D1
 - Expect:
   - The bottom bar reads Kezdőlap, Tabella, Ligáim, Értesítések, Profil; the sidebar has Ligáim after Ranglista.
   - Anna (one league): the Mintaváros card alone, with the city and season; "Kör": "1. kör: <start> – <end>" and "Határidő: <deadline>"; "Párod": her partner's name; "Helyetek": "Az 1. csoportban vagytok, most <n>. helyen"; "A liga": "1. kör: <pairs> pár, <groups> csoport" and "Lejátszott meccsek: <final> / <all>", the same as the Tabella; "A szezonod": Meccs, Győzelem, Élő-pontod; Tabella and Szabályzat buttons. No email address or phone number.
-  - Ilona (Példaváros, no pair): "Nincs párod. Hívd meg a párodat" (it opens Profil's Párod).
+  - Ilona (Példaváros, no pair): "Nincs párod. Hívd meg a párodat, vagy nézd meg a Párkeresőt." ("Hívd meg a párodat" opens Profil's Párod, the other the card's Párkereső, step 42).
   - `/leagues/pelda` as Anna: 404. In no league: "Melyik ligában játszol?" with "Csatlakozom".
+
+### 42. Players without a partner find each other on Párkereső (after step 11)
+
+The league's seekers see each other, with phone and email only between two seekers (#398, decision log D177; `app/e2e/43-parkereso.spec.ts`). No email goes out.
+
+- Page: `/home`, then `/leagues/minta#parkereso`; `/profile`
+- Account: two or three new accounts registered through Mintaváros's register button (as in step 5), without a pair; `kovacs.anna@example.test`; `idegen.ilona@example.test`
+- Do: as the first, tap "Nézd meg a Párkeresőt" under "Párt keresek" on Kezdőlap, then "Bekapcsolom a párkeresést". As the second, open Párkereső, then tap the same button. As the first, open the second's pair link (Párkereső shows it under "Hívd meg a párodat") as the second and accept.
+- Expect:
+  - Kezdőlap's and Párod's "Párt keresek" text says that the organizer and the league's other seekers see the name, level, Élő-pont, since when they look, phone and email (players without a pair the same without phone and email), and that it can be switched off at any time.
+  - The second, before switching on: the first in the list (name, level, "ma óta keres"), no phone or email, "Az elérhetőségüket akkor látod, ha te is bekapcsolod a párkeresést". After: the first's phone (call, SMS) and email (write); the first sees the second's too. Nobody sees themselves.
+  - A switch from before this change (`listed` = 0 in `partner_searches`, e.g. Ilona's in Példaváros): not listed for others; Párod says "Most csak a szervező látja, hogy párt keresel." with "Bekapcsolom a párkeresést".
+  - Once paired: "Neked már van párod." on both cards, and they are gone from the others' list. Anna (with a pair) sees only that line.
+  - `/leagues/minta` logged out goes to the login; as Ilona (Példaváros) it is 404.
 
 ## A running round instead
 

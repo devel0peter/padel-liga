@@ -42,7 +42,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   const kataSwitch = content(kata.page).getByRole("switch", { name: "Párt keresek" });
   await expect(kataSwitch).not.toBeChecked();
   await kataSwitch.click();
-  await expect(content(kata.page)).toContainText("A szervező látja, hogy párt keresel");
+  await expect(content(kata.page)).toContainText("Bekapcsolva: a szervező és a liga többi párkeresője látja");
   await visit(kata.page, "/profile");
   await expect(content(kata.page).getByRole("switch", { name: "Párt keresek" })).toBeChecked();
   await kata.context.close();
@@ -50,7 +50,7 @@ test("Párt keresek: switched on by the player, paired by the Szervező", async 
   // Kristóf straight on Kezdőlap.
   const kristof = await newPlayer(browser, KRISTOF);
   await content(kristof.page).getByRole("switch", { name: "Párt keresek" }).click();
-  await expect(content(kristof.page)).toContainText("A szervező látja, hogy párt keresel");
+  await expect(content(kristof.page)).toContainText("Bekapcsolva: a szervező és a liga többi párkeresője látja");
   await kristof.context.close();
 
   // The Szervező: both under "Párt keres" on Játékosok (#301), with their

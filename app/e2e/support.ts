@@ -175,7 +175,7 @@ export async function seekPartner(browser: Browser, who: Player): Promise<void> 
   const toggle = content(page).getByRole("switch", { name: "Párt keresek" });
   await expect(toggle).not.toBeChecked();
   await toggle.click();
-  await expect(content(page)).toContainText("A szervező látja, hogy párt keresel");
+  await expect(content(page)).toContainText("Bekapcsolva: a szervező és a liga többi párkeresője látja");
   await context.close();
 }
 

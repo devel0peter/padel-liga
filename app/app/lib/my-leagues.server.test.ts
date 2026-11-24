@@ -12,7 +12,7 @@ vi.mock("~/lib/email/outbox.server", () => ({
 }));
 
 const { migratedDatabase } = await import("~/test/sqlite");
-const { myLeagueCard, myLeagueCards, myLeaguesAction } = await import("~/lib/my-leagues.server");
+const { myLeagueCard, myLeagueCards, myLeaguesAction, withOrigin } = await import("~/lib/my-leagues.server");
 const { ladderPage, pairIdsOf } = await import("~/lib/ladder.server");
 const { leagueSummary, ownPlace } = await import("~/lib/my-leagues");
 
@@ -214,6 +214,25 @@ describe("myLeagueCards", () => {
       const text = JSON.stringify(await myLeagueCards(asUser(id), IN_ROUND_1));
       expect(text).not.toMatch(/@|titkos|\+36|3012345|3099988/);
     }
+  });
+
+  it("Párkereső (#398): one line with a pair; without one the listed seekers, with contact data only between two of them", async () => {
+    member("solo");
+    member("kata");
+    // Kata switched it on under the new wording (D177).
+    h.raw.exec("insert into partner_searches (league_id, user_id, seeking, listed) values (1, 'kata', 1, 1)");
+    const [paired] = await myLeagueCards(asUser("u1011a"), IN_ROUND_1);
+    expect(paired!.finder).toEqual({ kind: "paired" });
+    let [card] = await myLeagueCards(asUser("solo"), IN_ROUND_1);
+    expect(card!.finder).toMatchObject({ kind: "single", leagueId: 1, search: { seeking: false, listed: false }, seekers: [{ name: "Tag kata", contact: null }] });
+    // No email or phone while the viewer isn't a seeker.
+    expect(JSON.stringify(card)).not.toMatch(/@|titkos|\+36|3099988/);
+    h.raw.exec("insert into partner_searches (league_id, user_id, seeking, listed) values (1, 'solo', 1, 1)");
+    [card] = await myLeagueCards(asUser("solo"), IN_ROUND_1);
+    expect(card!.finder).toMatchObject({ seekers: [{ name: "Tag kata", contact: { phone: "+36 30 999 8877", email: "kata@titkos.example" } }] });
+    // The pair link becomes a full address in the route (withOrigin).
+    expect(withOrigin(card!, "https://padelparbaj.hu").finder).toMatchObject({ link: expect.stringMatching(/^https:\/\/padelparbaj\.hu\/pair\/join\/[\w-]+$/) });
+    expect(withOrigin(paired!, "https://padelparbaj.hu")).toBe(paired);
   });
 });
 

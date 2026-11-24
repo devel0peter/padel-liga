@@ -16,7 +16,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | C6 | Results read the same everywhere: pair A first, "4:2, 2:4, szuper tie-break 10:7"; both lose as "Mindkét pár vereséget kap (0:4, 0:4)". | D85 |
 | C7 | Nothing about the league is public: tables, results and profiles are for logged-in players only (the league page sits in the app shell). The league page shows names, tables and results only; no rating on it. Public stay the landing page, rules, privacy, login and register. | spec 14, D112, D134 |
 | C8 | Logged-in pages sit in the app shell and use `AppPage` (one header, no own `<h1>`); shadcn/ui components first. | CLAUDE.md |
-| C9 | Every player step on a match stays reachable whatever the state: propose, counter-propose, agreed time, accept, confirm/decline, venue, cancel, record/correct/confirm/dispute a result, substitute, no-show report. A redesign may fold a form away, never remove it. | spec 6–8, D68, D74, D77, D108, D109 |
+| C9 | Every player step on a match stays reachable whatever the state: propose, counter-propose, agreed time, accept, confirm/decline, venue, cancel, record/correct/confirm/dispute a result, marking a player who doesn't play (also on the result form), no-show report. A redesign may fold a form away, never remove it. | spec 6–8, D68, D74, D77, D108, D175 |
 | C10 | One look for every block: a card with one heading; no coloured boxes, glows or badges for decoration. A page shows what the player needs now; the rest is one tap away (a fold, a tab or another page). | Peter, 2026-11-07 (D136) |
 
 ## 2. Group table
@@ -69,7 +69,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | M8 | Fixed and started, or played without the app: recording the result is the main action. While the match has no club, the result form (main or folded) asks "Hol játszottatok?" (required club select) and the optional court, above the button; with a known club it asks nothing more. | D77, D146 |
 | M9 | Their result waiting: "Megerősítem" is the main action with the score and the auto-accept time; the dispute form opens from "Nem így volt?". | D77 |
 | M10 | Our result waiting, disputed, final: shown as it stands, with who decided. | D77, D78 |
-| M11 | Substitute and no-show: folded unless something is already pending or decided. The substitute part is hidden in the first season. | D108, D109, D145 |
+| M11 | Substitute and no-show: folded unless something is already pending or decided. A player marked as not playing shows to all four in "Helyettes", and next to the result to confirm. | D108, D175 |
 | M12 | The log stays visible to both pairs, compact. | spec 6.5 |
 
 ## 6. Profile

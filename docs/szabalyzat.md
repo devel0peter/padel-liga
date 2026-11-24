@@ -1,6 +1,6 @@
 # Padelpárbaj – Szabályzat
 
-*Hatályos: 2026. 11. 28.*
+*Hatályos: 2026. 11. 29.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
@@ -45,7 +45,10 @@ A részleteket lent találod.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.
 - **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni Élő-pontja alapján soroljuk be.
-- **Helyettes:** ebben a szezonban még nincs rá lehetőség. Ha a párod nem tud játszani, az elmaradt meccsekre vonatkozó szabályok érvényesek.
+- **Helyettes:** ha valamelyikőtök nem tud játszani egy meccsen, bárki beállhat helyette, a ligán kívülről is, a szervező jóváhagyása nélkül. A nevét nem kell megadni, csak azt jelöljétek a meccs oldalán, hogy ki nem játszik: a meccs előtt bármelyikőtök, hirtelen sérülésnél pedig az eredmény beírásakor az, aki beírja. Az ellenfél értesítést kap, és az eredménnyel együtt ezt is megerősíti.
+  - Az eredmény a párotoké, ugyanúgy számít, mint bármelyik meccs.
+  - A hiányzó játékos Élő-pontja nem változik: a számításban az ő Élő-pontja áll a helyettesé helyett. A másik három játékosé a szokásos módon változik.
+  - Ez a meccs nem számít bele a hiányzó játékos díjhoz szükséges részvételébe.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
 - **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
 - **Új liga első szezonja:** nincs nevezési határidő, a szezon akkor indul, amikor elég pár nevezett (a liga minimuma, alapból 12 pár). Amint a nevezések elérik a minimumot, az 1. kör a legalább 7 nappal későbbi első hétfőn indul (ha szünet esik rá, a szünet után), és ez a dátum akkor sem változik, ha később kevesebb nevezés marad.

@@ -273,7 +273,7 @@ Anyone can create an account, no invite needed (#113). Logging in on `/register`
   - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párod says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
   - After "Csatlakozom": the card is gone; Kezdőlap and Párod show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párod also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
-  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok, Játékosok and Helyettes pick never list her.
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok and Játékosok never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
@@ -470,21 +470,18 @@ Every organizer and system change leaves an entry (#225, #226, decision log (`do
   - Each filter narrows the list and stays in the address, so the reload shows the same list. 50 entries a page, "Régebbiek" for the next.
   - Nothing on the page changes an entry. A Szervező or a player opening `/admin/log` gets the 403 page, and has no Napló in the sidebar.
 
-### 32. A pair asks for a substitute, the Szervező approves (after step 11)
+### 32. A pair marks a player who doesn't play: a temporary substitute (after step 11)
 
-Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
+Spec section 4, decision log (`docs/decisions.md`) D175 (#400; replaces D109's approved substitute).
 
-- Page: a match of step 17 not played yet (`/matches/<id>`), then `/admin/leagues/minta/substitutes` ("Helyettesek" in the sidebar)
-- Accounts: the player of step 17, then `szervezo@example.test`, then one of the opponents
-- Do: on the match, under "Helyettes", pick your partner in "Ki nem tud játszani?" and a player of another group in "Ki helyettesít?", press "Helyettest kérek". As the Szervező, open Helyettesek and press "Jóváhagyom".
+- Page: a match of step 17 not played yet (`/matches/<id>`)
+- Accounts: the player of step 17, then one of the opponents
+- Do: on the match, open "Helyettes kell?", pick your partner in "Ki nem tud játszani?" and press "Helyettes jön helyette". Then press "Mégis <partner> játszik", mark them again, and record the result once played (step 27).
 - Expect:
-  - The picker shows names only, never an address, and never the match's four players or anyone in another pair of your group. "Elküldtük a kérést a szervezőnek. Szólunk, ha döntött." and the request "… helyett …: Jóváhagyásra vár", with "Visszavonom a kérést" for the player who asked (not for the partner).
-  - The Szervező and the Admin get "Helyettes kérés · <liga>" in Értesítések (no names, no email); the asking player doesn't.
-  - Helyettesek: the request under "Jóváhagyásra vár (1)" with the season, round, group and week, the pair and its opponents, the start (or the deadline), and the absent player's and the substitute's Elo side by side with the difference. "Jóváhagyom": "Jóváhagytad a helyettest. Mindkét pár értesítést kap.", and the request moves to "Jóváhagyva, még nem játszották", with "Visszavonom" until the match starts.
-  - Both pairs see "<hiányzó> helyett <helyettes> játszik …" on the match page; the asking pair gets "Jóváhagyták a helyettest", the opponents "Helyettes az ellenfeleteknél" (app and push only, no email). The substitute gets nothing and gets 404 on the match page. The group table and the Tabella show the pair's own names.
-  - "Elutasítom" with a reason instead: only the asking pair is told, and sees "Elutasítva" and "A szervező indoklása: …" on the match page; they can ask again.
-  - After the confirmed result (step 27), the substitute's Elo changes and the absent player's doesn't.
-  - Napló lists "Helyettes jóváhagyása" with the match and "<hiányzó> → <helyettes>". A player opening `/admin/leagues/minta/substitutes` gets 403.
+  - No substitute's name is asked and nothing waits for the Szervező: "Rendben, helyettes jön helyette. A többiek is látják." The "Helyettes" panel shows "<partner> helyett helyettes játszik nálatok", the opponents see "… az ellenfeleiteknél"; the partner and both opponents get "Helyettes a meccseteken" (app and push only, no email), and "Mégsem jön helyettes" after "Mégis … játszik".
+  - From the agreed start on, nothing can be marked or taken back on the match page. The result form instead has "Helyettes játszott valamelyikőtök helyett?" with a tick for each of your pair's players (ticked if marked); ticking one there after a sudden injury tells the other three the same way.
+  - The opponent confirming the result sees who didn't play next to "Megerősíted az eredményt?". After the confirmed result the absent player's Élő-pont doesn't change; the other three change as usual. The group table and the Tabella show the pair's own names.
+  - No "Helyettesek" in the Szervező's sidebar, and no "Helyettes kérés" switch on their profile.
 
 ### 33. A player opens a pair's and a player's profile (after step 29)
 

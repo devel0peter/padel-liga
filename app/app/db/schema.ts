@@ -671,7 +671,9 @@ export const leagueMembers = sqliteTable(
 // whether the organizer should find them a partner; Párkeresők lists them.
 // No row: off (D128, #333; before, on for a waiting solo signup, whose
 // default the release stored as a row). A row stays when they get a pair; it
-// only counts while they have none.
+// only counts while they have none. `listed` (D177, #398): the player switched
+// it on under the wording that the league's other seekers see them too, so
+// Párkereső lists them; a switch from before keeps its organizer-only meaning.
 export const partnerSearches = sqliteTable(
   "partner_searches",
   {
@@ -682,6 +684,7 @@ export const partnerSearches = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     seeking: integer("seeking", { mode: "boolean" }).notNull(),
+    listed: integer("listed", { mode: "boolean" }).notNull().default(false),
     updatedAt: integer("updated_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

@@ -19,6 +19,7 @@ import { leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.
 import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
+import { finderPath } from "~/lib/partner-search";
 import { partnerSearchState } from "~/lib/partner-search.server";
 import { homeSeasons, isWaiting, waitingText } from "~/lib/seasons";
 import { entryCounts, entryViews } from "~/lib/season-entries.server";
@@ -103,7 +104,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       leagueId: l.league.id,
       league: l.league.name,
       url: new URL(request.url).origin + pairLinkPath(l.token),
-      seeking: searching.get(l.league.id) ?? false,
+      search: searching.get(l.league.id) ?? { seeking: false, listed: false },
+      finder: finderPath(mine.find((m) => m.id === l.league.id)?.slug),
     })),
     multiLeague: leagueName.size > 1,
     seasons,
@@ -242,7 +244,7 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
       {d.pairLinks.map((l) => (
         <div key={l.url} className="grid gap-4">
           <PairLinkBox url={l.url} league={d.multiLeague ? l.league : undefined} />
-          <PartnerSearchBox leagueId={l.leagueId} seeking={l.seeking} />
+          <PartnerSearchBox leagueId={l.leagueId} search={l.search} finder={l.finder} />
         </div>
       ))}
       {!running && d.seasons.map((s) => <SeasonCard key={s.id} s={s} running={false} actionData={actionData} />)}

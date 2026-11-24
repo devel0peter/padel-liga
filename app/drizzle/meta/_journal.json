@@ -397,8 +397,15 @@
     {
       "idx": 56,
       "version": "6",
-      "when": 1795559292973,
-      "tag": "0068_partner_changes",
+      "when": 1795559265165,
+      "tag": "0069_parkereso_listed",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1795561482399,
+      "tag": "0070_partner_changes",
       "breakpoints": true
     }
   ]

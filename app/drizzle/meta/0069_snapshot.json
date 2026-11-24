@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c9433780-0d24-4665-828e-525863b6b8d3",
+  "id": "bff26ccb-838c-41bb-aaa8-1997cca0e95a",
   "prevId": "3b6a1553-e61e-4920-837c-efd009f452b6",
   "tables": {
     "account_invites": {
@@ -1630,13 +1630,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "partner_change_id": {
-          "name": "partner_change_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -1695,19 +1688,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "marked_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "match_absences_partner_change_id_partner_changes_id_fk": {
-          "name": "match_absences_partner_change_id_partner_changes_id_fk",
-          "tableFrom": "match_absences",
-          "tableTo": "partner_changes",
-          "columnsFrom": [
-            "partner_change_id"
           ],
           "columnsTo": [
             "id"
@@ -3192,253 +3172,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "partner_changes": {
-      "name": "partner_changes",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "league_id": {
-          "name": "league_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "season_id": {
-          "name": "season_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "pair_id": {
-          "name": "pair_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "started_by": {
-          "name": "started_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "leaving_id": {
-          "name": "leaving_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "partner_id": {
-          "name": "partner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'open'"
-        },
-        "starts_phase": {
-          "name": "starts_phase",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "new_pair_id": {
-          "name": "new_pair_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "answered_at": {
-          "name": "answered_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ended_by": {
-          "name": "ended_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ended_at": {
-          "name": "ended_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "partner_changes_live_pair_idx": {
-          "name": "partner_changes_live_pair_idx",
-          "columns": [
-            "pair_id"
-          ],
-          "isUnique": true,
-          "where": "\"partner_changes\".\"status\" in ('open', 'final')"
-        },
-        "partner_changes_final_partner_idx": {
-          "name": "partner_changes_final_partner_idx",
-          "columns": [
-            "league_id",
-            "partner_id"
-          ],
-          "isUnique": true,
-          "where": "\"partner_changes\".\"status\" = 'final'"
-        },
-        "partner_changes_season_idx": {
-          "name": "partner_changes_season_idx",
-          "columns": [
-            "season_id",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "partner_changes_partner_idx": {
-          "name": "partner_changes_partner_idx",
-          "columns": [
-            "partner_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "partner_changes_league_id_leagues_id_fk": {
-          "name": "partner_changes_league_id_leagues_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "leagues",
-          "columnsFrom": [
-            "league_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "partner_changes_season_id_seasons_id_fk": {
-          "name": "partner_changes_season_id_seasons_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "seasons",
-          "columnsFrom": [
-            "season_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "partner_changes_pair_id_pairs_id_fk": {
-          "name": "partner_changes_pair_id_pairs_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "pairs",
-          "columnsFrom": [
-            "pair_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "partner_changes_started_by_users_id_fk": {
-          "name": "partner_changes_started_by_users_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "started_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "partner_changes_leaving_id_users_id_fk": {
-          "name": "partner_changes_leaving_id_users_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "leaving_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "partner_changes_partner_id_users_id_fk": {
-          "name": "partner_changes_partner_id_users_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "partner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "partner_changes_new_pair_id_pairs_id_fk": {
-          "name": "partner_changes_new_pair_id_pairs_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "pairs",
-          "columnsFrom": [
-            "new_pair_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "partner_changes_ended_by_users_id_fk": {
-          "name": "partner_changes_ended_by_users_id_fk",
-          "tableFrom": "partner_changes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "ended_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "partner_searches": {
       "name": "partner_searches",
       "columns": {
@@ -3462,6 +3195,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "listed": {
+          "name": "listed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "updated_at": {
           "name": "updated_at",

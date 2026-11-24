@@ -659,6 +659,20 @@ The league's seekers see each other, with phone and email only between two seeke
   - A switch from before this change (`listed` = 0 in `partner_searches`, e.g. Ilona's in Példaváros): not listed for others; Párod says "Most csak a szervező látja, hogy párt keresel." with "Bekapcsolom a párkeresést".
   - Once paired: "Neked már van párod." on both cards, and they are gone from the others' list. Anna (with a pair) sees only that line.
   - `/leagues/minta` logged out goes to the login; as Ilona (Példaváros) it is 404.
+### 43. A player opts out of the next round on Ligáim, then takes it back (after step 41)
+
+Default in, and "Nem folytatom" until the round's deadline (#395, decision log (`docs/decisions.md`) D176; `app/e2e/42-opt-out.spec.ts`). Needs a running round: best seen on the running round seed below.
+
+- Page: `/leagues`; then `/admin/leagues/minta/pairs` and the season's Csoportok
+- Account: `kovacs.anna@example.test`; then her partner; then the Szervező
+- Do: as Anna, press "Nem folytatom" on the card, read the confirmation, press "Nem folytatom" in it; later press "Mégis folytatom".
+- Expect:
+  - Before: "Következő kör": "Benne vagytok a 2. körben (<start>-tól/-től). Ha nem folytatnád, jelezd <deadline>, 23:59-ig."
+  - The confirmation: the pair leaves the season after round 1, round 1's remaining matches still count and must be played, the partner can go on with a new partner; "Mégse" changes nothing.
+  - After: "Jelezted, hogy nem folytatod: az 1. kör után kiléptek a szezonból. Meggondolhatod …" with "Mégis folytatom". The partner's card says "A párod jelezte, hogy nem folytatja …" with no button, and the partner has one notice "A párod nem folytatja" (no email).
+  - Párok: "Kilép a kör végén" in the pair's Nevezés cell. Csoportok' preview: the pair under "Kimaradnak" with "nem folytatja". Napló: one entry with Anna as actor.
+  - "Mégis folytatom": the card is back to "Benne vagytok …", the partner gets "A párod mégis folytatja", Napló has a second entry.
+  - After the deadline the section is gone; in the season's last round it never shows.
 
 ## A running round instead
 

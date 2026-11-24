@@ -16,7 +16,8 @@ describe("movement and originText (#35: the draft shows where each pair comes fr
   });
 
   it("has a Hungarian reason for every leaver", () => {
-    expect(Object.keys(LEAVE_REASONS).sort()).toEqual(["dissolved", "strikes", "taken_out", "withdrawn"]);
+    expect(Object.keys(LEAVE_REASONS).sort()).toEqual(["dissolved", "opted_out", "strikes", "taken_out", "withdrawn"]);
+    expect(LEAVE_REASONS.opted_out).toBe("nem folytatja");
   });
 });
 

@@ -400,6 +400,13 @@
       "when": 1795559265165,
       "tag": "0069_parkereso_listed",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1795561598973,
+      "tag": "0070_season_entry_opt_out",
+      "breakpoints": true
     }
   ]
 }

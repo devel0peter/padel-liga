@@ -266,11 +266,22 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search, and joining a league (their own tests check the entry).
+// and partner search, joining a league, and opting out on Ligáim (#395)
+// (their own tests check the entry).
 // RETIRED: written by flows that went with the interest list (#333, D129)
 // and with the organizer's approval of named substitutes (#400, D175);
 // Napló still names their old entries, nothing writes new ones.
-const OUTSIDE: AuditAction[] = ["superadmin.grant", "superadmin.revoke", "account_invite.create", "pair.link", "partner_search.on", "partner_search.off", "league.join"];
+const OUTSIDE: AuditAction[] = [
+  "superadmin.grant",
+  "superadmin.revoke",
+  "account_invite.create",
+  "pair.link",
+  "partner_search.on",
+  "partner_search.off",
+  "league.join",
+  "season_entry.opt_out",
+  "season_entry.opt_out_undo",
+];
 const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send", "substitute.approve", "substitute.reject", "substitute.revoke"];
 
 // Every admin page with an action, and the audit actions its action writes.

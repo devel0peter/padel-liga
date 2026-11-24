@@ -28,6 +28,7 @@ import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
+import { optOutEntryText } from "~/lib/opt-out";
 import type { LeaguePairRow } from "~/lib/pairs.server";
 import { entryChip } from "~/lib/player-status";
 import { fromPhase, WITHDRAWAL_REASON_MAX } from "~/lib/season-entries";
@@ -57,6 +58,7 @@ export function EntryCell({ pair, action }: { pair: Pair; action?: string }) {
     <div className="grid justify-items-start gap-1">
       {chip ? <StatusChips chips={[chip]} /> : "–"}
       {starts && <span className="text-xs text-muted-foreground">{starts}</span>}
+      {pair.optOut && <span className="text-xs font-medium">{optOutEntryText(pair.optOut)}</span>}
       {pair.entryAction?.kind === "remove" && pair.lockedIn.includes(pair.entryAction.seasonId) ? (
         <WithdrawDialog pair={pair} entry={pair.entryAction} action={action} />
       ) : (

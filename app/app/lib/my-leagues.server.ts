@@ -22,12 +22,14 @@ import {
   type OwnSeason,
   type RoundInfo,
 } from "./my-leagues";
+import { optOutView, type OptOutView } from "./opt-out";
+import { optOut, optOutCard, undoOptOut } from "./opt-out.server";
 import { partnerFinder, type PartnerFinder } from "./partner-search.server";
 import { seasonRecords } from "./profiles.server";
 import { applyToSeason, entryCounts, entryViews } from "./season-entries.server";
 import type { EntryView } from "./season-entries";
 import { currentSeason, isWaiting, waitingText, type Season } from "./seasons";
-import { listSeasons } from "./seasons.server";
+import { getSeason, listSeasons } from "./seasons.server";
 
 // Ligáim (#394): one card per league of the player (D128). The round, the
 // summary and the place come from ladderPage, the Tabella's own loader, so
@@ -48,6 +50,8 @@ export type MyLeagueCard = {
   joins: { round: number; startsAt: Date | null } | null;
   /** The entry's status, the "Nevezünk" button or why not (#23); null when there's nothing to say. */
   entry: EntryView | null;
+  /** Default in or opted out of the next round (#395), with the button the state offers; null when there's nothing to say. */
+  optOut: OptOutView | null;
   /** Null before the season's groups are out. */
   summary: LeagueSummary | null;
   own: OwnSeason;
@@ -138,6 +142,7 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
     const place = ladder?.kind === "ladder" ? ownPlace(ladder.phase, bands) : null;
     const entry = season ? (views.get(season.id) ?? null) : null;
     const record = season ? records.get(season.id) : undefined;
+    const optOut = season && !isWaiting(season) ? await optOutCard(user.id, league.id, season, now) : null;
     cards.push({
       league: { name: league.name, slug: league.slug, city: cities.find((c) => c.slug === league.city)?.name ?? league.city },
       season: season ? { id: season.id, name: season.name } : null,
@@ -146,6 +151,7 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
       place,
       joins: place || !season ? null : joinsOf(season, entry, now),
       entry,
+      optOut: optOut ? optOutView(optOut) : null,
       summary: ladder?.kind === "ladder" ? leagueSummary(ladder.phase, bands) : null,
       own: { matches: record?.matches ?? 0, wins: record?.wins ?? 0, elo: rating === null ? null : Math.round(rating) },
       finder: await partnerFinder(user, league.id, now),
@@ -158,16 +164,24 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
 export type MyLeaguesActionData = { season: number; error?: string; notice?: string; ok?: true };
 
 /**
- * Ligáim's form posts, the same as Kezdőlap's: "Nevezünk" on a card (#23)
- * and "Csatlakozom" on the join card (#331, audited). `season` 0: not about
- * a card.
+ * Ligáim's form posts, the same as Kezdőlap's: "Nevezünk" on a card (#23),
+ * "Csatlakozom" on the join card (#331, audited), and "Nem folytatom" /
+ * "Mégis folytatom" (#395, audited; the card's own fetcher reads the
+ * answer). `season` 0: not about a card.
  */
-export async function myLeaguesAction(user: User, form: FormData): Promise<MyLeaguesActionData> {
+export async function myLeaguesAction(user: User, form: FormData, now = new Date()): Promise<MyLeaguesActionData> {
   if (form.get("intent") === "join_league") {
     if (!(await chooseLeague(user.id, Number(form.get("league"))))) throw new Response("Hibás kérés.", { status: 400 });
     return { season: 0, ok: true };
   }
   const season = Number(form.get("season") || 0);
+  const intent = form.get("intent");
+  if ((intent === "opt_out" || intent === "undo_opt_out") && Number.isInteger(season) && season > 0) {
+    const leagueId = (await getSeason(season))?.leagueId;
+    if (leagueId === undefined) throw new Response("Hibás kérés.", { status: 400 });
+    const result = await (intent === "opt_out" ? optOut : undoOptOut)(user, leagueId, season, now);
+    return result.ok ? { season, ok: true } : { season, error: result.error };
+  }
   if (form.get("intent") !== "enter" || !Number.isInteger(season) || season <= 0) throw new Response("Hibás kérés.", { status: 400 });
   const result = await applyToSeason(user, season);
   return result.ok ? { season, notice: enteredNotice(result.joins) } : { season, error: result.error };

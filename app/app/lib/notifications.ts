@@ -60,6 +60,9 @@ export type PlayerKind =
   // A pair withdrawn mid-phase (#34): to its players and the group's other
   // pairs, in the app and by push only, never by email.
   | "pair_withdrawn"
+  // "Nem folytatom" and "Mégis folytatom" on Ligáim (#395): to the partner of
+  // the player who pressed it, in the app and by push only, never by email.
+  | "pair_opt_out"
   // A strike (#294, spec 13), with the count; from the 3rd on that the pair
   // leaves at the end of the phase. In the app and by push; the 2nd also
   // sends the warning email (strike_warning). Not a digest item: that email
@@ -134,6 +137,7 @@ export const KIND_TOPIC: Readonly<Record<PlayerKind, PushTopic>> = {
   groups_published: "season",
   pair_intro: "season",
   pair_withdrawn: "season",
+  pair_opt_out: "season",
   round_extended: "season",
   absence_marked: "absences",
   no_show_confirmed: "absences",

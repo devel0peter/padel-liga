@@ -126,7 +126,7 @@ export function Todos({ items }: { items: Todo[] }) {
 const nextMatch = (g: HomeGroup) => [...g.matches].sort((x, y) => x.week - y.week).find((m) => m.result.status !== "final") ?? null;
 
 function statusOf(m: HomeMatch) {
-  return resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue);
+  return resultStatusView(m.result, m.side, m.setGames) ?? statusView(m.state, m.side, m.venue);
 }
 
 // When and where, once a time is fixed or agreed.

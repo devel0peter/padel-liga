@@ -1,7 +1,9 @@
 // Match results (spec section 7, rules section 4; walkovers spec section 8).
-// Best of 2 short sets: a set goes to 4 games, win by 2 (so 4-3 plays on to 5-3 or
-// 4-4); at 4-4 a tie-break to 7 decides it, so the set ends 5-4. At 1-1 in sets a super tie-break to 10 (win by 2)
-// replaces the third set. Only the final result is recorded.
+// Best of 2 sets. A set goes to `setGames` games, win by 2; at `setGames` all a
+// tie-break to 7 decides it. The format belongs to the round (D173, #396):
+// sets to 4 (Győr's round 1: 4-0 to 4-2, 5-3, 5-4) or sets to 6 (every later
+// round: 6-0 to 6-4, 7-5, 7-6). At 1-1 in sets a super tie-break to 10 (win
+// by 2) replaces the third set. Only the final result is recorded.
 
 /** Games (or tie-break points) of the two sides, in the order [a, b]. */
 export type Score = readonly [number, number];
@@ -42,21 +44,39 @@ export type ScoreValidation =
   | { readonly ok: true; readonly totals: MatchTotals }
   | { readonly ok: false; readonly errors: readonly ResultError[] };
 
-export const SET_GAMES = 4;
+/** Games that win a set: a round's set format (D173, #396). */
+export type SetGames = 4 | 6;
+/** Short sets: Győr's round 1 (season 1) keeps them (decision of 2026-10-04). */
+export const SHORT_SETS: SetGames = 4;
+/** Sets to 6: every round from Győr's round 2 on, and every new round (D173). */
+export const SETS_TO_SIX: SetGames = 6;
+
+/** A stored set format read back (the column is a plain integer); null if it is not one. */
+export function asSetGames(n: unknown): SetGames | null {
+  return n === SHORT_SETS || n === SETS_TO_SIX ? (n as SetGames) : null;
+}
+
 export const SUPER_TIE_BREAK_POINTS = 10;
 
 const isCount = (n: number) => Number.isInteger(n) && n >= 0;
 const show = ([a, b]: Score) => `${a}:${b}`;
 
 /**
- * A finished short set (either side): 4-0, 4-1, 4-2; 5-3 after 4-3 (win by 2); or 5-4
- * after the tie-break at 4-4.
+ * A finished set (either side) to `g` games: g-0 up to g-(g-2); g+1 to g-1
+ * after g-(g-1) (win by 2); or g+1 to g after the tie-break at g-g. Sets to 4:
+ * 4-0, 4-1, 4-2, 5-3, 5-4. Sets to 6: 6-0 to 6-4, 7-5, 7-6.
  */
-export function isValidSet([a, b]: Score): boolean {
+export function isValidSet([a, b]: Score, g: SetGames): boolean {
   const hi = Math.max(a, b);
   const lo = Math.min(a, b);
-  if (hi === SET_GAMES) return lo <= SET_GAMES - 2;
-  return hi === SET_GAMES + 1 && (lo === SET_GAMES - 1 || lo === SET_GAMES);
+  if (hi === g) return lo <= g - 2;
+  return hi === g + 1 && (lo === g - 1 || lo === g);
+}
+
+/** The valid sets in Hungarian: "6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6". */
+export function validSetsText(g: SetGames): string {
+  const plain = Array.from({ length: g - 1 }, (_, lo) => `${g}:${lo}`);
+  return `${[...plain, `${g + 1}:${g - 1}`].join(", ")} vagy (tie-break után) ${g + 1}:${g}`;
 }
 
 /** A finished super tie-break: 10 points, win by 2 (10-8, 11-9, 12-10 ...). */
@@ -70,10 +90,11 @@ export function isValidSuperTieBreak([a, b]: Score): boolean {
 const winnerOf = ([a, b]: Score): Side => (a > b ? "a" : "b");
 
 /**
- * Checks a recorded result against the league format and, when it is valid, turns it
- * into sets and games per side. Returns every problem found, each with its own message.
+ * Checks a recorded result against its round's set format and, when it is
+ * valid, turns it into sets and games per side. Returns every problem found,
+ * each with its own message.
  */
-export function validateScore(score: MatchScore): ScoreValidation {
+export function validateScore(score: MatchScore, setGames: SetGames): ScoreValidation {
   const errors: ResultError[] = [];
   const { sets, superTieBreak } = score;
 
@@ -86,11 +107,11 @@ export function validateScore(score: MatchScore): ScoreValidation {
   sets.slice(0, 2).forEach((set, i) => {
     if (!set.every(isCount)) {
       errors.push({ kind: "not-a-number", set: i + 1, message: `${i + 1}. szett: a játékok száma 0 vagy pozitív egész szám.` });
-    } else if (!isValidSet(set)) {
+    } else if (!isValidSet(set, setGames)) {
       errors.push({
         kind: "invalid-set",
         set: i + 1,
-        message: `${i + 1}. szett: ${show(set)} nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4.`,
+        message: `${i + 1}. szett: ${show(set)} nem lehet. Lehet ${validSetsText(setGames)}.`,
       });
     }
   });
@@ -135,12 +156,17 @@ export function validateScore(score: MatchScore): ScoreValidation {
   };
 }
 
-/** Walkover (spec 8): the winner gets 4-0 4-0. */
-export function walkoverTotals(winner: Side): MatchTotals {
+/** Walkover (spec 8): the winner gets two sets to love, 4-0 4-0 or 6-0 6-0 by the round's format. */
+export function walkoverTotals(winner: Side, setGames: SetGames): MatchTotals {
   return winner === "a"
-    ? { winner, sets: [2, 0], games: [2 * SET_GAMES, 0] }
-    : { winner, sets: [0, 2], games: [0, 2 * SET_GAMES] };
+    ? { winner, sets: [2, 0], games: [2 * setGames, 0] }
+    : { winner, sets: [0, 2], games: [0, 2 * setGames] };
 }
 
-/** Sets and games one side gets when neither side was active (spec 8): 0-4 0-4, a loss for both. */
-export const BOTH_INACTIVE_SIDE = { setsWon: 0, setsLost: 2, gamesWon: 0, gamesLost: 2 * SET_GAMES } as const;
+/**
+ * Sets and games one side gets when neither side was active (spec 8): 0-4 0-4
+ * or 0-6 0-6 by the round's format, a loss for both.
+ */
+export function bothInactiveSide(setGames: SetGames) {
+  return { setsWon: 0, setsLost: 2, gamesWon: 0, gamesLost: 2 * setGames } as const;
+}

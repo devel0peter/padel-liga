@@ -2,10 +2,13 @@
 // their Hungarian text. Pure; storage and sending are in
 // notifications.server.ts, encryption in push/webpush.ts.
 
+import type { SetGames } from "@padel-liga/rules";
+
 import type { Actor } from "./auth/permissions";
 import type { MessageKind } from "./email/budget";
 import { formatDeadline, formatShortDate, formatWeekdayDate } from "./format";
 import { withArticle } from "./groups";
+import { walkoverScoreTo } from "./results";
 
 // "Az 1." / "A 2.": the article and number, starting a sentence.
 const capitalArticle = (n: number) => withArticle(n).replace(/^a/, "A");
@@ -522,14 +525,14 @@ export function noShowReportedMessage(input: { matchId: number; leagueSlug: stri
 
 // The organizer's decision, to each pair from its own side: `reported` is
 // the pair that made the report. The reason is on the match page only.
-export function noShowDecidedMessage(input: { matchId: number; confirmed: boolean; reported: boolean }): Message {
+export function noShowDecidedMessage(input: { matchId: number; confirmed: boolean; reported: boolean; setGames: SetGames }): Message {
   const url = matchUrl(input.matchId);
   if (input.confirmed)
     return input.reported
-      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.", url }
+      ? { title: "Jóváhagyta a szervező: nem jöttek el", body: `${walkoverScoreTo(input.setGames)} megnyertétek a meccset. A részletek a meccs oldalán.`, url }
       : {
           title: "A szervező szerint nem jöttetek el",
-          body: "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+          body: `A meccset ${walkoverScoreTo(input.setGames, false)} elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.`,
           url,
         };
   return input.reported

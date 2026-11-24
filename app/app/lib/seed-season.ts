@@ -24,7 +24,7 @@ import {
   type SlotRange,
 } from "@padel-liga/rules";
 
-import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedSql } from "./seed";
+import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedSetGames, seedSql } from "./seed";
 
 type Level = "kezdo" | "kozephalado" | "halado" | "versenyzo";
 type Person = { name: string; email: string };
@@ -267,7 +267,9 @@ export function seasonStatements(now: Date): string[] {
   );
   out.push(`delete from season_phases where season_id = ${SEASON}`);
   for (const p of phases)
-    out.push(`insert into season_phases (season_id, number, starts_at, deadline) values (${SEASON}, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)})`);
+    out.push(
+      `insert into season_phases (season_id, number, starts_at, deadline, set_games) values (${SEASON}, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)}, ${seedSetGames(p.number)})`,
+    );
 
   // Finished accounts with a fake phone each, joined through the league's
   // register button (D128), then the pairs, approved for phase 1.
@@ -358,7 +360,7 @@ export function seasonElo(plan: SeasonPlan): ReturnType<typeof replayElo> {
   const level = new Map(plan.pairs.flatMap((p) => [[seasonUserId(p.a), p.level] as const, [seasonUserId(p.b), p.level] as const]));
   const list = plan.matches
     .flatMap((m, i): { match: RatedMatch; at: number }[] => {
-      const winner = m.status === "final" ? ratedWinner(m.outcome ?? null) : null;
+      const winner = m.status === "final" ? ratedWinner(m.outcome ?? null, seedSetGames(1)) : null;
       return winner ? [{ match: { id: i, a: ids(m.a), b: ids(m.b), winner }, at: confirmedAt(m).getTime() }] : [];
     })
     .sort((x, y) => x.at - y.at || x.match.id - y.match.id);

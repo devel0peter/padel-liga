@@ -14,6 +14,7 @@ import {
   type GroupMatch,
   type MatchOutcome,
   type MatchScore,
+  type SetGames,
   validateScore,
 } from "@padel-liga/rules";
 
@@ -53,6 +54,8 @@ export type LadderGroupInput = {
   number: number;
   pairs: LadderPair[];
   matches: LadderMatch[];
+  /** Its round's set format (D173, #396). */
+  setGames: SetGames;
 };
 
 /** A table row as groupTable computes it (the rules engine's numbers). */
@@ -107,11 +110,12 @@ const isPair = (x: unknown) => Array.isArray(x) && x.length === 2;
 
 /**
  * Whether a stored outcome is one a table can count (#190, D115): a known
- * kind, a walkover with its winner, a played match with a valid score. Every
+ * kind, a walkover with its winner, a played match with a valid score in its
+ * round's set format (`setGames`, D173). Every
  * write is validated, so a bad one means a bug or a hand edit; the rules engine
  * throws on it, and the public league page skips the match instead of failing.
  */
-export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
+export function isValidOutcome(outcome: unknown, setGames: SetGames): outcome is MatchOutcome {
   if (!outcome || typeof outcome !== "object") return false;
   const o = outcome as { kind?: unknown; winner?: unknown; score?: unknown };
   switch (o.kind) {
@@ -125,7 +129,7 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
       if (!score || typeof score !== "object" || !Array.isArray(score.sets) || !score.sets.every(isPair)) return false;
       // null is no super tie-break, as validateScore reads it.
       if (score.superTieBreak != null && !isPair(score.superTieBreak)) return false;
-      return validateScore(score as MatchScore).ok;
+      return validateScore(score as MatchScore, setGames).ok;
     }
     default:
       return false;
@@ -137,10 +141,12 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
  * are left out). The one standing computation of the public ladder and of the
  * player's own group card on Kezdőlap (#201): same order, same numbers. A pair
  * withdrawn mid-phase (#34, rules 2) is left out with all of its matches.
+ * `setGames`: the round's set format (D173), for walkovers and score checks.
  */
 export function groupTable(
   pairs: readonly { id: number; elo: number; withdrawn?: boolean }[],
   matches: readonly { a: number; b: number; outcome: MatchOutcome | null }[],
+  setGames: SetGames,
 ): TableRow[] {
   const decided: GroupMatch[] = matches.flatMap((m) => (m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : []));
   return groupStandings(
@@ -150,6 +156,7 @@ export function groupTable(
       withdrawn: !!p.withdrawn,
     })),
     decided,
+    setGames,
   ).map((r) => ({
     pairId: Number(r.id),
     rank: r.rank,
@@ -189,7 +196,7 @@ export function buildLadder(
   ordered.forEach((group, index) => {
     const byId = new Map(group.pairs.map((p) => [p.id, p]));
     const names = (id: number) => byId.get(id)!.names;
-    const standings = groupTable(group.pairs, group.matches);
+    const standings = groupTable(group.pairs, group.matches, group.setGames);
     const ranked = isRanked(standings);
     const zones = moveZones(standings.length, index + 1, ordered.length, ranked);
     bands.get(divisionOf(index + 1, ordered.length))!.push({
@@ -207,7 +214,7 @@ export function buildLadder(
       weeks: fixtureWeeks(
         group.pairs.filter((p) => !p.withdrawn),
         group.matches,
-        { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null },
+        { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null, setGames: group.setGames },
       ),
       withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
     });

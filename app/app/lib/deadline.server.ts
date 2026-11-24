@@ -1,9 +1,9 @@
-import { applyStrikes, deadlineDecision, type MatchStatus, resolutionCutoff, type Side } from "@padel-liga/rules";
+import { applyStrikes, deadlineDecision, type MatchStatus, resolutionCutoff, type SetGames, type Side } from "@padel-liga/rules";
 import { and, asc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { groups, leagues, matchDecisions, matches, noShowReports, pairs, seasons, users } from "~/db/schema";
+import { groups, leagues, matchDecisions, matches, noShowReports, pairs, seasonPhases, seasons, users } from "~/db/schema";
 import { auditEntry } from "~/lib/audit.server";
 import { reminderEmailInserts } from "~/lib/email/outbox.server";
 import { matchResolvedMessage, type Message } from "~/lib/notifications";
@@ -54,6 +54,8 @@ type Due = {
   leagueId: number;
   league: string;
   season: string;
+  // The round's set format (D173, #396): a walkover is 6:0, 6:0 or 4:0, 4:0.
+  setGames: SetGames;
 };
 
 /**
@@ -80,11 +82,13 @@ export async function resolveDeadlines(
       leagueId: leagues.id,
       league: leagues.name,
       season: seasons.name,
+      setGames: seasonPhases.setGames,
     })
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
     .innerJoin(leagues, eq(leagues.id, seasons.leagueId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(
       and(
         inArray(matches.status, ["open", "scheduled"]),
@@ -131,7 +135,7 @@ export async function resolveDeadlines(
     const { m, outcome, inactive } = plan;
     const messages: { userId: string; message: Message }[] = [];
     for (const s of ["a", "b"] as const)
-      for (const u of players.get(side(m, s)) ?? []) messages.push({ userId: u.id, message: matchResolvedMessage({ matchId: m.id, outcome: outcomeText(outcome, s) }) });
+      for (const u of players.get(side(m, s)) ?? []) messages.push({ userId: u.id, message: matchResolvedMessage({ matchId: m.id, outcome: outcomeText(outcome, s, m.setGames) }) });
     // Each struck player's count after this strike, by `${seasonId}:${userId}`,
     // and the pair's highest: the pair leaves when either of its players has 3
     // (spec 13), so both are told.
@@ -157,7 +161,7 @@ export async function resolveDeadlines(
           .set({ revision: m.revision + 1, status: "final", outcome })
           .where(and(eq(matches.id, m.id), eq(matches.revision, m.revision))),
         // The system's decision: no actor, no names (A/B).
-        auditEntry({ actorId: null, action: "match.deadline", target: `match:${m.id}`, detail: neutralOutcomeText(outcome, SIDES), at: now, leagueId: m.leagueId }),
+        auditEntry({ actorId: null, action: "match.deadline", target: `match:${m.id}`, detail: neutralOutcomeText(outcome, SIDES, m.setGames), at: now, leagueId: m.leagueId }),
         ...strikeInserts(
           [...new Set(given.map((u) => u.pairId))].map((pairId) => ({
             seasonId: m.seasonId,

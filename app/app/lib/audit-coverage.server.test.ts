@@ -86,7 +86,7 @@ function world() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, platform_role, level, consent_at) values ('adm', 'adm@x.hu', 'Admin', 'superadmin', 'halado', 1)`);

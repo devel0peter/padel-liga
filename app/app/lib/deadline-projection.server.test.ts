@@ -3,7 +3,7 @@
 // deadline run (deadline.server.ts) then stores for the same data, and
 // reading it writes nothing. The fixture is deadline.server.test.ts's; email
 // is captured, never sent.
-import { budapestTime } from "@padel-liga/rules";
+import { budapestTime, SETS_TO_SIX } from "@padel-liga/rules";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({ raw: null as any }));
@@ -51,7 +51,7 @@ async function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('o', 'o@x.hu', 'Org', 'versenyzo', 1)`);
@@ -128,7 +128,7 @@ describe("phaseProjection (#362)", () => {
     expect(reasons(ids.waiting)).toEqual({ kind: "leave", reason: "result_pending" });
     expect(reasons(ids.disputed)).toEqual({ kind: "leave", reason: "disputed" });
     expect(reasons(ids.noShow)).toEqual({ kind: "leave", reason: "no_show" });
-    expect(projectionLine(reasons(ids.noShow), { a: "A", b: "B" })).toBe("Nem dönt róla a határidő: meg nem jelenés bejelentése vár a döntésedre");
+    expect(projectionLine(reasons(ids.noShow), { a: "A", b: "B" }, SETS_TO_SIX)).toBe("Nem dönt róla a határidő: meg nem jelenés bejelentése vár a döntésedre");
 
     // p3a: 1 now, +1 (1-3 walkover) +1 (3-4 both lose) = 3; p3b 0 -> 2; p4a 1 -> 2; p4b 0 -> 1.
     expect(p.strikes.get("p3a")).toEqual({ now: 1, after: 3 });

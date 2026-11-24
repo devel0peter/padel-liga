@@ -10,6 +10,7 @@ import {
   resolutionDue,
   resolveAtDeadline,
 } from "./deadline";
+import { SETS_TO_SIX, SHORT_SETS } from "./results";
 import type { SchedulingEvent } from "./scheduling";
 import { groupStandings } from "./standings";
 
@@ -169,24 +170,32 @@ describe("resolveAtDeadline (spec 8, #11)", () => {
     expect(resolveAtDeadline(log, DEADLINE)).toEqual({ outcome: { kind: "both-inactive" }, inactive: ["a", "b"] });
   });
 
-  it("the outcomes count in the table as spec 9 says: walkover 3-0, both inactive 0-0 in the differences, unplayed nothing", () => {
-    const rows = groupStandings(
-      [
-        { id: "A", elo: 1200 },
-        { id: "B", elo: 1200 },
-        { id: "C", elo: 1200 },
-      ],
-      [
-        { a: "A", b: "B", outcome: resolveAtDeadline([proposal("a")], DEADLINE).outcome },
-        { a: "B", b: "C", outcome: resolveAtDeadline([], DEADLINE).outcome },
-        { a: "A", b: "C", outcome: resolveAtDeadline([proposal("a"), proposal("b", at("2026-11-11", 9))], DEADLINE).outcome },
-      ],
-    );
-    const by = new Map(rows.map((r) => [r.id, r]));
-    expect(by.get("A")).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
-    expect(by.get("B")).toMatchObject({ points: 0, matches: 2, setDiff: -4, gameDiff: -16 });
-    expect(by.get("C")).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
-  });
+  // A walkover is two sets to love in the round's format: 4-0 4-0 in Győr's
+  // round 1, 6-0 6-0 from round 2 (#396); neither tried: 0-4 0-4 or 0-6 0-6.
+  for (const [setGames, label] of [
+    [SHORT_SETS, "a short-set round: 4-0 4-0 and 0-4 0-4"],
+    [SETS_TO_SIX, "a sets-to-6 round (#396): 6-0 6-0 and 0-6 0-6"],
+  ] as const)
+    it(`the outcomes count in the table as spec 9 says, in ${label}: walkover 3-0, both inactive 0-0 in the differences, unplayed nothing`, () => {
+      const rows = groupStandings(
+        [
+          { id: "A", elo: 1200 },
+          { id: "B", elo: 1200 },
+          { id: "C", elo: 1200 },
+        ],
+        [
+          { a: "A", b: "B", outcome: resolveAtDeadline([proposal("a")], DEADLINE).outcome },
+          { a: "B", b: "C", outcome: resolveAtDeadline([], DEADLINE).outcome },
+          { a: "A", b: "C", outcome: resolveAtDeadline([proposal("a"), proposal("b", at("2026-11-11", 9))], DEADLINE).outcome },
+        ],
+        setGames,
+      );
+      const by = new Map(rows.map((r) => [r.id, r]));
+      const set = 2 * setGames;
+      expect(by.get("A")).toMatchObject({ points: 3, matches: 1, setDiff: 2, gamesWon: set, gamesLost: 0, gameDiff: set });
+      expect(by.get("B")).toMatchObject({ points: 0, matches: 2, setDiff: -4, gamesWon: 0, gameDiff: -2 * set });
+      expect(by.get("C")).toMatchObject({ points: 0, matches: 1, setDiff: -2, gamesWon: 0, gamesLost: set, gameDiff: -set });
+    });
 });
 
 describe("deadlineDecision: the one rule of the run and its projection (spec 8, D103, D108, #362)", () => {

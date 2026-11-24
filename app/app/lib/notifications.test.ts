@@ -1,3 +1,4 @@
+import { SHORT_SETS } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -369,13 +370,28 @@ describe("no-show notices (#33, D108)", () => {
   });
 
   it("tells each pair the decision from its own side, never the reason; not digest items", () => {
-    const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true });
-    const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false });
+    const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: SHORT_SETS });
+    const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: SHORT_SETS });
     expect(won).toMatchObject({ title: "Jóváhagyta a szervező: nem jöttek el", url: "/matches/7" });
     expect(won.body).toContain("4:0, 4:0");
     expect(lost.body).toContain("fekete pontot");
-    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true }).title).toBe("A szervező elutasította a bejelentésed");
-    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true, setGames: SHORT_SETS }).title).toBe("A szervező elutasította a bejelentésed");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false, setGames: SHORT_SETS }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");
     for (const kind of ["no_show_confirmed", "no_show_rejected"] as const) expect(DIGEST_KINDS).not.toContain(kind);
+  });
+
+  it("names the walkover in the round's set format (#396)", () => {
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: SHORT_SETS }).body).toBe(
+      "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: SHORT_SETS }).body).toBe(
+      "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: 6 }).body).toBe(
+      "6:0, 6:0-ra megnyertétek a meccset. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: 6 }).body).toBe(
+      "A meccset 0:6, 0:6-ra elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+    );
   });
 });

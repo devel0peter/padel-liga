@@ -4,9 +4,9 @@
 // round-extension.server.ts, the shift of the later rounds packages/rules
 // extendRound.
 
-import { addDays, budapestDay, extendRound, isSunday, weeksLater, type Break, type Day, type Phase } from "@padel-liga/rules";
+import { addDays, budapestDay, extendRound, isSunday, weeksLater, type Day, type Phase } from "@padel-liga/rules";
 
-import { formatDeadline, formatShortDate } from "./format";
+import { formatDeadline } from "./format";
 import { withArticle } from "./groups";
 import type { StoredPhase } from "./seasons";
 
@@ -51,14 +51,13 @@ export type ExtensionPlan = {
   later: { number: number; startsAt: Date; deadline: Date; weeks: number }[];
 };
 
-/** The season's rounds once round `number`'s deadline moves to `newEnd`; the later rounds' break rule is the engine's. */
-export function planExtension(
-  season: { phases: readonly StoredPhase[]; breaks: readonly Break[] },
-  number: number,
-  newEnd: Day,
-): ExtensionPlan {
+/**
+ * The season's rounds once round `number`'s deadline moves to `newEnd`: every
+ * later round moves by the same weeks, with no jump over a break (D172).
+ */
+export function planExtension(season: { phases: readonly StoredPhase[] }, number: number, newEnd: Day): ExtensionPlan {
   const spans = season.phases.map((p) => ({ number: p.number, start: budapestDay(p.startsAt), end: budapestDay(p.deadline) }));
-  const phases = extendRound(spans, number, newEnd, season.breaks);
+  const phases = extendRound(spans, number, newEnd);
   const later = phases
     .filter((p) => p.number > number)
     .map((p) => ({ number: p.number, startsAt: p.startsAt, deadline: p.deadline, weeks: weeksLater(spans.find((s) => s.number === p.number)!, p) }));
@@ -70,7 +69,7 @@ const weeksText = (weeks: number) => `${weeks} héttel`;
 
 /**
  * The confirmation's lines: the round's old and new deadline, then how much
- * later the later rounds move (one line when they all move the same).
+ * later the later rounds move (all by the same weeks, D172).
  * "Az 1. kör határideje: nov. 29., vasárnap 23:59 → dec. 6., vasárnap 23:59."
  */
 export function extensionSummary(number: number, oldDeadline: Date, plan: ExtensionPlan): string[] {
@@ -78,12 +77,7 @@ export function extensionSummary(number: number, oldDeadline: Date, plan: Extens
   const lines = [`${capitalArticle(number)} kör határideje: ${formatDeadline(oldDeadline)} → ${formatDeadline(own.deadline)}.`];
   const { later } = plan;
   if (later.length === 0) lines.push("Ez a szezon utolsó köre, más kör nem mozdul.");
-  else if (later.every((p) => p.weeks === later[0]!.weeks))
-    lines.push(`${roundsText(later)} ${weeksText(later[0]!.weeks)} később kezdődik.`);
-  else {
-    lines.push("A szünet miatt a későbbi körök nem egyformán tolódnak:");
-    for (const p of later) lines.push(`${capitalArticle(p.number)} kör ${weeksText(p.weeks)} később kezdődik (${formatShortDate(p.startsAt)}).`);
-  }
+  else lines.push(`${roundsText(later)} ${weeksText(later[0]!.weeks)} később kezdődik.`);
   return lines;
 }
 

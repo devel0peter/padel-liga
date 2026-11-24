@@ -331,7 +331,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     const seasons = await S.listSeasons(1);
     for (const id of ["g", "h"]) {
       const view = (await E.entryViews({ id, email: `${id}@x.hu`, name: id, level: "halado" } as any, seasons, NOW)).get(1);
-      expect(view).toEqual({ kind: "status", status: "withdrawn", text: TAKEN_OUT_TEXT, note: null });
+      expect(view).toEqual({ kind: "status", status: "withdrawn", text: TAKEN_OUT_TEXT, note: null, joinsPhase: expect.any(Number) });
     }
   });
 });

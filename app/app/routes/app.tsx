@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
+import { ArrowLeftRight, Shield, BarChart3, Medal, Bell, BellRing, BookOpen, Building2, CalendarDays, Check, ChevronsUpDown, Globe, House, HeartHandshake, LayoutDashboard, LogOut, Mail, MapPin, MessageSquarePlus, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, UserCog, UsersRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -74,6 +74,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   home: House,
+  myLeagues: Shield,
   rankings: Medal,
   notifications: Bell,
   overview: LayoutDashboard,
@@ -228,6 +229,7 @@ function TabBar({ tableHref, unread, initials, imageUrl }: { tableHref: string |
   const tabs = [
     { to: "/home", label: "Kezdőlap", icon: House },
     ...(tableHref ? [{ to: tableHref, label: "Tabella", icon: Trophy }] : []),
+    { to: "/leagues", label: "Ligáim", icon: Shield },
     { to: "/notifications", label: "Értesítések", icon: Bell },
   ];
   const item = "relative grid min-w-0 flex-1 justify-items-center gap-0.5 px-1 pt-2 pb-1.5 text-[11px] font-medium no-underline";

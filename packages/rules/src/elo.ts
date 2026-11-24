@@ -67,7 +67,7 @@ export function ratedWinner(outcome: MatchOutcome | null): Side | null {
   return v.ok ? v.totals.winner : null;
 }
 
-/** A side of a rated match: the two players who actually played. */
+/** A side of a rated match: the pair's two players. */
 export type EloSide = readonly [string, string];
 
 /** A played, final match in the order it first became final. */
@@ -76,6 +76,12 @@ export interface RatedMatch {
   readonly a: EloSide;
   readonly b: EloSide;
   readonly winner: Side;
+  /**
+   * Players marked as not playing it (a temporary substitute played
+   * instead, #400): their Elo and K stand in for the substitute's, but
+   * their rating and match count don't change.
+   */
+  readonly absent?: readonly string[];
 }
 
 /** One player's change in one match. */
@@ -96,10 +102,11 @@ export interface EloState {
 }
 
 /**
- * The changes of one match for the four players who played it (a
- * substitute counts as who played, spec 11). Both players of a side get the
- * same delta, K × (result − E), with the side's K and E from the two pairs'
- * average ratings. Not zero-sum when the sides' K differ.
+ * The changes of one match for the pairs' players who played it. Both
+ * players of a side get the same delta, K × (result − E), with the side's K
+ * and E from the two pairs' average ratings. Not zero-sum when the sides' K
+ * differ. A player marked absent (a temporary substitute played, spec 11,
+ * #400) still counts in their side's rating and K, and gets no change.
  */
 export function matchEloChanges(match: RatedMatch, state: (playerId: string) => EloState): EloChange[] {
   const sides = { a: match.a, b: match.b } as const;
@@ -111,6 +118,7 @@ export function matchEloChanges(match: RatedMatch, state: (playerId: string) => 
     const k = sideK(playerK(state(p).matches), playerK(state(q).matches));
     const delta = k * ((match.winner === side ? 1 : 0) - expectedScore(rating(side), rating(other)));
     for (const playerId of sides[side]) {
+      if (match.absent?.includes(playerId)) continue;
       const before = state(playerId).rating;
       changes.push({ matchId: match.id, playerId, before, after: before + delta, delta, k });
     }

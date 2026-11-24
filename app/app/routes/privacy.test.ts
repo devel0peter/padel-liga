@@ -50,6 +50,11 @@ describe("privacy page (#334)", () => {
     expect(text).not.toContain("az e-mail-címe és a telefonszáma nélkül");
   });
 
+  it("says that a league's seekers see each other's contact data on Párkereső (#398, D177)", () => {
+    expect(text).toContain("A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét, telefonszámát és e-mail-címét.");
+    expect(text).toContain("csak a nevüket és a szintjüket látja, elérhetőséget nem");
+  });
+
   it("lists the leagues an account joined (D128)", () => {
     expect(text).toContain("melyik ligákhoz csatlakoztál");
   });

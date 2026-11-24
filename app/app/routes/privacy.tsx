@@ -3,7 +3,7 @@ import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 12.";
+const EFFECTIVE_FROM = "2026. 11. 29.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -284,6 +284,13 @@ export default function Privacy() {
               másik párkeresővel. Erről az oldalon és e-mailben is szólunk, benne
               a párod nevével, e-mail-címével és telefonszámával. A jelzés
               alapból ki van kapcsolva, és bármikor kikapcsolhatod.
+            </p>
+            <p>
+              A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét,
+              telefonszámát és e-mail-címét. A liga többi pár nélküli játékosa
+              csak a nevüket és a szintjüket látja, elérhetőséget nem. Ha
+              felhívod vagy írsz valakinek, az a saját telefonodról vagy
+              levelezésedből megy: mi nem küldünk és nem tárolunk róla semmit.
             </p>
           </Section>
 

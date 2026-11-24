@@ -1,12 +1,12 @@
 # Padelpárbaj – Szabályzat
 
-*Hatályos: 2026. 11. 09.*
+*Hatályos: 2026. 11. 28.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
 - Minden héten egy meccset játszotok a csoport egy másik párjával. Egy kör 3 hétig tart.
 - Az időpontot SMS-ben vagy e-mailben beszélitek meg, és rögzítitek az oldalon. A kör végéig minden meccset le kell játszani.
-- 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
+- 2 nyert szettig játszotok, egy szett 6 nyert játékig tart (a győri 1. körben még 4-ig), 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
 - A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a divíziók győztesei díjat kapnak.
 
@@ -69,7 +69,8 @@ A részleteket lent találod.
 
 ## 4. A meccs
 - **Formátum:**
-  - 2 nyert szettig játszotok. Egy szett 4 nyert játékig tart, 2 játék különbséggel: 4:3 után még egy játék jön, így a szett 5:3-mal is végződhet. 4:4-nél rendes tie-break dönt 7 pontig (2 pont különbséggel), ilyenkor 5:4 a szett.
+  - 2 nyert szettig játszotok. Egy szett 6 nyert játékig tart, 2 játék különbséggel: 6:5 után még egy játék jön, így a szett 7:5-tel is végződhet. 6:6-nál rendes tie-break dönt 7 pontig (2 pont különbséggel), ilyenkor 7:6 a szett.
+  - A győri liga 1. körében még 4 nyert játékig tart egy szett: 4:3 után 5:3, 4:4-nél tie-break, ilyenkor 5:4 a szett. Ezek az eredmények így maradnak.
   - 1:1-es szettállásnál a 3. szett helyett szuper tie-break jön 10 pontig (2 pont különbséggel).
   - **Arany pont:** 40:40-nél nincs előny, egyetlen pont dönt. A fogadó pár választja ki, melyik játékosuk fogadja.
   - A szett- és játékkülönbségnél a szuper tie-break egy szettnek és 1:0-s játéknak számít.
@@ -81,9 +82,9 @@ A részleteket lent találod.
 
 ## 5. Ha elmarad a meccs
 A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
-- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 4:0, 4:0 eredménnyel.
+- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel (a győri 1. körben 4:0, 4:0).
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az Élő-pontok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
-- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:4, 0:4 eredménnyel.
+- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel (a győri 1. körben 0:4, 0:4).
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
 
 **Egyeztetésnek számít**, ha a meccs oldalán megnyomod az „SMS mindenkinek” vagy az „E-mail mindenkinek” gombot, ha időpontokat ajánlotok, vagy ha rögzítitek vagy megerősítitek a megbeszélt időpontot. Ha az időpont fix lett (megerősítve vagy magától), mindkét pár próbált egyeztetni.

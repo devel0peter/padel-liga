@@ -4,6 +4,8 @@ import {
   DEFAULT_FAST_SWITCHES,
   entryGroup,
   isFastSwitch,
+  changeAtSwitch,
+  changeLeaveReason,
   keepSpots,
   leaveReason,
   optedOutAfter,
@@ -518,6 +520,28 @@ describe("keepSpots and roundSwitchDraft with permanent partner changes (#403, s
     expect(ids(out.groups)).toEqual([["A", "B2"], ["C"]]);
     expect(out.unplaced.map((x) => x.id)).toEqual(["X2"]);
     expect(ids(groups)).toEqual([["A", "B"], ["C"]]);
+  });
+
+  it("with an opt-out (#395): the staying player's ends the change and the pair leaves as opted out; the leaving player's changes nothing", () => {
+    expect(changeAtSwitch({ strikes: false, optedOutBy: null })).toBe("keeps_spot");
+    expect(changeAtSwitch({ strikes: false, optedOutBy: "leaving" })).toBe("keeps_spot");
+    expect(changeAtSwitch({ strikes: true, optedOutBy: "leaving" })).toBe("new_pair");
+    expect(changeAtSwitch({ strikes: false, optedOutBy: "staying" })).toBe("ends");
+    expect(changeAtSwitch({ strikes: true, optedOutBy: "staying" })).toBe("ends");
+    expect(changeLeaveReason({ strikes: false, optedOutBy: "leaving" })).toBeNull();
+    expect(changeLeaveReason({ strikes: false, optedOutBy: "staying" })).toBe("opted_out");
+    expect(changeLeaveReason({ strikes: true, optedOutBy: null })).toBe("strikes");
+
+    // The draft: G2P1 changes partner. The leaving player opted out: the new pair still goes up.
+    const t = tables(4, 4, 4);
+    const winner = t[1]![0]!;
+    const kept = roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [{ old: winner, pair: changed(winner) }] });
+    expect(at(kept, "G2P1+new")).toBe(0);
+    // The staying player opted out: no change reaches the draft, the old pair leaves and the pairs below move up.
+    const ended = roundSwitchDraft({ tables: t, fast: false, leaves: (x) => x.id === "G2P1", newPairs: [], changes: [] });
+    expect(at(ended, "G2P1")).toBe(-1);
+    expect(at(ended, "G2P1+new")).toBe(-1);
+    expect(ended.flat()).toHaveLength(11);
   });
 
   it("without changes the draft is unchanged", () => {

@@ -129,7 +129,7 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
 - **A liga első szezonjának első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. Ha a határ egyik oldalán 3 páros csoport van, ott ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
-- **Állandó partnercsere után** az új pár a régi pár helyét kapja meg: ha a régi pár megnyerte a csoportját, az új pár egy csoporttal feljebb kezd, ha utolsó lett, egy csoporttal lejjebb. Ha a régi pár 3 fekete pont miatt esik ki, az új párt új párként soroljuk be.
+- **Állandó partnercsere után** az új pár a régi pár helyét kapja meg: ha a régi pár megnyerte a csoportját, az új pár egy csoporttal feljebb kezd, ha utolsó lett, egy csoporttal lejjebb. Ha a régi pár 3 fekete pont miatt esik ki, az új párt új párként soroljuk be. Ha a maradó játékos a „Nem folytatom” gombot nyomja meg, a pár kilép a kör végén, és a csere nem jön létre.
 - **Új párok a szezon közben** (később nevezők, a szervező párcseréje után és visszatérők):
   - Ha szezon közben csatlakozol, vagy szünet után visszatérsz, a szinted (ha már játszottál, az Élő-pontod) szerinti divízió legalsó csoportjába kerülsz. Ha ott nincs hely, onnan lefelé a csoportok leggyengébb párja egy csoporttal lejjebb kerül.
   - A beosztást a kör indulása előtt a szervező átnézi.

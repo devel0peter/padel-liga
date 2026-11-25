@@ -1,4 +1,13 @@
-import { isFastSwitch, leaveReason, optedOutAfter, roundSwitchDraft, type MatchOutcome, type PartnerChange } from "@padel-liga/rules";
+import {
+  changeAtSwitch,
+  changeLeaveReason,
+  isFastSwitch,
+  leaveReason,
+  optedOutAfter,
+  roundSwitchDraft,
+  type MatchOutcome,
+  type PartnerChange,
+} from "@padel-liga/rules";
 import { and, asc, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
@@ -85,7 +94,7 @@ export async function roundSwitch(
   const stored = await phaseGroups(seasonId, endingPhase);
   if (stored.length === 0 || stored.some((g) => !g.publishedAt)) return null;
 
-  const [[league], [first], rows, entered, strikeLeavers, optedOut, changes] = await Promise.all([
+  const [[league], [first], rows, entered, strikeLeavers, optedOut, switching] = await Promise.all([
     db.select({ fastSwitches: leagues.fastSwitches }).from(leagues).where(eq(leagues.id, season.leagueId)),
     // The league's first season: the one created first.
     db.select({ id: sql<number>`min(${seasons.id})` }).from(seasons).where(eq(seasons.leagueId, season.leagueId)),
@@ -104,7 +113,7 @@ export async function roundSwitch(
     // The season's opt-outs on Ligáim (#395), whatever happened to the pair
     // or its entry since; optedOutAfter picks the ones that end by now.
     db
-      .select({ pairId: seasonEntries.pairId, optOutPhase: seasonEntries.optOutPhase })
+      .select({ pairId: seasonEntries.pairId, optOutPhase: seasonEntries.optOutPhase, optedOutBy: seasonEntries.optedOutBy })
       .from(seasonEntries)
       .where(and(eq(seasonEntries.seasonId, seasonId), isNotNull(seasonEntries.optOutPhase))),
     switchChanges(seasonId, nextPhase),
@@ -161,16 +170,24 @@ export async function roundSwitch(
   const entry = new Map(entered.map((p) => [p.pairId, p]));
   const strikes = new Set(strikeLeavers.map((p) => p.pairId));
   const out = new Set(optedOut.filter((p) => optedOutAfter(p.optOutPhase, endingPhase)).map((p) => p.pairId));
-  // A pair with a permanent partner change leaves only by strikes (#403
-  // req 5), also when it opted out (#395): it is dissolved once its new pair
-  // starts, which takes its spot.
-  const changing = new Set(changes.map((c) => c.oldPairId));
-  const reasonOf = (p: GroupPair): LeaveReason | null =>
-    changing.has(p.pairId)
-      ? strikes.has(p.pairId)
-        ? "strikes"
-        : null
+  // A permanent partner change (#403) at this switch (packages/rules
+  // changeAtSwitch): the staying player's own opt-out (#395) ends it, and its
+  // old pair leaves as "Nem folytatja" like any opted-out pair (the publish
+  // then ends the change and tells its players); otherwise the old pair
+  // leaves only by strikes (the leaving player's opt-out changes nothing) and
+  // is dissolved once its new pair starts, which takes its spot.
+  const optOutBy = new Map(optedOut.filter((p) => out.has(p.pairId)).map((p) => [p.pairId, p.optedOutBy]));
+  const optedOutBy = (c: SwitchChange) =>
+    !out.has(c.oldPairId) ? null : c.status === "final" && optOutBy.get(c.oldPairId) === c.staying.id ? ("staying" as const) : ("leaving" as const);
+  const changes = switching.filter((c) => changeAtSwitch({ strikes: strikes.has(c.oldPairId), optedOutBy: optedOutBy(c) }) !== "ends");
+  const changeOf = new Map(changes.map((c) => [c.oldPairId, c]));
+  const reasonOf = (p: GroupPair): LeaveReason | null => {
+    const c = changeOf.get(p.pairId);
+    return c
+      ? changeLeaveReason({ strikes: strikes.has(p.pairId), optedOutBy: optedOutBy(c) })
       : leaveReason({ strikes: strikes.has(p.pairId), optedOut: out.has(p.pairId), active: p.active, entered: entry.has(p.pairId) });
+  };
+  const changing = new Set(changes.map((c) => c.oldPairId));
   const continuing = new Set(tables.flatMap((t) => t.rows.map((r) => r.pair.pairId)));
   const leaving = [
     ...stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((pair) => ({ pair, reason: "withdrawn" as const }))),

@@ -496,16 +496,33 @@ describe("permanent partner changes at the round switch (#403, D179)", () => {
     expect(s.leaving).toEqual([]);
   });
 
-  it("an old pair that opted out (#395) but has a final change: the new pair keeps the spot, not listed as leaving", async () => {
+  it("the leaving player opted out (#395): the new pair still keeps the spot, not listed as leaving", async () => {
     finishAll();
     finalChange(5, "q");
-    h.raw.exec("update season_entries set opt_out_phase = 1 where pair_id = 5");
+    h.raw.exec("update season_entries set opt_out_phase = 1, opted_out_by = 'p5b' where pair_id = 5");
     const s = (await R.roundSwitch(1, 2, AFTER))!;
     expect(ids(s.draft)[0]).toContain(5);
+    expect(s.changes.get(5)).toEqual({ leaving: "Játékos 5B", partner: "Játékos Q" });
     expect(s.leaving).toEqual([]);
     // Without the change it would leave as "Nem folytatja".
     h.raw.exec("update partner_changes set status = 'undone'");
     expect((await R.roundSwitch(1, 2, AFTER))!.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual([[5, "opted_out"]]);
+  });
+
+  it("the staying player opted out (#395): the pair leaves as \"Nem folytatja\", the change doesn't start and its players are told", async () => {
+    finishAll();
+    finalChange(5, "q");
+    h.raw.exec("update season_entries set opt_out_phase = 1, opted_out_by = 'p5a' where pair_id = 5");
+    const s = (await R.roundSwitch(1, 2, AFTER))!;
+    expect(s.leaving.map((l) => [l.pair.pairId, l.reason])).toEqual([[5, "opted_out"]]);
+    expect(s.draft.flat().map((p) => p.pairId)).not.toContain(5);
+    expect(s.changes.size).toBe(0);
+    // At the publish the change ends: the old pair is no longer in the draft.
+    expect(await R.generateRoundSwitchDraft(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(await R.publishRoundSwitch(1, 2, "o", AFTER)).toEqual({ ok: true });
+    expect(all("select status from partner_changes")).toEqual([{ status: "undone" }]);
+    expect(all("select user_id from notifications where kind = 'partner_change' order by user_id").map((n: { user_id: string }) => n.user_id)).toEqual(["p5a", "p5b", "q"]);
+    expect(all("select count(*) n from pairs where status = 'active' and player_b = 'q'")[0].n).toBe(0);
   });
 
   it("an old pair that finished last: the new pair starts one group lower", async () => {

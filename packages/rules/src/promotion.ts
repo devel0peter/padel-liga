@@ -229,6 +229,32 @@ export function leaveReason(f: LeaverFacts): Exclude<LeaveReason, "withdrawn"> |
 }
 
 /**
+ * What a permanent partner change does at the round switch it starts at
+ * (#403, D179, with #395's opt-out):
+ * - "ends": the staying player (who would play on in the new pair) opted
+ *   out: the old pair leaves as "Nem folytatja" like any opted-out pair, and
+ *   the change doesn't start.
+ * - "new_pair": the old pair leaves by a 3rd strike: the new pair is placed
+ *   by the new-pair rules.
+ * - "keeps_spot": otherwise the new pair takes the old pair's spot. The
+ *   leaving player's opt-out changes nothing (they leave anyway), nor does a
+ *   dissolved pair or a taken-out entry (the change ends the old pair).
+ */
+export type ChangeAtSwitch = "keeps_spot" | "new_pair" | "ends";
+
+export function changeAtSwitch(f: { readonly strikes: boolean; readonly optedOutBy: "staying" | "leaving" | null }): ChangeAtSwitch {
+  if (f.optedOutBy === "staying") return "ends";
+  if (f.strikes) return "new_pair";
+  return "keeps_spot";
+}
+
+/** The leave reason of the old pair of a partner change (changeAtSwitch): only a 3rd strike or the staying player's opt-out. */
+export function changeLeaveReason(f: { readonly strikes: boolean; readonly optedOutBy: "staying" | "leaving" | null }): "strikes" | "opted_out" | null {
+  const at = changeAtSwitch(f);
+  return at === "ends" ? (f.strikes ? "strikes" : "opted_out") : at === "new_pair" ? "strikes" : null;
+}
+
+/**
  * Whether an opt-out made in `optOutPhase` (null: none) ends the pair's
  * season after `endingPhase` (#395): the pair plays the phase it opted out
  * in to the end and leaves at the switch after it.

@@ -8,7 +8,7 @@ import type { User } from "./auth/session.server";
 import { finderEntries, searchState, type FinderEntry, type SearchState } from "./partner-search";
 import { memberOf } from "./league-members.server";
 import { pairLinkFor, pairLinkPath } from "./pair-links.server";
-import { activePairWith, createPair, type PairLeague } from "./pairs.server";
+import { activePairWith, committedPartner, createPair, type PairLeague } from "./pairs.server";
 import { LEVELS } from "./interest";
 import { formatPhone } from "./phone";
 
@@ -23,10 +23,12 @@ import { formatPhone } from "./phone";
 const LEVEL_ORDER: string[] = Object.keys(LEVELS);
 const levelRank = (level: string) => (LEVEL_ORDER.includes(level) ? LEVEL_ORDER.indexOf(level) : LEVEL_ORDER.length);
 
-// No active pair in the league for the player in `user` (a column).
+// No active pair in the league for the player in `user` (a column), and not
+// the new partner of a final permanent partner change there (#402): such a
+// player is committed to a pair.
 const unpaired = (leagueId: number, user: typeof users.id) =>
   sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
-    and (${pairs.playerA} = ${user} or ${pairs.playerB} = ${user}))`;
+    and (${pairs.playerA} = ${user} or ${pairs.playerB} = ${user})) and not ${committedPartner(leagueId, sql`${user}`)}`;
 
 // Párod: per league where the player has no pair, whether the switch is on,
 // and whether under the #398 wording (listed on Párkereső).

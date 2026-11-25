@@ -54,6 +54,7 @@ import {
   movement,
   type Origin,
   originText,
+  changeText,
   OUTDATED_DRAFT,
   PREVIEW_TITLE,
   previewText,
@@ -98,7 +99,12 @@ function phaseParam(value: FormDataEntryValue | string | null): number | null {
 }
 
 // Only names and ratings leave the server.
-function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, origins?: Map<number, Origin>) {
+// `changes`: the permanent partner changes starting at this switch (#403).
+function groupView(
+  g: StoredGroup | { number: number; pairs: GroupPair[] },
+  origins?: Map<number, Origin>,
+  changes?: Map<number, { leaving: string; partner: string }>,
+) {
   const average = groupAverage(g.pairs);
   return {
     number: g.number,
@@ -116,9 +122,18 @@ function groupView(g: StoredGroup | { number: number; pairs: GroupPair[] }, orig
         withdrawn: p.withdrawn,
         withdrawalReason: p.withdrawalReason,
         origin: origin ? { text: originText(origin), move: movement(origin, g.number) } : null,
+        change: changeText(changes?.get(p.pairId)),
       };
     }),
   };
+}
+
+// A stored draft's group with the permanent partner changes (#403) shown as
+// the draft computes them: the new pair's players and rating in the old
+// pair's row, as on the preview.
+function withChanges(g: StoredGroup, s: { draft: GroupPair[][]; changes: Map<number, unknown> }): StoredGroup {
+  const computed = new Map(s.draft.flat().filter((p) => s.changes.has(p.pairId)).map((p) => [p.pairId, p]));
+  return { ...g, pairs: g.pairs.map((p) => computed.get(p.pairId) ?? p) };
 }
 
 // The pairs that leave at a switch, with why: names only.
@@ -163,7 +178,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     endingPhase: p.endingPhase,
     fast: p.fast,
     undecided: p.undecided,
-    groups: p.draft.map((pairs, i) => groupView({ number: i + 1, pairs }, p.origins)),
+    groups: p.draft.map((pairs, i) => groupView({ number: i + 1, pairs }, p.origins, p.changes)),
     leaving: leavingView(p.leaving),
   };
 
@@ -204,7 +219,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     splitProblem: null,
     blocker: sizesBlocker ?? (s && s.disputes.length > 0 ? DISPUTES_BLOCK : null),
     players,
-    groups: stored.map((g) => groupView(g, s?.origins)),
+    groups: stored.map((g) => groupView(draft && s ? withChanges(g, s) : g, s?.origins, s?.changes)),
     switch: s && {
       endingPhase: s.endingPhase,
       state: s.state,
@@ -337,6 +352,7 @@ function GroupCard({ group, groups, editable, phase }: { group: Group; groups: G
                     Elo: {p.elo}
                     {p.origin && <OriginBadge origin={p.origin} />}
                   </span>
+                  {p.change && <span className="text-xs font-medium break-words">{p.change}</span>}
                   {p.withdrawalReason && (
                     <span className="text-xs break-words text-muted-foreground">Indok: {p.withdrawalReason}</span>
                   )}

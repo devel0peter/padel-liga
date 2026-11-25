@@ -33,6 +33,7 @@ const SEASONS = await import("~/lib/seasons.server");
 const START = await import("~/lib/season-start.server");
 const REMINDERS = await import("~/lib/reminders.server");
 const PAIRS = await import("~/lib/pairs.server");
+const CHANGES = await import("~/lib/partner-changes.server");
 const ENTRIES = await import("~/lib/season-entries.server");
 const GROUPS = await import("~/lib/groups.server");
 const RESULTS = await import("~/lib/results.server");
@@ -198,6 +199,59 @@ const STEPS: Step[] = [
     },
   },
   {
+    // A permanent partner change (#402) the new partner accepted (the
+    // players' steps are audited in partner-changes.server.test.ts), approved
+    // on Párok (#416), then undone there.
+    action: "partner_change.approve",
+    actor: ORG,
+    run: async () => {
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'accepted', ?)",
+        )
+        .run(sec("2026-11-10T10:00:00Z"));
+      await expectOk(CHANGES.approvePartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE));
+    },
+  },
+  {
+    action: "partner_change.undo",
+    actor: ORG,
+    run: () => expectOk(CHANGES.undoPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, IN_PHASE)),
+  },
+  {
+    // Accepted again, and rejected with a reason (#416).
+    action: "partner_change.reject",
+    actor: ORG,
+    run: async () => {
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, created_at) values (1, 1, 2, 'p2a', 'p2b', 'r3', 'accepted', ?)",
+        )
+        .run(sec("2026-11-11T09:00:00Z"));
+      await expectOk(CHANGES.rejectPartnerChange(ORG, 1, one("select max(id) as id from partner_changes").id, "Túl sok csere.", IN_PHASE));
+    },
+  },
+  {
+    // The new pair of a final change starts when the organizer publishes the
+    // round switch it starts at (#403): here the start alone, on a round 2
+    // draft that holds the old pair.
+    action: "partner_change.start",
+    actor: ORG,
+    run: async () => {
+      h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('r4', 'r4@x.hu', 'Játékos r4', 'halado', 1)`);
+      h.raw
+        .prepare(
+          "insert into partner_changes (league_id, season_id, pair_id, started_by, leaving_id, partner_id, status, starts_phase, created_at) values (1, 1, 3, 'p3a', 'p3b', 'r4', 'final', 2, ?)",
+        )
+        .run(sec("2026-11-10T10:00:00Z"));
+      h.raw.exec(`insert into groups (season_id, phase, number) values (1, 2, 1)`);
+      h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) select id, 3, 1 from groups where phase = 2`);
+      expect(await CHANGES.startChangesAtPublish(1, 2, ORG, IN_PHASE)).toBe(1);
+      // The draft is the fixture's: gone again for the steps after.
+      h.raw.exec(`delete from groups where phase = 2`);
+    },
+  },
+  {
     action: "strike.cancel",
     actor: ORG,
     run: () => expectOk(STRIKES.cancelStrike(ORG, 1, one("select min(id) as id from strikes").id, "Beteg volt.", AFTER_PHASE)),
@@ -266,8 +320,8 @@ async function expectOk(p: Promise<{ ok: boolean; error?: string }>) {
 
 // The actions written by scripts and players, outside this guard: the CLI
 // (scripts/superadmin.mjs, scripts/invite.mjs) and a player's own pair link
-// and partner search, joining a league, and opting out on Ligáim (#395)
-// (their own tests check the entry).
+// and partner search, joining a league, opting out on Ligáim (#395), and a
+// permanent partner change's steps (#402) (their own tests check the entries).
 // RETIRED: written by flows that went with the interest list (#333, D129)
 // and with the organizer's approval of named substitutes (#400, D175);
 // Napló still names their old entries, nothing writes new ones.
@@ -281,6 +335,10 @@ const OUTSIDE: AuditAction[] = [
   "league.join",
   "season_entry.opt_out",
   "season_entry.opt_out_undo",
+  "partner_change.request",
+  "partner_change.withdraw",
+  "partner_change.accept",
+  "partner_change.decline",
 ];
 const RETIRED: AuditAction[] = ["signup.update", "signup.delete", "solo.pair", "solo.unpair", "registration_invites.send", "substitute.approve", "substitute.reject", "substitute.revoke"];
 
@@ -290,14 +348,14 @@ const ROUTE_ACTIONS: Record<string, AuditAction[]> = {
   "admin.cities.tsx": ["city.create", "city.update", "city.delete"],
   "admin.clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
   "admin.league-clubs.tsx": ["club.create", "club.update", "club.activate", "club.deactivate", "club.delete"],
-  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel"],
+  "admin.league-pairs.tsx": ["pair.create", "pair.dissolve", "pair.change", "season_entry.enter", "season_entry.remove", "season_entry.withdraw", "strike.cancel", "partner_change.approve", "partner_change.reject", "partner_change.undo"],
   "admin.league-reminders.tsx": ["reminders.on", "reminders.off"],
   "admin.league-seasons.tsx": ["season.create", "season.update", "season.delete", "phase.extend"],
   "admin.league-players.tsx": ["pair.create"],
   "admin.leagues.tsx": ["league.create", "league_admin.grant", "league_admin.invite", "league_admin.revoke", "league_admin.invite_cancel"],
   "admin.outbox.tsx": ["outbox.retry"],
   "admin.match-decide.tsx": ["match.decide", "match.no_show_confirm", "match.no_show_reject"],
-  "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish"],
+  "admin.season-groups.tsx": ["groups.draft", "groups.move", "groups.publish", "partner_change.start"],
   "admin.league.tsx": ["league.min_entries"],
   "admin.users.tsx": ["account.delete", "account.anonymize"],
   "admin.user.tsx": ["user.update", "partner_search.on", "partner_search.off"],

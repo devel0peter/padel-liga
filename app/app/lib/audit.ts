@@ -36,6 +36,16 @@ export const AUDIT_ACTIONS = {
   "pair.dissolve": "Pár felbontása",
   "pair.change": "Partnercsere",
   "pair.link": "Pár párlinkkel",
+  // Permanent partner change (#402): the players' steps, the organizer's
+  // undo and the new pair's start at the round switch publish (#403).
+  "partner_change.request": "Állandó partnercsere kérése",
+  "partner_change.withdraw": "Állandó partnercsere: kérés visszavonva",
+  "partner_change.accept": "Állandó partnercsere elfogadva",
+  "partner_change.decline": "Állandó partnercsere elutasítva",
+  "partner_change.approve": "Állandó partnercsere jóváhagyása",
+  "partner_change.reject": "Állandó partnercsere elutasítása",
+  "partner_change.undo": "Állandó partnercsere visszavonása",
+  "partner_change.start": "Állandó partnercsere: az új pár indul",
   "season_entry.enter": "Benevezés",
   "season_entry.remove": "Kivétel a szezonból",
   "season_entry.withdraw": "Kivétel kihirdetett csoportból",

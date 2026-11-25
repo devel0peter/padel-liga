@@ -674,6 +674,32 @@ Default in, and "Nem folytatom" until the round's deadline (#395, decision log (
   - "Mégis folytatom": the card is back to "Benne vagytok …", the partner gets "A párod mégis folytatja", Napló has a second entry.
   - After the deadline the section is gone; in the season's last round it never shows.
 
+### 44. A player changes partner permanently; the Szervező approves it, then undoes it (after step 11)
+
+"Állandó partnercsere" on Ligáim (#402, #416, decision log (`docs/decisions.md`) D178, D180; `app/e2e/44-partner-change.spec.ts`). Best seen on the running round seed below. Emails are printed by the dev server, never sent.
+
+- Page: `/leagues/minta`, then the match page, then Párok (`/admin/leagues/minta/pairs`)
+- Account: a player of a pair in round 1; then the new partner (a registered player of Mintaváros without a pair); then the Szervező
+- Do: in "Állandó partnercsere" open "Végleg új partnerrel játszanál?", pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Jóváhagyom" on the change in "Állandó partnercserék" on Párok; later press "Visszavonás" there and confirm. (Or "Elutasítom" with a reason instead of approving.)
+- Expect:
+  - The picker lists names only (no email or phone): the league's players with no pair. After sending: "Elküldtük." and "Elküldted <név> részére. <nap>-ig válaszolhat." with "Visszavonom"; the partner sees that a change was asked. A second change can't be started while one waits.
+  - The new partner: one email ("<név> állandó partnernek hív") and an in-app notice; on Ligáim "<név> állandó partnernek hív <partner> helyett." with "Elfogadom" and "Nem fogadom el". Unanswered, it disappears after 7 days.
+  - After "Elfogadom": "Elfogadtad.", and "Jóváhagyásra vár" for the starter and the new partner; nothing on the matches yet. The Szervező (and the Admins) get "Partnercsere jóváhagyásra vár" in the app and by push, no email; Párok shows the change with "Jóváhagyásra vár", how often the two changed partner this season, "Jóváhagyom" and "Elutasítom".
+  - After "Jóváhagyom": the new partner's card says "A 2. körtől <név> párja vagy." The leaving player gets one email ("Új partner a helyeden") and an in-app notice; the starter and the new partner an in-app notice. Every remaining match of the pair in round 1 (before its agreed start) shows "<távozó> helyett <új partner> játszik"; the opponents get "Helyettes a meccseteken" naming the new partner. Párok's pair row shows "Helyettessel: <n> meccs ebben a szezonban".
+  - "Elutasítom" instead: the change ends, the three players get "Elutasított partnercsere" with the reason in the app and by push, no email.
+  - Párok: "Állandó partnercserék" with "<maradó>: <távozó> helyett <új partner>" and its state; after "Visszavonás" the marks on matches not played yet are gone and all three get an in-app notice.
+
+### 45. The new pair takes the old pair's spot at the round switch (after step 44, before step 11's round ends)
+
+#403, decision log (`docs/decisions.md`) D179; `app/e2e/45-partner-change-switch.spec.ts`; the rule is unit tested in the rules engine (`keepSpots`).
+
+- Page: the season's Csoportok (`/admin/leagues/minta/seasons/<id>/groups`)
+- Account: the Szervező
+- Do: with a change accepted (step 44, not undone), open Csoportok on the running round's page.
+- Expect:
+  - "Előzetes beosztás": the new pair (the starter and the new partner, its own Élő-pont) in the old pair's spot after promotion and relegation, with "Partnercsere: <távozó> helyett <új partner>". The real draft after the deadline shows the same, and the organizer can still move it.
+  - Publishing the next round dissolves the old pair, makes the new one (Párok: "partnercseréből") and gives it the round's matches; round 1's results stay with the old pair. An old pair that leaves by a 3rd strike: its new pair is placed as a new pair ("Új pár").
+
 ## A running round instead
 
 `npm run db:seed:season:local -w app` writes the same seed, then skips to the middle of round 1: every pair-to-be above and Varga Dóra and Kiss Miklós have a finished account in Mintaváros, 11 pairs are approved and in 3 published groups (4, 4, 3), and today is in week 2. The matches are in every state: final, a result waiting for confirmation, a dispute, a proposal, a counter-proposal, an agreed time, booked for tomorrow, played without a result, open. Log in as `kovacs.anna@example.test` (group 1: a result to confirm, a proposal to answer) or as the Szervező (Meccsek, Viták). Elo shows the starting values until the next result is confirmed in the app. Local only, with the same guard as the seed; running either seed again resets it.

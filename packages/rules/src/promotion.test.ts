@@ -4,6 +4,9 @@ import {
   DEFAULT_FAST_SWITCHES,
   entryGroup,
   isFastSwitch,
+  changeAtSwitch,
+  changeLeaveReason,
+  keepSpots,
   leaveReason,
   optedOutAfter,
   placeNewPairs,
@@ -401,5 +404,150 @@ describe("default in and opting out (#395: opted-out pairs leave as \"Nem folyta
       ["G1P1", "G1P3", "G1P4", "G2P1"],
       ["New", "G2P2", "G2P3", "G2P4"],
     ]);
+  });
+});
+
+describe("keepSpots and roundSwitchDraft with permanent partner changes (#403, spec 10, D179)", () => {
+  // The new pair of G<g>P<n>: the staying player with a new partner.
+  const changed = (old: Pair, averageElo = old.averageElo): Pair => p(`${old.id}+new`, averageElo);
+  const at = (draft: readonly (readonly { id: string }[])[], id: string) => draft.findIndex((g) => g.some((x) => x.id === id));
+
+  it("an old pair that won its group: the new pair starts one group higher, in the winner's spot", () => {
+    const t = tables(4, 4, 4);
+    const winner = t[1]![0]!; // G2P1
+    const draft = roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [{ old: winner, pair: changed(winner) }] });
+    expect(at(draft, "G2P1+new")).toBe(0);
+    expect(at(draft, "G2P1")).toBe(-1);
+    expect(ids(draft)).toEqual([
+      ["G1P1", "G1P2", "G1P3", "G2P1+new"],
+      ["G1P4", "G2P2", "G2P3", "G3P1"],
+      ["G2P4", "G3P2", "G3P3", "G3P4"],
+    ]);
+  });
+
+  it("an old pair that finished last: the new pair starts one group lower", () => {
+    const t = tables(4, 4, 4);
+    const last = t[1]![3]!; // G2P4
+    const draft = roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [{ old: last, pair: changed(last) }] });
+    expect(at(draft, "G2P4+new")).toBe(2);
+  });
+
+  it("keeps the spot whatever the new pair's rating: no new-pair placement, only the seed inside the group follows it", () => {
+    const t = tables(4, 4, 4);
+    const mid = t[2]![1]!; // G3P2 stays in group 3
+    const draft = roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [{ old: mid, pair: changed(mid, 2500) }] });
+    // Placed as a new pair, 2500 would aim at group 2; it keeps group 3 and is seeded first there.
+    expect(draft[2]![0]!.id).toBe("G3P2+new");
+  });
+
+  it("an old pair that leaves by a 3rd strike: the new pair is placed by the new-pair rules", () => {
+    const t = tables(4, 4, 4);
+    const winner = t[0]![0]!; // G1P1, rated 1990: the new pair, 1000, goes to the bottom
+    const draft = roundSwitchDraft({
+      tables: t,
+      fast: false,
+      leaves: (x) => x.id === "G1P1",
+      newPairs: [],
+      changes: [{ old: winner, pair: changed(winner, 1000) }],
+    });
+    expect(at(draft, "G1P1")).toBe(-1);
+    expect(at(draft, "G1P1+new")).toBe(2);
+    // The same as a late entry of that rating.
+    const late = roundSwitchDraft({ tables: t, fast: false, leaves: (x) => x.id === "G1P1", newPairs: [p("G1P1+new", 1000)] });
+    expect(ids(draft)).toEqual(ids(late));
+  });
+
+  it("a group where two pairs change partners: both keep their spots", () => {
+    const t = tables(4, 4, 4);
+    const [first, , third] = t[1]!; // G2P1 goes up, G2P3 stays
+    const draft = roundSwitchDraft({
+      tables: t,
+      fast: false,
+      leaves: none,
+      newPairs: [],
+      changes: [
+        { old: first!, pair: changed(first!) },
+        { old: third!, pair: changed(third!) },
+      ],
+    });
+    expect(at(draft, "G2P1+new")).toBe(0);
+    expect(at(draft, "G2P3+new")).toBe(1);
+    expect(draft.flat()).toHaveLength(12);
+  });
+
+  it("a group where one pair opts out (#395) and another changes partner: the change keeps its spot, the pairs below move up into the hole", () => {
+    const t = tables(4, 4, 4);
+    const stays = t[1]![1]!; // G2P2
+    const draft = roundSwitchDraft({
+      tables: t,
+      fast: false,
+      leaves: (x) => x.id === "G2P3",
+      newPairs: [],
+      changes: [{ old: stays, pair: changed(stays) }],
+    });
+    expect(ids(draft)).toEqual([
+      ["G1P1", "G1P2", "G1P3", "G2P1"],
+      ["G1P4", "G2P2+new", "G2P4", "G3P1"],
+      ["G3P2", "G3P3", "G3P4"],
+    ]);
+  });
+
+  it("late entries are placed after the spots are kept, and a change without a spot after them", () => {
+    const t = tables(4, 4);
+    const gone = t[0]![1]!; // G1P2 leaves by a 3rd strike
+    const keep = t[1]![2]!; // G2P3
+    const draft = roundSwitchDraft({
+      tables: t,
+      fast: false,
+      leaves: (x) => x.id === "G1P2",
+      newPairs: [p("Late", 1000)],
+      changes: [
+        { old: gone, pair: changed(gone, 1000) },
+        { old: keep, pair: changed(keep) },
+      ],
+    });
+    expect(at(draft, "G2P3+new")).toBe(1);
+    expect(draft.flat().map((x) => x.id)).toEqual(expect.arrayContaining(["Late", "G1P2+new"]));
+    expect(draft.map((g) => g.length)).toEqual([3, 3, 3]);
+  });
+
+  it("keepSpots returns the changes without a spot, in their order, and leaves the input as it was", () => {
+    const groups = [[p("A"), p("B")], [p("C")]];
+    const out = keepSpots(groups, [
+      { old: groups[0]![1]!, pair: p("B2") },
+      { old: p("X"), pair: p("X2") },
+    ]);
+    expect(ids(out.groups)).toEqual([["A", "B2"], ["C"]]);
+    expect(out.unplaced.map((x) => x.id)).toEqual(["X2"]);
+    expect(ids(groups)).toEqual([["A", "B"], ["C"]]);
+  });
+
+  it("with an opt-out (#395): the staying player's ends the change and the pair leaves as opted out; the leaving player's changes nothing", () => {
+    expect(changeAtSwitch({ strikes: false, optedOutBy: null })).toBe("keeps_spot");
+    expect(changeAtSwitch({ strikes: false, optedOutBy: "leaving" })).toBe("keeps_spot");
+    expect(changeAtSwitch({ strikes: true, optedOutBy: "leaving" })).toBe("new_pair");
+    expect(changeAtSwitch({ strikes: false, optedOutBy: "staying" })).toBe("ends");
+    expect(changeAtSwitch({ strikes: true, optedOutBy: "staying" })).toBe("ends");
+    expect(changeLeaveReason({ strikes: false, optedOutBy: "leaving" })).toBeNull();
+    expect(changeLeaveReason({ strikes: false, optedOutBy: "staying" })).toBe("opted_out");
+    expect(changeLeaveReason({ strikes: true, optedOutBy: null })).toBe("strikes");
+
+    // The draft: G2P1 changes partner. The leaving player opted out: the new pair still goes up.
+    const t = tables(4, 4, 4);
+    const winner = t[1]![0]!;
+    const kept = roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [{ old: winner, pair: changed(winner) }] });
+    expect(at(kept, "G2P1+new")).toBe(0);
+    // The staying player opted out: no change reaches the draft, the old pair leaves and the pairs below move up.
+    const ended = roundSwitchDraft({ tables: t, fast: false, leaves: (x) => x.id === "G2P1", newPairs: [], changes: [] });
+    expect(at(ended, "G2P1")).toBe(-1);
+    expect(at(ended, "G2P1+new")).toBe(-1);
+    expect(ended.flat()).toHaveLength(11);
+  });
+
+  it("without changes the draft is unchanged", () => {
+    const t = tables(4, 4, 4);
+    expect(ids(roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [], changes: [] }))).toEqual(
+      ids(roundSwitchDraft({ tables: t, fast: false, leaves: none, newPairs: [] })),
+    );
   });
 });

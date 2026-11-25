@@ -148,7 +148,9 @@ export default function Privacy() {
               első szezonja összegyűjti a szükséges nevezéseket, minden nevezett
               játékosnak egy levelet küldünk az indulás napjával. Ha a szervező
               meghosszabbítja a futó kört, a kör minden játékosának küldünk egy
-              levelet az új határidővel.
+              levelet az új határidővel. Állandó partnercserénél az új partnernek
+              küldünk egy levelet a kéréssel, a távozó játékosnak pedig egyet, amikor
+              a csere végleges.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (nem fejezted be a regisztrációt;
@@ -233,6 +235,14 @@ export default function Privacy() {
                 hogy melyik meccsen nem játszottál, ki jelölte és mikor. A meccs
                 négy játékosa látja. A helyettes nevét nem kérjük és nem
                 tároljuk.
+              </li>
+              <li>
+                <strong>Állandó partnercserénél</strong> azt tároljuk, ki kérte,
+                kinek a helyére, ki az új partner, mikor válaszolt, a szervező
+                döntését (ki, mikor, elutasításnál az indoklást), és ha visszavonta, ki és mikor. Hármótok és a liga szervezője látja, a
+                csoportbeosztásban a szervező is. Amíg az új pár el nem indul, a
+                meccs négy játékosa látja, hogy az új partner játszik a távozó
+                helyett. E-mail-címet vagy telefonszámot ehhez senkinek nem mutatunk.
               </li>
               <li>
                 <strong>A „nem jöttek el” bejelentést</strong> (melyik pár

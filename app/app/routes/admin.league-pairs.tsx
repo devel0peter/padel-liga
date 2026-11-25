@@ -9,6 +9,17 @@ import { ChangeDialog, CreateDialog, DissolveButton, EntryCell } from "~/compone
 import { PersonLink } from "~/components/person-link";
 import { PhoneLink } from "~/components/phone-link";
 import { StatusChips } from "~/components/status-chips";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -44,6 +55,14 @@ import { formatElo } from "~/lib/groups";
 import { getLeague } from "~/lib/leagues.server";
 import { DISSOLVE_REFUSED, SOURCE_LABELS } from "~/lib/pairs";
 import { changePartner, dissolvePair, leaguePairs, pairCandidates } from "~/lib/pairs.server";
+import { absenceCountText, changeCountText, changeStateText, REASON_MAX } from "~/lib/partner-changes";
+import {
+  approvePartnerChange,
+  leaguePartnerChanges,
+  pairAbsenceCounts,
+  rejectPartnerChange,
+  undoPartnerChange,
+} from "~/lib/partner-changes.server";
 import { missingChips } from "~/lib/player-status";
 import { ENTRY_STATUS_LABELS } from "~/lib/season-entries";
 import { enterPairByOrganizer, removePairFromSeason, withdrawPairMidPhase } from "~/lib/season-entries.server";
@@ -94,7 +113,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const [strikeList, seasons] = await Promise.all([leagueStrikes(league.id), listSeasons(league.id)]);
   const strikeSeason = currentSeason(seasons, new Date())?.id ?? 0;
   const strikes = strikeList.filter((s) => s.seasonId === strikeSeason);
+  const [changes, absences] = await Promise.all([leaguePartnerChanges(league.id), pairAbsenceCounts(league.id)]);
   return {
+    partnerChanges: changes.map((c) => ({
+      ...c,
+      state: changeStateText(c),
+      // How often they changed partner this season (#416), for a waiting change.
+      counts: c.canDecide ? [changeCountText(c.staying, c.counts.staying), changeCountText(c.partner, c.counts.partner)] : [],
+    })),
+    absenceCounts: Object.fromEntries(absences),
     strikes,
     strikeCounts: Object.fromEntries(countsBySeason(strikes).get(strikeSeason) ?? []),
     name: league.name,
@@ -133,6 +160,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     result = await withdrawPairMidPhase(actor, league.id, pairId, seasonId, field("reason"));
   else if (intent === "strike-cancel" && valid(Number(field("strike"))))
     result = await cancelStrike(actor.id, league.id, Number(field("strike")), field("reason"));
+  else if (intent === "partner-change-undo" && valid(Number(field("change"))))
+    result = await undoPartnerChange(actor.id, league.id, Number(field("change")));
+  else if (intent === "partner-change-approve" && valid(Number(field("change"))))
+    result = await approvePartnerChange(actor.id, league.id, Number(field("change")));
+  else if (intent === "partner-change-reject" && valid(Number(field("change"))))
+    result = await rejectPartnerChange(actor.id, league.id, Number(field("change")), field("reason"));
   else throw new Response("Hibás kérés.", { status: 400 });
   return result.ok ? { ok: true as const } : { error: result.error };
 }
@@ -194,7 +227,18 @@ function Filters({ query, counts, slug, canMail, shown }: {
 }
 
 
-function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Candidate[]; strikes: Record<string, number> }) {
+function PairRow({
+  pair: p,
+  candidates,
+  strikes,
+  absences,
+}: {
+  pair: Pair;
+  candidates: Candidate[];
+  strikes: Record<string, number>;
+  // Matches with an absent player this season, by pair (#416).
+  absences: Record<string, number>;
+}) {
   return (
     <TableRow className={cn(CARD_ROW, p.status === "dissolved" && "text-muted-foreground")}>
       <TableCell className={cn("min-w-56", CARD_CELL)}>
@@ -223,6 +267,7 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
       <TableCell className={CARD_CELL}>
         <CardLabel>Forrás</CardLabel>
         {SOURCE_LABELS[p.source]}
+        {absenceCountText(absences[p.id] ?? 0) && <div className="text-xs text-muted-foreground">{absenceCountText(absences[p.id] ?? 0)}</div>}
       </TableCell>
       <TableCell className={CARD_CELL}>
         <Badge variant={p.status === "active" ? "default" : "outline"}>{p.status === "active" ? "Aktív" : "Felbontva"}</Badge>
@@ -247,6 +292,139 @@ function PairRow({ pair: p, candidates, strikes }: { pair: Pair; candidates: Can
 }
 
 type Strike = Route.ComponentProps["loaderData"]["strikes"][number];
+
+type PartnerChange = Route.ComponentProps["loaderData"]["partnerChanges"][number];
+
+// The players' permanent partner changes of the season (#402, spec 4,
+// D178): open (waiting for the new partner), accepted (waiting for the
+// organizer's approval, with how often the two changed partner this season,
+// #416), final (the new partner plays instead until the new pair starts) and
+// started. A final one can be undone until the new pair starts. Names only.
+function PartnerChangesSection({ changes }: { changes: PartnerChange[] }) {
+  if (changes.length === 0) return null;
+  return (
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="partner-changes-title">
+      <h2 id="partner-changes-title" className="font-display text-lg font-bold">
+        Állandó partnercserék
+      </h2>
+      <p className="max-w-2xl text-sm text-muted-foreground">
+        A játékosok a Ligáim oldalon kérnek partnercserét. Ha az új partner elfogadja, itt hagyod jóvá vagy utasítod el;
+        jóváhagyás után a kör hátralévő meccsein ő játszik, és az új pár a körváltáskor a régi pár helyére kerül. Vita esetén
+        visszavonhatod, amíg az új pár el nem indul.
+      </p>
+      <ul className="grid gap-3">
+        {changes.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+            <div className="grid min-w-0 gap-0.5">
+              <span className="font-medium break-words">
+                {c.staying}: {c.leaving} helyett {c.partner}
+              </span>
+              <span className="text-sm text-muted-foreground">{c.state}</span>
+              {c.counts.map((line) => (
+                <span key={line} className="text-sm break-words">
+                  {line}
+                </span>
+              ))}
+            </div>
+            {c.canUndo && <UndoChangeButton change={c} />}
+            {c.canDecide && <DecideChange change={c} />}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// "Jóváhagyom" or "Elutasítom" with an optional reason the three players see (#416).
+function DecideChange({ change }: { change: PartnerChange }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const busy = fetcher.state !== "idle";
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.ok) setOpen(false);
+  }, [fetcher.state, fetcher.data]);
+  return (
+    <div className="grid gap-1">
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" disabled={busy} onClick={() => fetcher.submit({ intent: "partner-change-approve", change: String(change.id) }, { method: "post" })}>
+          Jóváhagyom
+        </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" disabled={busy}>
+              Elutasítom
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Elutasítod a partnercserét?</DialogTitle>
+              <DialogDescription>
+                {change.leaving} marad {change.staying} párja. Mindhárman értesítést kapnak az alkalmazásban, az indoklással együtt.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2">
+              <Label htmlFor={`change-reason-${change.id}`}>Indoklás (nem kötelező)</Label>
+              <Textarea id={`change-reason-${change.id}`} value={reason} maxLength={REASON_MAX} onChange={(e) => setReason(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Mégse</Button>
+              </DialogClose>
+              <Button
+                disabled={busy}
+                onClick={() => fetcher.submit({ intent: "partner-change-reject", change: String(change.id), reason }, { method: "post" })}
+              >
+                Elutasítom
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+      {fetcher.data?.error && (
+        <p role="alert" className="text-sm font-semibold text-destructive">
+          {fetcher.data.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function UndoChangeButton({ change }: { change: PartnerChange }) {
+  const fetcher = useFetcher<{ ok?: true; error?: string }>();
+  const busy = fetcher.state !== "idle";
+  return (
+    <div className="grid gap-1">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" size="sm" disabled={busy}>
+            Visszavonás
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Visszavonod a partnercserét?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {change.leaving} marad {change.staying} párja, és a még le nem játszott meccseken újra ő játszik. Mindhárman
+              értesítést kapnak.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Mégse</AlertDialogCancel>
+            <AlertDialogAction onClick={() => fetcher.submit({ intent: "partner-change-undo", change: String(change.id) }, { method: "post" })}>
+              Visszavonás
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {fetcher.data?.error && (
+        <p role="alert" className="text-sm font-semibold text-destructive">
+          {fetcher.data.error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const STRIKE_SOURCES = { deadline: "Határidő: nem próbált egyeztetni", no_show: "Nem jelent meg" } as const;
 
@@ -369,7 +547,7 @@ function CancelStrikeDialog({ strike }: { strike: Strike }) {
 }
 
 export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
-  const { name, slug, rows, counts, query, activePairs, candidates, canMail, strikes, strikeCounts } = loaderData;
+  const { name, slug, rows, counts, query, activePairs, candidates, canMail, strikes, strikeCounts, partnerChanges, absenceCounts } = loaderData;
   return (
     <AppPage
       title="Párok"
@@ -380,6 +558,8 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
         A játékosok párlinkkel lesznek párok, vagy te teszed őket párba itt vagy a Játékosok oldalon. A kihirdetett csoportban
         játszó pár a kör határidejéig nem bontható fel.
       </p>
+      {/* Few and time-bound (until the new pair starts): above the long list. */}
+      <PartnerChangesSection changes={partnerChanges} />
       <Filters query={query} counts={counts} slug={slug} canMail={canMail} shown={rows.length} />
       {rows.length === 0 ? (
         <p className="py-10 text-center text-muted-foreground">
@@ -402,7 +582,7 @@ export default function LeaguePairs({ loaderData }: Route.ComponentProps) {
             </TableHeader>
             <TableBody className="max-sm:block">
               {rows.map((p) => (
-                <PairRow key={p.id} pair={p} candidates={candidates} strikes={strikeCounts} />
+                <PairRow key={p.id} pair={p} candidates={candidates} strikes={strikeCounts} absences={absenceCounts} />
               ))}
             </TableBody>
           </Table>

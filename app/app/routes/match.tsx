@@ -520,7 +520,7 @@ function AbsenceLines({ s }: { s: AbsencePanel }) {
     <ul className="grid gap-1 text-sm" aria-label="Helyettesek">
       {s.marked.map((a) => (
         <li key={a.absentId} className="break-words">
-          <span className="font-medium">{absenceLine(a.name, a.afterMatch || !s.open)}</span> {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
+          <span className="font-medium">{absenceLine(a.name, a.afterMatch || !s.open, a.substitute)}</span> {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
         </li>
       ))}
     </ul>

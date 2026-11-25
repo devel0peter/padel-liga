@@ -130,12 +130,20 @@ export function seasonOpen(season: Season | undefined, now: Date): boolean {
   return Math.max(...season.phases.map((p) => p.deadline.getTime())) >= now.getTime();
 }
 
-type OwnPair = { pairId: number; players: [string, string]; joinsPhase: number };
+// `optedOutBy`: who pressed "Nem folytatom" for the pair (#395), if anyone.
+type OwnPair = { pairId: number; players: [string, string]; joinsPhase: number; optedOutBy: string | null };
 
 /** The player's active pair in the league with an approved entry in the season that still counts (#402 req 1). */
 async function ownPair(userId: string, leagueId: number, seasonId: number): Promise<OwnPair | null> {
   const [row] = await db
-    .select({ pairId: pairs.id, a: pairs.playerA, b: pairs.playerB, joinsPhase: seasonEntries.joinsPhase })
+    .select({
+      pairId: pairs.id,
+      a: pairs.playerA,
+      b: pairs.playerB,
+      joinsPhase: seasonEntries.joinsPhase,
+      optOutPhase: seasonEntries.optOutPhase,
+      optedOutBy: seasonEntries.optedOutBy,
+    })
     .from(pairs)
     .innerJoin(seasonEntries, eq(seasonEntries.pairId, pairs.id))
     .where(
@@ -148,7 +156,9 @@ async function ownPair(userId: string, leagueId: number, seasonId: number): Prom
         isNotNull(seasonEntries.joinsPhase),
       ),
     );
-  return row ? { pairId: row.pairId, players: [row.a, row.b], joinsPhase: row.joinsPhase! } : null;
+  return row
+    ? { pairId: row.pairId, players: [row.a, row.b], joinsPhase: row.joinsPhase!, optedOutBy: row.optOutPhase === null ? null : row.optedOutBy }
+    : null;
 }
 
 // A registered, not deleted player of the league with a level, without an
@@ -248,7 +258,8 @@ export async function partnerChangeView(userId: string, leagueId: number, season
   }
   const pair = seasonOpen(season, now) ? await ownPair(userId, leagueId, season.id) : null;
   const holds = pair && items.some((i) => i.role !== "partner");
-  const start = pair && !holds ? { candidates: await partnerCandidates(leagueId, pair.players) } : null;
+  // Not after "Nem folytatom" (#395): such a change would end at the switch.
+  const start = pair && !holds && pair.optedOutBy !== userId ? { candidates: await partnerCandidates(leagueId, pair.players) } : null;
   return items.length === 0 && !start ? null : { items, start };
 }
 
@@ -269,6 +280,7 @@ export async function startPartnerChange(user: Pick<User, "id">, leagueId: numbe
     live: !!live,
     partnerId,
     partnerFree: !!partnerId && (await isFree(leagueId, partnerId)),
+    optedOut: pair?.optedOutBy === user.id,
   });
   if (refusal) return refused(refusal);
   const leavingId = pair!.players.find((p) => p !== user.id)!;
@@ -420,6 +432,9 @@ export async function approvePartnerChange(actorId: string, leagueId: number, ch
   const refusal = decideRefusal({ status: c.status });
   if (refusal) return refused(refusal);
   const season = await getSeason(c.seasonId);
+  // The staying player said "Nem folytatom" (#395): the change would end at
+  // the switch anyway (changeAtSwitch), so it isn't approved.
+  if ((await ownPair(c.startedBy, c.leagueId, c.seasonId))?.optedOutBy === c.startedBy) return refused("opted_out");
   // The old pair was dissolved or taken out meanwhile: nothing to approve,
   // and the change must not keep holding the new partner.
   if (!(await oldPairActive(c))) {

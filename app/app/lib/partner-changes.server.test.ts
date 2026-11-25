@@ -109,6 +109,28 @@ describe("starting, withdrawing and declining (#402 req 1-3)", () => {
     ]);
   });
 
+  it("not after the starter's own \"Nem folytatom\" (#395), which would end it at the switch; the partner's opt-out doesn't stop it (review L3)", async () => {
+    const { getSeason } = await import("~/lib/seasons.server");
+    const season = (await getSeason(1))!;
+    h.raw.exec("update season_entries set opt_out_phase = 1, opted_out_by = 'a1' where pair_id = 1");
+    expect(await P.startPartnerChange({ id: "a1" }, 1, "q", DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.opted_out });
+    expect((await P.partnerChangeView("a1", 1, season, DURING))?.start ?? null).toBeNull();
+    // The other player, who opted out for the pair, isn't the one who stays.
+    expect(await P.startPartnerChange({ id: "b1" }, 1, "q", DURING)).toMatchObject({ ok: true });
+  });
+
+  it("the Szervező can't approve once the staying player opted out (#395, review L3)", async () => {
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    h.raw.exec("update season_entries set opt_out_phase = 1, opted_out_by = 'a1' where pair_id = 1");
+    expect(await P.approvePartnerChange("o", 1, 1, DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.opted_out });
+    expect(change().status).toBe("accepted");
+    expect(marks()).toEqual([]);
+    // The leaving player's opt-out doesn't stop it.
+    h.raw.exec("update season_entries set opted_out_by = 'b1' where pair_id = 1");
+    expect(await P.approvePartnerChange("o", 1, 1, DURING)).toMatchObject({ ok: true });
+  });
+
   it("needs a pair with an entry that counts, and the season not over", async () => {
     expect(await P.startPartnerChange({ id: "q" }, 1, "r", DURING)).toEqual({ ok: false, error: PARTNER_CHANGE_REFUSALS.no_pair });
     h.raw.exec("update season_entries set status = 'withdrawn' where pair_id = 1");

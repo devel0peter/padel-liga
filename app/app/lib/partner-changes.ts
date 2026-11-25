@@ -96,6 +96,8 @@ export type PartnerChangeRefusal =
   | "not_final"
   // A rejection's reason is too long.
   | "reason"
+  // The staying player opted out of the next round (#395).
+  | "opted_out"
   // Only the one who sent it withdraws, only the new partner answers.
   | "not_yours";
 
@@ -108,6 +110,7 @@ export const PARTNER_CHANGE_REFUSALS: Record<PartnerChangeRefusal, string> = {
   not_waiting: "Ez a partnercsere már nem vár döntésre.",
   not_final: "Ez a partnercsere már nem vonható vissza.",
   reason: "Az indoklás legfeljebb 300 karakter lehet.",
+  opted_out: "A maradó játékos nem folytatja a következő körben, így ez a partnercsere nem indulhat.",
   not_yours: "Ez a kérés nem a tiéd.",
 };
 
@@ -122,9 +125,12 @@ export function startRefusal(c: {
   partnerId: string;
   /** The new partner is a registered player of the league without an active pair or a final change. */
   partnerFree: boolean;
+  /** The starter pressed "Nem folytatom" (#395): the change would end at the switch (changeAtSwitch). */
+  optedOut?: boolean;
 }): PartnerChangeRefusal | null {
   if (!c.pair) return "no_pair";
   if (!c.seasonOpen) return "season_over";
+  if (c.optedOut) return "opted_out";
   if (c.live) return "already";
   if (c.pair.players.includes(c.partnerId) || !c.partnerFree) return "partner";
   return null;

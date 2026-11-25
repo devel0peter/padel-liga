@@ -509,7 +509,8 @@ export type PartnerChangeNotice =
   | { kind: "final_leaving"; league: League; staying: string; partner: string; from: number | "now" | null }
   | { kind: "final_staying"; league: League; partner: string; from: number | "now" | null }
   | { kind: "undone"; league: League; staying: string; leaving: string; partner: string }
-  // It couldn't start at its round switch (the old pair was no longer there).
+  // It couldn't start: the old pair is gone (dissolved, taken out, opted out),
+  // at its round switch or when the organizer tried to approve it.
   | { kind: "not_started"; league: League; staying: string; leaving: string; partner: string }
   // A player of it deleted their account (section 3).
   | { kind: "ended"; league: League };
@@ -558,7 +559,7 @@ export function partnerChangeMessage(n: PartnerChangeNotice): Message {
     case "not_started":
       return {
         title: "Nem indult el a partnercsere",
-        body: `Az állandó partnercsere nem indult el a körváltáskor: ${n.partner} nem lett ${n.staying} párja ${n.leaving} helyett (${n.league.name}). Kérdés esetén írj a szervezőnek.`,
+        body: `Az állandó partnercsere nem jöhet létre, mert a régi pár már nem játszik így tovább: ${n.partner} nem lesz ${n.staying} párja ${n.leaving} helyett (${n.league.name}). Kérdés esetén írj a szervezőnek.`,
         url,
       };
     case "ended":

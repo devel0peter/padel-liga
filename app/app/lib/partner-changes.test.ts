@@ -72,6 +72,8 @@ describe("startRefusal (#402 req 1, 2)", () => {
 
   it("lets either player of an active, entered pair name a free player", () => {
     expect(startRefusal(ok)).toBeNull();
+    // Not after the starter's own "Nem folytatom" (#395).
+    expect(startRefusal({ ...ok, optedOut: true })).toBe("opted_out");
   });
 
   it("refuses without a pair whose entry continues", () => {

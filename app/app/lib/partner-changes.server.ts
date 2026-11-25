@@ -256,6 +256,8 @@ export async function partnerChangeView(userId: string, leagueId: number, season
 
 const refused = (r: keyof typeof PARTNER_CHANGE_REFUSALS): Result => ({ ok: false, error: PARTNER_CHANGE_REFUSALS[r] });
 
+const PAIR_GONE = "A régi pár már nem aktív, így a partnercsere nem indulhat. Lezártuk, és szóltunk a játékosoknak.";
+
 /** "Állandó partnercsere": a player of the pair names the new partner (#402 req 1-3). */
 export async function startPartnerChange(user: Pick<User, "id">, leagueId: number, partnerId: string, now = new Date()): Promise<Result> {
   const season = await seasonOf(leagueId, now);
@@ -418,7 +420,12 @@ export async function approvePartnerChange(actorId: string, leagueId: number, ch
   const refusal = decideRefusal({ status: c.status });
   if (refusal) return refused(refusal);
   const season = await getSeason(c.seasonId);
-  if (!(await oldPairActive(c))) return refused("not_open");
+  // The old pair was dissolved or taken out meanwhile: nothing to approve,
+  // and the change must not keep holding the new partner.
+  if (!(await oldPairActive(c))) {
+    await endUnstarted(c, actorId, now);
+    return { ok: false, error: PAIR_GONE };
+  }
   if (!seasonOpen(season, now)) return refused("season_over");
   const [withGroups, played] = await Promise.all([phasesWithGroups(c.seasonId), playedInSeason(c.pairId, c.seasonId)]);
   const when = startsAt({ phases: season!.phases.map((p) => p.number), withGroups: withGroups.map((g) => g.phase), played });
@@ -1068,6 +1075,9 @@ export async function startChangesAtPublish(seasonId: number, phase: number, act
   const due = await changesQuery().where(
     and(eq(partnerChanges.seasonId, seasonId), eq(partnerChanges.status, "final"), sql`${partnerChanges.startsPhase} <= ${phase}`),
   );
+  // Accepted ones still waiting whose old pair is gone (#416): ended too.
+  for (const c of await changesQuery().where(and(eq(partnerChanges.seasonId, seasonId), eq(partnerChanges.status, "accepted"))))
+    if (!(await oldPairActive(c))) await endUnstarted(c, actorId, now);
   let started = 0;
   for (const c of due) {
     if (!inDraft.has(c.pairId)) {
@@ -1101,7 +1111,9 @@ export async function startChangesAtPublish(seasonId: number, phase: number, act
   return started;
 }
 
-// A final change that can't start at its switch: ended (status "undone", by
+// A final change that can't start at its switch, or an accepted one whose
+// old pair is gone (#416: it would hold the new partner until a decision
+// that can't come): ended (status "undone", by
 // the publishing organizer, audited), its marks on matches still open go,
 // and the three players are told in the app and by push. The old pair plays
 // on as it is.
@@ -1111,7 +1123,7 @@ async function endUnstarted(c: ChangeRow, actorId: string | null, now: Date): Pr
     db
       .update(partnerChanges)
       .set({ status: "undone", endedBy: actorId, endedAt: now })
-      .where(and(eq(partnerChanges.id, c.id), eq(partnerChanges.status, "final")))
+      .where(and(eq(partnerChanges.id, c.id), inArray(partnerChanges.status, ["accepted", "final"])))
       .returning({ id: partnerChanges.id }),
     auditIfChanged({ actorId, action: "partner_change.undo", target: `partner_change:${c.id}`, detail: `pair:${c.pairId}; could not start`, leagueId: c.leagueId }),
     marksStillOpen(c.id, now),

@@ -211,6 +211,28 @@ describe("accepting in a running round (#402 req 5-7)", () => {
     expect(await P.startPartnerChange({ id: "a1" }, 1, "q", DURING)).toMatchObject({ ok: true });
   });
 
+  it("a waiting change whose old pair is gone ends instead of holding the new partner (review L2)", async () => {
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    h.raw.exec("update pairs set status = 'dissolved' where id = 1");
+    h.raw.exec("delete from notifications");
+    expect(await P.approvePartnerChange("o", 1, 1, DURING)).toMatchObject({ ok: false });
+    expect(change().status).toBe("undone");
+    expect(notices("partner_change").map((n) => n.user_id)).toEqual(["a1", "b1", "q"]);
+    const PAIRS = await import("~/lib/pairs.server");
+    expect(await PAIRS.createPair("o", 1, "q", "r")).toMatchObject({ ok: true });
+  });
+
+  it("the publish also ends a waiting change whose old pair is gone", async () => {
+    await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
+    await P.acceptPartnerChange({ id: "q" }, 1, DURING);
+    h.raw.exec("update pairs set status = 'dissolved' where id = 1");
+    h.raw.exec(`insert into groups (id, season_id, phase, number) values (61, 1, 2, 1)`);
+    h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (61, 2, 1)`);
+    await P.startChangesAtPublish(1, 2, "o", DURING);
+    expect(change().status).toBe("undone");
+  });
+
   it("a change still waiting when the round switch draft is made starts at the following switch once approved (#416)", async () => {
     await P.startPartnerChange({ id: "a1" }, 1, "q", DURING);
     await P.acceptPartnerChange({ id: "q" }, 1, DURING);

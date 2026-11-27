@@ -1,16 +1,16 @@
 import { Link } from "react-router";
 
-import { CardContent, CardHeader, CardTitle, Card as UiCard } from "~/components/ui/card";
+import { SectionLabel, StatusPill } from "~/components/blocks";
 
 import { pairPath, playerPath, type ProfileMatchView, type ProfilePair, type ProfilePerson } from "~/lib/profiles";
 
 // Shared pieces of the pair and player profiles (#36; members only, D112),
-// in the league page's look: cards.
+// in direction A (#424, mockups P08, P09).
 
 export function PersonLink({ person }: { person: ProfilePerson }) {
   const path = playerPath(person);
   return path ? (
-    <Link to={path} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
+    <Link to={path} className="text-foreground underline decoration-foreground/40 underline-offset-2 hover:decoration-foreground">
       {person.name}
     </Link>
   ) : (
@@ -21,51 +21,49 @@ export function PersonLink({ person }: { person: ProfilePerson }) {
 // A pair by its team label, "Kovács / Nagy" (#419), linking its page.
 export function PairLink({ pair }: { pair: ProfilePair }) {
   return (
-    <Link to={pairPath(pair.id)} className="leading-snug break-words underline decoration-court/40 underline-offset-2 hover:decoration-court">
+    <Link to={pairPath(pair.id)} className="leading-snug break-words text-inherit no-underline hover:underline">
       {pair.label}
     </Link>
   );
 }
 
-// One block of a profile: the app's card with a heading (D136).
+// One block of a profile: a section label over its content (D136, D181).
 export function Card({ title, children, label }: { title: string; children: React.ReactNode; label?: string }) {
   return (
-    <UiCard role="region" aria-label={label ?? title}>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-3">{children}</CardContent>
-    </UiCard>
+    <section role="region" aria-label={label ?? title} className="flex flex-col gap-2.5">
+      <SectionLabel>{title}</SectionLabel>
+      {children}
+    </section>
   );
 }
 
+// The matches as rows of one card: the verdict as a pill, the opponents, when,
+// the score from the pair's side and the Élő-pont change.
 export function MatchList({ matches, empty }: { matches: ProfileMatchView[]; empty: string }) {
-  if (matches.length === 0) return <p className="text-muted-foreground">{empty}</p>;
+  if (matches.length === 0) return <p className="m-0 text-muted-foreground">{empty}</p>;
   return (
-    <ul className="grid gap-2">
+    <ul className="m-0 flex list-none flex-col overflow-hidden rounded-2xl bg-surface p-0 [&>li+li]:border-t [&>li+li]:border-hairline">
       {matches.map((m, i) => (
-        <li key={i} className="grid gap-1 rounded-lg border bg-background px-3 py-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-3">
-          <div className="grid gap-1">
-            <span className="text-sm text-muted-foreground">
+        <li key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 md:px-5">
+          <StatusPill tone={m.verdict === "Győzelem" ? "success" : m.verdict === "Vereség" ? "danger" : "neutral"}>{m.verdict}</StatusPill>
+          <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
+            <span className="text-body">
+              <PairLink pair={m.opponents} /> ellen
+            </span>
+            <span className="text-caption text-muted-foreground">
               {m.when}
               {m.date && `, ${m.date}`}
             </span>
-            <span className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-sm font-bold text-muted-foreground">ellenfél:</span>
-              <PairLink pair={m.opponents} />
-            </span>
-            {m.note && <span className="text-sm text-muted-foreground">{m.note}</span>}
-          </div>
-          <div className="grid gap-0.5 sm:text-right">
-            <span className="font-semibold">
-              <span className={m.verdict === "Győzelem" ? "text-court" : ""}>{m.verdict}</span> · {m.result}
-            </span>
+            {m.note && <span className="text-caption text-muted-foreground">{m.note}</span>}
+          </span>
+          <span className="flex flex-col items-end gap-0.5 text-right">
+            <strong className="text-body tabular-nums">{m.result}</strong>
             {m.elo && (
-              <span className="text-sm" data-testid="elo-change">
-                Élő-pont: <strong>{m.elo.delta}</strong> → {m.elo.after}
+              <span className="text-xs text-muted-foreground" data-testid="elo-change">
+                Élő-pont: <strong className={m.elo.delta.startsWith("-") || m.elo.delta.startsWith("−") ? "text-danger" : "text-success"}>{m.elo.delta}</strong> → {m.elo.after}
               </span>
             )}
-          </div>
+          </span>
         </li>
       ))}
     </ul>
@@ -89,7 +87,7 @@ export function EloChart({ points }: { points: number[] }) {
     <figure className="grid gap-1">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-24 w-full max-w-md text-court"
+        className="h-28 w-full text-ball"
         role="img"
         aria-label={`Élő-pont a meccsek után: ${points.join(", ")}`}
       >
@@ -98,7 +96,7 @@ export function EloChart({ points }: { points: number[] }) {
           <circle key={i} cx={x(i)} cy={y(v)} r="3" fill="currentColor" />
         ))}
       </svg>
-      <figcaption className="text-sm text-muted-foreground">
+      <figcaption className="text-caption text-muted-foreground">
         Induló: {points[0]} · legjobb: {max} · most: {points[points.length - 1]}
       </figcaption>
     </figure>

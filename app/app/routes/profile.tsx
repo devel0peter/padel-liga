@@ -1,7 +1,7 @@
 import { data, Form, Link, redirect, useFetcher, useFetchers, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/profile";
-import { AppPage } from "~/components/app-page";
+import { Page, PageHeader, SectionLabel } from "~/components/blocks";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,6 @@ import { FormerPairs, PairSection } from "~/components/pair-section";
 import { PlayerProfileView } from "~/components/player-profile-view";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -240,13 +239,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 // One block of the settings: a card with a heading (D136).
 function Block({ id, title, description, children }: { id?: string; title: string; description?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <Card role="region" id={id} aria-label={title} className="scroll-mt-6">
-      <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent className="grid gap-4">{children}</CardContent>
-    </Card>
+    <section role="region" id={id} aria-label={title} className="flex scroll-mt-6 flex-col gap-4 rounded-2xl bg-surface p-4 md:p-5">
+      <div className="flex flex-col gap-1">
+        <SectionLabel>{title}</SectionLabel>
+        {description && <p className="m-0 text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -258,24 +257,22 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "settings" ? "settings" : "player";
   return (
-    <AppPage
-      title={
-        <span className="flex items-center gap-3">
-          <Avatar className="size-11">
-            {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
-            <AvatarFallback className="bg-nav-active-bg text-base font-bold text-nav-active">{d.initials}</AvatarFallback>
-          </Avatar>
-          {d.name}
-        </span>
-      }
-      description={d.role}
-    >
+    <Page>
+      <div className="flex items-end gap-4">
+        <Avatar className="mb-1 size-16 md:size-[72px]">
+          {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
+          <AvatarFallback className="bg-surface-3 text-xl font-bold text-foreground">{d.initials}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <PageHeader eyebrow={d.role} title={d.name} />
+        </div>
+      </div>
       <Tabs
         value={tab}
         onValueChange={(value) => setParams(value === "settings" ? { tab: "settings" } : {}, { replace: true, preventScrollReset: true })}
         className="gap-6"
       >
-        <TabsList>
+        <TabsList className="h-auto w-full max-w-md rounded-xl bg-surface p-1 [&>button]:h-11 [&>button]:rounded-[9px] [&>button]:text-body [&>button]:font-semibold [&>button]:data-[state=active]:bg-surface-3">
           <TabsTrigger value="player">Játékosprofil</TabsTrigger>
           <TabsTrigger value="settings">Beállításaim</TabsTrigger>
         </TabsList>
@@ -373,7 +370,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
           <DeleteAccount deletion={d.deletion} />
         </TabsContent>
       </Tabs>
-    </AppPage>
+    </Page>
   );
 }
 

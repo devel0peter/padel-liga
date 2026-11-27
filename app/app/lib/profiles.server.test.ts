@@ -175,6 +175,22 @@ describe("once the league has started", () => {
     expect((await pairProfile(2, DURING))!.matches).toHaveLength(1);
   });
 
+  it("names the pairs by their players' surnames, the clash rule over the page (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("ua", "Nagy", "Anna");
+    named("ub", "Kiss", "Bea");
+    named("uc", "Nagy", "Cili");
+    match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    const pair = (await pairProfile(1, DURING))!;
+    // Dóra has no surname yet: her full name.
+    expect([pair.pair.label, pair.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    const anna = (await playerProfile("ua", DURING))!;
+    expect([anna.pairs[0]!.pair.label, anna.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    // The player's own name line keeps the full name.
+    expect(anna.player.name).toBe("Nagy Anna");
+  });
+
   it("the summary (D136): seasons, rounds, matches, wins, losses, for the player and the pair", async () => {
     match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
     match(g1, 3, 1, 2, "final", JSON.stringify({ kind: "walkover", winner: "a" }));

@@ -69,6 +69,19 @@ describe("rankingsPage (D137)", () => {
     ]);
   });
 
+  it("names a pair by its players' surnames, the clash rule over the list (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("ua", "Nagy", "Anna");
+    named("ub", "Kiss", "Bea");
+    named("uc", "Nagy", "Cili");
+    const page = (await rankingsPage("gyor", "ub", DURING))!;
+    // Dóra has no surname yet: her full name.
+    expect(page.pairs.map((r) => r.name)).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    // The players' list keeps the full names.
+    expect(page.players.map((r) => r.name)).toContain("Nagy Anna");
+  });
+
   it("counts each player's rated matches", async () => {
     h.raw.prepare("insert into matches (id, group_id, pair_a, pair_b, week, deadline, status) values (1, 1, 1, 2, 1, ?, 'final')").run(sec("2026-11-29T22:59:00Z"));
     h.raw

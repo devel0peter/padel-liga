@@ -6,6 +6,7 @@ import { db } from "~/db/client.server";
 import { cities, eloChanges, groupPairs, groups, pairs, seasonPhases, seasons, users } from "~/db/schema";
 
 import { getLeague } from "./leagues.server";
+import { teamLabeler } from "./names";
 import { rankRows, type RankInput, type RankRow } from "./rankings";
 
 // The Ranglista (D137): a league's players and pairs by Élő-pont, for
@@ -51,11 +52,15 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
       status: pairs.status,
       aId: playerA.id,
       aName: playerA.name,
+      aSurname: playerA.surname,
+      aFirstName: playerA.firstName,
       aElo: playerA.elo,
       aLevel: playerA.level,
       aDeleted: playerA.deletedAt,
       bId: playerB.id,
       bName: playerB.name,
+      bSurname: playerB.surname,
+      bFirstName: playerB.firstName,
       bElo: playerB.elo,
       bLevel: playerB.level,
       bDeleted: playerB.deletedAt,
@@ -92,15 +97,24 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
     matches: matchCount.get(id) ?? 0,
   }));
 
-  // Pairs that still play together, both accounts still there.
-  const pairRows: RankInput[] = rows.flatMap((r) => {
+  // Pairs that still play together, both accounts still there, by team
+  // label (#419); the list is one screen for the clash rule.
+  const listed = rows.filter(
+    (r) => r.status === "active" && !r.aDeleted && !r.bDeleted && currentElo(r.aElo, r.aLevel) !== null && currentElo(r.bElo, r.bLevel) !== null,
+  );
+  const playersOf = (r: (typeof rows)[number]) => [
+    { id: r.aId, name: r.aName || "Névtelen", surname: r.aSurname, firstName: r.aFirstName },
+    { id: r.bId, name: r.bName || "Névtelen", surname: r.bSurname, firstName: r.bFirstName },
+  ];
+  const label = teamLabeler(listed.flatMap(playersOf));
+  const pairRows: RankInput[] = listed.flatMap((r) => {
     const a = currentElo(r.aElo, r.aLevel);
     const b = currentElo(r.bElo, r.bLevel);
-    if (r.status !== "active" || r.aDeleted || r.bDeleted || a === null || b === null) return [];
+    if (a === null || b === null) return [];
     return [
       {
         key: String(r.pairId),
-        name: `${r.aName || "Névtelen"} – ${r.bName || "Névtelen"}`,
+        name: label(playersOf(r)),
         rating: pairElo(a, b),
         href: `/pairs/${r.pairId}`,
         mine: r.aId === viewerId || r.bId === viewerId,

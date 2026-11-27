@@ -9,6 +9,7 @@ import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, isValidOutcome, phaseSpan, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague, minEntriesByLeague } from "./leagues.server";
 import { logWarn } from "./log";
+import type { NamedPlayer } from "./names";
 import { averageElo } from "./season-entries";
 import { currentSeason, isWaiting, waitingText, type Season } from "./seasons";
 import { listSeasons } from "./seasons.server";
@@ -63,9 +64,13 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       pairId: pairs.id,
       withdrawnAt: groupPairs.withdrawnAt,
       nameA: playerA.name,
+      surnameA: playerA.surname,
+      firstNameA: playerA.firstName,
       levelA: playerA.level,
       eloA: playerA.elo,
       nameB: playerB.name,
+      surnameB: playerB.surname,
+      firstNameB: playerB.firstName,
       levelB: playerB.level,
       eloB: playerB.elo,
     })
@@ -108,7 +113,10 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       .filter((m) => m.groupId === g.id)
       .map((m) => ({
         id: m.pairId,
-        names: [m.nameA || "Névtelen", m.nameB || "Névtelen"] as [string, string],
+        players: [
+          { name: m.nameA || "Névtelen", surname: m.surnameA, firstName: m.firstNameA },
+          { name: m.nameB || "Névtelen", surname: m.surnameB, firstName: m.firstNameB },
+        ] as [NamedPlayer, NamedPlayer],
         // The pair's current Elo (#13), the last tiebreak (D20).
         elo: averageElo({ elo: m.eloA, level: m.levelA }, { elo: m.eloB, level: m.levelB }) ?? 0,
         // Withdrawn mid-phase (#34): buildLadder drops it and its matches.

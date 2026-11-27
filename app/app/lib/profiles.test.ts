@@ -6,9 +6,10 @@ import {
   eloSeries,
   formerPairViews,
   matchViews,
-  pairName,
+  pageLabels,
   pairPath,
   personView,
+  profilePairOf,
   playerPath,
   playerStats,
   roundsText,
@@ -18,12 +19,14 @@ import {
   type ProfilePair,
 } from "./profiles";
 
-const pairOf = (id: number, a: string, b: string): ProfilePair => ({
-  id,
-  players: [personView({ id: `${a}-id`, name: a, deletedAt: null }), personView({ id: `${b}-id`, name: b, deletedAt: null })],
-});
-const P1 = pairOf(1, "Anna", "Bea");
-const P2 = pairOf(2, "Cili", "Dóra");
+// "Kovács Anna": surname Kovács, first name Anna (#419).
+const person = (name: string) => {
+  const [surname, firstName] = name.split(" ");
+  return personView({ id: `${name}-id`, name, surname, firstName, deletedAt: null });
+};
+const pairOf = (id: number, a: string, b: string): ProfilePair => profilePairOf(id, [person(a), person(b)]);
+const P1 = pairOf(1, "Kovács Anna", "Nagy Bea");
+const P2 = pairOf(2, "Tóth Cili", "Kiss Dóra");
 
 const input = (over: Partial<ProfileMatchInput>): ProfileMatchInput => ({
   id: 1,
@@ -50,9 +53,19 @@ describe("personView and links (#36)", () => {
   });
 
   it("a player links to /players/<id>, a pair to /pairs/<id>", () => {
-    expect(playerPath(P1.players[0])).toBe("/players/Anna-id");
+    expect(playerPath(P1.players[0])).toBe("/players/Kovács Anna-id");
     expect(pairPath(7)).toBe("/pairs/7");
-    expect(pairName(P1)).toBe("Anna – Bea");
+  });
+
+  it("a pair is its team label (#419), the clash rule over the page's pairs", () => {
+    expect(P1.label).toBe("Kovács / Nagy");
+    const other = pairOf(3, "Nagy Dóra", "Papp Ádám");
+    const label = pageLabels([P1, P2, other]);
+    expect([P1, P2, other].map((p) => label(p).label)).toEqual(["Kovács / Nagy B.", "Tóth / Kiss", "Nagy D. / Papp"]);
+    expect(label(P1).players).toBe(P1.players);
+    // Without a surname the full name; a deleted account stays Törölt játékos.
+    const other2 = profilePairOf(4, [personView({ id: "f", name: "Farkas Lilla", surname: null, deletedAt: null }), personView({ id: "g", name: "x", deletedAt: new Date() })]);
+    expect(other2.label).toBe("Farkas Lilla / Törölt játékos");
   });
 
   it("an account without a name is Névtelen", () => {

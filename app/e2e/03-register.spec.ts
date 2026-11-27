@@ -5,7 +5,7 @@
 // the interest list (#333).
 import { expect, test } from "@playwright/test";
 
-import { GROUP_PAIRS, PAIRS, as, content, d1, levelLabel, logOffset, loginCode, pairSeekers, pairUp, registerAll, save, seekPartner, visit } from "./support";
+import { GROUP_PAIRS, PAIRS, as, content, d1, fillName, levelLabel, logOffset, loginCode, pairSeekers, pairUp, registerAll, save, seekPartner, visit } from "./support";
 
 const [anna, bence] = PAIRS.p1;
 
@@ -29,8 +29,9 @@ test("5. a player registers through the league's register button", async ({ brow
     where u.email = '${anna.email}'`)).toEqual([{ slug: "minta", source: "register" }]);
 
   // Nothing prefilled (#333). Without the consent the form stays, with an error.
-  await expect(page.getByLabel("Neved")).toHaveValue("");
-  await page.getByLabel("Neved").fill(anna.name);
+  await expect(page.getByLabel("Vezetéknév")).toHaveValue("");
+  await expect(page.getByLabel("Keresztnév")).toHaveValue("");
+  await fillName(page, anna);
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: new RegExp(`^${levelLabel(anna)}`) }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 123 4567");

@@ -250,9 +250,9 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     const { report } = await reported();
     await N.decideNoShow("o", 1, report, "confirm", "", at("2026-11-13", 9));
     const page: any = await L.ladderPage("gyor", at("2026-11-13", 10));
-    const group = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.rows.some((r: any) => r.names.includes("Játékos 1A")));
-    expect(group.rows.find((r: any) => r.names.includes("Játékos 1A"))).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
-    expect(group.rows.find((r: any) => r.names.includes("Játékos 3A"))).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
+    const group = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.rows.some((r: any) => r.label.split(" / ").includes("Játékos 1A")));
+    expect(group.rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"))).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
+    expect(group.rows.find((r: any) => r.label.split(" / ").includes("Játékos 3A"))).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
   });
 
   it("rejecting leaves the match as it was, keeps the reason, tells both pairs, audited", async () => {

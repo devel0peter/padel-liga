@@ -101,7 +101,7 @@ function GroupCard({ group, division, label }: { group: LadderGroup; division: D
             <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
             {group.withdrawn.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                Visszalépett: {group.withdrawn.map((names) => names.join(" – ")).join(", ")}. A meccseik nem számítanak.
+                Visszalépett: {group.withdrawn.join(", ")}. A meccseik nem számítanak.
               </p>
             )}
           </div>

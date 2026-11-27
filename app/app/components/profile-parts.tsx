@@ -18,11 +18,11 @@ export function PersonLink({ person }: { person: ProfilePerson }) {
   );
 }
 
+// A pair by its team label, "Kovács / Nagy" (#419), linking its page.
 export function PairLink({ pair }: { pair: ProfilePair }) {
   return (
-    <Link to={pairPath(pair.id)} className="grid leading-snug underline decoration-court/40 underline-offset-2 hover:decoration-court">
-      <span>{pair.players[0].name}</span>
-      <span>{pair.players[1].name}</span>
+    <Link to={pairPath(pair.id)} className="leading-snug break-words underline decoration-court/40 underline-offset-2 hover:decoration-court">
+      {pair.label}
     </Link>
   );
 }

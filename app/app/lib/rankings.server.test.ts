@@ -64,9 +64,22 @@ describe("rankingsPage (D137)", () => {
     ]);
     // A pair's Élő-pont: its players' average.
     expect(page.pairs.map((r) => [r.place, r.name, r.elo, r.mine, r.href])).toEqual([
-      [1, "Anna – Bea", 1406, true, "/pairs/1"],
-      [2, "Cili – Dóra", 1200, false, "/pairs/2"],
+      [1, "Anna / Bea", 1406, true, "/pairs/1"],
+      [2, "Cili / Dóra", 1200, false, "/pairs/2"],
     ]);
+  });
+
+  it("names a pair by its players' surnames, the clash rule over the list (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("ua", "Nagy", "Anna");
+    named("ub", "Kiss", "Bea");
+    named("uc", "Nagy", "Cili");
+    const page = (await rankingsPage("gyor", "ub", DURING))!;
+    // Dóra has no surname yet: her full name.
+    expect(page.pairs.map((r) => r.name)).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    // The players' list keeps the full names.
+    expect(page.players.map((r) => r.name)).toContain("Nagy Anna");
   });
 
   it("counts each player's rated matches", async () => {

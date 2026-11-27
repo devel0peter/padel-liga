@@ -141,7 +141,7 @@ export async function adminPlayerProfile(userId: string, now = new Date()): Prom
     name: user.name,
     email: user.email,
     phone: formatPhone(user.phone),
-    editable: { name: user.name, phone: user.phone, level: user.level, sex: user.sex },
+    editable: { surname: user.surname, firstName: user.firstName, phone: user.phone, level: user.level, sex: user.sex },
     role: roleLabel({ platformRole: user.platformRole, leagues: organized }),
     organizes: organized.map((o) => o.name),
     google: google.length > 0,
@@ -188,11 +188,11 @@ export async function setSeekingByAdmin(actorId: string, userId: string, leagueI
 export async function updatePlayerByAdmin(
   actorId: string,
   userId: string,
-  input: { name: unknown; phone: unknown; level: unknown; sex: unknown },
+  input: { surname: unknown; firstName: unknown; phone: unknown; level: unknown; sex: unknown },
 ): Promise<{ ok: true; changed: number } | { ok: false; errors: AdminProfileErrors }> {
   const [user] = await db.select().from(users).where(and(eq(users.id, userId), isNull(users.deletedAt)));
-  if (!user) return { ok: false, errors: { name: "Ez a fiók már nem létezik." } };
-  const stored: EditableProfile = { name: user.name, phone: user.phone, level: user.level, sex: user.sex };
+  if (!user) return { ok: false, errors: { surname: "Ez a fiók már nem létezik." } };
+  const stored: EditableProfile = { surname: user.surname, firstName: user.firstName, phone: user.phone, level: user.level, sex: user.sex };
   const result = validateAdminProfile(input, stored, await hasTakenPartInSeason(userId));
   if (!result.ok) return result;
   const fields = changedFields(stored, result.value);

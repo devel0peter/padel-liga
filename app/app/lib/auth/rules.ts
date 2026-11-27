@@ -3,6 +3,7 @@
 // database side is in *.server.ts next to this file.
 
 import { EMAIL_RE, isLevel, type Level } from "../interest";
+import { fullName } from "../names";
 import { PHONE_REQUIRED, parsePhone } from "../phone";
 
 const MINUTE = 60 * 1000;
@@ -192,6 +193,20 @@ export function googlePicture(url: string | undefined): string | null {
   }
 }
 
+// Google's family and given name (#419): they pre-fill the first-login
+// page's Vezetéknév and Keresztnév, and make the full name in our order.
+// Null for a part Google doesn't give.
+export function googleNameParts(claims: { name?: string; family_name?: string; given_name?: string }): {
+  name: string;
+  surname: string | null;
+  firstName: string | null;
+} {
+  const surname = namePart(claims.family_name).slice(0, MAX_NAME) || null;
+  const firstName = namePart(claims.given_name).slice(0, MAX_NAME) || null;
+  const name = surname && firstName ? fullName(surname, firstName) : namePart(claims.name);
+  return { name: name.slice(0, MAX_NAME), surname, firstName };
+}
+
 // "Kiss Anna" -> "KA"; for the avatar when there is no picture.
 export function initials(name: string, email: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -209,21 +224,45 @@ export function parseSex(value: unknown): Sex | null {
   return value === "male" || value === "female" ? value : null;
 }
 
-export type ProfileInput = { name: string; level: Level; phone: string; consent: boolean; sex: Sex };
+// `name` is "<surname> <firstName>" (#419, D182): what every page that names
+// a player reads.
+export type ProfileInput = { name: string; surname: string; firstName: string; level: Level; phone: string; consent: boolean; sex: Sex };
 export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;
 
-// The profile form (first login and the profile page): name, level, phone
-// number and sex are all required; the phone is stored as E.164 (phone.ts).
-// `requireConsent`: the first-login page also asks for the privacy consent.
+export const SURNAME_REQUIRED = "Add meg a vezetékneved.";
+export const FIRST_NAME_REQUIRED = "Add meg a keresztneved.";
+export const NAME_TOO_LONG = `A teljes neved legfeljebb ${MAX_NAME} karakter.`;
+
+// One part of a name as typed: spaces trimmed and collapsed.
+export const namePart = (value: unknown) => (typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "");
+
+// The name in two parts (#419, D182): "Vezetéknév" and "Keresztnév", both
+// required; the full name is "<surname> <firstName>", at most MAX_NAME long.
+export function validateName(input: { surname: unknown; firstName: unknown }): {
+  value: { name: string; surname: string; firstName: string };
+  errors: Pick<ProfileErrors, "surname" | "firstName">;
+} {
+  const surname = namePart(input.surname);
+  const firstName = namePart(input.firstName);
+  const name = fullName(surname, firstName);
+  const errors: Pick<ProfileErrors, "surname" | "firstName"> = {};
+  if (!surname) errors.surname = SURNAME_REQUIRED;
+  if (!firstName) errors.firstName = FIRST_NAME_REQUIRED;
+  else if (name.length > MAX_NAME) errors.firstName = NAME_TOO_LONG;
+  return { value: { name, surname, firstName }, errors };
+}
+
+// The profile form (first login and the profile page): surname, first name,
+// level, phone number and sex are all required; the phone is stored as E.164
+// (phone.ts). `requireConsent`: the first-login page also asks for the
+// privacy consent.
 export function validateProfile(
-  input: { name: unknown; level: unknown; phone: unknown; consent?: unknown; sex?: unknown },
+  input: { surname: unknown; firstName: unknown; level: unknown; phone: unknown; consent?: unknown; sex?: unknown },
   { requireConsent }: { requireConsent: boolean },
 ): { ok: true; value: ProfileInput } | { ok: false; errors: ProfileErrors } {
-  const name = typeof input.name === "string" ? input.name.trim().replace(/\s+/g, " ") : "";
+  const named = validateName(input);
   const consent = input.consent === "on" || input.consent === true;
-  const errors: ProfileErrors = {};
-  if (name.length < 2) errors.name = "Add meg a neved.";
-  else if (name.length > MAX_NAME) errors.name = `Legfeljebb ${MAX_NAME} karakter.`;
+  const errors: ProfileErrors = { ...named.errors };
   const level = typeof input.level === "string" && isLevel(input.level) ? input.level : null;
   if (!level) errors.level = "Válaszd ki a szinted.";
   const phone = parsePhone(input.phone);
@@ -233,7 +272,7 @@ export function validateProfile(
   if (!sex) errors.sex = SEX_REQUIRED;
   if (requireConsent && !consent) errors.consent = "A belépéshez fogadd el az adatkezelési tájékoztatót.";
   if (Object.keys(errors).length || !level || !phone.ok || !phone.value || !sex) return { ok: false, errors };
-  return { ok: true, value: { name, level, phone: phone.value, consent, sex } };
+  return { ok: true, value: { ...named.value, level, phone: phone.value, consent, sex } };
 }
 
 // --- Redirects and cookies --------------------------------------------------

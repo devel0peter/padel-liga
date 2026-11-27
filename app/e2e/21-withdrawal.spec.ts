@@ -6,12 +6,14 @@
 // last: it changes a published group.
 import { expect, test, type Page } from "@playwright/test";
 
-import { GROUP_PAIRS, ORGANIZER, PAIRS, as, content, d1, visit, type Player } from "./support";
+import { GROUP_PAIRS, ORGANIZER, PAIRS, as, content, d1, surname, teamLabel, visit, type Player } from "./support";
 
 const REASON = "Sérülés, a kör végéig nem tudnak játszani.";
 // "A – B" in the order the pair is stored, which may differ from the seed's.
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const pairText = (a: Player, b: Player) => `(?:${esc(a.name)} – ${esc(b.name)}|${esc(b.name)} – ${esc(a.name)})`;
+// The player pages' team label (#419), "Takács / Juhász", in either order.
+const labelText = (a: Player, b: Player) => `(?:${esc(teamLabel(a, b))}|${esc(teamLabel(b, a))})`;
 const row = (page: Page, a: Player, b: Player) =>
   page.getByRole("row").filter({ hasText: a.name }).filter({ hasText: b.name });
 
@@ -70,10 +72,10 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   const mate = await as(browser, others[0]![0]);
   await visit(mate.page, "/home");
   const card = content(mate.page);
-  await expect(card).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
-  await expect(card.getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
+  await expect(card).toContainText(new RegExp(`Visszalépett: ${labelText(x, y)}\\. A meccseik nem számítanak\\.`));
+  await expect(card.getByRole("row").filter({ hasText: surname(x) })).toHaveCount(0);
   // The group's matches leave its matches out (D140: no Meccseitek row for the week off).
-  await expect(card.getByRole("group", { name: "A csoport meccsei" })).not.toContainText(x.name);
+  await expect(card.getByRole("group", { name: "A csoport meccsei" })).not.toContainText(surname(x));
   await visit(mate.page, "/notifications");
   await expect(content(mate.page)).toContainText("Visszalépett egy pár a csoportodból");
   await expect(content(mate.page)).not.toContainText(REASON);
@@ -82,8 +84,8 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   // The Tabella (players only, D134): the pair is named below its group, not in the table.
   const viewer = await as(browser, others[0]![0]);
   await visit(viewer.page, "/league/minta");
-  await expect(content(viewer.page)).toContainText(new RegExp(`Visszalépett: ${pairText(x, y)}\\. A meccseik nem számítanak\\.`));
-  await expect(content(viewer.page).getByRole("row").filter({ hasText: x.name })).toHaveCount(0);
+  await expect(content(viewer.page)).toContainText(new RegExp(`Visszalépett: ${labelText(x, y)}\\. A meccseik nem számítanak\\.`));
+  await expect(content(viewer.page).getByRole("row").filter({ hasText: surname(x) })).toHaveCount(0);
   await expect(content(viewer.page)).not.toContainText(REASON);
   await viewer.context.close();
 

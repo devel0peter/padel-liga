@@ -12,7 +12,9 @@ import {
   formerPairViews,
   groupHistory,
   matchViews,
+  pageLabels,
   personView,
+  profilePairOf,
   playerStats,
   shownElo,
   type EloChangeInput,
@@ -42,11 +44,15 @@ const playerB = alias(users, "profile_player_b");
 const personCols = {
   aId: playerA.id,
   aName: playerA.name,
+  aSurname: playerA.surname,
+  aFirstName: playerA.firstName,
   aDeleted: playerA.deletedAt,
   aLevel: playerA.level,
   aElo: playerA.elo,
   bId: playerB.id,
   bName: playerB.name,
+  bSurname: playerB.surname,
+  bFirstName: playerB.firstName,
   bDeleted: playerB.deletedAt,
   bLevel: playerB.level,
   bElo: playerB.elo,
@@ -56,19 +62,21 @@ type MemberRow = {
   pairId: number;
   aId: string;
   aName: string | null;
+  aSurname: string | null;
+  aFirstName: string | null;
   aDeleted: Date | null;
   bId: string;
   bName: string | null;
+  bSurname: string | null;
+  bFirstName: string | null;
   bDeleted: Date | null;
 };
 
-const profilePair = (r: MemberRow): ProfilePair => ({
-  id: r.pairId,
-  players: [
-    personView({ id: r.aId, name: r.aName, deletedAt: r.aDeleted }),
-    personView({ id: r.bId, name: r.bName, deletedAt: r.bDeleted }),
-  ],
-});
+const profilePair = (r: MemberRow): ProfilePair =>
+  profilePairOf(r.pairId, [
+    personView({ id: r.aId, name: r.aName, surname: r.aSurname, firstName: r.aFirstName, deletedAt: r.aDeleted }),
+    personView({ id: r.bId, name: r.bName, surname: r.bSurname, firstName: r.bFirstName, deletedAt: r.bDeleted }),
+  ]);
 
 /** The published groups, in listed cities, of the pairs `pairFilter` picks. */
 async function publicGroups(pairFilter: SQL) {
@@ -226,11 +234,14 @@ export async function pairProfile(pairId: number, now = new Date()): Promise<Pai
   const pair = details.pairById.get(pairId)!;
   const own = new Set([pairId]);
   const isStarted = started.has(leagueId);
-  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  const shownMatches = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  // The page is one screen for the clash rule (#419): the pair and its opponents.
+  const labelled = pageLabels([pair, ...shownMatches.map((m) => m.opponents)]);
+  const matchList = shownMatches.map((m) => ({ ...m, opponents: labelled(m.opponents) }));
   const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => p.id === pairId));
   const rating = ownGroups.flatMap((g) => g.pairs).find((p) => p.id === pairId)?.elo;
   return {
-    pair,
+    pair: labelled(pair),
     league: league!,
     started: isStarted,
     groups: groupHistory(pairId, details.inputs, now),
@@ -306,7 +317,10 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     .map(({ at: _, ...p }) => p);
 
   const eloByMatch = new Map<number, EloChangeInput>(changes.map((c) => [c.matchId, c]));
-  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  const shownMatches = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  // The page is one screen for the clash rule (#419): the player's pairs and their opponents.
+  const labelled = pageLabels([...pairsShown.map((p) => p.pair), ...shownMatches.map((m) => m.opponents)]);
+  const matchList = shownMatches.map((m) => ({ ...m, opponents: labelled(m.opponents) }));
   // A season is one league's: the same name in two leagues is two seasons.
   const leagueOf = new Map(list.map((g) => [g.id, g.leagueId]));
   const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => own.has(p.id)));
@@ -315,7 +329,7 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     started: isStarted,
     elo: isStarted && rating !== null ? shownElo(rating) : null,
     eloHistory: isStarted ? eloSeries(changes).map(shownElo) : [],
-    pairs: pairsShown,
+    pairs: pairsShown.map((p) => ({ ...p, pair: labelled(p.pair) })),
     matches: matchList,
     stats: playerStats(
       ownGroups.map((g) => ({ season: `${leagueOf.get(g.id)}:${g.season}`, startsAt: g.startsAt })),

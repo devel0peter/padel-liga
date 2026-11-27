@@ -20,15 +20,14 @@ function Side({ side, won, align, compact }: { side: FixtureSide; won: boolean; 
   return (
     <span
       className={cn(
-        "grid min-w-0",
+        "min-w-0 break-words",
         compact ? "text-xs leading-tight" : "text-[13px] leading-snug sm:text-sm",
         align === "right" ? "text-right" : "text-left",
         won && "font-bold",
         side.mine && "text-nav-active",
       )}
     >
-      <span className="break-words">{side.names[0]}</span>
-      <span className="break-words">{side.names[1]}</span>
+      {side.label}
     </span>
   );
 }
@@ -136,7 +135,7 @@ function CompactList({ weeks, label }: { weeks: FixtureWeek[]; label: string }) 
   return (
     <div className="grid gap-2" role="group" aria-label={label}>
       {weeks.map((w) => {
-        const rest = w.resting ? `pihen: ${w.resting[0]} – ${w.resting[1]}` : null;
+        const rest = w.resting ? `pihen: ${w.resting}` : null;
         const head = (
           <>
             <span className={cn("font-bold", !w.current && "text-foreground")}>{w.week}. hét</span> · {w.range}
@@ -198,7 +197,7 @@ export function FixtureList({ weeks, label = "Meccsek", compact = false }: { wee
           )}
           {w.resting && (
             <p className="text-xs text-muted-foreground">
-              Pihen: {w.resting[0]} – {w.resting[1]}
+              Pihen: {w.resting}
             </p>
           )}
         </section>

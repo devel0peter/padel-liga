@@ -165,6 +165,13 @@ export const users = sqliteTable("users", {
   // Lowercased; the same email is the same account whichever way they log in.
   email: text("email").notNull().unique(),
   name: text("name").notNull().default(""),
+  // The name in two parts (#419, D182): "Vezetéknév" and "Keresztnév" on
+  // every name form, and `name` = "<surname> <first_name>" for every reader of
+  // the full name. Pages show a pair by its surnames ("Kovács / Nagy").
+  // Migration 0072 filled them from `name` (before / after the first space;
+  // a one-word name has no first_name); null until a name form saves them.
+  surname: text("surname"),
+  firstName: text("first_name"),
   // Profile picture URL from Google (refreshed at each Google login); none for
   // email-code accounts, which show initials.
   imageUrl: text("image_url"),

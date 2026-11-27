@@ -7,7 +7,9 @@ import { formatSlot } from "./format";
 const START = new Date("2026-11-01T23:00:00Z"); // Mon 2 Nov 00:00 Budapest
 import { buildLadder, countedOutcome, groupTable, isValidOutcome, phaseSpan, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
-const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, names: [`Játékos ${id}A`, `Játékos ${id}B`], elo });
+// "A11 Anna" and "B11 Béla", surnames A11 and B11: the team label is "A11 / B11" (#419).
+const player = (surname: string, firstName: string) => ({ name: `${surname} ${firstName}`, surname, firstName });
+const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, players: [player(`A${id}`, "Anna"), player(`B${id}`, "Béla")], elo });
 
 /** A group of 3 pairs with ids base+1..base+3 and no matches. */
 function group(number: number, matches: LadderMatch[] = []): LadderGroupInput {
@@ -82,11 +84,11 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
     const [band] = buildLadder([g], 1, START);
     expect(band!.groups[0]!.rows).toEqual([
       // prettier-ignore
-      { rank: 1, pairId: 11, names: ["Játékos 11A", "Játékos 11B"], matches: 2, wins: 1, losses: 1, setsWon: 2, setsLost: 2, gamesWon: 11, gamesLost: 10, points: 4, setDiff: 0, gameDiff: 1, zone: null, mine: false },
+      { rank: 1, pairId: 11, label: "A11 / B11", matches: 2, wins: 1, losses: 1, setsWon: 2, setsLost: 2, gamesWon: 11, gamesLost: 10, points: 4, setDiff: 0, gameDiff: 1, zone: null, mine: false },
       {
         rank: 2,
         pairId: 12,
-        names: ["Játékos 12A", "Játékos 12B"],
+        label: "A12 / B12",
         matches: 1,
         wins: 1,
         losses: 0,
@@ -103,7 +105,7 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
       {
         rank: 3,
         pairId: 13,
-        names: ["Játékos 13A", "Játékos 13B"],
+        label: "A13 / B13",
         matches: 1,
         wins: 0,
         losses: 1,
@@ -122,10 +124,10 @@ describe("buildLadder: group tables come from the rules engine (spec 9)", () => 
 
   it("shows table order (Elo, then seed) and zeros before any match is played", () => {
     const [band] = buildLadder([group(1, [open(1, 11, 12, 1)])], 1, START);
-    expect(band!.groups[0]!.rows.map((r) => [r.rank, r.names[0], r.points, r.matches])).toEqual([
-      [1, "Játékos 11A", 0, 0],
-      [2, "Játékos 12A", 0, 0],
-      [3, "Játékos 13A", 0, 0],
+    expect(band!.groups[0]!.rows.map((r) => [r.rank, r.label, r.points, r.matches])).toEqual([
+      [1, "A11 / B11", 0, 0],
+      [2, "A12 / B12", 0, 0],
+      [3, "A13 / B13", 0, 0],
     ]);
   });
 });
@@ -169,7 +171,7 @@ describe("buildLadder: the fixture list (D133)", () => {
   });
 
   it("names the pair that rests in a group of 3", () => {
-    expect(weeks().map((w) => w.resting?.[0])).toEqual(["Játékos 13A", "Játékos 12A", "Játékos 11A"]);
+    expect(weeks().map((w) => w.resting)).toEqual(["A13 / B13", "A12 / B12", "A11 / B11"]);
   });
 
   it("keeps a result waiting for confirmation or disputed in the list, without a score", () => {
@@ -234,6 +236,26 @@ describe("buildLadder: up and down marks (spec 10, D133)", () => {
     const g = buildLadder([group(1), group(2)], 1, START)[1]!.groups[0]!;
     expect(g.ranked).toBe(false);
     expect(g.rows.map((r) => r.zone)).toEqual([null, null, null]);
+  });
+});
+
+describe("buildLadder: team labels (#419)", () => {
+  it("applies the clash rule per group card: its table, matches and withdrawn pairs", () => {
+    const nagy = (id: number, given: string, elo: number): LadderPair => ({ id, players: [player("Nagy", given), player(`C${id}`, "Csaba")], elo });
+    // Two Nagys in group 1 get their initials everywhere on its card; the
+    // Nagy of group 2 shares no card with them and stays plain.
+    const one: LadderGroupInput = {
+      id: 1,
+      number: 1,
+      pairs: [nagy(11, "Bence", 1500), nagy(12, "Dóra", 1490), { ...nagy(13, "Anna", 1480), id: 13, players: [player("Kiss", "Anna"), player("Tóth", "Ádám")] }],
+      matches: [open(1, 11, 12, 1)],
+      setGames: SHORT_SETS,
+    };
+    const two: LadderGroupInput = { id: 2, number: 2, pairs: [nagy(21, "Béla", 1400), pair(22), pair(23)], matches: [], setGames: SHORT_SETS };
+    const [g1, g2] = buildLadder([one, two], 1, START).flatMap((b) => b.groups);
+    expect(g1!.rows.map((r) => r.label)).toEqual(["Nagy B. / C11", "Nagy D. / C12", "Kiss / Tóth"]);
+    expect(g1!.weeks[0]!.matches[0]).toMatchObject({ a: { label: "Nagy B. / C11" }, b: { label: "Nagy D. / C12" } });
+    expect(g2!.rows.map((r) => r.label)).toContain("Nagy / C21");
   });
 });
 
@@ -342,7 +364,7 @@ describe("buildLadder: a pair withdrawn mid-phase (#34, rules 2)", () => {
       const n = buildLadder([without()], week, START)[0]!.groups[0]!;
       expect(g.weeks).toEqual(n.weeks);
     }
-    expect(buildLadder([withdrawnGroup()], 1, START)[0]!.groups[0]!.withdrawn).toEqual([["Játékos 14A", "Játékos 14B"]]);
+    expect(buildLadder([withdrawnGroup()], 1, START)[0]!.groups[0]!.withdrawn).toEqual(["A14 / B14"]);
     expect(buildLadder([without()], 1, START)[0]!.groups[0]!.withdrawn).toEqual([]);
   });
 });

@@ -200,7 +200,8 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(group.rows).toEqual(without.rows);
     expect(group.rows.map((r) => r.points)).toEqual([4, 4, 4]);
     expect(group.weeks).toEqual(without.weeks);
-    expect(group.withdrawn).toEqual([["Játékos G", "Játékos H"]]);
+    // By team label (#419): these accounts have no surname, so their full names.
+    expect(group.withdrawn).toEqual(["Játékos G / Játékos H"]);
     expect(without.withdrawn).toEqual([]);
   });
 
@@ -228,12 +229,12 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     // The group card's table (#201) leaves the pair and all its matches out,
     // as if it never played, and names it below.
     expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
-    expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
+    expect(mine!.withdrawn).toEqual(["Játékos G / Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
-    const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
+    const table = mine!.pairs.map(({ label: _, mine: __, ...r }) => r);
     freshDb({ withPair4: false });
     const [never] = await M.currentGroups("a", NOW);
-    expect(table).toEqual(never!.pairs.map(({ name: _, mine: __, ...r }) => r));
+    expect(table).toEqual(never!.pairs.map(({ label: _, mine: __, ...r }) => r));
     expect(table.map((r) => r.points)).toEqual([4, 4, 4]);
     expect(never!.withdrawn).toEqual([]);
   });
@@ -247,7 +248,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
   it("match page and steps: off for both pairs, no scheduling or result step", async () => {
     await withdraw();
     const page = await M.matchPage(6, "c", NOW);
-    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
+    expect(page?.voided).toBe("Játékos G / Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
     expect(page?.actions.propose).toBe(false);
     expect(page?.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect((await M.matchPage(6, "g", NOW))?.voided).toMatch(/^Visszaléptetek/);

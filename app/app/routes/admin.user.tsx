@@ -79,7 +79,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = form.get("intent");
   if (intent === "edit") {
     const result = await updatePlayerByAdmin(actor.id, params.id, {
-      name: form.get("name"),
+      surname: form.get("surname"),
+      firstName: form.get("first_name"),
       phone: form.get("phone"),
       level: form.get("level"),
       sex: form.get("sex"),
@@ -130,10 +131,17 @@ function EditDialog({ profile }: { profile: Profile }) {
         </DialogHeader>
         <fetcher.Form method="post" className="grid gap-4" id="profile-edit">
           <input type="hidden" name="intent" value="edit" />
-          <div className="grid gap-1.5">
-            <Label htmlFor="edit-name">Név</Label>
-            <Input id="edit-name" name="name" defaultValue={profile.editable.name} maxLength={80} required />
-            <FieldError text={errors.name} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-surname">Vezetéknév</Label>
+              <Input id="edit-surname" name="surname" defaultValue={profile.editable.surname ?? ""} maxLength={80} required />
+              <FieldError text={errors.surname} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-first-name">Keresztnév</Label>
+              <Input id="edit-first-name" name="first_name" defaultValue={profile.editable.firstName ?? ""} maxLength={80} />
+              <FieldError text={errors.firstName} />
+            </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="edit-phone">Telefonszám</Label>

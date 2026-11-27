@@ -83,6 +83,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       ? { effect: `${OWN_DELETION_EFFECTS[deletion.mode]} ${ownDeletionNote(actor.leagues.length > 0)}` }
       : { refused: DELETION_REFUSALS[deletion.refusal] },
     name: user.name,
+    // The name's two parts (#419): an account from before them has the
+    // migration's split of its name, or nothing yet.
+    surname: user.surname ?? "",
+    firstName: user.firstName ?? "",
     email: user.email,
     imageUrl: user.imageUrl,
     level: user.level,
@@ -135,7 +139,7 @@ export async function action({ request }: Route.ActionArgs) {
     });
     if (!level.ok) return data({ saved: false, errors: { level: level.error } as ProfileErrors }, { status: 400 });
     const result = validateProfile(
-      { name: form.get("name"), level: level.level, phone: form.get("phone"), sex: form.get("sex") },
+      { surname: form.get("surname"), firstName: form.get("first_name"), level: level.level, phone: form.get("phone"), sex: form.get("sex") },
       { requireConsent: false },
     );
     if (!result.ok) return data({ saved: false, errors: result.errors }, { status: 400 });
@@ -302,7 +306,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             )}
             <Form method="post" className="grid gap-5">
               <input type="hidden" name="intent" value="profile" />
-              <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
+              <ProfileFields errors={errors} values={{ surname: d.surname, firstName: d.firstName, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
               <div className="flex items-center gap-3">
                 <Button type="submit" disabled={busy}>
                   Mentés

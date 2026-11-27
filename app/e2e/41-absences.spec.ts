@@ -42,6 +42,8 @@ test("Helyettes: marked before the match and taken back, then ticked on the resu
   const asker = await as(browser, m.asker);
   await visit(asker.page, `/matches/${m.id}`);
   const main = content(asker.page);
+  // Under "Helyettes, segítség", the page's last row (#421).
+  await main.getByText("Helyettes, segítség").click();
   await main.getByText("Helyettes kell?").click();
   await main.getByRole("combobox", { name: "Ki nem tud játszani?" }).click();
   await asker.page.getByRole("option", { name: m.partner }).click();

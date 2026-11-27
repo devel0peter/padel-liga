@@ -142,6 +142,8 @@ test("18. propose → accept: a refused proposal, the email to the other pair, s
   const player = await as(browser, anna);
   await visit(player.page, `/matches/${first!.id}`);
   const main = content(player.page);
+  // The how-to sits under "Helyettes, segítség", the page's last row (#421).
+  await main.getByText("Helyettes, segítség").click();
   await expect(main.getByRole("heading", { name: "Hogyan egyeztessetek?" })).toBeVisible();
   await expect(main).toContainText("adjátok meg, mikor értek rá, legalább 2 különböző napon");
   // No time yet (D148): first write to each other, then record the time (open);

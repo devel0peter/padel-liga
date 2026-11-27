@@ -1,6 +1,6 @@
 # Padelpárbaj – Szabályzat
 
-*Hatályos: 2026. 11. 29.*
+*Hatályos: 2026. 11. 28.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.

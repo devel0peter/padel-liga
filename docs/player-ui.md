@@ -17,7 +17,7 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 | C7 | Nothing about the league is public: tables, results and profiles are for logged-in players only (the league page sits in the app shell). The league page shows names, tables and results only; no rating on it. Public stay the landing page, rules, privacy, login and register. | spec 14, D112, D134 |
 | C8 | Logged-in pages sit in the app shell and use `AppPage` (one header, no own `<h1>`); shadcn/ui components first. | CLAUDE.md |
 | C9 | Every player step on a match stays reachable whatever the state: propose, counter-propose, agreed time, accept, confirm/decline, venue, cancel, record/correct/confirm/dispute a result, marking a player who doesn't play (also on the result form), no-show report. A redesign may fold a form away, never remove it. | spec 6–8, D68, D74, D77, D108, D175 |
-| C10 | One look for every block: a card with one heading; no coloured boxes, glows or badges for decoration. A page shows what the player needs now; the rest is one tap away (a fold, a tab or another page). | Peter, 2026-11-07 (D136) |
+| C10 | One look for every block: the building blocks of `docs/ui-guidelines.md` (direction A); colour carries status (green, amber, blue, red, the yellow primary action), never decoration. A page shows what the player needs now; the rest is one tap away (a fold, a tab or another page). | Peter, 2026-11-07 (D136); 2026-11-27 (D181) |
 
 ## 2. Group table
 

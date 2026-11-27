@@ -60,24 +60,24 @@ export function GroupMessage({ message, week, url, matchId }: { message: GroupMe
       <p className="text-sm font-medium">Írj mindenkinek egyszerre, a párodnak és az ellenfeleknek:</p>
       <div className="grid gap-2 sm:flex sm:flex-wrap">
         {m.sms && (
-          <Button asChild variant="outline" className={button}>
+          <Button asChild variant="secondary" className={button}>
             <a href={m.sms} className="no-underline" onClick={() => logTap(matchId, "sms", revalidator.revalidate)}>
-              <MessageSquare aria-hidden className="text-court" />
+              <MessageSquare aria-hidden className="text-ball" />
               SMS mindenkinek
             </a>
           </Button>
         )}
         {m.mailto && (
-          <Button asChild variant="outline" className={button}>
+          <Button asChild variant="secondary" className={button}>
             <a href={m.mailto} className="no-underline" onClick={() => logTap(matchId, "email", revalidator.revalidate)}>
-              <Mail aria-hidden className="text-court" />
+              <Mail aria-hidden className="text-ball" />
               E-mail mindenkinek
             </a>
           </Button>
         )}
         {m.sms && (
-          <Button type="button" variant="outline" onClick={copy} className={button}>
-            <Copy aria-hidden className="text-court" />
+          <Button type="button" variant="secondary" onClick={copy} className={button}>
+            <Copy aria-hidden className="text-ball" />
             Számok másolása
           </Button>
         )}

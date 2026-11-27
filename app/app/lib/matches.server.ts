@@ -633,6 +633,8 @@ export type MatchPage = {
   side: Side;
   us: string;
   opponents: string;
+  // The two pairs' badges (#421): the pair id (the colour) and the initials.
+  badges: { us: TeamBadgeData; them: TeamBadgeData };
   // Only while the phase runs (spec 3); empty afterwards.
   contacts: Opponent[];
   // Írj mindenkinek (D147): while `contacts` shows and the result isn't final.
@@ -760,6 +762,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     side,
     us: label(ours.players),
     opponents: label(theirs.players),
+    badges: { us: badgeOf(ours), them: badgeOf(theirs) },
     contacts: reachable ? theirs.players.map(contactOf) : [],
     message: reachable && result.status !== "final" ? groupMessageOf(ours.players, theirs.players, userId) : null,
     state,

@@ -31,9 +31,16 @@ describe("Kezdőlap: after Fiók törlése (#38)", () => {
     expect(await load("/")).toMatchObject({ accountDeleted: false });
   });
 
-  it("never to someone logged in", async () => {
+  it("someone logged in goes to Kezdőlap instead of the landing page (#444)", async () => {
     const cookie = (await createSession("u")).split(";")[0]!;
-    expect(await load("/?accountDeleted=1", cookie)).toMatchObject({ accountDeleted: false });
+    for (const path of ["/", "/?accountDeleted=1"]) {
+      const thrown = await load(path, cookie).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(thrown).toBeInstanceOf(Response);
+      expect((thrown as Response).headers.get("Location")).toBe("/home");
+    }
   });
 });
 

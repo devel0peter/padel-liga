@@ -31,6 +31,7 @@ import { DELETION_REFUSALS, OWN_DELETION_EFFECTS, ownDeletionNote } from "~/lib/
 import { deleteOwnAccount, planOwnDeletion } from "~/lib/account-deletion.server";
 import {
   channelEnabled,
+  tipsOff,
   CHANNELS,
   isChannel,
   isEnabled,
@@ -42,7 +43,7 @@ import {
   topicEnabled,
   type PushTopic,
 } from "~/lib/notifications";
-import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTipsOff, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
@@ -105,6 +106,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     vapidPublicKey: vapidPublicKey(),
     emailOn: channelEnabled(disabled, "email"),
     pushOn: channelEnabled(disabled, "push"),
+    // "Nem kérek tippeket" (#444).
+    tipsOff: tipsOff(disabled),
     // One push switch per topic (#349), for every account: anyone may play.
     topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...PUSH_TOPICS[topic], enabled: topicEnabled(disabled, topic) })),
     kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
@@ -146,6 +149,10 @@ export async function action({ request }: Route.ActionArgs) {
     return { saved: true, errors: {} as ProfileErrors };
   }
   const enabled = form.get("enabled") === "1";
+  if (form.get("intent") === "tips") {
+    await setTipsOff(user.id, enabled);
+    return { ok: true };
+  }
   if (form.get("intent") === "channel") {
     const channel = form.get("channel");
     if (!isChannel(channel)) return data({ ok: false }, { status: 400 });
@@ -357,6 +364,15 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             />
             <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
             <PushTopics topics={d.topics} pushOn={d.pushOn} />
+            <div className="border-t border-hairline pt-4">
+              <SettingSwitch
+                id="tips-off"
+                label="Nem kérek tippeket"
+                description="A Kezdőlapon nem mutatunk több tippet az app funkcióiról, egyik eszközödön sem."
+                enabled={d.tipsOff}
+                fields={{ intent: "tips" }}
+              />
+            </div>
             {d.kinds.length > 0 && (
               <div className="grid gap-4 border-t pt-4">
                 <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>

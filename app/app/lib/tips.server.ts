@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { tipDismissals } from "~/db/schema";
 
-import { channelEnabled } from "./notifications";
+import { channelEnabled, tipsOff } from "./notifications";
 import { disabledKindsFor, vapidPublicKey } from "./notifications.server";
 import { offeredTips, TIPS, type TipDismissal } from "./tips";
 
@@ -19,6 +19,8 @@ export async function tipDismissalsOf(userId: string): Promise<Map<string, TipDi
 // picks the first that applies on the device. Two queries.
 export async function offeredTipIds(userId: string, now = new Date()): Promise<string[]> {
   const [disabled, dismissals] = await Promise.all([disabledKindsFor(userId), tipDismissalsOf(userId)]);
+  // "Nem kérek tippeket" on Profil (#444): none at all.
+  if (tipsOff(disabled)) return [];
   const account = { pushChannelOn: channelEnabled(disabled, "push"), pushConfigured: vapidPublicKey() !== null };
   return offeredTips(TIPS, account, dismissals, now).map((t) => t.id);
 }

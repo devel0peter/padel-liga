@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { data, Link } from "react-router";
+import { data, Link, redirect } from "react-router";
 
 import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
@@ -42,6 +42,8 @@ export function meta({ location }: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // A logged-in user wants their own page, not the landing page (#444).
+  if (await getUser(request)) throw redirect("/home");
   const listed = await listedCities();
   // A listed city with a league shows where it is and sends visitors to
   // registration (#83). There is no interest form any more (#332, D123):
@@ -75,7 +77,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Back from the player's own "Fiók törlése" (#38), logged out. Only for a
   // visitor without a session, so a link with it can't tell a logged-in
   // player their account is gone.
-  const accountDeleted = params.get("accountDeleted") === "1" && !(await getUser(request));
+  // Only a logged-out visitor gets here (above), e.g. right after deleting the account.
+  const accountDeleted = params.get("accountDeleted") === "1";
   return { ref, cities, accountDeleted };
 }
 

@@ -58,7 +58,10 @@ test("Belépés is in the header of every public page; logged in it reads Saját
   await anon.close();
 
   const admin = await as(browser, ADMIN.email);
-  for (const path of ["/", "/rules", "/privacy"]) {
+  // The landing page sends a logged-in user to Kezdőlap (#444).
+  await visit(admin.page, "/");
+  await expect(admin.page).toHaveURL(/\/home$/);
+  for (const path of ["/rules", "/privacy"]) {
     await visit(admin.page, path);
     const header = admin.page.getByRole("banner");
     await expect(header.getByRole("link", { name: "Saját oldalam" })).toHaveAttribute("href", "/home");

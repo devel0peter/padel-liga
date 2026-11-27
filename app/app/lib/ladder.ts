@@ -19,16 +19,18 @@ import {
 } from "@padel-liga/rules";
 
 import { fixtureWeeks, moveZones, type FixtureWeek, type Zone } from "./fixtures";
+import { teamLabeler, type NamedPlayer } from "./names";
 
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
 /**
- * A pair as the ladder shows it: the two players' names and the pair's rating
- * for the last tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
+ * A pair as the ladder shows it: the two players' names (and picked
+ * surnames, for the team label, #419) and the pair's rating for the last
+ * tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
  */
 export type LadderPair = {
   id: number;
-  names: [string, string];
+  players: [NamedPlayer, NamedPlayer];
   elo: number;
   withdrawn?: boolean;
 };
@@ -75,7 +77,8 @@ export type TableRow = {
   gameDiff: number;
 };
 
-export type LadderRow = TableRow & { names: [string, string]; zone: Zone; mine: boolean };
+/** `label`: the pair's team label, "Kovács / Nagy" (#419). */
+export type LadderRow = TableRow & { label: string; zone: Zone; mine: boolean };
 
 export type LadderGroup = {
   number: number;
@@ -86,8 +89,8 @@ export type LadderGroup = {
   rows: LadderRow[];
   /** Every match of the group by week (D133); no database id leaves the server. */
   weeks: FixtureWeek[];
-  /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
-  withdrawn: [string, string][];
+  /** Pairs withdrawn mid-phase, by team label: out of the table, with all of their matches. */
+  withdrawn: string[];
 };
 
 export type LadderBand = {
@@ -194,8 +197,10 @@ export function buildLadder(
   const ordered = [...groups].sort((x, y) => x.number - y.number);
   const bands = new Map<Division, LadderGroup[]>(DIVISIONS.map((d) => [d, []]));
   ordered.forEach((group, index) => {
-    const byId = new Map(group.pairs.map((p) => [p.id, p]));
-    const names = (id: number) => byId.get(id)!.names;
+    // One group card is one screen for the clash rule (#419): its table,
+    // its matches and its withdrawn pairs.
+    const label = teamLabeler(group.pairs.flatMap((p) => p.players));
+    const labels = new Map(group.pairs.map((p) => [p.id, label(p.players)]));
     const standings = groupTable(group.pairs, group.matches, group.setGames);
     const ranked = isRanked(standings);
     const zones = moveZones(standings.length, index + 1, ordered.length, ranked);
@@ -205,18 +210,18 @@ export function buildLadder(
       ranked,
       rows: standings.map((r, i) => ({
         ...r,
-        names: names(r.pairId),
+        label: labels.get(r.pairId)!,
         zone: zones[i]!,
         mine: mine.has(r.pairId),
       })),
       // A withdrawn pair's matches leave the group (rules 2): fixtureWeeks
       // lists only the matches of the pairs given.
       weeks: fixtureWeeks(
-        group.pairs.filter((p) => !p.withdrawn),
+        group.pairs.filter((p) => !p.withdrawn).map((p) => ({ id: p.id, label: labels.get(p.id)! })),
         group.matches,
         { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null, setGames: group.setGames },
       ),
-      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
+      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => labels.get(p.id)!),
     });
   });
   return DIVISIONS.map((division) => ({

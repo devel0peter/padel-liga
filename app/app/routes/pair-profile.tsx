@@ -3,7 +3,6 @@ import { AppPage } from "~/components/app-page";
 import { Card, MatchList, PersonLink } from "~/components/profile-parts";
 import { ProfileSummary } from "~/components/player-profile-view";
 import { requireUser } from "~/lib/auth/session.server";
-import { pairName } from "~/lib/profiles";
 import { pairProfile } from "~/lib/profiles.server";
 import { SITE_NAME } from "~/lib/site";
 
@@ -21,7 +20,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 // Not for search engines or link previews (D112): a title only.
 export function meta({ loaderData }: Route.MetaArgs) {
-  const name = loaderData ? pairName(loaderData.pair) : "Pár";
+  const name = loaderData ? loaderData.pair.label : "Pár";
   return [{ title: `${name} – ${SITE_NAME}` }, { name: "robots", content: "noindex, nofollow" }];
 }
 
@@ -29,10 +28,11 @@ export default function PairProfile({ loaderData: d }: Route.ComponentProps) {
   return (
     <AppPage
       back={{ to: `/league/${d.league.slug}`, label: "Tabella" }}
-      title={
-        <span className="grid leading-tight">
-          <PersonLink person={d.pair.players[0]} />
-          <PersonLink person={d.pair.players[1]} />
+      // The team label (#419); the full names stay as the sub-line, each linking its profile.
+      title={d.pair.label}
+      description={
+        <span data-testid="pair-players">
+          <PersonLink person={d.pair.players[0]} /> és <PersonLink person={d.pair.players[1]} />
         </span>
       }
     >

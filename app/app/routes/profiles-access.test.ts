@@ -161,7 +161,8 @@ describe("league page: logged-in players only (D134), no rating (D112)", () => {
   it("a logged-in player sees the names, the results and each pair's name as a link to its profile", async () => {
     const { html, data } = await render(member);
     expect(data).toMatchObject({ kind: "ladder" });
-    expect(html).toContain("Kis Anna");
+    // A pair is its team label (#419).
+    expect(html).toContain("Kis / Nagy");
     for (const id of [1, 2, 3]) expect(html).toContain(`href="/pairs/${id}"`);
   });
 

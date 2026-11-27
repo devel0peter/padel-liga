@@ -9,10 +9,12 @@ import { cn } from "~/lib/utils";
 // wins, losses, sets and games won:lost, points; the places that move up or
 // down at the end of the round are marked. One component for Kezdőlap and the
 // public league page. Fits 390 px: the names wrap, the games column hides.
+// A pair shows as its team label, "Kovács / Nagy" (#419, lib/names.ts).
 
 export type StandingsRow = {
   pairId: number;
-  names: [string, string];
+  /** The team label, "Kovács / Nagy" (#419: teamLabeler over the group's players). */
+  label: string;
   rank: number;
   matches: number;
   wins: number;
@@ -49,13 +51,8 @@ function ZoneMark({ zone }: { zone: Zone }) {
   return null;
 }
 
-function Names({ names }: { names: [string, string] }) {
-  return (
-    <span className="grid leading-snug">
-      <span className="break-words">{names[0]}</span>
-      <span className="break-words">{names[1]}</span>
-    </span>
-  );
+function Label({ label }: { label: string }) {
+  return <span className="leading-snug break-words">{label}</span>;
 }
 
 const num = "px-1 text-right tabular-nums";
@@ -118,10 +115,10 @@ export function StandingsTable({
                 <TableCell className="px-1 whitespace-normal">
                   {href ? (
                     <Link to={href} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
-                      <Names names={r.names} />
+                      <Label label={r.label} />
                     </Link>
                   ) : (
-                    <Names names={r.names} />
+                    <Label label={r.label} />
                   )}
                   {/* The own pair is bold (D143); the word is for screen readers only. */}
                   {r.mine && <span className="sr-only"> (ti)</span>}

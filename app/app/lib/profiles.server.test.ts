@@ -139,7 +139,7 @@ describe("before the league starts", () => {
     expect(anna).toMatchObject({ started: false, elo: null, eloHistory: [], matches: [] });
     expect(anna!.pairs).toEqual([
       {
-        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }] },
+        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }], label: "Anna / Bea" },
         league: "Padelpárbaj Győr",
         latest: { season: "2026/27 tél", phase: 1, group: 1, division: "Bronz divízió", place: null, withdrawn: false },
       },

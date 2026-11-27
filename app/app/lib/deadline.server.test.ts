@@ -164,7 +164,7 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
       detail: "Mindkét pár vereséget kap (0:6, 0:6)",
     });
     const page: any = await L.ladderPage("gyor", MONDAY_6);
-    const pair1 = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.number === 1).rows.find((r: any) => r.names.includes("Játékos 1A"));
+    const pair1 = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.number === 1).rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"));
     // 1–3 won 6:0, 6:0; 1–4 and 1–2 lost 0:6, 0:6 by both being inactive.
     expect(pair1).toMatchObject({ points: 3, matches: 3, setDiff: 2 - 4, gameDiff: 12 - 24 });
   });
@@ -277,7 +277,7 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
     await resolveDeadlines(MONDAY_6, undefined, 25);
     const page: any = await L.ladderPage("gyor", MONDAY_6);
     const group1 = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.number === 1);
-    const pair1 = group1.rows.find((r: any) => r.names.includes("Játékos 1A"));
+    const pair1 = group1.rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"));
     // 1–3 won by walkover, 1–4 and 1–2 lost by both being inactive.
     expect(pair1).toMatchObject({ points: 3, matches: 3, setDiff: 2 - 4, gameDiff: 8 - 16 });
   });

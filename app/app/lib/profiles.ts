@@ -8,6 +8,7 @@ import { DIVISION_NAMES, divisionOf, type MatchOutcome, type SetGames, type Side
 import { DELETED_NAME } from "./account-deletion";
 import { signed } from "./format";
 import { countedOutcome, groupTable } from "./ladder";
+import { teamLabel, teamLabeler } from "./names";
 import { bothLostText, scoreText, walkoverScoreText, winnerOf } from "./results";
 
 /**
@@ -16,21 +17,33 @@ import { bothLostText, scoreText, walkoverScoreText, winnerOf } from "./results"
  * profile's address, so keeping it would tie the anonymized results back to
  * the person (D60).
  */
-export type ProfilePerson = { id: string | null; name: string };
+export type ProfilePerson = { id: string | null; name: string; surname?: string | null };
 
-export function personView(p: { id: string; name: string | null; deletedAt: Date | null }): ProfilePerson {
+/** `surname`: the part of the name the player picked (users.surname, #419), for the team label. */
+export function personView(p: { id: string; name: string | null; surname?: string | null; deletedAt: Date | null }): ProfilePerson {
   if (p.deletedAt) return { id: null, name: DELETED_NAME };
-  return { id: p.id, name: p.name || "Névtelen" };
+  return p.surname ? { id: p.id, name: p.name || "Névtelen", surname: p.surname } : { id: p.id, name: p.name || "Névtelen" };
 }
 
 /** Where a player links: their profile, or nowhere for a deleted account. */
 export const playerPath = (p: ProfilePerson) => (p.id ? `/players/${p.id}` : null);
 export const pairPath = (pairId: number) => `/pairs/${pairId}`;
 
-/** A pair named on a profile: its two players and its page. */
-export type ProfilePair = { id: number; players: [ProfilePerson, ProfilePerson] };
+/** A pair named on a profile: its two players, its team label ("Kovács / Nagy", #419) and its page. */
+export type ProfilePair = { id: number; players: [ProfilePerson, ProfilePerson]; label: string };
 
-export const pairName = (p: ProfilePair) => `${p.players[0].name} – ${p.players[1].name}`;
+/** A pair with the label it has alone; labelPairs applies the clash rule over a page. */
+export const profilePairOf = (id: number, players: [ProfilePerson, ProfilePerson]): ProfilePair => ({ id, players, label: teamLabel(players) });
+
+/**
+ * The team labels of the pairs one profile page shows (#419): its own
+ * pairs and their opponents are one screen for the clash rule. Returns the
+ * pair with its label on that page.
+ */
+export function pageLabels(shown: readonly ProfilePair[]): (pair: ProfilePair) => ProfilePair {
+  const label = teamLabeler(shown.flatMap((p) => p.players));
+  return (pair) => ({ ...pair, label: label(pair.players) });
+}
 
 /** A published group a pair played in, with what its table needs. */
 export type GroupInput = {

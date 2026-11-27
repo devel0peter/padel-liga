@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { EloChart, MatchList } from "~/components/profile-parts";
 import { RatingInfo } from "~/components/rating-info";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { pairName, pairPath } from "~/lib/profiles";
+import { pairPath } from "~/lib/profiles";
 import type { PlayerStats } from "~/lib/profiles";
 import type { PlayerProfile } from "~/lib/profiles.server";
 
@@ -120,7 +120,7 @@ export function PlayerProfileView({
                         className="flex items-center gap-2 rounded-lg border px-3 py-2 text-foreground no-underline hover:bg-muted/50"
                       >
                         <span className="grid min-w-0 flex-1 gap-0.5">
-                          <span className="font-semibold break-words">{pairName(x.pair)}</span>
+                          <span className="font-semibold break-words">{x.pair.label}</span>
                           <span className="text-sm text-muted-foreground">
                             {x.league}, {x.latest.season}, {x.latest.phase}. kör: {x.latest.group}. csoport ({x.latest.division})
                           </span>

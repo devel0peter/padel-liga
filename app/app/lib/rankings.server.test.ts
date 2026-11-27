@@ -64,8 +64,8 @@ describe("rankingsPage (D137)", () => {
     ]);
     // A pair's Élő-pont: its players' average.
     expect(page.pairs.map((r) => [r.place, r.name, r.elo, r.mine, r.href])).toEqual([
-      [1, "Anna – Bea", 1406, true, "/pairs/1"],
-      [2, "Cili – Dóra", 1200, false, "/pairs/2"],
+      [1, "Anna / Bea", 1406, true, "/pairs/1"],
+      [2, "Cili / Dóra", 1200, false, "/pairs/2"],
     ]);
   });
 

@@ -1,9 +1,17 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Menu } from "lucide-react";
 import { Link } from "react-router";
+
+import { useOptionalSidebar } from "~/components/ui/sidebar";
+import { cn } from "~/lib/utils";
 
 // The top of a player page (D181): an optional way back, one eyebrow line
 // (where the page sits: season, city, round), the title in the display type,
 // and an optional slot on the right (a round card, a button).
+//
+// On a phone, inside the app shell, the menu button sits top right: it opens
+// the sidebar panel with everything the bottom bar doesn't hold (the
+// organizer's and the Admin's sections, Szabályzat, Visszajelzés, Kilépés).
+// From md up the sidebar is always there, so the button isn't.
 export function PageHeader({
   title,
   eyebrow,
@@ -15,16 +23,34 @@ export function PageHeader({
   aside?: React.ReactNode;
   back?: { to: string; label: string };
 }) {
+  const sidebar = useOptionalSidebar();
   return (
     <header className="flex flex-col gap-2">
-      {back && (
-        <Link
-          to={back.to}
-          className="-ml-1 flex min-h-11 w-fit items-center gap-1 text-sm text-muted-foreground no-underline hover:text-foreground"
-        >
-          <ChevronLeft aria-hidden className="size-[18px]" />
-          {back.label}
-        </Link>
+      {(back || sidebar) && (
+        <div className={cn("flex min-h-11 items-center justify-between gap-3", !back && "md:hidden")}>
+          {back ? (
+            <Link
+              to={back.to}
+              className="-ml-1 flex min-h-11 w-fit items-center gap-1 text-sm text-muted-foreground no-underline hover:text-foreground"
+            >
+              <ChevronLeft aria-hidden className="size-[18px]" />
+              {back.label}
+            </Link>
+          ) : (
+            <span />
+          )}
+          {sidebar && (
+            <button
+              type="button"
+              aria-label="Menü"
+              aria-expanded={sidebar.openMobile}
+              onClick={() => sidebar.setOpenMobile(true)}
+              className="-mr-2 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-soft-foreground transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring md:hidden"
+            >
+              <Menu aria-hidden className="size-6" />
+            </button>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="flex min-w-0 flex-col gap-1.5">

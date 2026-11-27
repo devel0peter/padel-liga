@@ -26,6 +26,7 @@ import {
   type TeamBadgeSize,
 } from "~/components/blocks";
 import { Button } from "~/components/ui/button";
+import { SidebarProvider } from "~/components/ui/sidebar";
 
 // The gallery of direction A's building blocks (D181, #418): every block in
 // every state, at the window's width. Local development only: a production
@@ -151,6 +152,13 @@ export default function DevUi() {
       <Block name="PageHeader" note="Szemöldöksor, display cím, jobb oldali hely; opcionális vissza link.">
         <State label="szemöldök + cím">
           <PageHeader eyebrow="Teszt szezon · Mintaváros" title="Szia, Anna!" />
+        </State>
+        <State label="az app keretében: menü gomb jobb fent (csak telefonon; az oldalsávot nyitja)">
+          <SidebarProvider className="min-h-0">
+            <div className="w-full">
+              <PageHeader eyebrow="Teszt szezon · Mintaváros" title="Szia, Anna!" />
+            </div>
+          </SidebarProvider>
         </State>
         <State label="vissza link + csapatok a címben">
           <PageHeader

@@ -66,7 +66,7 @@ export default function Feedback({ loaderData, actionData }: Route.ComponentProp
   if (actionData?.ok) {
     return (
       <AuthPage title="Köszi, megkaptuk!" intro="Elolvassuk, és ha kell, javítjuk.">
-        <Button asChild className="h-11 text-base">
+        <Button asChild size="xl">
           <Link to={back}>Vissza oda, ahonnan jöttél</Link>
         </Button>
       </AuthPage>
@@ -88,11 +88,13 @@ export default function Feedback({ loaderData, actionData }: Route.ComponentProp
         <input type="hidden" name="from" value={from} />
         <fieldset className="grid gap-2">
           <legend className="mb-2 text-sm font-semibold">Miről szól?</legend>
-          <RadioGroup name="kind" required defaultValue={failed?.kind || undefined} className="flex flex-wrap gap-x-5 gap-y-2">
+          <RadioGroup name="kind" required defaultValue={failed?.kind || undefined} className="flex flex-wrap gap-x-6 gap-y-1">
             {FORM_KINDS.map((kind) => (
-              <div key={kind} className="flex items-center gap-2">
-                <RadioGroupItem id={`kind-${kind}`} value={kind} />
-                <Label htmlFor={`kind-${kind}`}>{KIND_LABELS[kind]}</Label>
+              <div key={kind} className="flex min-h-11 items-center gap-2">
+                <RadioGroupItem id={`kind-${kind}`} value={kind} className="size-5" />
+                <Label htmlFor={`kind-${kind}`} className="text-base font-normal">
+                  {KIND_LABELS[kind]}
+                </Label>
               </div>
             ))}
           </RadioGroup>
@@ -113,7 +115,7 @@ export default function Feedback({ loaderData, actionData }: Route.ComponentProp
           />
           <p className="text-sm text-muted-foreground">Ne írj bele jelszót, és mások személyes adatait se.</p>
         </div>
-        <div className="grid gap-1 rounded-lg bg-muted/60 p-3 text-sm">
+        <div className="grid gap-1.5 rounded-xl bg-surface-2 px-3.5 py-3 text-sm">
           <p className="font-semibold">Ezt küldjük el veled:</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
             {context.map(([label, value]) => (
@@ -126,7 +128,7 @@ export default function Feedback({ loaderData, actionData }: Route.ComponentProp
         </div>
         {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} action="feedback" resetKey={actionData} onReady={setBotOk} />}
         <FieldError id="message-error" message={failed?.error} />
-        <Button type="submit" disabled={busy || blocked} className="h-11 text-base">
+        <Button type="submit" size="xl" disabled={busy || blocked}>
           {busy ? "Küldés…" : "Küldés"}
         </Button>
         <p className="text-sm text-muted-foreground">

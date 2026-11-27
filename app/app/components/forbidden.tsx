@@ -18,7 +18,7 @@ export function Forbidden() {
         címre.
       </p>
       <div>
-        <Button asChild variant="outline" className="h-11 px-5">
+        <Button asChild variant="secondary" size="xl">
           <Link to="/profile">Vissza a profilodhoz</Link>
         </Button>
       </div>

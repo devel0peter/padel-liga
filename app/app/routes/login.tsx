@@ -143,10 +143,10 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
           {actionData.resent && !actionData.error && <p className="text-sm text-muted-foreground">Új kódot küldtünk.</p>}
           {turnstile}
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" name="intent" value="verify" disabled={busy} className="h-11 px-6 text-base">
+            <Button type="submit" name="intent" value="verify" size="xl" disabled={busy}>
               {words.verify}
             </Button>
-            <Button type="submit" name="intent" value="resend" variant="ghost" disabled={busy || blocked} formNoValidate>
+            <Button type="submit" name="intent" value="resend" variant="secondary" size="xl" disabled={busy || blocked} formNoValidate>
               Új kódot kérek
             </Button>
           </div>
@@ -201,22 +201,22 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
       }
     >
       {error && (
-        <p role="alert" className="font-semibold text-destructive">
+        <p role="alert" className="font-semibold text-danger">
           {error}
         </p>
       )}
       {google && (
         <>
-          <Button asChild variant="outline" className="h-11 gap-3 text-base">
+          <Button asChild variant="secondary" size="xl" className="gap-3">
             <a href={`/auth/google?returnTo=${encodeURIComponent(returnTo)}`}>
               <GoogleMark />
               {words.google}
             </a>
           </Button>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
+            <span className="h-px flex-1 bg-hairline" />
             vagy
-            <span className="h-px flex-1 bg-border" />
+            <span className="h-px flex-1 bg-hairline" />
           </div>
         </>
       )}
@@ -236,7 +236,7 @@ export function AuthForm({ loaderData, actionData, mode }: Pick<Route.ComponentP
         </Field>
         {turnstile}
         <div>
-          <Button type="submit" name="intent" value="send" disabled={busy || blocked} className="h-11 w-full text-base">
+          <Button type="submit" name="intent" value="send" size="xl" disabled={busy || blocked} className="w-full">
             {busy ? "Küldés…" : "Kódot kérek"}
           </Button>
         </div>

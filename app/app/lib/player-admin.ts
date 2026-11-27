@@ -3,7 +3,8 @@
 // the D1 side is player-admin.server.ts.
 
 import { DELETED_NAME } from "./account-deletion";
-import { MAX_NAME, parseSex, SEX_REQUIRED, type Sex } from "./auth/rules";
+import { MAX_NAME, namePart, parseSex, SEX_REQUIRED, type Sex } from "./auth/rules";
+import { fullName } from "./names";
 import { isLevel, type Level } from "./interest";
 import { parsePhone } from "./phone";
 
@@ -16,12 +17,20 @@ export function profileLink(id: string | null | undefined, name: string, canView
   return id && canView && name !== DELETED_NAME ? adminProfilePath(id) : null;
 }
 
-export type EditableProfile = { name: string; phone: string | null; level: Level | null; sex: Sex | null };
+// The name in two parts (#419, D182); `name` = "<surname> <firstName>" is
+// written with them.
+export type EditableProfile = { surname: string | null; firstName: string | null; phone: string | null; level: Level | null; sex: Sex | null };
 export type ProfileField = keyof EditableProfile;
 export type AdminProfileErrors = Partial<Record<ProfileField, string>>;
 
 // The words Napló's entry uses for the fields that changed.
-export const FIELD_LABELS: Record<ProfileField, string> = { name: "név", phone: "telefonszám", level: "szint", sex: "nem" };
+export const FIELD_LABELS: Record<ProfileField, string> = {
+  surname: "vezetéknév",
+  firstName: "keresztnév",
+  phone: "telefonszám",
+  level: "szint",
+  sex: "nem",
+};
 
 export const LEVEL_LOCKED_ADMIN = "A szintje lezárult: már játszott a ligában, az eredményei döntik el, hol tart.";
 
@@ -32,16 +41,21 @@ export const LEVEL_LOCKED_ADMIN = "A szintje lezárult: már játszott a ligába
 // (D79: the player took part in a season) can't change, for the Admin
 // either.
 export function validateAdminProfile(
-  input: { name: unknown; phone: unknown; level: unknown; sex: unknown },
+  input: { surname: unknown; firstName: unknown; phone: unknown; level: unknown; sex: unknown },
   stored: EditableProfile,
   levelLocked: boolean,
-): { ok: true; value: EditableProfile } | { ok: false; errors: AdminProfileErrors } {
+): { ok: true; value: EditableProfile & { name: string } } | { ok: false; errors: AdminProfileErrors } {
   const errors: AdminProfileErrors = {};
   const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
-  const name = text(input.name).replace(/\s+/g, " ");
-  if (name.length < 2) errors.name = "Add meg a nevét.";
-  else if (name.length > MAX_NAME) errors.name = `Legfeljebb ${MAX_NAME} karakter.`;
+  // The surname is required; a first name the account never had (a one-word
+  // name before #419) may stay empty, one it has can't be emptied.
+  const surname = namePart(input.surname);
+  const firstName = namePart(input.firstName);
+  const name = firstName ? fullName(surname, firstName) : surname;
+  if (!surname) errors.surname = "Add meg a vezetéknevét.";
+  if (!firstName && stored.firstName) errors.firstName = "A keresztnevét nem törölheted, csak javíthatod.";
+  else if (surname && name.length > MAX_NAME) errors.firstName = `A teljes neve legfeljebb ${MAX_NAME} karakter.`;
 
   const phone = parsePhone(input.phone);
   if (!phone.ok) errors.phone = phone.error;
@@ -65,6 +79,8 @@ export function validateAdminProfile(
     ok: true,
     value: {
       name,
+      surname,
+      firstName: firstName || null,
       phone: phone.value,
       // A locked level is kept as it is, whatever the form sent.
       level: levelLocked ? stored.level : level,

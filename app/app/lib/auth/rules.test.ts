@@ -7,6 +7,7 @@ import {
   codeSendDecision,
   CODE_TTL_MS,
   DEFAULT_RETURN_TO,
+  googleNameParts,
   googlePicture,
   initials,
   isStaleCode,
@@ -278,64 +279,80 @@ describe("Google login", () => {
 });
 
 describe("profile", () => {
+  // The name in two parts (#419): the form's fields and what is saved.
+  const KISS_ANNA = { surname: "Kiss", firstName: "Anna" };
+  const KISS_ANNA_VALUE = { name: "Kiss Anna", surname: "Kiss", firstName: "Anna" };
   const first = { requireConsent: true };
   const edit = { requireConsent: false };
 
   const PHONE = "06 30 123 4567";
 
-  it("first login needs a name, a level, a phone number and consent", () => {
-    expect(validateProfile({ name: "  Kiss   Anna ", level: "halado", phone: PHONE, consent: "on", sex: "female" }, first)).toEqual({
+  it("first login needs a surname, a first name, a level, a phone number and consent", () => {
+    expect(
+      validateProfile({ surname: "  Kiss ", firstName: " Anna   Mária ", level: "halado", phone: PHONE, consent: "on", sex: "female" }, first),
+    ).toEqual({
       ok: true,
-      value: { name: "Kiss Anna", level: "halado", phone: "+36301234567", consent: true, sex: "female" },
+      value: { name: "Kiss Anna Mária", surname: "Kiss", firstName: "Anna Mária", level: "halado", phone: "+36301234567", consent: true, sex: "female" },
     });
-    const r = validateProfile({ name: " ", level: "", phone: "", consent: null }, first);
+    const r = validateProfile({ surname: " ", firstName: "", level: "", phone: "", consent: null }, first);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["consent", "level", "name", "phone", "sex"]);
+    if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["consent", "firstName", "level", "phone", "sex", "surname"]);
+  });
+
+  it("asks for each part of the name with its own message (#419)", () => {
+    expect(validateProfile({ ...KISS_ANNA, surname: "", level: "kezdo", phone: PHONE, consent: "on", sex: "female" }, first)).toEqual({
+      ok: false,
+      errors: { surname: "Add meg a vezetékneved." },
+    });
+    expect(validateProfile({ ...KISS_ANNA, firstName: null, level: "kezdo", phone: PHONE, consent: "on", sex: "female" }, first)).toEqual({
+      ok: false,
+      errors: { firstName: "Add meg a keresztneved." },
+    });
   });
 
   it("refuses a missing phone number with its own message", () => {
     for (const phone of ["", "   ", null, undefined]) {
-      const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone, consent: "on", sex: "female" }, first);
+      const r = validateProfile({ ...KISS_ANNA, level: "kezdo", phone, consent: "on", sex: "female" }, first);
       expect(r, String(phone)).toEqual({ ok: false, errors: { phone: "Add meg a telefonszámod, a meccsek egyeztetéséhez kell." } });
     }
   });
 
   it("stores the phone number as E.164", () => {
-    const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: "+36 1 234 5678", consent: "on", sex: "female" }, first);
-    expect(r).toEqual({ ok: true, value: { name: "Kiss Anna", level: "kezdo", phone: "+3612345678", consent: true, sex: "female" } });
+    const r = validateProfile({ ...KISS_ANNA, level: "kezdo", phone: "+36 1 234 5678", consent: "on", sex: "female" }, first);
+    expect(r).toEqual({ ok: true, value: { ...KISS_ANNA_VALUE, level: "kezdo", phone: "+3612345678", consent: true, sex: "female" } });
   });
 
   it("refuses a phone number that is not Hungarian", () => {
-    const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: "+43 660 1234567", consent: "on", sex: "female" }, first);
+    const r = validateProfile({ ...KISS_ANNA, level: "kezdo", phone: "+43 660 1234567", consent: "on", sex: "female" }, first);
     expect(r).toEqual({ ok: false, errors: { phone: "Magyar telefonszámot adj meg, pl. +36 30 123 4567." } });
   });
 
   it("requires a known level", () => {
     for (const level of ["", "expert", undefined, 3, "constructor", "__proto__"]) {
-      const r = validateProfile({ name: "Kiss Anna", level, phone: PHONE, consent: "on", sex: "female" }, first);
+      const r = validateProfile({ ...KISS_ANNA, level, phone: PHONE, consent: "on", sex: "female" }, first);
       expect(r.ok, String(level)).toBe(false);
     }
     for (const level of ["kezdo", "kozephalado", "halado", "versenyzo"])
-      expect(validateProfile({ name: "Kiss Anna", level, phone: PHONE, consent: "on", sex: "female" }, first).ok, level).toBe(true);
+      expect(validateProfile({ ...KISS_ANNA, level, phone: PHONE, consent: "on", sex: "female" }, first).ok, level).toBe(true);
   });
 
   it("the profile page needs no consent but can't clear the phone number", () => {
-    expect(validateProfile({ name: "Kiss Anna", level: "versenyzo", phone: PHONE, consent: null, sex: "female" }, edit)).toEqual({
+    expect(validateProfile({ ...KISS_ANNA, level: "versenyzo", phone: PHONE, consent: null, sex: "female" }, edit)).toEqual({
       ok: true,
-      value: { name: "Kiss Anna", level: "versenyzo", phone: "+36301234567", consent: false, sex: "female" },
+      value: { ...KISS_ANNA_VALUE, level: "versenyzo", phone: "+36301234567", consent: false, sex: "female" },
     });
-    const r = validateProfile({ name: "Kiss Anna", level: "versenyzo", phone: "  ", consent: null, sex: "female" }, edit);
+    const r = validateProfile({ ...KISS_ANNA, level: "versenyzo", phone: "  ", consent: null, sex: "female" }, edit);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors)).toEqual(["phone"]);
   });
 
   it("requires Férfi or Nő and nothing else (#133)", () => {
     for (const sex of ["", undefined, null, "other", "ferfi", "Nő", "MALE", "__proto__"]) {
-      const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: PHONE, consent: "on", sex }, first);
+      const r = validateProfile({ ...KISS_ANNA, level: "kezdo", phone: PHONE, consent: "on", sex }, first);
       expect(r, String(sex)).toEqual({ ok: false, errors: { sex: "Válaszd ki: férfi vagy nő." } });
     }
     for (const sex of ["male", "female"]) {
-      const r = validateProfile({ name: "Kiss Anna", level: "kezdo", phone: PHONE, consent: null, sex }, edit);
+      const r = validateProfile({ ...KISS_ANNA, level: "kezdo", phone: PHONE, consent: null, sex }, edit);
       expect(r.ok && r.value.sex, sex).toBe(sex);
     }
     expect(SEXES).toEqual({ male: "Férfi", female: "Nő" });
@@ -343,9 +360,10 @@ describe("profile", () => {
     expect(parseSex("x")).toBeNull();
   });
 
-  it("caps the name length", () => {
-    const r = validateProfile({ name: "a".repeat(81), level: "kezdo", phone: PHONE, consent: "on", sex: "female" }, first);
-    expect(r.ok).toBe(false);
+  it("caps the full name's length", () => {
+    const r = validateProfile({ surname: "Kiss", firstName: "a".repeat(76), level: "kezdo", phone: PHONE, consent: "on", sex: "female" }, first);
+    expect(r).toEqual({ ok: false, errors: { firstName: "A teljes neved legfeljebb 80 karakter." } });
+    expect(validateProfile({ surname: "Kiss", firstName: "a".repeat(75), level: "kezdo", phone: PHONE, consent: "on", sex: "female" }, first).ok).toBe(true);
   });
 });
 
@@ -409,5 +427,20 @@ describe("loginEmailParam", () => {
     expect(loginEmailParam("")).toBe("");
     expect(loginEmailParam("not an email")).toBe("");
     expect(loginEmailParam(`${"a".repeat(250)}@example.com`)).toBe("");
+  });
+});
+
+describe("googleNameParts (#419)", () => {
+  it("takes Google's family and given name, and makes the full name in our order", () => {
+    expect(googleNameParts({ name: "Anna Kovács", family_name: " Kovács ", given_name: "Anna  Mária" })).toEqual({
+      name: "Kovács Anna Mária",
+      surname: "Kovács",
+      firstName: "Anna Mária",
+    });
+  });
+
+  it("keeps Google's full name when a part is missing, and leaves that part empty", () => {
+    expect(googleNameParts({ name: " Anna ", given_name: "Anna" })).toEqual({ name: "Anna", surname: null, firstName: "Anna" });
+    expect(googleNameParts({})).toEqual({ name: "", surname: null, firstName: null });
   });
 });

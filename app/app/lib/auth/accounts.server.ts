@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
@@ -11,10 +11,12 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
   return row?.id ?? null;
 }
 
-export async function createUser(email: string, name = ""): Promise<string> {
+// `parts`: the name's two parts when the login brings them (Google's family
+// and given name, #419); the first-login page asks for them anyway.
+export async function createUser(email: string, name = "", parts: { surname: string | null; firstName: string | null } = { surname: null, firstName: null }): Promise<string> {
   const id = crypto.randomUUID();
   // onConflictDoNothing: two logins racing for a new email end up in one account.
-  await db.insert(users).values({ id, email, name }).onConflictDoNothing();
+  await db.insert(users).values({ id, email, name, ...parts }).onConflictDoNothing();
   const userId = (await findUserIdByEmail(email)) ?? id;
   await acceptOrganizerInvites(userId, email);
   return userId;
@@ -36,15 +38,19 @@ async function acceptOrganizerInvites(userId: string, email: string): Promise<vo
   ]);
 }
 
-// A new name clears the surname the player picked from the old one (#419,
-// D182); the same name keeps it. SQLite reads the old row on the right.
-export const surnameFor = (name: string) => sql`case when ${users.name} = ${name} then ${users.surname} else null end`;
-
 // First login: the profile and the privacy consent.
 export async function saveProfile(userId: string, profile: ProfileInput): Promise<void> {
   await db
     .update(users)
-    .set({ name: profile.name, surname: surnameFor(profile.name), level: profile.level, phone: profile.phone, sex: profile.sex, consentAt: new Date() })
+    .set({
+      name: profile.name,
+      surname: profile.surname,
+      firstName: profile.firstName,
+      level: profile.level,
+      phone: profile.phone,
+      sex: profile.sex,
+      consentAt: new Date(),
+    })
     .where(eq(users.id, userId));
 }
 
@@ -52,7 +58,7 @@ export async function saveProfile(userId: string, profile: ProfileInput): Promis
 export async function updateProfile(userId: string, profile: Omit<ProfileInput, "consent">): Promise<void> {
   await db
     .update(users)
-    .set({ name: profile.name, surname: surnameFor(profile.name), level: profile.level, phone: profile.phone, sex: profile.sex })
+    .set({ name: profile.name, surname: profile.surname, firstName: profile.firstName, level: profile.level, phone: profile.phone, sex: profile.sex })
     .where(eq(users.id, userId));
 }
 

@@ -41,6 +41,14 @@ type Person = { name: string; email: string };
 
 const person = (name: string, local: string): Person => ({ name, email: `${local}@${SEED_EMAIL_DOMAIN}` });
 
+// A seeded name's two parts (#419): every seeded name is "Vezetéknév
+// Keresztnév", so the surname is the first word, as the first-login page
+// would store it.
+export function seedNameParts(name: string): { surname: string; firstName: string } {
+  const space = name.indexOf(" ");
+  return { surname: name.slice(0, space), firstName: name.slice(space + 1) };
+}
+
 // The walkthrough's players, who register themselves (none has an account):
 // ten pairs-to-be, each with one level both pick on the first-login page.
 export const PAIR_PLAYERS: { a: Person; b: Person; level: Level }[] = [
@@ -109,6 +117,11 @@ export function assertLocalArgs(args: readonly string[]): void {
 
 const q = (s: string | null): string => (s === null ? "NULL" : `'${s.replaceAll("'", "''")}'`);
 const secs = (d: Date): number => Math.floor(d.getTime() / 1000);
+// "'Kovács', 'Anna'": the surname and first_name values of a seeded name.
+const parts = (name: string): string => {
+  const { surname, firstName } = seedNameParts(name);
+  return `${q(surname)}, ${q(firstName)}`;
+};
 
 const SEED_USERS = `select id from users where lower(email) like '%@${SEED_EMAIL_DOMAIN}'`;
 const SEED_LEAGUES = `select id from leagues where slug in (${q(LEAGUE.slug)}, ${q(OTHER_LEAGUE.slug)})`;
@@ -168,10 +181,10 @@ export function insertStatements(now: Date): string[] {
   // they log in with an email code and land on the app, not on /welcome. The
   // second league's player too, with a phone number like every new player.
   out.push(
-    `insert into users (id, email, name, platform_role, level, sex, phone, consent_at) values ` +
-      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', 'male', NULL, ${secs(now)}), ` +
-      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', 'female', NULL, ${secs(now)}), ` +
-      `(${q(OUTSIDER.id)}, ${q(OUTSIDER.email)}, ${q(OUTSIDER.name)}, 'player', 'kozephalado', 'female', '+36301112233', ${secs(now)})`,
+    `insert into users (id, email, name, surname, first_name, platform_role, level, sex, phone, consent_at) values ` +
+      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, ${parts(ADMIN.name)}, 'superadmin', 'halado', 'male', NULL, ${secs(now)}), ` +
+      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, ${parts(ORGANIZER.name)}, 'player', 'halado', 'female', NULL, ${secs(now)}), ` +
+      `(${q(OUTSIDER.id)}, ${q(OUTSIDER.email)}, ${q(OUTSIDER.name)}, ${parts(OUTSIDER.name)}, 'player', 'kozephalado', 'female', '+36301112233', ${secs(now)})`,
   );
   out.push(
     `insert into league_admins (league_id, user_id, granted_by) select id, ${q(ORGANIZER.id)}, ${q(ADMIN.id)} ` +

@@ -8,7 +8,6 @@ import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
 import { SeasonEntry } from "~/components/season-entry";
-import { SURNAME_INTENT, SurnameCard } from "~/components/surname-choice";
 import { TipCard } from "~/components/tip-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getActor } from "~/lib/auth/admin.server";
@@ -27,8 +26,6 @@ import { entryCounts, entryViews } from "~/lib/season-entries.server";
 import { myLeaguesAction, type MyLeaguesActionData } from "~/lib/my-leagues.server";
 import { listSeasons } from "~/lib/seasons.server";
 import { withArticle } from "~/lib/groups";
-import { asksSurname } from "~/lib/names";
-import { pickSurname, surnameView } from "~/lib/names.server";
 import { SITE_NAME } from "~/lib/site";
 import { myStrikes } from "~/lib/strikes.server";
 import { vapidPublicKey } from "~/lib/notifications.server";
@@ -95,9 +92,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const groups = await currentGroups(user.id, now);
   return {
     groups,
-    // The one-time surname card (#419): only while the rules can't tell and
-    // the player hasn't answered.
-    surname: asksSurname(user) ? await surnameView(user) : null,
     // For the match links in the Írj mindenkinek text (D147).
     origin: new URL(request.url).origin,
     // "Melyik ligában játszol?" (#331): empty once they belong to a league.
@@ -123,18 +117,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-// "Nevezünk" on a season card, "Csatlakozom" (#331), a tip's "Most nem"
-// (#262) and the surname card's answer (#419). `season` 0: not about a
-// season card.
+// "Nevezünk" on a season card, "Csatlakozom" (#331), and a tip's "Most
+// nem" (#262). `season` 0: not about a season card.
 export async function action({ request }: Route.ActionArgs): Promise<MyLeaguesActionData> {
   const user = await requireUser(request);
   const form = await request.formData();
   if (form.get("intent") === "dismiss_tip") {
     if (!(await dismissTip(user.id, String(form.get("tip") ?? "")))) throw new Response("Hibás kérés.", { status: 400 });
-    return { season: 0, ok: true };
-  }
-  if (form.get("intent") === SURNAME_INTENT) {
-    if (!(await pickSurname(user, form.get("surname")))) throw new Response("Hibás kérés.", { status: 400 });
     return { season: 0, ok: true };
   }
   // "Csatlakozom" (#331, audited) and "Nevezünk": the same as on Ligáim (#394).
@@ -220,7 +209,6 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
   const open = todos(d.groups);
   return (
     <AppPage title="Kezdőlap">
-      {d.surname && <SurnameCard view={d.surname} />}
       {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {running && (
         // Separate cards (D136, D140, D143): the season's summary, what to do,

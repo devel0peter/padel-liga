@@ -30,8 +30,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (user.consentAt) return { onlySex: true as const, returnTo };
   return {
     onlySex: false as const,
-    // A Google login brings its own name; a code login has none yet.
-    name: user.name,
+    // A Google login brings its own name parts; a code login has none yet.
+    surname: user.surname ?? "",
+    firstName: user.firstName ?? "",
     level: user.level,
     email: user.email,
     phone: formatPhone(user.phone),
@@ -52,7 +53,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
   const result = validateProfile(
     {
-      name: form.get("name"),
+      surname: form.get("surname"),
+      firstName: form.get("first_name"),
       level: form.get("level"),
       phone: form.get("phone"),
       consent: form.get("consent"),
@@ -89,7 +91,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
     >
       <Form method="post" className="grid gap-5">
         <input type="hidden" name="returnTo" value={loaderData.returnTo} />
-        <ProfileFields errors={errors} values={{ name: loaderData.name, level: loaderData.level, phone: loaderData.phone, sex: null }} />
+        <ProfileFields errors={errors} values={{ surname: loaderData.surname, firstName: loaderData.firstName, level: loaderData.level, phone: loaderData.phone, sex: null }} />
         <div className="grid gap-1.5">
           <div className="flex items-start gap-3">
             <Checkbox id="consent" name="consent" className="mt-0.5 size-5" {...invalid("consent", errors.consent)} />

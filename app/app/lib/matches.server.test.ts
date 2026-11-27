@@ -101,8 +101,7 @@ describe("currentGroups (#25)", () => {
       [4, false],
       [3, false],
     ]);
-    // Team labels (#419): every "Játékos" shares the surname and the initial
-    // of its pair, so the clash rule spells the rest out.
+    // Team labels (#419): these accounts have no surname, so their full names.
     expect(g!.matches.map((m) => [m.week, m.opponents])).toEqual([
       [1, "Játékos 3A / Játékos 3B"],
       [2, "Játékos 4A / Játékos 4B"],
@@ -245,18 +244,24 @@ describe("matchPage (#25, #26)", () => {
     expect(await M.matchPage(99999, "p1a", NOW)).toBeNull();
   });
 
-  it("names the pairs by team label: the picked surname, initials for a shared one (#419)", async () => {
-    h.raw.exec(`update users set name = 'Farkas Lilla', surname = 'Lilla' where id = 'p1a'`);
-    h.raw.exec(`update users set name = 'Papp Ádám' where id = 'p1b'`);
-    h.raw.exec(`update users set name = 'Nagy Bence' where id = 'p3a'`);
-    h.raw.exec(`update users set name = 'Nagy Dóra' where id = 'p3b'`);
+  it("names the pairs by surname, initials for a shared one, the full name without one (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("p1a", "Farkas", "Lilla");
+    named("p1b", "Papp", "Ádám");
+    named("p3a", "Nagy", "Bence");
+    named("p3b", "Nagy", "Dóra");
     const page = (await M.matchPage(matchOf(1, 3), "p1a", NOW))!;
-    expect(page).toMatchObject({ us: "Lilla / Papp", opponents: "Nagy B. / Nagy D." });
+    expect(page).toMatchObject({ us: "Farkas / Papp", opponents: "Nagy B. / Nagy D." });
     // The contacts keep the full names.
     expect(page.contacts.map((c) => c.name)).toEqual(["Nagy Bence", "Nagy Dóra"]);
     const [g] = await M.currentGroups("p1a", NOW);
-    expect(g!.pairs.find((p) => p.pairId === 1)!.label).toBe("Lilla / Papp");
+    expect(g!.pairs.find((p) => p.pairId === 1)!.label).toBe("Farkas / Papp");
     expect(g!.matches.find((m) => m.week === 1)!.opponents).toBe("Nagy B. / Nagy D.");
+    // A player without a surname yet (an account from before #419 the
+    // migration left empty) shows the full name.
+    h.raw.exec("update users set surname = null where id = 'p1b'");
+    expect((await M.matchPage(matchOf(1, 3), "p1a", NOW))!.us).toBe("Farkas / Papp Ádám");
   });
 
   it("shows the opponents, their phones while the phase runs, and the active clubs of the city", async () => {

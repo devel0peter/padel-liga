@@ -120,7 +120,7 @@ describe("who has a profile", () => {
     match(g1, 2, 1, 1, "final", played([[4, 1], [4, 2]]));
     const p = await pairProfile(1, DURING);
     expect(p!.pair.players).toEqual([
-      { id: "ua", name: "Anna" },
+      { id: "ua", name: "Anna", surname: null, firstName: null },
       { id: null, name: "Törölt játékos" },
     ]);
     // Also where the pair appears as an opponent.
@@ -139,7 +139,14 @@ describe("before the league starts", () => {
     expect(anna).toMatchObject({ started: false, elo: null, eloHistory: [], matches: [] });
     expect(anna!.pairs).toEqual([
       {
-        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }], label: "Anna / Bea" },
+        pair: {
+          id: 1,
+          players: [
+            { id: "ua", name: "Anna", surname: null, firstName: null },
+            { id: "ub", name: "Bea", surname: null, firstName: null },
+          ],
+          label: "Anna / Bea",
+        },
         league: "Padelpárbaj Győr",
         latest: { season: "2026/27 tél", phase: 1, group: 1, division: "Bronz divízió", place: null, withdrawn: false },
       },

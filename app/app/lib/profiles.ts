@@ -15,14 +15,20 @@ import { bothLostText, scoreText, walkoverScoreText, winnerOf } from "./results"
  * A player as a profile names them. A deleted or anonymized account has no
  * profile, no old name and no id: its account id was public in its old
  * profile's address, so keeping it would tie the anonymized results back to
- * the person (D60).
+ * the person (D60). `surname`, `firstName`: the name's two parts (#419),
+ * for the team label; only where a pair is named.
  */
-export type ProfilePerson = { id: string | null; name: string; surname?: string | null };
+export type ProfilePerson = { id: string | null; name: string; surname?: string | null; firstName?: string | null };
 
-/** `surname`: the part of the name the player picked (users.surname, #419), for the team label. */
-export function personView(p: { id: string; name: string | null; surname?: string | null; deletedAt: Date | null }): ProfilePerson {
+export function personView(p: {
+  id: string;
+  name: string | null;
+  surname?: string | null;
+  firstName?: string | null;
+  deletedAt: Date | null;
+}): ProfilePerson {
   if (p.deletedAt) return { id: null, name: DELETED_NAME };
-  return p.surname ? { id: p.id, name: p.name || "Névtelen", surname: p.surname } : { id: p.id, name: p.name || "Névtelen" };
+  return { id: p.id, name: p.name || "Névtelen", ...(p.surname !== undefined && { surname: p.surname, firstName: p.firstName ?? null }) };
 }
 
 /** Where a player links: their profile, or nowhere for a deleted account. */
@@ -32,7 +38,7 @@ export const pairPath = (pairId: number) => `/pairs/${pairId}`;
 /** A pair named on a profile: its two players, its team label ("Kovács / Nagy", #419) and its page. */
 export type ProfilePair = { id: number; players: [ProfilePerson, ProfilePerson]; label: string };
 
-/** A pair with the label it has alone; labelPairs applies the clash rule over a page. */
+/** A pair with the label it has alone; pageLabels applies the clash rule over a page. */
 export const profilePairOf = (id: number, players: [ProfilePerson, ProfilePerson]): ProfilePair => ({ id, players, label: teamLabel(players) });
 
 /**

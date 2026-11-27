@@ -53,12 +53,14 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
       aId: playerA.id,
       aName: playerA.name,
       aSurname: playerA.surname,
+      aFirstName: playerA.firstName,
       aElo: playerA.elo,
       aLevel: playerA.level,
       aDeleted: playerA.deletedAt,
       bId: playerB.id,
       bName: playerB.name,
       bSurname: playerB.surname,
+      bFirstName: playerB.firstName,
       bElo: playerB.elo,
       bLevel: playerB.level,
       bDeleted: playerB.deletedAt,
@@ -101,8 +103,8 @@ export async function rankingsPage(slug: string, viewerId: string, now = new Dat
     (r) => r.status === "active" && !r.aDeleted && !r.bDeleted && currentElo(r.aElo, r.aLevel) !== null && currentElo(r.bElo, r.bLevel) !== null,
   );
   const playersOf = (r: (typeof rows)[number]) => [
-    { name: r.aName || "Névtelen", surname: r.aSurname },
-    { name: r.bName || "Névtelen", surname: r.bSurname },
+    { id: r.aId, name: r.aName || "Névtelen", surname: r.aSurname, firstName: r.aFirstName },
+    { id: r.bId, name: r.bName || "Névtelen", surname: r.bSurname, firstName: r.bFirstName },
   ];
   const label = teamLabeler(listed.flatMap(playersOf));
   const pairRows: RankInput[] = listed.flatMap((r) => {

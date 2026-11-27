@@ -5,7 +5,7 @@
 // after the admin status spec, so its counts stay as they were.
 import { expect, test, type Browser } from "@playwright/test";
 
-import { ORGANIZER, SEEKERS, as, content, d1, logIn, playersTable, save, visit } from "./support";
+import { ORGANIZER, SEEKERS, as, content, d1, fillName, logIn, playersTable, save, visit } from "./support";
 
 const KATA = { name: "Kereső Kata", email: "kereso.kata@example.test" };
 const KRISTOF = { name: "Kereső Kristóf", email: "kereso.kristof@example.test" };
@@ -17,7 +17,7 @@ async function newPlayer(browser: Browser, who: { name: string; email: string })
   const page = await context.newPage();
   await logIn(page, who.email);
   await expect(page).toHaveURL(/\/welcome/);
-  await page.getByLabel("Neved").fill(who.name);
+  await fillName(page, who);
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: /^Középhaladó/ }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 555 1234");

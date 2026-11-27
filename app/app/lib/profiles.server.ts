@@ -45,12 +45,14 @@ const personCols = {
   aId: playerA.id,
   aName: playerA.name,
   aSurname: playerA.surname,
+  aFirstName: playerA.firstName,
   aDeleted: playerA.deletedAt,
   aLevel: playerA.level,
   aElo: playerA.elo,
   bId: playerB.id,
   bName: playerB.name,
   bSurname: playerB.surname,
+  bFirstName: playerB.firstName,
   bDeleted: playerB.deletedAt,
   bLevel: playerB.level,
   bElo: playerB.elo,
@@ -61,17 +63,19 @@ type MemberRow = {
   aId: string;
   aName: string | null;
   aSurname: string | null;
+  aFirstName: string | null;
   aDeleted: Date | null;
   bId: string;
   bName: string | null;
   bSurname: string | null;
+  bFirstName: string | null;
   bDeleted: Date | null;
 };
 
 const profilePair = (r: MemberRow): ProfilePair =>
   profilePairOf(r.pairId, [
-    personView({ id: r.aId, name: r.aName, surname: r.aSurname, deletedAt: r.aDeleted }),
-    personView({ id: r.bId, name: r.bName, surname: r.bSurname, deletedAt: r.bDeleted }),
+    personView({ id: r.aId, name: r.aName, surname: r.aSurname, firstName: r.aFirstName, deletedAt: r.aDeleted }),
+    personView({ id: r.bId, name: r.bName, surname: r.bSurname, firstName: r.bFirstName, deletedAt: r.bDeleted }),
   ]);
 
 /** The published groups, in listed cities, of the pairs `pairFilter` picks. */
@@ -270,7 +274,7 @@ export type PlayerProfile = {
 /** A player's public profile, or null: no such account, a deleted or anonymized one, or no published group yet. */
 export async function playerProfile(userId: string, now = new Date()): Promise<PlayerProfile | null> {
   const [user] = await db
-    .select({ id: users.id, name: users.name, surname: users.surname, level: users.level, elo: users.elo, deletedAt: users.deletedAt })
+    .select({ id: users.id, name: users.name, level: users.level, elo: users.elo, deletedAt: users.deletedAt })
     .from(users)
     .where(eq(users.id, userId));
   if (!user || user.deletedAt) return null;

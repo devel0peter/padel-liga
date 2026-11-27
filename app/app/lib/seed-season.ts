@@ -24,7 +24,7 @@ import {
   type SlotRange,
 } from "@padel-liga/rules";
 
-import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedSetGames, seedSql } from "./seed";
+import { LEAGUE, ORGANIZER, PAIR_PLAYERS, SEASON_NAME, SOLO_PLAYERS, seedNameParts, seedSetGames, seedSql } from "./seed";
 
 type Level = "kezdo" | "kozephalado" | "halado" | "versenyzo";
 type Person = { name: string; email: string };
@@ -277,8 +277,8 @@ export function seasonStatements(now: Date): string[] {
   pairs.forEach((p) =>
     [p.a, p.b].forEach((who, j) => {
       out.push(
-        `insert into users (id, email, name, level, sex, phone, consent_at, created_at) values (${q(seasonUserId(who))}, ${q(who.email)}, ` +
-          `${q(who.name)}, ${q(p.level)}, ${q(j === 0 ? "female" : "male")}, ${q(`+3630${phone++}`)}, ${joined}, ${joined})`,
+        `insert into users (id, email, name, surname, first_name, level, sex, phone, consent_at, created_at) values (${q(seasonUserId(who))}, ${q(who.email)}, ` +
+          `${q(who.name)}, ${q(seedNameParts(who.name).surname)}, ${q(seedNameParts(who.name).firstName)}, ${q(p.level)}, ${q(j === 0 ? "female" : "male")}, ${q(`+3630${phone++}`)}, ${joined}, ${joined})`,
       );
       out.push(
         `insert into league_members (league_id, user_id, source, joined_at) select id, ${q(seasonUserId(who))}, 'register', ${joined} ` +

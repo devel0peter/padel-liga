@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bbb90674-d667-4fbc-8a2d-dadb719bf43b",
+  "id": "38b0d77d-e9f7-4c47-946c-0c66185ebe90",
   "prevId": "b9761616-3350-4028-94ce-c3010ea32ce1",
   "tables": {
     "account_invites": {
@@ -4490,6 +4490,13 @@
         },
         "surname": {
           "name": "surname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "first_name": {
+          "name": "first_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

@@ -67,8 +67,8 @@ beforeEach(async () => {
   ];
   for (const [id, name, sex] of people)
     h.raw
-      .prepare("insert into users (id, email, name, phone, level, elo, sex, consent_at) values (?, ?, ?, '+36301234567', 'halado', 1412.4, ?, 1)")
-      .run(id, `${id}@titkos.example`, name, sex);
+      .prepare("insert into users (id, email, name, surname, first_name, phone, level, elo, sex, consent_at) values (?, ?, ?, ?, ?, '+36301234567', 'halado', 1412.4, ?, 1)")
+      .run(id, `${id}@titkos.example`, name, name.split(" ")[0], name.split(" ")[1], sex);
   h.raw.exec(`insert into pairs (id, league_id, player_a, player_b) values (1, 1, 'ua', 'ub'), (2, 1, 'uc', 'ud'), (3, 1, 'ue', 'uf')`);
   h.raw.prepare("insert into groups (id, season_id, phase, number, published_at) values (1, 1, 1, 1, ?)").run(sec("2026-11-06T10:00:00Z"));
   h.raw.exec(`insert into group_pairs (group_id, pair_id, seed) values (1, 1, 1), (1, 2, 2), (1, 3, 3)`);

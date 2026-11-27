@@ -24,8 +24,8 @@ import { teamLabeler, type NamedPlayer } from "./names";
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
 /**
- * A pair as the ladder shows it: the two players' names (and picked
- * surnames, for the team label, #419) and the pair's rating for the last
+ * A pair as the ladder shows it: the two players' names (with their two
+ * parts, for the team label, #419) and the pair's rating for the last
  * tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
  */
 export type LadderPair = {

@@ -7,8 +7,9 @@ import { formatSlot } from "./format";
 const START = new Date("2026-11-01T23:00:00Z"); // Mon 2 Nov 00:00 Budapest
 import { buildLadder, countedOutcome, groupTable, isValidOutcome, phaseSpan, phaseWeek, type LadderGroupInput, type LadderMatch, type LadderPair } from "./ladder";
 
-// "A11 Anna" and "B11 Béla": the team label is "A11 / B11" (#419).
-const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, players: [{ name: `A${id} Anna` }, { name: `B${id} Béla` }], elo });
+// "A11 Anna" and "B11 Béla", surnames A11 and B11: the team label is "A11 / B11" (#419).
+const player = (surname: string, firstName: string) => ({ name: `${surname} ${firstName}`, surname, firstName });
+const pair = (id: number, elo = 1500 - id): LadderPair => ({ id, players: [player(`A${id}`, "Anna"), player(`B${id}`, "Béla")], elo });
 
 /** A group of 3 pairs with ids base+1..base+3 and no matches. */
 function group(number: number, matches: LadderMatch[] = []): LadderGroupInput {
@@ -240,13 +241,13 @@ describe("buildLadder: up and down marks (spec 10, D133)", () => {
 
 describe("buildLadder: team labels (#419)", () => {
   it("applies the clash rule per group card: its table, matches and withdrawn pairs", () => {
-    const nagy = (id: number, given: string, elo: number): LadderPair => ({ id, players: [{ name: `Nagy ${given}` }, { name: `C${id} Csaba` }], elo });
+    const nagy = (id: number, given: string, elo: number): LadderPair => ({ id, players: [player("Nagy", given), player(`C${id}`, "Csaba")], elo });
     // Two Nagys in group 1 get their initials everywhere on its card; the
     // Nagy of group 2 shares no card with them and stays plain.
     const one: LadderGroupInput = {
       id: 1,
       number: 1,
-      pairs: [nagy(11, "Bence", 1500), nagy(12, "Dóra", 1490), { ...nagy(13, "Anna", 1480), id: 13, players: [{ name: "Kiss Anna" }, { name: "Tóth Ádám" }] }],
+      pairs: [nagy(11, "Bence", 1500), nagy(12, "Dóra", 1490), { ...nagy(13, "Anna", 1480), id: 13, players: [player("Kiss", "Anna"), player("Tóth", "Ádám")] }],
       matches: [open(1, 11, 12, 1)],
       setGames: SHORT_SETS,
     };

@@ -19,8 +19,12 @@ import {
   type ProfilePair,
 } from "./profiles";
 
-const pairOf = (id: number, a: string, b: string): ProfilePair =>
-  profilePairOf(id, [personView({ id: `${a}-id`, name: a, deletedAt: null }), personView({ id: `${b}-id`, name: b, deletedAt: null })]);
+// "Kovács Anna": surname Kovács, first name Anna (#419).
+const person = (name: string) => {
+  const [surname, firstName] = name.split(" ");
+  return personView({ id: `${name}-id`, name, surname, firstName, deletedAt: null });
+};
+const pairOf = (id: number, a: string, b: string): ProfilePair => profilePairOf(id, [person(a), person(b)]);
 const P1 = pairOf(1, "Kovács Anna", "Nagy Bea");
 const P2 = pairOf(2, "Tóth Cili", "Kiss Dóra");
 
@@ -59,9 +63,9 @@ describe("personView and links (#36)", () => {
     const label = pageLabels([P1, P2, other]);
     expect([P1, P2, other].map((p) => label(p).label)).toEqual(["Kovács / Nagy B.", "Tóth / Kiss", "Nagy D. / Papp"]);
     expect(label(P1).players).toBe(P1.players);
-    // A picked surname (users.surname) counts; a deleted account stays whole.
-    const picked = profilePairOf(4, [personView({ id: "f", name: "Farkas Lilla", surname: "Lilla", deletedAt: null }), personView({ id: "g", name: "x", deletedAt: new Date() })]);
-    expect(picked.label).toBe("Lilla / Törölt játékos");
+    // Without a surname the full name; a deleted account stays Törölt játékos.
+    const other2 = profilePairOf(4, [personView({ id: "f", name: "Farkas Lilla", surname: null, deletedAt: null }), personView({ id: "g", name: "x", deletedAt: new Date() })]);
+    expect(other2.label).toBe("Farkas Lilla / Törölt játékos");
   });
 
   it("an account without a name is Névtelen", () => {

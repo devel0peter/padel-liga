@@ -449,17 +449,17 @@ describe("a player deleting their own account (#38)", () => {
     };
     const points = (page: Awaited<ReturnType<typeof table>>) =>
       page.bands.flatMap((b) => b.groups.flatMap((g) => g.rows.map((r) => [r.points, r.matches])));
-    // The surname the player picked (#419) goes with the name.
-    h.raw.prepare("update users set surname = 'Teszt' where id = 'a'").run();
+    // The name's two parts (#419) go with the name.
+    h.raw.prepare("update users set surname = 'Teszt', first_name = 'Anna' where id = 'a'").run();
     const before = await table();
-    // The table shows the team label (#419): "Anna Teszt" is "Teszt".
+    // The table shows the team label (#419): the surname, "Teszt".
     expect(JSON.stringify(before)).toContain("Teszt");
 
     expect(await D.planOwnDeletion("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
     expect(await D.deleteOwnAccount("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
 
     const after = await table();
-    expect(one("select surname from users where id = 'a'")).toEqual({ surname: null });
+    expect(one("select surname, first_name from users where id = 'a'")).toEqual({ surname: null, first_name: null });
     expect(JSON.stringify(after)).not.toContain("Teszt");
     expect(points(after)).toEqual(points(before));
     expect(points(after)).toContainEqual([3, 1]);

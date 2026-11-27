@@ -5,7 +5,7 @@
 // walkthrough; leaves the state as it found it (the name is restored).
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, ORGANIZER, PAIRS, as, content, d1, playersTable, visit } from "./support";
+import { ADMIN, ORGANIZER, PAIRS, as, content, d1, fillName, playersTable, surname, visit } from "./support";
 
 const PLAYERS = "/admin/leagues/minta/players";
 
@@ -29,11 +29,13 @@ test("the Admin opens a player's profile from Játékosok and fixes the name", a
   await expect(mail).toContainText("Konzol (fejlesztés)");
   await expect(mail).not.toContainText("@");
 
+  // The name in two parts (#419): the full name is "<Vezetéknév> <Keresztnév>".
   const fixed = `${anna.name} (javítva)`;
   for (const name of [fixed, anna.name]) {
     await main.getByRole("button", { name: "Adatok módosítása" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Név").fill(name);
+    await expect(dialog.getByLabel("Vezetéknév")).toHaveValue(surname(anna));
+    await fillName(dialog, { name });
     await dialog.getByRole("button", { name: "Mentés" }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
@@ -41,7 +43,7 @@ test("the Admin opens a player's profile from Játékosok and fixes the name", a
   // Two entries in its Napló, naming the field and not the value.
   const log = main.getByRole("region", { name: "Napló" });
   await expect(log.getByText("Játékos adatainak módosítása")).toHaveCount(2);
-  await expect(log).toContainText("Módosítva: név");
+  await expect(log).toContainText("Módosítva: keresztnév");
   await expect(log).not.toContainText("(javítva)");
   // Other admin pages link her name too: Párok and Napló.
   await visit(page, "/admin/leagues/minta/pairs");

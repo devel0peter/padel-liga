@@ -66,9 +66,8 @@ import { logError } from "~/lib/log";
 // the current phase's opponents (spec 3, D135) and, for "Írj mindenkinek",
 // the partner (D147); otherwise addresses go only to the outbox.
 
-// `surname`: the part of the name the player picked (users.surname, #419),
-// for the team label; null: the rules in names.ts decide.
-export type Person = { id: string; name: string; surname: string | null; email: string; phone: string | null };
+// `surname`, `firstName`: the name's two parts (#419), for the team label.
+export type Person = { id: string; name: string; surname: string | null; firstName: string | null; email: string; phone: string | null };
 // `elo`: the pair's rating, the last tiebreak of the table (D20).
 // `withdrawn`: taken out of the group mid-phase (#34); its matches there
 // don't count and can't be played.
@@ -82,6 +81,7 @@ const pairPlayerColumns = {
   aId: playerA.id,
   aName: playerA.name,
   aSurname: playerA.surname,
+  aFirstName: playerA.firstName,
   aEmail: playerA.email,
   aPhone: playerA.phone,
   aLevel: playerA.level,
@@ -91,6 +91,7 @@ const pairPlayerColumns = {
   bId: playerB.id,
   bName: playerB.name,
   bSurname: playerB.surname,
+  bFirstName: playerB.firstName,
   bEmail: playerB.email,
   bPhone: playerB.phone,
 };
@@ -100,18 +101,20 @@ type PairPlayerRow = {
   aId: string;
   aName: string;
   aSurname: string | null;
+  aFirstName: string | null;
   aEmail: string;
   aPhone: string | null;
   bId: string;
   bName: string;
   bSurname: string | null;
+  bFirstName: string | null;
   bEmail: string;
   bPhone: string | null;
 };
 
 const toPlayers = (r: PairPlayerRow): [Person, Person] => [
-  { id: r.aId, name: r.aName || "Névtelen", surname: r.aSurname, email: r.aEmail, phone: r.aPhone },
-  { id: r.bId, name: r.bName || "Névtelen", surname: r.bSurname, email: r.bEmail, phone: r.bPhone },
+  { id: r.aId, name: r.aName || "Névtelen", surname: r.aSurname, firstName: r.aFirstName, email: r.aEmail, phone: r.aPhone },
+  { id: r.bId, name: r.bName || "Névtelen", surname: r.bSurname, firstName: r.bFirstName, email: r.bEmail, phone: r.bPhone },
 ];
 
 // The pairs of these groups with their players, by group, in seed order.

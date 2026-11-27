@@ -274,7 +274,7 @@ const STEPS: Step[] = [
   {
     action: "user.update",
     actor: ADMIN,
-    run: () => PLAYER_ADMIN.updatePlayerByAdmin(ADMIN, "q1", { name: "Játékos Q egy", phone: "", level: "halado", sex: "" }).then((r) => expect(r).toEqual({ ok: true, changed: 1 })),
+    run: () => PLAYER_ADMIN.updatePlayerByAdmin(ADMIN, "q1", { surname: "Játékos", firstName: "Q egy", phone: "", level: "halado", sex: "" }).then((r) => expect(r).toEqual({ ok: true, changed: 2 })),
   },
   { action: "partner_search.on", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, true).then((ok) => expect(ok).toBe(true)) },
   { action: "partner_search.off", actor: ADMIN, run: () => PLAYER_ADMIN.setSeekingByAdmin(ADMIN, "r2", 1, false).then((ok) => expect(ok).toBe(true)) },

@@ -65,10 +65,12 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       withdrawnAt: groupPairs.withdrawnAt,
       nameA: playerA.name,
       surnameA: playerA.surname,
+      firstNameA: playerA.firstName,
       levelA: playerA.level,
       eloA: playerA.elo,
       nameB: playerB.name,
       surnameB: playerB.surname,
+      firstNameB: playerB.firstName,
       levelB: playerB.level,
       eloB: playerB.elo,
     })
@@ -112,8 +114,8 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       .map((m) => ({
         id: m.pairId,
         players: [
-          { name: m.nameA || "Névtelen", surname: m.surnameA },
-          { name: m.nameB || "Névtelen", surname: m.surnameB },
+          { name: m.nameA || "Névtelen", surname: m.surnameA, firstName: m.firstNameA },
+          { name: m.nameB || "Névtelen", surname: m.surnameB, firstName: m.firstNameB },
         ] as [NamedPlayer, NamedPlayer],
         // The pair's current Elo (#13), the last tiebreak (D20).
         elo: averageElo({ elo: m.eloA, level: m.levelA }, { elo: m.eloB, level: m.levelB }) ?? 0,

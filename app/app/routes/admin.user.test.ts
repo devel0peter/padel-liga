@@ -38,7 +38,7 @@ const args = (cookie: string, id: string, init: RequestInit = {}) =>
 const load = (cookie: string, id = "a") => R.loader(args(cookie, id));
 const act = (cookie: string, fields: Record<string, string>, id = "a") => R.action(args(cookie, id, { method: "POST", body: new URLSearchParams(fields) }));
 const edit = (cookie: string, o: Record<string, string> = {}) =>
-  act(cookie, { intent: "edit", name: "Kovács Anna", phone: "+36 30 123 4567", level: "kezdo", sex: "female", ...o });
+  act(cookie, { intent: "edit", surname: "Kovács", first_name: "Anna", phone: "+36 30 123 4567", level: "kezdo", sex: "female", ...o });
 const one = (q: string, ...p: unknown[]) => h.raw.prepare(q).get(...p);
 
 async function status(p: Promise<unknown>): Promise<number> {
@@ -70,7 +70,7 @@ describe("/admin/users/:id access (#301, D156)", () => {
   it("refuses a Játékos and a Szervező (403), page and action alike; no change made", async () => {
     for (const cookie of [await cookieFor("jatekos", "player"), await cookieFor("szervezo", "player", 1)]) {
       expect(await status(load(cookie))).toBe(403);
-      expect(await status(edit(cookie, { name: "Más Név" }))).toBe(403);
+      expect(await status(edit(cookie, { surname: "Más" }))).toBe(403);
       expect(await status(act(cookie, { intent: "seeking", league: "1", seeking: "1" }))).toBe(403);
     }
     expect(one("select name from users where id = 'a'").name).toBe("Kovács Anna - Nagy Bence");
@@ -103,15 +103,23 @@ describe("the profile (#301)", () => {
     expect(page.canEdit).toBe(true);
   });
 
-  it("saves the name, phone, level and sex, with one audit entry naming the fields, not the values", async () => {
+  it("saves the name in two parts, phone, level and sex, with one audit entry naming the fields, not the values", async () => {
     const admin = await cookieFor("admin", "superadmin");
-    expect(await edit(admin, { name: "Kovács Anna", sex: "female", level: "halado", phone: "06 20 111 2222" })).toEqual({ intent: "edit", ok: true, changed: 3 });
-    expect(one("select name, phone, level, sex from users where id = 'a'")).toEqual({ name: "Kovács Anna", phone: "+36201112222", level: "halado", sex: "female" });
+    expect(await edit(admin, { sex: "female", level: "halado", phone: "06 20 111 2222" })).toEqual({ intent: "edit", ok: true, changed: 4 });
+    // The full name is "<Vezetéknév> <Keresztnév>" (#419).
+    expect(one("select name, surname, first_name, phone, level, sex from users where id = 'a'")).toEqual({
+      name: "Kovács Anna",
+      surname: "Kovács",
+      first_name: "Anna",
+      phone: "+36201112222",
+      level: "halado",
+      sex: "female",
+    });
     expect(h.raw.prepare("select actor_id, action, target, detail from audit_log where action = 'user.update'").all()).toEqual([
-      { actor_id: "admin", action: "user.update", target: "user:a", detail: "Módosítva: név, telefonszám, szint" },
+      { actor_id: "admin", action: "user.update", target: "user:a", detail: "Módosítva: vezetéknév, keresztnév, telefonszám, szint" },
     ]);
     // Nothing changed: no entry.
-    expect(await edit(admin, { name: "Kovács Anna", level: "halado", phone: "+36201112222" })).toEqual({ intent: "edit", ok: true, changed: 0 });
+    expect(await edit(admin, { level: "halado", phone: "+36201112222" })).toEqual({ intent: "edit", ok: true, changed: 0 });
     expect(one("select count(*) as n from audit_log where action = 'user.update'").n).toBe(1);
     // The profile's Napló lists the edit, with the accounts for the links (#301).
     const entry = (await load(admin)).log.rows.find((r: any) => r.action === "user.update");
@@ -122,7 +130,7 @@ describe("the profile (#301)", () => {
   it("refuses a bad value with the field's error and saves nothing", async () => {
     const admin = await cookieFor("admin", "superadmin");
     expect(await edit(admin, { phone: "123" })).toEqual({ intent: "edit", errors: { phone: expect.any(String) } });
-    expect(await edit(admin, { name: "" })).toEqual({ intent: "edit", errors: { name: "Add meg a nevét." } });
+    expect(await edit(admin, { surname: "" })).toEqual({ intent: "edit", errors: { surname: "Add meg a vezetéknevét." } });
     expect(one("select name, phone from users where id = 'a'")).toEqual({ name: "Kovács Anna - Nagy Bence", phone: "+36301234567" });
   });
 
@@ -133,7 +141,7 @@ describe("the profile (#301)", () => {
     const admin = await cookieFor("admin", "superadmin");
     expect((await load(admin)).profile.levelLocked).toBe(true);
     expect(await edit(admin, { level: "versenyzo" })).toEqual({ intent: "edit", errors: { level: expect.stringMatching(/lezárult/) } });
-    expect(await edit(admin, { level: "", name: "Kovács Anna" })).toEqual({ intent: "edit", ok: true, changed: 1 });
+    expect(await edit(admin, { level: "" })).toEqual({ intent: "edit", ok: true, changed: 2 });
     expect(one("select level from users where id = 'a'").level).toBe("kezdo");
   });
 

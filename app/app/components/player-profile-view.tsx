@@ -131,6 +131,7 @@ export function PlayerProfileView({
                           {x.league}, {x.latest.season}, {x.latest.phase}. kör: {x.latest.group}. csoport ({x.latest.division})
                         </span>
                       </span>
+                      <span className="sr-only">A pár oldala</span>
                       <ChevronRight aria-hidden className="size-5 shrink-0 text-ball" />
                     </Link>
                   </li>

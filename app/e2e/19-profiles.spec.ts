@@ -93,8 +93,9 @@ test("33. once round 1 has started: the results, the Élő-pont and its change",
     const main = content(page);
     await expect(main.getByRole("region", { name: "Csoportok" })).toContainText(/\d+\. hely/);
     const matches = main.getByRole("region", { name: "Meccsek" });
-    await expect(matches).toContainText(/Győzelem · (4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10)/);
-    await expect(matches).toContainText("Vereség · Mindkét pár vereséget kap (0:4, 0:4)");
+    // The verdict as a pill, the score from the pair's side (#424).
+    await expect(matches.getByRole("listitem").filter({ hasText: "Győzelem" })).toContainText(/(4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10)/);
+    await expect(matches.getByRole("listitem").filter({ hasText: "Vereség" })).toContainText("Mindkét pár vereséget kap (0:4, 0:4)");
     await expect(matches.getByRole("listitem")).toHaveCount(2);
     // The pair's summary (D136): Élő-pont, 1 season, 1 round, 2 matches, 1 win, 1 loss.
     await expect(main.getByRole("definition")).toHaveText([/^\d+$/, "1", "1", "2", "1", "1"]);

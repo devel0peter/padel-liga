@@ -28,7 +28,7 @@ export function AppPage({
     <div className="grid grid-cols-1 content-start gap-6 px-4 py-4 sm:px-6 lg:px-8 lg:py-6 [&>*]:min-w-0">
       <header className="flex flex-wrap items-start gap-x-3 gap-y-3">
         {/* Phones: the sidebar is a slide-in panel, opened from here. On wider
-            screens its own button (at its top) collapses it to icons. */}
+            screens it is always open and doesn't collapse (D181). */}
         <SidebarTrigger className="mt-0.5 -ml-1.5 shrink-0 md:hidden" />
         <div className="grid min-w-0 flex-1 basis-64 gap-1">
           {back && (

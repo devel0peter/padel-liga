@@ -102,7 +102,7 @@ export function LadderDemo() {
           {PAIRS.map((_, g) => (
             <div
               key={g}
-              className="absolute inset-x-0 rounded-[10px] border-[3px] border-white bg-court px-3 text-white outline-2 outline-court-deep"
+              className="absolute inset-x-0 rounded-[10px] border-[3px] border-white bg-court-deep px-3 text-white outline-2 outline-court-deep"
               style={{ top: g * (BOX + GAP), height: BOX }}
             >
               <div className={`${cols} text-xs`} style={{ height: HEADER - 3 }}>

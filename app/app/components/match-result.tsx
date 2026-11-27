@@ -105,7 +105,7 @@ export function ScoreBoard({ score, side, us, them }: { score: MatchScore; side:
           <tr key={row}>
             <th scope="row" className={cn("pr-3 text-left break-words", row === winner ? "font-bold" : "font-normal text-muted-foreground")}>
               {name}
-              {row === winner && <span className="ml-1.5 rounded bg-emerald-100 px-1 text-[10px] font-bold text-emerald-800 uppercase">nyert</span>}
+              {row === winner && <span className="ml-1.5 rounded bg-success-tint px-1 text-[10px] font-bold text-success uppercase">nyert</span>}
             </th>
             {cols.map((c, i) => (
               <td

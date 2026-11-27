@@ -67,7 +67,7 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "myLeagues" | "notifications" | "rankings" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
+export type NavIcon = "home" | "myLeagues" | "notifications" | "rankings" | "profile" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
 // `hint`: one short line under the label on what the page lists (#301: the
 // people pages say what each is for).
 export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string };

@@ -35,14 +35,14 @@ function ZoneMark({ zone }: { zone: Zone }) {
   if (zone === "up")
     return (
       <>
-        <ChevronUp aria-hidden className="size-4 shrink-0 text-emerald-600" />
+        <ChevronUp aria-hidden className="size-4 shrink-0 text-success" />
         <span className="sr-only">feljutó hely</span>
       </>
     );
   if (zone === "down")
     return (
       <>
-        <ChevronDown aria-hidden className="size-4 shrink-0 text-rose-600" />
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-danger" />
         <span className="sr-only">kieső hely</span>
       </>
     );
@@ -154,10 +154,10 @@ export function StandingsLegend({ zones = true }: { zones?: boolean }) {
       {zones && (
         <>
           <span className="inline-flex items-center gap-0.5">
-            <ChevronUp aria-hidden className="size-3.5 text-emerald-600" /> feljut
+            <ChevronUp aria-hidden className="size-3.5 text-success" /> feljut
           </span>
           <span className="inline-flex items-center gap-0.5">
-            <ChevronDown aria-hidden className="size-3.5 text-rose-600" /> kiesik a kör végén
+            <ChevronDown aria-hidden className="size-3.5 text-danger" /> kiesik a kör végén
           </span>
         </>
       )}

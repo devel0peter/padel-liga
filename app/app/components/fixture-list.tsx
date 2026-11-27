@@ -185,7 +185,7 @@ export function FixtureList({ weeks, label = "Meccsek", compact = false }: { wee
         <section key={w.week} aria-label={`${w.week}. hét`} className="grid gap-2">
           <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-bold">
             {w.week}. hét <span className="font-normal text-muted-foreground">{w.range}</span>
-            {w.current && <span className="rounded-full bg-court px-2 py-px text-[10px] font-bold tracking-wide text-white uppercase">ez a hét</span>}
+            {w.current && <span className="rounded-full bg-court px-2 py-px text-[10px] font-bold tracking-wide text-court-foreground uppercase">ez a hét</span>}
           </h4>
           {w.matches.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ezen a héten nincs meccs.</p>

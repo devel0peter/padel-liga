@@ -20,6 +20,9 @@ export default [
   route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
   route("health", "routes/health.ts"),
+  // The building blocks' gallery (D181, #418): local development only, a
+  // production build answers 404 (its loader).
+  route("dev/ui", "routes/dev.ui.tsx"),
   // The old Párom address: leads to Profil's Párod section (D141).
   route("pair", "routes/pair.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin

@@ -98,7 +98,7 @@ export function Todos({ items }: { items: Todo[] }) {
       <CardHeader>
         <CardTitle role="heading" aria-level={2} id="teendok" className="flex items-center gap-2 font-display text-lg font-bold">
           Teendők
-          <span className="rounded-full bg-nav-active px-2 py-px text-xs font-bold text-white tabular-nums dark:text-background">
+          <span className="rounded-full bg-nav-active px-2 py-px text-xs font-bold text-nav-active-foreground tabular-nums">
             {items.length}
           </span>
         </CardTitle>

@@ -383,3 +383,14 @@ describe("no-show notices (#33, D108)", () => {
     );
   });
 });
+
+describe("noticeTone (#423)", () => {
+  it("colours an item by what it asks of the player", async () => {
+    const { noticeTone } = await import("./notifications");
+    expect(noticeTone("match_result")).toBe("warning");
+    expect(noticeTone("match_proposal")).toBe("info");
+    expect(noticeTone("match_result_confirmed")).toBe("success");
+    expect(noticeTone("strike")).toBe("danger");
+    expect(noticeTone("groups_published")).toBe("neutral");
+  });
+});

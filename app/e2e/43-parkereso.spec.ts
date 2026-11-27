@@ -85,7 +85,8 @@ test("Párkereső: seekers see each other with phone and email, a single without
   await expect(panni.page).toHaveURL(/\/profile\?joined=1#parod$/);
   for (const page of [pal.page, panni.page]) {
     await visit(page, "/leagues/minta");
-    await expect(finder(page)).toHaveText(/Neked már van párod\./);
+    // With a pair the card has no Párkereső (#423).
+    await expect(finder(page)).toHaveCount(0);
     await expect(seekers(page)).toHaveCount(0);
   }
   await visit(petra.page, "/leagues/minta");
@@ -101,7 +102,7 @@ test("Párkereső: seekers see each other with phone and email, a single without
 test("Párkereső: a paired player, another league's player and a logged-out visitor can't see the list", async ({ browser }) => {
   const anna = await as(browser, PAIRS.p1[0]);
   await visit(anna.page, "/leagues/minta");
-  await expect(finder(anna.page)).toHaveText(/Neked már van párod\./);
+  await expect(finder(anna.page)).toHaveCount(0);
   await expect(seekers(anna.page)).toHaveCount(0);
   await anna.context.close();
 

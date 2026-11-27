@@ -710,3 +710,31 @@ export function parseSubscription(form: FormData): SubscriptionInput | null {
   if (!/^[A-Za-z0-9_-]{87}$/.test(p256dh) || !/^[A-Za-z0-9_-]{22}$/.test(auth)) return null;
   return { endpoint, p256dh, auth };
 }
+
+/** An item's colour on Értesítések (#423, docs/ui-guidelines.md): what it asks of the player. */
+export type NoticeTone = "warning" | "info" | "success" | "danger" | "neutral";
+
+const TONES: Record<string, NoticeTone> = {
+  // Waits on the player: a result or an agreed time to answer, a deadline.
+  match_result: "warning",
+  match_agreed_time: "warning",
+  match_deadline_soon: "warning",
+  match_no_proposal: "warning",
+  partner_change_waiting: "warning",
+  // A time to pick.
+  match_proposal: "info",
+  match_tomorrow: "info",
+  // Done.
+  match_result_confirmed: "success",
+  match_decided: "success",
+  // A problem.
+  match_declined: "danger",
+  match_cancelled: "danger",
+  match_result_disputed: "danger",
+  result_disputed: "danger",
+  strike: "danger",
+  no_show_reported: "danger",
+  pair_withdrawn: "danger",
+};
+
+export const noticeTone = (kind: string): NoticeTone => TONES[kind] ?? "neutral";

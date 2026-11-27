@@ -1,15 +1,17 @@
 import { currentElo } from "@padel-liga/rules";
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { enteredNotice } from "~/components/season-entry";
 import { db } from "~/db/client.server";
-import { pairs, users } from "~/db/schema";
+import { eloChanges, pairs, users } from "~/db/schema";
 
 import type { User } from "./auth/session.server";
 import { listedCities } from "./cities.server";
 import { ladderPage, pairIdsOf } from "./ladder.server";
 import { chooseLeague, playerLeagues, type ListedLeague } from "./league-members.server";
+import { roundClock } from "./home";
+import { badgeInitials, teamLabel } from "./names";
 import { minEntriesByLeague } from "./leagues.server";
 import {
   acceptPartnerChange,
@@ -52,6 +54,19 @@ export type MyLeagueCard = {
   round: RoundInfo;
   /** The partner's name, or null without an active pair in the league. */
   pair: { partner: string } | null;
+  /**
+   * The pair as a team (#423): its id (the badge's colour), team label, the
+   * two players' initials in the pair's order, and the partner's profile.
+   */
+  team: { pairId: number; label: string; initials: [string, string]; partnerId: string; partnerInitials: string } | null;
+  /** The own row's points and the group's division ("Bronz divízió"), from the Tabella's round. */
+  standing: { points: number; division: string } | null;
+  /** The running round's days left and the share of its time gone (#423). */
+  clock: { daysLeft: number; progress: number } | null;
+  /** The season's rounds, for "Szezon naptár" (moved from Kezdőlap, #423), and the round being played. */
+  calendar: { phases: { number: number; startsAt: Date; deadline: Date }[]; current: number | null };
+  /** The player's last Élő-pont change, rounded; null before any. */
+  delta: number | null;
   /** The pair's group and place in the Tabella's round, if it plays there. */
   place: OwnPlace | null;
   /** The phase the pair's entry starts in and its start (null: a waiting first season, D124), when it hasn't played yet. */
@@ -78,16 +93,52 @@ export function withOrigin(card: MyLeagueCard, origin: string): MyLeagueCard {
   return card.finder?.kind === "single" ? { ...card, finder: { ...card.finder, link: origin + card.finder.link } } : card;
 }
 
-/** The partner's name in each league where the player has an active pair. */
-async function partners(userId: string, leagueIds: number[]): Promise<Map<number, string>> {
+type Partner = { pairId: number; first: boolean; id: string; name: string; surname: string | null; firstName: string | null };
+
+/** The partner in each league where the player has an active pair: names only, no contact data. */
+async function partners(userId: string, leagueIds: number[]): Promise<Map<number, Partner>> {
   if (leagueIds.length === 0) return new Map();
   const partner = alias(users, "my_leagues_partner");
   const rows = await db
-    .select({ leagueId: pairs.leagueId, name: partner.name, deletedAt: partner.deletedAt })
+    .select({
+      leagueId: pairs.leagueId,
+      pairId: pairs.id,
+      playerA: pairs.playerA,
+      id: partner.id,
+      name: partner.name,
+      surname: partner.surname,
+      firstName: partner.firstName,
+      deletedAt: partner.deletedAt,
+    })
     .from(pairs)
     .innerJoin(partner, sql`${partner.id} = case when ${pairs.playerA} = ${userId} then ${pairs.playerB} else ${pairs.playerA} end`)
     .where(and(inArray(pairs.leagueId, leagueIds), eq(pairs.status, "active"), or(eq(pairs.playerA, userId), eq(pairs.playerB, userId))));
-  return new Map(rows.map((r) => [r.leagueId, r.deletedAt ? "Törölt játékos" : r.name || "Névtelen"]));
+  return new Map(
+    rows.map((r) => [
+      r.leagueId,
+      {
+        pairId: r.pairId,
+        first: r.playerA === userId,
+        id: r.id,
+        name: r.deletedAt ? "Törölt játékos" : r.name || "Névtelen",
+        surname: r.deletedAt ? null : r.surname,
+        firstName: r.deletedAt ? null : r.firstName,
+      },
+    ]),
+  );
+}
+
+// The pair as a team on the card (#423), in the pair's player order.
+function teamOf(user: User, p: Partner): NonNullable<MyLeagueCard["team"]> {
+  const me = { id: user.id, name: user.name || "Névtelen", surname: user.surname, firstName: user.firstName };
+  const players = p.first ? [me, p] : [p, me];
+  return {
+    pairId: p.pairId,
+    label: teamLabel(players),
+    initials: [badgeInitials(players[0]!), badgeInitials(players[1]!)],
+    partnerId: p.id,
+    partnerInitials: badgeInitials(p),
+  };
 }
 
 /** The approved entry's starting phase, for "A 2. körben kezdtek (dec. 7.)": only before that phase starts. */
@@ -121,11 +172,12 @@ export async function myLeagueCard(user: User, slug: string, now = new Date()): 
 async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise<MyLeagueCard[]> {
   if (leagues.length === 0) return [];
   const ids = leagues.map((l) => l.id);
-  const [cities, allSeasons, mine, partnerNames] = await Promise.all([
+  const [cities, allSeasons, mine, partnerOf, [last]] = await Promise.all([
     listedCities(),
     listSeasons(),
     pairIdsOf(user.id),
     partners(user.id, ids),
+    db.select({ delta: eloChanges.delta }).from(eloChanges).where(eq(eloChanges.userId, user.id)).orderBy(desc(eloChanges.at)).limit(1),
   ]);
   const seasonOf = new Map(leagues.map((l) => [l.id, currentSeason(allSeasons.filter((s) => s.leagueId === l.id), now)]));
   const shown = [...seasonOf.values()].filter((s): s is Season => !!s);
@@ -154,11 +206,24 @@ async function cardsFor(user: User, leagues: ListedLeague[], now: Date): Promise
     const record = season ? records.get(season.id) : undefined;
     const partnerChange = await partnerChangeView(user.id, league.id, season ?? undefined, now);
     const optOut = season && !isWaiting(season) ? await optOutCard(user.id, league.id, season, now) : null;
+    const partner = partnerOf.get(league.id);
+    // The own row of the Tabella's round: its points and its division.
+    const band = bands.find((b) => b.groups.some((g) => g.mine));
+    const row = band?.groups.find((g) => g.mine)?.rows.find((r) => r.mine);
+    const running = season?.phases.find((p) => p.startsAt <= now && now <= p.deadline);
     cards.push({
       league: { name: league.name, slug: league.slug, city: cities.find((c) => c.slug === league.city)?.name ?? league.city },
       season: season ? { id: season.id, name: season.name } : null,
       round: roundInfo(calendar, now),
-      pair: partnerNames.has(league.id) ? { partner: partnerNames.get(league.id)! } : null,
+      pair: partner ? { partner: partner.name } : null,
+      team: partner ? teamOf(user, partner) : null,
+      standing: band && row ? { points: row.points, division: band.label } : null,
+      clock: running ? roundClock(running.startsAt, running.deadline, now) : null,
+      calendar: {
+        phases: (season?.phases ?? []).map((p) => ({ number: p.number, startsAt: p.startsAt, deadline: p.deadline })),
+        current: running?.number ?? null,
+      },
+      delta: last ? Math.round(last.delta) : null,
       place,
       joins: place || !season ? null : joinsOf(season, entry, now),
       entry,

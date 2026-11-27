@@ -487,6 +487,7 @@ export async function listNotifications(userId: string) {
   return db
     .select({
       id: notifications.id,
+      kind: notifications.kind,
       title: notifications.title,
       body: notifications.body,
       readAt: notifications.readAt,

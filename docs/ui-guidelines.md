@@ -8,7 +8,7 @@ Player pages are made of the blocks in `app/app/components/blocks/`, shown in ev
 
 | Block | For |
 |---|---|
-| `PageHeader` | Way back, eyebrow line (season, city, round), display title, a slot on the right |
+| `PageHeader` | Way back, eyebrow line (season, city, round), display title, a slot on the right; the phone's menu button |
 | `SectionLabel` | The title above a card ("Meccseid az 1. körben"); amber only for "Rád vár" |
 | `ActionCard` | One thing that waits on the player: badge or icon, title, one or two lines, buttons or a link |
 | `RoundProgress` | Round, week, days left, deadline, bar |
@@ -23,6 +23,11 @@ Player pages are made of the blocks in `app/app/components/blocks/`, shown in ev
 | `OverflowRow` | "•••": the rare or destructive actions |
 
 Buttons are shadcn's `Button` with `size="xl"` (44 px): `default` is the yellow primary, `secondary` the dark one.
+
+## The shell
+
+- **Wider screens:** the sidebar is always open. The player's pages come first in 40 px rows; the organizer's and the Admin's sections follow in compact 30 px rows. When they don't fit, the list scrolls with a visible scrollbar and a shadow at the edge that has more items. Szabályzat, Visszajelzés and Kilépés stay at its foot.
+- **Phones:** the bottom bar holds Kezdőlap, Tabella, Ligáim, Értesítések and Profil. Everything else is in the sidebar panel: the organizer's and the Admin's sections, Szabályzat, Visszajelzés, Kilépés. On a page built with `PageHeader`, the menu button at the top right opens it. On a page still on `AppPage`, the menu button left of the title opens it. Every page in the shell must have one of the two, so nothing in the sidebar is out of reach on a phone.
 
 ## Rules
 
@@ -47,7 +52,7 @@ Buttons are shadcn's `Button` with `size="xl"` (44 px): `default` is the yellow 
 | `danger` | `#ff8f80` | Lost, going down, a problem | "Vereség", "kieső hely", "Vitatott" |
 | neutral | `surface-3` | Everything else | "Fix időpont", "Lejátszva" |
 
-Each status has a 16% tint (`bg-success-tint` …) for pill backgrounds, with the status colour as text. Divisions have their dots: Bronz `#d08a4a`, Réz `#3fbf9f`, Rookie `#9b7bff`.
+Each status has a 16% tint (`bg-success-tint` …) for pill backgrounds, with the status colour as text. The tints are solid (mixed into the card colour), so a pill reads the same on any surface; don't build one from a see-through colour (`bg-info/16`), which drops under 4.5:1 on the lighter surfaces. A destructive button uses `danger-tint`, and `danger-tint-hover` under the pointer. Divisions have their dots: Bronz `#d08a4a`, Réz `#3fbf9f`, Rookie `#9b7bff`.
 
 ## Type and surfaces
 

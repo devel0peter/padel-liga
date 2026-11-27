@@ -7,7 +7,7 @@
 // the page shows week 1 of a phase that has not started.
 import { expect, test } from "@playwright/test";
 
-import { GROUP_PAIRS, PAIRS, as, content, d1, visit } from "./support";
+import { GROUP_PAIRS, PAIRS, as, content, d1, surname, visit } from "./support";
 
 const anna = PAIRS.p1[0];
 
@@ -37,11 +37,13 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await expect(main.getByRole("region", { name: /^\d+\. csoport$/ }).filter({ hasText: "Rookie divízió" })).toHaveCount(0);
   // Anna's group and pair are marked.
   await expect(first).toContainText("A ti csoportotok");
-  await expect(first.getByRole("row").filter({ hasText: anna.name })).toContainText("(ti)");
+  await expect(first.getByRole("row").filter({ hasText: surname(anna) })).toContainText("(ti)");
 
-  // Every pair of both groups, by name; the pair that joins later is not there.
-  for (const player of GROUP_PAIRS.flat()) await expect(main).toContainText(player.name);
-  await expect(main).not.toContainText(PAIRS.late[0].name);
+  // Every pair of both groups, by team label (#419): surnames only, no full
+  // name; the pair that joins later is not there.
+  for (const player of GROUP_PAIRS.flat()) await expect(main).toContainText(surname(player));
+  await expect(main).not.toContainText(anna.name);
+  await expect(main).not.toContainText(surname(PAIRS.late[0]));
 
   // A table with 3 rows per group, all at zero and no places before the first result.
   await expect(first.getByRole("row")).toHaveCount(4); // header + 3 pairs

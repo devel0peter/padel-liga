@@ -48,7 +48,7 @@ export function SurnameCard({ view }: { view: SurnameView }) {
   return (
     <Card role="region" aria-label="Egy gyors kérdés" className="max-w-2xl border-nav-active/40">
       <CardHeader className="gap-3">
-        <Badge variant="secondary" className="w-fit text-xs font-semibold tracking-wide uppercase">
+        <Badge variant="secondary" className="w-fit text-xs font-semibold tracking-wide [word-spacing:0.2em] uppercase">
           Egy gyors kérdés
         </Badge>
         <p className="text-sm">{view.label.partner ? "A tabellában így írjuk ki a csapatotokat:" : "A tabellában így írjuk ki a neved:"}</p>

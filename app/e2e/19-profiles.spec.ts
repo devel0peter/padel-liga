@@ -10,7 +10,7 @@
 // and Párod.
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, d1Update, visit } from "./support";
+import { PAIRS, as, content, d1, d1Update, surname, visit } from "./support";
 
 const anna = PAIRS.p1[0];
 const partner = PAIRS.p1[1];
@@ -22,9 +22,9 @@ const ROUND_1 = `season_id in (select s.id from seasons s join leagues l on l.id
 function annaRow(page: Page) {
   return content(page)
     .getByRole("region", { name: /^\d+\. csoport$/ })
-    .filter({ hasText: anna.name })
+    .filter({ hasText: surname(anna) })
     .locator("tbody tr")
-    .filter({ hasText: anna.name });
+    .filter({ hasText: surname(anna) });
 }
 
 // A logged-in member (Anna) on the league page, then her pair's profile.
@@ -62,8 +62,11 @@ test("33. a visitor must log in for a profile", async ({ browser }) => {
 test("33. before round 1 starts a profile shows names and groups only", async ({ browser }) => {
   const { context, page } = await openPairFromLeague(browser);
   const main = content(page);
-  await expect(main.getByRole("heading", { level: 1 })).toContainText(anna.name);
-  await expect(main.getByRole("heading", { level: 1 })).toContainText(partner.name);
+  // The team label (#419) as the heading, the full names, each a link, under it.
+  await expect(main.getByRole("heading", { level: 1 })).toContainText(surname(anna));
+  await expect(main.getByRole("heading", { level: 1 })).not.toContainText(anna.name);
+  await expect(main.getByTestId("pair-players")).toContainText(anna.name);
+  await expect(main.getByTestId("pair-players")).toContainText(partner.name);
   await expect(main.getByRole("region", { name: "Csoportok" })).toContainText(/1\. kör: \d+\. csoport \(\w+ divízió\)/);
   await expect(main.getByRole("region", { name: "Meccsek" })).toHaveCount(0);
   await expect(main).toContainText("Az eredmények a liga indulása után látszanak itt.");
@@ -71,12 +74,12 @@ test("33. before round 1 starts a profile shows names and groups only", async ({
   await expect(main.getByRole("definition")).toHaveText(["–", "–", "–", "–", "–", "–"]);
   await noContactData(page);
 
-  await main.getByRole("heading", { level: 1 }).getByRole("link", { name: anna.name }).click();
+  await main.getByTestId("pair-players").getByRole("link", { name: anna.name }).click();
   await expect(page).toHaveURL(/\/players\/[0-9a-f-]+$/);
   await expect(content(page).getByRole("heading", { level: 1 })).toHaveText(anna.name);
   await expect(content(page).getByTestId("player-elo")).toHaveCount(0);
   // Her pair, a link to its page (D136).
-  await expect(content(page).getByRole("region", { name: "Párosa" }).getByRole("link", { name: /A pár oldala/ })).toContainText(partner.name);
+  await expect(content(page).getByRole("region", { name: "Párosa" }).getByRole("link", { name: /A pár oldala/ })).toContainText(surname(partner));
   await noContactData(page);
   await context.close();
 });
@@ -97,7 +100,7 @@ test("33. once round 1 has started: the results, the Élő-pont and its change",
     await expect(main.getByRole("definition")).toHaveText([/^\d+$/, "1", "1", "2", "1", "1"]);
     await noContactData(page);
 
-    await main.getByRole("heading", { level: 1 }).getByRole("link", { name: anna.name }).click();
+    await main.getByTestId("pair-players").getByRole("link", { name: anna.name }).click();
     await expect(page).toHaveURL(/\/players\/[0-9a-f-]+$/);
     const player = content(page);
     await expect(player.getByTestId("player-elo")).toHaveText(/^\d+$/);
@@ -139,6 +142,6 @@ test("33. Anna finds her profile and the pair's in Profil's Párod section", asy
   await visit(page, "/profile");
   await content(page).getByRole("link", { name: "A párotok oldala" }).click();
   await expect(page).toHaveURL(/\/pairs\/\d+$/);
-  await expect(content(page).getByRole("heading", { level: 1 })).toContainText(partner.name);
+  await expect(content(page).getByRole("heading", { level: 1 })).toContainText(surname(partner));
   await context.close();
 });

@@ -6,7 +6,7 @@
 import { addDays, budapestClock, budapestDay, budapestTime } from "@padel-liga/rules";
 import { devices, expect, test, type Page } from "@playwright/test";
 
-import { PAIRS, as, content, d1, d1Update, emailsSince, logOffset, visit, waitForEmails, type Player } from "./support";
+import { PAIRS, as, content, d1, d1Update, emailsSince, logOffset, teamLabel, visit, waitForEmails, type Player } from "./support";
 
 // A Budapest day `days` from today.
 const inDays = (days: number) => addDays(budapestDay(new Date()), days);
@@ -54,7 +54,7 @@ test("17. Kezdőlap shows the group, the division line, the next match with phon
   // match each, and the pair rests one week; Anna's 2 matches open their page (D140).
   const fixtures = main.getByRole("group", { name: "A csoport meccsei" });
   await expect(fixtures.locator("li")).toHaveCount(3);
-  await expect(fixtures.getByText(`Pihen: ${anna.name} – ${PAIRS.p1[1].name}`)).toHaveCount(1);
+  await expect(fixtures.getByText(`Pihen: ${teamLabel(anna, PAIRS.p1[1])}`)).toHaveCount(1);
   await expect(fixtures.locator('a[href^="/matches/"]')).toHaveCount(2);
   // Both matches are a Teendő.
   await expect(main.getByRole("link", { name: /^Ajánlj időpontot/ })).toHaveCount(2);

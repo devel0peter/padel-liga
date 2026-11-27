@@ -48,6 +48,12 @@ export const GROUP_PAIRS = [PAIRS.p1, PAIRS.p2, PAIRS.p3, PAIRS.p4, PAIRS.p5, PA
 
 export const levelLabel = (p: Player) => LEVEL_LABELS[p.level];
 
+// The player pages name a pair by its team label (#419): every seeded name
+// is "Surname Given", and no two seeded players share a surname, so a label
+// is the two first words, "Kovács / Nagy".
+export const surname = (p: { name: string }) => p.name.split(" ")[0]!;
+export const teamLabel = (a: { name: string }, b: { name: string }) => `${surname(a)} / ${surname(b)}`;
+
 // Opens a page and waits until it is interactive: dialogs, selects and
 // fetcher buttons do nothing before React hydrates, and the dev server loads
 // the page's modules one by one.

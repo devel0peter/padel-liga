@@ -6,7 +6,7 @@
 // Runs after 16-public-ladder (every pair still at zero) and 17-match-overview.
 import { expect, test, type Page } from "@playwright/test";
 
-import { ORGANIZER, PAIRS, as, content, d1, logOffset, visit, waitForEmails, type Player } from "./support";
+import { ORGANIZER, PAIRS, as, content, d1, logOffset, surname, visit, waitForEmails, type Player } from "./support";
 
 const anna = PAIRS.p1[0];
 
@@ -74,7 +74,7 @@ test("22. record → confirm: an invalid score refused, the email, played for bo
   // Before any result the group card on Kezdőlap has the table without places (#201, #220, D133).
   await visit(player.page, "/home");
   const table = content(player.page).getByRole("table", { name: "Tabella" });
-  await expect(table.getByRole("row").filter({ hasText: "(ti)" })).toContainText(anna.name);
+  await expect(table.getByRole("row").filter({ hasText: "(ti)" })).toContainText(surname(anna));
   await expect(content(player.page)).toContainText("Még nincs végleges eredmény: a sorrend a kiemelés.");
 
   await visit(player.page, `/matches/${first!.id}`);

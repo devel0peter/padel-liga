@@ -4,7 +4,7 @@
 // round 1's start into the past and puts it back, like 19-profiles.
 import { expect, test } from "@playwright/test";
 
-import { GROUP_PAIRS, PAIRS, as, content, d1, d1Update, visit } from "./support";
+import { GROUP_PAIRS, PAIRS, as, content, d1, d1Update, teamLabel, visit } from "./support";
 
 const anna = PAIRS.p1[0];
 const ROUND_1 = `season_id in (select s.id from seasons s join leagues l on l.id = s.league_id where l.slug = 'minta') and number = 1`;
@@ -49,7 +49,8 @@ test("33a. once round 1 has started: every placed player and pair by Élő-pont,
     await expect(page).toHaveURL(/\?view=pairs$/);
     const pairs = main.getByRole("table", { name: "Párok Élő-pont szerint" });
     await expect(pairs.locator("tbody tr")).toHaveCount(GROUP_PAIRS.length);
-    await expect(pairs.locator("tbody tr").filter({ hasText: anna.name })).toContainText("(ti)");
+    // A pair by its team label (#419), "Kovács / Nagy".
+    await expect(pairs.locator("tbody tr").filter({ hasText: teamLabel(anna, PAIRS.p1[1]) })).toContainText("(ti)");
 
     // Names and ratings only.
     await expect(main).not.toContainText("@");

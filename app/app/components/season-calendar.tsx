@@ -27,7 +27,7 @@ export function PhaseList({ phases, compact = false, current = null }: { phases:
               {formatShortDate(p.startsAt)} – {formatShortDate(p.deadline)}
             </span>
             {!compact && <span className={p.number === current ? undefined : "text-muted-foreground"}>határidő: {formatDeadline(p.deadline)}</span>}
-            {p.number === current && <span className="rounded-full bg-nav-active px-2 py-px text-[10px] font-bold tracking-wide text-white uppercase">most</span>}
+            {p.number === current && <span className="rounded-full bg-nav-active px-2 py-px text-[10px] font-bold tracking-wide text-nav-active-foreground uppercase">most</span>}
           </li>
         ))}
       </ol>

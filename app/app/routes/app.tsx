@@ -145,7 +145,7 @@ function LeagueSwitcher({ leagues, current, role }: { leagues: LeagueRef[]; curr
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarGroupLabel asChild>
-          <button type="button" className="w-full gap-1.5 hover:bg-sidebar-accent">
+          <button type="button" className="h-7 w-full gap-1.5 hover:bg-sidebar-accent">
             <NavSectionLabel label={current} role={role} />
             <ChevronsUpDown className="shrink-0" />
           </button>
@@ -185,7 +185,7 @@ type ChipProps = { name: string; email: string; imageUrl: string | null; initial
 // Who is logged in: name, and the team with its division (or the role).
 function UserChip({ name, email, imageUrl, initials, role, team }: ChipProps) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl bg-surface p-2.5">
+    <div className="flex items-center gap-2.5 rounded-xl bg-surface p-2">
       <Avatar className="size-9">
         {imageUrl && <AvatarImage src={imageUrl} alt="" referrerPolicy="no-referrer" />}
         <AvatarFallback className="bg-surface-3 text-[13px] font-bold text-foreground" style={avatarColor(team)}>
@@ -202,22 +202,28 @@ function UserChip({ name, email, imageUrl, initials, role, team }: ChipProps) {
   );
 }
 
-// Nav items as on the mockups: 40 px high, 20 px icons, the active one in
-// ball yellow on a tint (--nav-active).
-const navButton = "h-10 gap-3 rounded-[10px] px-2.5 text-[15px] data-active:font-bold [&_svg]:size-5";
+// Nav items: the player's own pages as on the mockups (40 px, 20 px icons);
+// the organizer's and the Admin's sections compact (30 px, 16 px icons), so
+// they fit at 1280x800. When they still don't (the Admin's, a short window),
+// the nav scrolls with a visible scrollbar and edge shadows (app.css
+// .shell-nav). The active one in ball yellow on a tint (--nav-active).
+const NAV_ROW = {
+  player: "h-10 gap-3 rounded-[10px] px-2.5 text-[15px] data-active:font-bold [&_svg]:size-5",
+  compact: "h-[30px] gap-2.5 rounded-lg px-2.5 text-sm data-active:font-bold [&_svg]:size-4",
+};
 
 function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueRef[]; unread: number }) {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
   const active = activeItem(nav, pathname);
-  return nav.map((section) => (
-    <SidebarGroup key={section.label} className="px-0 py-0 not-first:pt-5">
+  return nav.map((section, i) => (
+    <SidebarGroup key={section.label} className="px-0 py-0 not-first:pt-3">
       {/* The league section gets a switcher when there are more leagues. */}
       {leagues.length > 1 && leagues.some((l) => l.name === section.label) ? (
         <LeagueSwitcher leagues={leagues} current={section.label} role={section.role} />
       ) : (
         section.label && (
-          <SidebarGroupLabel className="gap-1.5 px-2.5">
+          <SidebarGroupLabel className="h-7 gap-1.5 px-2.5">
             <NavSectionLabel label={section.label} role={section.role} />
           </SidebarGroupLabel>
         )
@@ -227,7 +233,12 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
           const Icon = ICONS[item.icon];
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={item.to === active} size={item.hint ? "lg" : "default"} className={cn(navButton, item.hint && "h-12")}>
+              <SidebarMenuButton
+                asChild
+                isActive={item.to === active}
+                size={item.hint ? "lg" : "default"}
+                className={cn(i === 0 ? NAV_ROW.player : NAV_ROW.compact, item.hint && "h-10")}
+              >
                 <NavLink to={item.to} onClick={() => setOpenMobile(false)} className="no-underline">
                   <Icon />
                   {item.hint ? (
@@ -255,7 +266,7 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
 }
 
 // The quiet links at the foot of the sidebar.
-const footLink = "h-8 px-2.5 text-[13px] text-muted-foreground hover:text-foreground";
+const footLink = "h-7 px-2.5 text-[13px] text-muted-foreground hover:text-foreground";
 
 // Phones (D133, D174, docs/player-ui.md N1): the player's own pages one tap
 // away at the bottom; the sidebar stays for the organizer's and the Admin's
@@ -345,14 +356,14 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
       {/* Always open on wider screens: no collapse on the mockups. */}
       <SidebarProvider open onOpenChange={() => {}} style={{ "--sidebar-width": "15.5rem" } as React.CSSProperties}>
         <Sidebar className="border-sidebar-border">
-          <SidebarHeader className="gap-[22px] px-3 pt-[22px] pb-[22px]">
+          <SidebarHeader className="gap-3.5 px-3 pt-4 pb-3.5">
             <ShellLogo />
             <UserChip {...profile} />
           </SidebarHeader>
-          <SidebarContent className="px-3">
+          <SidebarContent className="shell-nav px-3 pb-2">
             <NavMenu nav={nav} leagues={leagues} unread={unread} />
           </SidebarContent>
-          <SidebarFooter className="gap-0.5 px-3 pt-4 pb-[22px]">
+          <SidebarFooter className="gap-0.5 px-3 pt-2 pb-3">
             <SidebarMenu className="gap-0.5">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className={footLink}>

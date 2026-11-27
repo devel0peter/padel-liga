@@ -38,6 +38,7 @@
   --color-info-tint: var(--info-tint);
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
+  --color-danger-tint-hover: var(--danger-tint-hover);
   --color-division-bronz: var(--division-bronz);
   --color-division-rez: var(--division-rez);
   --color-division-rookie: var(--division-rookie);
@@ -116,15 +117,20 @@
   --ball-foreground: #10233d;
   --ball-tint: color-mix(in srgb, var(--ball) 10%, transparent);
 
-  /* Status, each with a 16% tint for pill backgrounds. */
+  /* Status, each with a 16% tint for pill backgrounds. The tints are solid
+     (mixed into the card colour), so the status text on them reads the same
+     on any surface: a see-through tint over the lighter surfaces dropped
+     under 4.5:1. */
   --success: #5fd492;
-  --success-tint: color-mix(in srgb, var(--success) 16%, transparent);
+  --success-tint: color-mix(in srgb, var(--success) 16%, var(--surface));
   --warning: #f7b955; /* "Rád vár" */
-  --warning-tint: color-mix(in srgb, var(--warning) 16%, transparent);
+  --warning-tint: color-mix(in srgb, var(--warning) 16%, var(--surface));
   --info: #7cb2ff; /* "Időpont kell" */
-  --info-tint: color-mix(in srgb, var(--info) 16%, transparent);
+  --info-tint: color-mix(in srgb, var(--info) 16%, var(--surface));
   --danger: #ff8f80;
-  --danger-tint: color-mix(in srgb, var(--danger) 16%, transparent);
+  --danger-tint: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  /* A destructive button under the pointer: a step stronger, still 4.5:1. */
+  --danger-tint-hover: color-mix(in srgb, var(--danger) 22%, var(--surface));
 
   /* Division dots. */
   --division-bronz: #d08a4a;
@@ -187,7 +193,7 @@
   /* Older names: the court blue becomes the info blue (light, for text on the
      dark ground); "nav active" is the ball, as the active nav item. */
   --court: var(--info);
-  --court-deep: #3a5a8c; /* a court-blue fill under white text (6.2:1) */
+  --court-deep: #263f68; /* a court-blue fill: white 10.5:1, the ball on a 20% ball tint 5.1:1 */
   --court-foreground: var(--ball-foreground);
   --nav-active: var(--ball);
   --nav-active-bg: var(--ball-tint);
@@ -256,4 +262,18 @@
     transform: scaleX(1);
     transition: opacity 0ms linear 120ms;
   }
+}
+
+/* The sidebar's nav (routes/app.tsx): when the organizer's and the Admin's
+   sections don't fit, it scrolls, and shows it: a thin scrollbar (the shadcn
+   content hides it; unlayered, this wins) and a shadow at each edge that has
+   more items behind it (the covers scroll with the list, the shadows stay). */
+[data-sidebar="content"].shell-nav {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 50%, transparent) transparent;
+  background:
+    linear-gradient(var(--sidebar) 40%, transparent) top / 100% 32px no-repeat local,
+    linear-gradient(transparent, var(--sidebar) 60%) bottom / 100% 32px no-repeat local,
+    linear-gradient(rgb(0 0 0 / 0.7), transparent) top / 100% 20px no-repeat scroll,
+    linear-gradient(transparent, rgb(0 0 0 / 0.7)) bottom / 100% 20px no-repeat scroll;
 }

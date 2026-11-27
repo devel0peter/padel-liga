@@ -31,6 +31,8 @@ function freshDb() {
     ["ede", ""],
   ])
     h.raw.prepare("insert into users (id, email, name, consent_at) values (?, ?, ?, 1)").run(id, `${id}@x.hu`, name);
+  // Anna and Bea have the name in two parts (#419); the others only the full name.
+  h.raw.exec(`update users set surname = 'Kiss', first_name = 'Anna' where id = 'anna'; update users set surname = 'Nagy', first_name = 'Bea' where id = 'bea'`);
 }
 
 const pair = (id: number, league: number, a: string, b: string, status = "active") =>
@@ -67,12 +69,12 @@ describe("the user chip's team (D181)", () => {
     pair(7, 2, "cili", "anna");
     pair(3, 1, "anna", "bea");
     const team = await shellTeam("anna");
-    expect(team).toEqual({ pairId: 3, name: "Kiss Anna – Nagy Bea", division: null, first: true });
+    expect(team).toEqual({ pairId: 3, name: "Kiss / Nagy", division: null, first: true });
     expect(await playerLeagueSlug("anna")).toBe("gyor");
-    // Bea is the pair's second player (the lighter circle); a nameless partner reads "Névtelen".
+    // Bea is the pair's second player (the lighter circle); without a surname the full name shows, a nameless partner reads "Névtelen".
     expect(await shellTeam("bea")).toMatchObject({ pairId: 3, first: false });
     pair(9, 1, "dora", "ede");
-    expect(await shellTeam("dora")).toMatchObject({ name: "Szabó Dóra – Névtelen" });
+    expect(await shellTeam("dora")).toMatchObject({ name: "Szabó Dóra / Névtelen" });
   });
 
   it("takes the division of the newest published group: a draft round doesn't count", async () => {

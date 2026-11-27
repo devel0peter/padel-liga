@@ -74,8 +74,8 @@ test("Kivétel a szezonból mid-round: a reason, the table without the pair, Pá
   const card = content(mate.page);
   await expect(card).toContainText(new RegExp(`Visszalépett: ${labelText(x, y)}\\. A meccseik nem számítanak\\.`));
   await expect(card.getByRole("row").filter({ hasText: surname(x) })).toHaveCount(0);
-  // The group's matches leave its matches out (D140: no Meccseitek row for the week off).
-  await expect(card.getByRole("group", { name: "A csoport meccsei" })).not.toContainText(surname(x));
+  // The pair's matches leave the withdrawn pair's out (#420).
+  await expect(card.getByRole("region", { name: "Meccseid az 1. körben" })).not.toContainText(surname(x));
   await visit(mate.page, "/notifications");
   await expect(content(mate.page)).toContainText("Visszalépett egy pár a csoportodból");
   await expect(content(mate.page)).not.toContainText(REASON);

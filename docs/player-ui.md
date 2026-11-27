@@ -46,14 +46,15 @@ Sources: [spec.md](spec.md) sections 3–9, 13, 14, 16, 17; [szabalyzat.md](szab
 
 | # | Requirement | Source |
 |---|---|---|
-| H1 | "Teendők" first, only when there is one: every step waiting on the player, each a link, with its deadline where there is one (auto-accept time, phase deadline). | D67, spec 13, D136 |
-| H2 | "Következő meccsetek": only the next match to play (the first without a final result): opponents, state, time and venue once fixed, the opponents' phone and email, "Írj mindenkinek" (SMS, e-mail, copy the numbers: partner and opponents), and the way to its page; gone once every match is final. | D67, D136, D140, D147 |
-| H3 | The group: division and group, round and deadline, the table (section 2), a link to the Tabella, and under the table every match of the group with its result (section 3), the pair's own rows a link. | D67, D85, D136, D138, D140 |
-| H4 | Where the pair stands on the ladder: "Réz divízió, 2. csoport · még 1 feljutás a divízió éléig, 3 kör van hátra". | spec 14 |
-| H5 | A link to the whole league (every group). | Peter, 2026-11-07 |
-| H6 | The season card opens the left column as the season's summary: under its title the round being played and its deadline; its rounds listed with their dates, the round being played highlighted; entry button and strikes count. | D103a, #23, D136, D139, D143 |
-| H7 | Before the groups are out: pair link, "Párt keresek", entry, as today. | D55, D59, #23 |
+| H1 | The title greets the player ("Szia, Anna!", spec 4), with the season and the league above it. | D182, D184, mockup P01 |
+| H2 | The round's card: round, week, days left, deadline, a bar of the time gone, and how many of the pair's matches are done. | D184 |
+| H3 | "Rád vár · N" first, only when there is one: a card per step waiting on the player. The opponents' result to confirm is answered on the card ("Megerősítem", the only yellow button; "Nem így volt" opens the match page); every other step is a card that opens its match page. | D67, spec 13, D184 |
+| H4 | The group's standing: the pair's place as a big number with its points, division and group, the table in short (place, team, sets, points; the own row highlighted, promotion and relegation places named), a link to the Tabella. Before any final result no places show (D85). | D67, D85, D184 |
+| H5 | "Meccseid az N. körben": the pair's matches of the round, each with its state as a coloured pill, the week, the opponents, and the score or when it is due; each opens its match page. | D184 |
+| H6 | Not on Kezdőlap: the opponents' contact data and "Írj mindenkinek" (match page), the whole group's matches (Tabella), the season calendar (Ligáim). No email address or phone number on the page. | D184 |
+| H7 | Wider screens: to-dos and matches left, standing and whether the pair plays on in the next round (a link to Ligáim) right. | D184, mockup P01 |
 | H8 | Below the main content, at most one "Tipp" card about a feature the player may not know, first the push tip ("Kapj értesítést a telefonodra", "Bekapcsolom", "Most nem"): never a pop-up, never on another page. | D160, #262, spec 13 |
+| H9 | Before the groups are out, or for a season the player has no group in: the season card (dates, entry, strikes), pair link, "Párt keresek", as before. The player's strikes show under "Rád vár" once the group runs. | D55, D59, #23, #294 |
 
 ## 5. Match page
 

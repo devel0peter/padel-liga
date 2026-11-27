@@ -44,6 +44,21 @@ export function initial(firstName: string): string {
   return `${letters.charAt(0).toLocaleUpperCase("hu")}${letters.slice(1).toLocaleLowerCase("hu")}.`;
 }
 
+/**
+ * A player's two letters for a team badge (#420): the surname's and the
+ * first name's initial, "KA" for Kovács Anna, "SzE" for Szabó Eszter. Without
+ * the two parts, the first and the last word of the full name; "?" for an
+ * empty name.
+ */
+export function badgeInitials(p: NamedPlayer): string {
+  const letters = (word: string) => initial(word).slice(0, -1);
+  const surname = p.surname?.trim();
+  if (surname) return letters(surname) + (p.firstName?.trim() ? letters(p.firstName) : "");
+  const words = p.name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  return letters(words[0]!) + (words.length > 1 ? letters(words.at(-1)!) : "");
+}
+
 // A surname a label can show: set, and not an anonymized account.
 const surnameOf = (p: NamedPlayer) => (p.name !== DELETED_NAME && p.surname?.trim() ? p.surname.trim() : null);
 

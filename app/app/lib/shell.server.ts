@@ -5,14 +5,14 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import { groupPairs, groups, pairs, users } from "~/db/schema";
 
-import { pairName } from "./groups";
+import { teamLabel } from "./names";
 
 const playerA = alias(users, "shell_player_a");
 const playerB = alias(users, "shell_player_b");
 
 export type ShellTeam = {
   pairId: number;
-  // The pair's name as the app writes pairs today (#419 brings surnames).
+  // The pair's team label, "Kovács / Nagy" (#419).
   name: string;
   // "Bronz": the division of the pair's newest published group, if any.
   division: string | null;
@@ -28,7 +28,17 @@ export type ShellTeam = {
  */
 export async function shellTeam(userId: string): Promise<ShellTeam | null> {
   const [pair] = await db
-    .select({ id: pairs.id, a: pairs.playerA, aName: playerA.name, bName: playerB.name })
+    .select({
+      id: pairs.id,
+      a: pairs.playerA,
+      b: pairs.playerB,
+      aName: playerA.name,
+      aSurname: playerA.surname,
+      aFirstName: playerA.firstName,
+      bName: playerB.name,
+      bSurname: playerB.surname,
+      bFirstName: playerB.firstName,
+    })
     .from(pairs)
     .innerJoin(playerA, eq(playerA.id, pairs.playerA))
     .innerJoin(playerB, eq(playerB.id, pairs.playerB))
@@ -55,7 +65,10 @@ export async function shellTeam(userId: string): Promise<ShellTeam | null> {
   }
   return {
     pairId: pair.id,
-    name: pairName([{ name: pair.aName }, { name: pair.bName }]),
+    name: teamLabel([
+      { id: pair.a, name: pair.aName, surname: pair.aSurname, firstName: pair.aFirstName },
+      { id: pair.b, name: pair.bName, surname: pair.bSurname, firstName: pair.bFirstName },
+    ]),
     division,
     first: pair.a === userId,
   };

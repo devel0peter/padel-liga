@@ -1,9 +1,10 @@
+import { UserRound } from "lucide-react";
 import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/app.home";
-import { AppPage } from "~/components/app-page";
+import { ActionCard, IconTile, Page, PageHeader, SectionLabel } from "~/components/blocks";
 import { ChooseLeague } from "~/components/choose-league";
-import { GroupStanding, NextMatch, Todos, todos } from "~/components/my-group";
+import { HomeMatches, HomeNextRound, HomeRound, HomeStanding, HomeTodos } from "~/components/home-round";
 import { currentPhase, PhaseList } from "~/components/season-calendar";
 import { PairLinkBox } from "~/components/pair-link";
 import { PartnerSearchBox } from "~/components/partner-search";
@@ -18,6 +19,9 @@ import { LEAGUE_PARAM, parseLeagueParam } from "~/lib/league-members";
 import { leagueChoices, leagueOffer, playerLeagues } from "~/lib/league-members.server";
 import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
+import { nextRound } from "~/lib/home";
+import { greeting } from "~/lib/names";
+import { optOutCard } from "~/lib/opt-out.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { finderPath } from "~/lib/partner-search";
 import { partnerSearchState } from "~/lib/partner-search.server";
@@ -32,9 +36,9 @@ import { vapidPublicKey } from "~/lib/notifications.server";
 import { dismissTip, offeredTipIds } from "~/lib/tips.server";
 
 // The app's home (Kezdőlap): where the sidebar logo and a login lead. Once the
-// groups are out it is "your group and your matches" (#25): the Teendők, the
-// group and its matches by week. Before that the season cards and entry
-// status. The public landing page stays at "/".
+// groups are out it says what to do first (#420, mockup P01): the round's
+// progress, "Rád vár", the group's standing and the pair's matches. Before
+// that the season cards and entry status. The public landing page stays at "/".
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Kezdőlap – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -90,10 +94,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   const searching = await partnerSearchState(user, links.map((l) => l.league));
   // The current phase's groups (#25): empty before they are published.
   const groups = await currentGroups(user.id, now);
+  // Whether each of those pairs plays on in the next round (#395), in short.
+  const next = await Promise.all(
+    groups.map(async (g) => {
+      const season = shown.find((s) => s.id === g.seasonId);
+      const state = season && !isWaiting(season) ? await optOutCard(user.id, season.leagueId, season, now) : null;
+      return state ? nextRound(state, g.leagueSlug) : null;
+    }),
+  );
   return {
     groups,
-    // For the match links in the Írj mindenkinek text (D147).
-    origin: new URL(request.url).origin,
+    next,
+    now,
+    // "Szia, Anna!" (#419): the first name when the account has one.
+    greeting: greeting(user.firstName),
     // "Melyik ligában játszol?" (#331): empty once they belong to a league.
     choices: choices.map((c) => ({ id: c.id, city: c.cityName, name: c.name })),
     // The register button's league, rather than "which one".
@@ -135,8 +149,8 @@ export async function action({ request }: Route.ActionArgs): Promise<MyLeaguesAc
 // and that the organizer can cancel one.
 function StrikeLine({ count, leaving }: { count: number; leaving: boolean }) {
   return (
-    <p role="status" className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-      <span className="font-semibold">Fekete pontjaid ebben a szezonban: {count}.</span>{" "}
+    <p role="status" className="m-0 rounded-2xl bg-danger-tint p-4 text-sm">
+      <span className="font-bold text-danger">Fekete pontjaid ebben a szezonban: {count}.</span>{" "}
       {leaving
         ? "A pároddal a kör végén kikerültök a ligából; a következő szezonban újra nevezhettek."
         : "A harmadiknál a pároddal a kör végén kikerültök a ligából."}{" "}
@@ -175,16 +189,15 @@ function SeasonDates({ s }: { s: SeasonView }) {
   );
 }
 
-// A season: its dates with the round being played marked, entry and
-// strikes. Once it runs (`running`) it opens Kezdőlap as the season's summary
-// (docs/player-ui.md H6, D139, D143): the round being played and its deadline
-// under the title.
-function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolean; actionData: Route.ComponentProps["actionData"] }) {
+// A season the player has no group in yet (before the groups are out, or a
+// pair that joins later): its dates, the entry and the strikes. Once the
+// player's group runs, the round card and Ligáim say all of this (#420).
+function SeasonCard({ s, actionData }: { s: SeasonView; actionData: Route.ComponentProps["actionData"] }) {
   const now = s.phases.find((p) => p.number === s.current);
   return (
-    <Card size={running ? "sm" : "default"} className={running ? undefined : "max-w-2xl"}>
+    <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{s.name}</CardTitle>
+        <CardTitle role="heading" aria-level={2} className="text-lg font-bold">{s.name}</CardTitle>
         <CardDescription>
           {s.league}
           {now && ` · most ${withArticle(now.number)} kör megy, határidő: ${formatDeadline(new Date(now.deadline))}`}
@@ -206,40 +219,67 @@ function SeasonCard({ s, running, actionData }: { s: SeasonView; running: boolea
 
 export default function AppHome({ loaderData: d, actionData }: Route.ComponentProps) {
   const running = d.groups.length > 0;
-  const open = todos(d.groups);
+  const [first] = d.groups;
+  // A season whose group the player is in shows as the round below; the
+  // others keep their card.
+  const inGroup = new Set(d.groups.map((g) => g.seasonId));
+  const waiting = d.seasons.filter((s) => !inGroup.has(s.id));
+  const strikes = d.seasons.filter((s) => inGroup.has(s.id) && (s.strikes.count > 0 || s.strikes.leaving));
   return (
-    <AppPage title="Kezdőlap">
+    <Page>
+      <PageHeader
+        eyebrow={first ? `${first.season} · ${first.league}` : undefined}
+        title={d.greeting}
+        aside={
+          first && (
+            <div className="w-[calc(100vw-2rem)] max-w-full md:w-[372px]">
+              <HomeRound group={first} now={d.now} />
+            </div>
+          )
+        }
+      />
       {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {running && (
-        // Separate cards (D136, D140, D143): the season's summary, what to do,
-        // the next match; our group on the right.
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-          <div className="grid gap-6">
-            {d.seasons.map((s) => (
-              <SeasonCard key={s.id} s={s} running actionData={actionData} />
-            ))}
-            {open.length > 0 && <Todos items={open} />}
-            {d.groups.map((g) => (
-              <NextMatch key={g.groupId} group={g} multiLeague={d.multiLeague} origin={d.origin} />
-            ))}
+        // Phones: one column in reading order (to-dos, standing, matches).
+        // Wider: to-dos and matches left, standing and the next round right.
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_384px] lg:items-start lg:gap-x-8">
+          <div className="contents lg:flex lg:flex-col lg:gap-7">
+            <div className="order-1 flex flex-col gap-3 empty:hidden">
+              <HomeTodos groups={d.groups} />
+              {strikes.map((s) => (
+                <StrikeLine key={s.id} {...s.strikes} />
+              ))}
+            </div>
+            <div className="order-3 flex flex-col gap-5">
+              {d.groups.map((g) => (
+                <HomeMatches key={g.groupId} group={g} multiLeague={d.multiLeague} />
+              ))}
+            </div>
           </div>
-          <div className="grid gap-6">
-            {d.groups.map((g) => (
-              <GroupStanding key={g.groupId} group={g} multiLeague={d.multiLeague} />
+          <div className="contents lg:flex lg:flex-col lg:gap-5">
+            {d.groups.map((g, i) => (
+              <div key={g.groupId} className="order-2 flex flex-col gap-5">
+                {i > 0 && <HomeRound group={g} now={d.now} />}
+                <HomeStanding group={g} multiLeague={d.multiLeague} />
+              </div>
             ))}
+            {d.next.some(Boolean) && (
+              <div className="order-4 hidden flex-col gap-3 lg:flex">
+                {d.next.map((n, i) => n && <HomeNextRound key={d.groups[i]!.groupId} next={n} />)}
+              </div>
+            )}
           </div>
         </div>
       )}
       {d.needsLevel && (
-        <section role="status" className="grid max-w-2xl gap-2 rounded-lg border border-nav-active bg-nav-active-bg p-6">
-          <h2 className="font-display text-lg font-bold">Add meg a szinted</h2>
-          <p>
-            A jelentkezéshez kell a szinted, és innen indul az Élő-pontod.{" "}
-            <Link to="/profile?tab=settings#adatok" className="font-semibold underline">
-              Megadom a profilomban
-            </Link>
-          </p>
-        </section>
+        <ActionCard
+          to="/profile?tab=settings#adatok"
+          linkLabel="Megadom"
+          leading={<IconTile tone="warning"><UserRound /></IconTile>}
+          title="Add meg a szinted"
+          description="A jelentkezéshez kell a szinted, és innen indul az Élő-pontod."
+          className="max-w-2xl"
+        />
       )}
       {d.pairLinks.map((l) => (
         <div key={l.url} className="grid gap-4">
@@ -247,11 +287,13 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           <PartnerSearchBox leagueId={l.leagueId} search={l.search} finder={l.finder} />
         </div>
       ))}
-      {!running && d.seasons.map((s) => <SeasonCard key={s.id} s={s} running={false} actionData={actionData} />)}
+      {waiting.map((s) => (
+        <SeasonCard key={s.id} s={s} actionData={actionData} />
+      ))}
       {!running && (
-        <section className="grid max-w-2xl gap-2 rounded-lg border border-dashed p-6">
-          <h2 className="font-display text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
-          <p className="text-muted-foreground">
+        <section className="flex max-w-2xl flex-col gap-1.5 rounded-2xl bg-surface p-4 md:p-5">
+          <h2 className="m-0 text-lg font-bold">Hamarosan itt lesz a csoportod</h2>
+          <p className="m-0 text-sm text-muted-foreground">
             Amint indul a szezon, itt látod a csoportodat, a következő meccsedet és az eredményeket. Addig a{" "}
             <Link to="/rules" className="underline">
               szabályzatot
@@ -262,17 +304,15 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
       )}
       {d.tips.length > 0 && <TipCard offered={d.tips} vapidPublicKey={d.vapidPublicKey} />}
       {d.shortcuts.map((s) => (
-        <section key={s.label} className="grid gap-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+        <section key={s.label} className="flex flex-col gap-2.5">
+          <SectionLabel>
             {s.label}
-            {s.role && (
-              <span className="rounded-full bg-nav-active-bg px-1.5 py-px text-[10px] font-semibold tracking-wide text-nav-active uppercase">{s.role}</span>
-            )}
-          </h2>
-          <ul className="flex flex-wrap gap-2">
+            {s.role && <span className="ml-2 rounded-full bg-ball-tint px-1.5 py-px text-[10px] text-ball">{s.role}</span>}
+          </SectionLabel>
+          <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
             {s.items.map((i) => (
               <li key={i.to}>
-                <Link to={i.to} className="inline-block rounded-md border px-3 py-1.5 text-sm no-underline hover:bg-accent">
+                <Link to={i.to} className="flex min-h-11 items-center rounded-xl bg-surface px-3.5 text-sm text-foreground no-underline transition-colors hover:bg-surface-2">
                   {i.label}
                 </Link>
               </li>
@@ -280,6 +320,6 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           </ul>
         </section>
       ))}
-    </AppPage>
+    </Page>
   );
 }

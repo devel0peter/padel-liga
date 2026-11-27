@@ -5,6 +5,7 @@ export { BigRank } from "./big-rank";
 export { ListCard, ListRow } from "./list-card";
 export { MatchRow } from "./match-row";
 export { OverflowRow } from "./overflow-row";
+export { Page } from "./page";
 export { PageHeader } from "./page-header";
 export { RoundProgress } from "./round-progress";
 export { ScoreBoard } from "./score-board";

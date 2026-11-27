@@ -14,6 +14,8 @@ import {
   schedulingActions,
   schedulingState,
   contactDue,
+  DIVISION_NAMES,
+  divisionOf,
   unloggedAutoFix,
   type AutoFix,
   type SchedulingActions,
@@ -49,7 +51,7 @@ import { eventText, fixesAtText, schedulingEmailDue, type ContactChannel } from 
 import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } from "./calendar";
 import { SITE_URL } from "./site";
 import { pairName } from "./groups";
-import { teamLabeler } from "./names";
+import { badgeInitials, teamLabeler } from "./names";
 import { COURT_MAX, venueLine } from "./matches";
 import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseSpan, type TableRow } from "./ladder";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureWeek, type Zone } from "./fixtures";
@@ -258,11 +260,18 @@ function groupMessageOf(ours: readonly Person[], theirs: readonly Person[], user
   };
 }
 
+// A pair's badge (#420, TeamBadge): the pair id picks the colour.
+export type TeamBadgeData = { pairId: number; initials: [string, string] };
+
+const badgeOf = (p: PairPlayers): TeamBadgeData => ({ pairId: p.pairId, initials: [badgeInitials(p.players[0]), badgeInitials(p.players[1])] });
+
 export type HomeMatch = {
   id: number;
   week: number;
   // The other pair: names, phones and email addresses (only the current phase is listed here).
   opponents: string;
+  // The other pair's badge (#420): its id (the colour) and its players' initials.
+  badge: TeamBadgeData | null;
   contacts: Opponent[];
   // Írj mindenkinek (D147); null once the result is final.
   message: GroupMessageData | null;
@@ -277,6 +286,9 @@ export type HomeMatch = {
 
 export type HomeGroup = {
   groupId: number;
+  // The player's own pair in it.
+  pairId: number;
+  seasonId: number;
   league: string;
   /** The public league page is /league/<leagueSlug>. */
   leagueSlug: string;
@@ -284,8 +296,12 @@ export type HomeGroup = {
   phase: number;
   number: number;
   groupCount: number;
+  // "Bronz" (spec 4): the group's division now.
+  division: string;
   phaseStartsAt: Date;
   deadline: Date;
+  // The week being played (1–3); null before the round starts and during an extension (#356).
+  week: number | null;
   // Every pair of the group in table order (#201), names only; `mine` marks
   // the player's. The table is the public league page's, from final results
   // only; before any result every `matches` is 0 and the order is the table's
@@ -393,14 +409,18 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       const { week, started, extension } = phaseSpan(budapestDay(g.startsAt), budapestDay(g.deadline), budapestDay(now));
       return {
         groupId: g.groupId,
+        pairId: g.pairId,
+        seasonId: g.seasonId,
         league: g.league,
         leagueSlug: g.leagueSlug,
         season: g.season,
         phase: g.phase,
         number: g.number,
         groupCount: groupCountNow,
+        division: DIVISION_NAMES[divisionOf(g.number, groupCountNow)],
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
+        week: started && !extension ? week : null,
         pairs: table.map((row, i) => {
           const p = byId.get(row.pairId)!;
           return { ...row, label: label(p.players), mine: p.pairId === g.pairId, zone: zones[i]! };
@@ -435,6 +455,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
             id: m.id,
             week: m.week,
             opponents: them ? labelOf(them.pairId) : "",
+            badge: them ? badgeOf(them) : null,
             contacts: (them?.players ?? []).map(contactOf),
             message: them && us && result.status !== "final" ? groupMessageOf(us.players, them.players, userId) : null,
             side,

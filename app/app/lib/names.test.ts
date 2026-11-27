@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DELETED_NAME } from "./account-deletion";
-import { fullName, greeting, initial, teamLabel, teamLabeler, teamLabels } from "./names";
+import { badgeInitials, fullName, greeting, initial, teamLabel, teamLabeler, teamLabels } from "./names";
 
 // A player as the pages hand one in: the full name and its two parts.
 const p = (surname: string, firstName: string, id?: string) => ({ id, name: fullName(surname, firstName), surname, firstName });
@@ -108,5 +108,20 @@ describe("team labels (#419)", () => {
     expect(teamLabel([{ name: DELETED_NAME, surname: "Törölt" }, bence])).toBe("Törölt játékos / Nagy");
     expect(teamLabels([[{ name: DELETED_NAME }, bence], [{ name: DELETED_NAME }, anna]])).toEqual(["Törölt játékos / Nagy", "Törölt játékos / Kovács"]);
     expect(teamLabel([{ name: "" }, bence])).toBe("Névtelen / Nagy");
+  });
+});
+
+describe("badgeInitials", () => {
+  it("takes the surname's and the first name's initial, double letters whole", () => {
+    expect(badgeInitials({ name: "Kovács Anna", surname: "Kovács", firstName: "Anna" })).toBe("KA");
+    expect(badgeInitials({ name: "Szabó Eszter", surname: "Szabó", firstName: "Eszter" })).toBe("SzE");
+    expect(badgeInitials({ name: "Nagy", surname: "Nagy", firstName: null })).toBe("N");
+  });
+
+  it("falls back to the full name's first and last word", () => {
+    expect(badgeInitials({ name: "Tóth Gergő" })).toBe("TG");
+    expect(badgeInitials({ name: "Kiss Anna Mária" })).toBe("KM");
+    expect(badgeInitials({ name: "zsolt" })).toBe("Zs");
+    expect(badgeInitials({ name: "  " })).toBe("?");
   });
 });

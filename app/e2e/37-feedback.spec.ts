@@ -5,7 +5,7 @@
 // opens, marks done and reopens on Visszajelzések; a Szervező and a player
 // are refused (#241). Runs after the walkthrough; leaves its bug report, idea
 // and rating for e2e:shots (--data walked) and removes the filler rows.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { ORGANIZER, ADMIN, PAIRS, as, content, d1, d1Delete, d1Insert, visit } from "./support";
 
@@ -14,7 +14,7 @@ const IDEA = "E2E: legyen sötét mód";
 const RATING = "E2E: jó kis liga";
 const LIST = "/admin/feedback";
 
-async function send(page: Page, kind: string, message: string) {
+async function send(page: Page | Locator, kind: string, message: string) {
   await page.getByRole("radio", { name: kind, exact: true }).click();
   await page.getByLabel("Üzenet").fill(message);
   await page.getByRole("button", { name: "Küldés" }).click();
@@ -24,22 +24,24 @@ test("a logged-in player sends a bug report from the sidebar", async ({ browser 
   const player = PAIRS.p1[0];
   const { context, page } = await as(browser, player);
   await visit(page, "/notifications?from=e2e");
-  await page.getByRole("link", { name: "Visszajelzés", exact: true }).click();
-  await expect(page).toHaveURL(/\/feedback\?from=%2Fnotifications%3Ffrom%3De2e$/);
-  await expect(page.getByRole("heading", { name: "Visszajelzés", level: 1 })).toBeVisible();
+  // A dialog over the page (#444): the address doesn't change.
+  await page.locator("[data-sidebar=sidebar]").getByRole("button", { name: "Visszajelzés", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/notifications\?from=e2e$/);
   // What goes along, listed above the button: the page (path only), the account.
-  const main = page.getByRole("main");
-  await expect(main).toContainText("Ezt küldjük el veled:");
-  await expect(main).toContainText("/notifications");
-  await expect(main).not.toContainText("from=e2e");
-  await expect(main).toContainText(player.name);
-  await expect(main).toContainText("hello@padelparbaj.hu");
-  await send(page, "Hiba", BUG);
-  await expect(page.getByRole("heading", { name: "Köszi, megkaptuk!" })).toBeVisible();
+  await expect(dialog).toContainText("Ezt küldjük el veled:");
+  await expect(dialog).toContainText("/notifications");
+  await expect(dialog).not.toContainText("from=e2e");
+  await expect(dialog).toContainText(player.name);
+  await expect(dialog).toContainText("hello@padelparbaj.hu");
+  await send(dialog, "Hiba", BUG);
+  await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, device, browser, user_id is not null as account from feedback where message = '${BUG}'`)).toEqual([
     { kind: "bug", page: "/notifications", device: "desktop", browser: "Chrome", account: 1 },
   ]);
-  await page.getByRole("link", { name: "Vissza oda, ahonnan jöttél" }).click();
+  await page.getByRole("button", { name: "Bezárom" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page).toHaveURL(/\/notifications\?from=e2e$/);
   await context.close();
 });
@@ -48,13 +50,14 @@ test("a visitor sends an idea from a public page's footer; the 31st in an hour i
   const context = await browser.newContext();
   const page = await context.newPage();
   await visit(page, "/rules");
-  await page.getByRole("contentinfo").getByRole("link", { name: "Visszajelzés" }).click();
-  await expect(page).toHaveURL(/\/feedback\?from=%2Frules$/);
-  await expect(page.getByRole("main")).not.toContainText("Fiók");
-  await send(page, "Ötlet", IDEA);
-  await expect(page.getByRole("heading", { name: "Köszi, megkaptuk!" })).toBeVisible();
+  await page.getByRole("contentinfo").getByRole("button", { name: "Visszajelzés" }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés" });
+  await expect(dialog).toContainText("/rules");
+  await expect(dialog).not.toContainText("Fiók");
+  await send(dialog, "Ötlet", IDEA);
+  await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, user_id from feedback where message = '${IDEA}'`)).toEqual([{ kind: "idea", page: "/rules", user_id: null }]);
-  await expect(page.getByRole("link", { name: "Vissza oda, ahonnan jöttél" })).toHaveAttribute("href", "/rules");
+  await expect(page).toHaveURL(/\/rules$/);
 
   // 29 more visitor messages this hour fill the limit of 30.
   const now = Math.floor(Date.now() / 1000);

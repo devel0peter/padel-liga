@@ -51,6 +51,13 @@ describe("Kezdőlap tip (#262)", () => {
     expect(await tips(anna)).toEqual([]);
   });
 
+  it("none with Nem kérek tippeket on the profile, back when it is off again (#444)", async () => {
+    await N.setTipsOff("a", true);
+    expect(await tips(anna)).toEqual([]);
+    await N.setTipsOff("a", false);
+    expect(await tips(anna)).toEqual(["push"]);
+  });
+
   it("Most nem: gone for 14 days on every device, back after; the second time for good", async () => {
     expect(await dismiss(anna)).toEqual({ season: 0, ok: true });
     expect(dismissals()).toEqual([{ user: "a", tip: "push", count: 1 }]);

@@ -6,6 +6,7 @@ import { db } from "~/db/client.server";
 import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
+  TIPS_OFF,
   channelKey,
   disputeRecipients,
   KIND_TOPIC,
@@ -539,6 +540,11 @@ async function setOptOut(userId: string, kind: string, enabled: boolean): Promis
 
 export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
   await setOptOut(userId, kind, enabled);
+}
+
+// "Nem kérek tippeket" (#444): `off` stores the opt-out.
+export async function setTipsOff(userId: string, off: boolean): Promise<void> {
+  await setOptOut(userId, TIPS_OFF, !off);
 }
 
 // The email and push switches (#115), stored like the kinds.

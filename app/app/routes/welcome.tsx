@@ -77,7 +77,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
           <input type="hidden" name="returnTo" value={loaderData.returnTo} />
           <SexField error={errors.sex} />
           <div>
-            <Button type="submit" disabled={busy} className="h-11 px-6 text-base">
+            <Button type="submit" size="xl" disabled={busy} className="w-full sm:w-auto">
               Mentés
             </Button>
           </div>
@@ -106,7 +106,7 @@ export default function Welcome({ loaderData, actionData }: Route.ComponentProps
           <FieldError id="consent-error" message={errors.consent} />
         </div>
         <div>
-          <Button type="submit" disabled={busy} className="h-11 px-6 text-base">
+          <Button type="submit" size="xl" disabled={busy} className="w-full sm:w-auto">
             Kész
           </Button>
         </div>

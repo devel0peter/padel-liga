@@ -3,8 +3,10 @@ import { Label } from "~/components/ui/label";
 
 // Shared frame and form bits for the login and account pages.
 
-// A short task on its own (log in, first-login profile, 403): one panel in
-// the middle of the window, an optional line under it.
+// A short task on its own (log in, first-login profile, 403): one card in
+// the middle of the dark ground under the logo (the header's), the title in
+// the display type, an optional line under the card (direction A, D181, #425).
+// One yellow button per card: the shadcn Button with size="xl".
 export function AuthPage({
   title,
   intro,
@@ -19,12 +21,12 @@ export function AuthPage({
   return (
     <>
       <SiteHeader cta={false} />
-      <main className="grid place-items-center py-10 sm:py-16">
-        <Wrap className="grid max-w-md gap-4">
-          <div className="grid gap-6 rounded-2xl border bg-card p-6 shadow-[0_1px_2px_rgb(16_35_61/0.06),0_8px_24px_-12px_rgb(16_35_61/0.18)] sm:p-8">
-            <div className="grid gap-2">
-              <h1 className="font-display text-3xl font-black">{title}</h1>
-              {intro && <p className="text-muted-foreground">{intro}</p>}
+      <main className="grid place-items-center py-6 sm:py-16">
+        <Wrap className="grid max-w-md gap-4 max-sm:px-4">
+          <div className="grid gap-6 rounded-2xl bg-surface p-5 sm:p-8">
+            <div className="grid gap-2.5">
+              <h1 className="type-display m-0 text-[34px] break-words sm:text-[40px]">{title}</h1>
+              {intro && <p className="text-body text-muted-foreground">{intro}</p>}
             </div>
             {children}
           </div>
@@ -41,7 +43,7 @@ export const inputClass = "h-11 bg-background text-base";
 export function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} role="alert" className="text-sm font-semibold text-destructive">
+    <p id={id} role="alert" className="text-sm font-semibold text-danger">
       {message}
     </p>
   );

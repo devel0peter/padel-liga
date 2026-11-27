@@ -359,6 +359,9 @@ async function anonymize(
       .update(users)
       .set({
         name: DELETED_NAME,
+        // The name's parts go with it (#419).
+        surname: null,
+        firstName: null,
         email: anonymizedEmail(userId),
         imageUrl: null,
         phone: null,

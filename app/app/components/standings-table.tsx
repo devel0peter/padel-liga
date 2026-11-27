@@ -1,18 +1,19 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import type { Zone } from "~/lib/fixtures";
 import { cn } from "~/lib/utils";
 
-// A group's table (docs/player-ui.md section 2, D133): place, pair, played,
-// wins, losses, sets and games won:lost, points; the places that move up or
-// down at the end of the round are marked. One component for Kezdőlap and the
-// public league page. Fits 390 px: the names wrap, the games column hides.
+// A group's table on the Tabella (docs/player-ui.md section 2, D133; direction
+// A, #422, mockup P04): place, team, played, wins, losses, sets, games (from
+// sm up) and points. One line per pair; the own row on the ball tint; ▲ next
+// to a pair that goes up at the end of the round, ▼ to one that goes down,
+// and the place in their colour. Fits 390 px.
+// A pair shows as its team label, "Kovács / Nagy" (#419, lib/names.ts).
 
 export type StandingsRow = {
   pairId: number;
-  names: [string, string];
+  /** The team label, "Kovács / Nagy" (#419: teamLabeler over the group's players). */
+  label: string;
   rank: number;
   matches: number;
   wins: number;
@@ -26,46 +27,26 @@ export type StandingsRow = {
   mine?: boolean;
 };
 
-const ZONE_ROW: Record<"up" | "down", string> = {
-  up: "shadow-[inset_4px_0_0_var(--color-emerald-500)]",
-  down: "shadow-[inset_4px_0_0_var(--color-rose-500)]",
-};
-
 function ZoneMark({ zone }: { zone: Zone }) {
-  if (zone === "up")
-    return (
-      <>
-        <ChevronUp aria-hidden className="size-4 shrink-0 text-emerald-600" />
-        <span className="sr-only">feljutó hely</span>
-      </>
-    );
-  if (zone === "down")
-    return (
-      <>
-        <ChevronDown aria-hidden className="size-4 shrink-0 text-rose-600" />
-        <span className="sr-only">kieső hely</span>
-      </>
-    );
-  return null;
-}
-
-function Names({ names }: { names: [string, string] }) {
+  if (!zone) return null;
   return (
-    <span className="grid leading-snug">
-      <span className="break-words">{names[0]}</span>
-      <span className="break-words">{names[1]}</span>
-    </span>
+    <>
+      <span aria-hidden className={cn("ml-1 text-[11px]", zone === "up" ? "text-success" : "text-danger")}>
+        {zone === "up" ? "▲" : "▼"}
+      </span>
+      <span className="sr-only">{zone === "up" ? " feljutó hely" : " kieső hely"}</span>
+    </>
   );
 }
 
 const num = "px-1 text-right tabular-nums";
+const head = "h-8 px-1 text-xs font-normal text-muted-foreground";
 
 export function StandingsTable({
   rows,
   ranked,
   linkFor,
   label = "Tabella",
-  legend = true,
 }: {
   rows: StandingsRow[];
   /** False before any final result: no places and no marks (D85). */
@@ -73,95 +54,92 @@ export function StandingsTable({
   /** A pair's profile link, or null (members only, D112). */
   linkFor?: (pairId: number) => string | null;
   label?: string;
-  /** False when the page shows the legend once (StandingsLegend), below several tables. */
-  legend?: boolean;
 }) {
-  const zones = rows.some((r) => r.zone);
   return (
-    <div className="grid gap-2">
-      <Table className="table-fixed" aria-label={label}>
-        <TableHeader>
-          <TableRow className="text-xs">
-            <TableHead className="w-8 px-1">#</TableHead>
-            <TableHead className="px-1">Pár</TableHead>
-            <TableHead className={cn(num, "w-6")} title="Lejátszott meccsek">
+    <div className="flex flex-col gap-2">
+      <table className="w-full table-fixed border-separate border-spacing-0 text-body" aria-label={label}>
+        <thead>
+          <tr>
+            <th scope="col" className={cn(head, "w-7 pl-2.5 text-left")}>
+              #
+            </th>
+            <th scope="col" className={cn(head, "text-left")}>
+              Pár
+            </th>
+            <th scope="col" className={cn(head, num, "w-7")} title="Lejátszott meccsek">
               M
-            </TableHead>
-            <TableHead className={cn(num, "w-6")} title="Győzelem">
+            </th>
+            <th scope="col" className={cn(head, num, "w-7")} title="Győzelem">
               Gy
-            </TableHead>
-            <TableHead className={cn(num, "w-6")} title="Vereség">
+            </th>
+            <th scope="col" className={cn(head, num, "w-6")} title="Vereség">
               V
-            </TableHead>
-            <TableHead className={cn(num, "w-10")} title="Nyert és vesztett szettek">
+            </th>
+            <th scope="col" className={cn(head, num, "w-11")} title="Nyert és vesztett szettek">
               Szett
-            </TableHead>
-            <TableHead className={cn(num, "hidden w-14 sm:table-cell")} title="Nyert és vesztett játékok">
+            </th>
+            <th scope="col" className={cn(head, num, "hidden w-12 sm:table-cell")} title="Nyert és vesztett játékok">
               Játék
-            </TableHead>
-            <TableHead className={cn(num, "w-7")} title="Pont">
+            </th>
+            <th scope="col" className={cn(head, num, "w-8 pr-2.5")} title="Pont">
               P
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
           {rows.map((r) => {
             const href = linkFor?.(r.pairId) ?? null;
             return (
-              <TableRow key={r.pairId} className={cn(r.zone && ZONE_ROW[r.zone], r.mine && "font-bold")}>
-                <TableCell className="px-1">
-                  <span className="flex items-center gap-0.5 font-bold">
-                    {ranked ? `${r.rank}.` : "–"}
-                    <ZoneMark zone={r.zone} />
+              <tr
+                key={r.pairId}
+                className={cn("[&>td]:h-11 [&>td]:py-1", r.mine && "font-bold [&>td]:bg-ball-tint [&>td:first-child]:rounded-l-[10px] [&>td:last-child]:rounded-r-[10px]")}
+              >
+                <td className={cn("pl-2.5 tabular-nums", r.mine ? "text-ball" : r.zone === "up" ? "text-success" : r.zone === "down" ? "text-danger" : "text-muted-foreground")}>
+                  {ranked ? r.rank : "–"}
+                </td>
+                <td className="px-1">
+                  <span className="break-words">
+                    {href ? (
+                      <Link to={href} className="text-inherit no-underline hover:underline">
+                        {r.label}
+                      </Link>
+                    ) : (
+                      r.label
+                    )}
+                    {ranked && <ZoneMark zone={r.zone} />}
                   </span>
-                </TableCell>
-                <TableCell className="px-1 whitespace-normal">
-                  {href ? (
-                    <Link to={href} className="underline decoration-court/40 underline-offset-2 hover:decoration-court">
-                      <Names names={r.names} />
-                    </Link>
-                  ) : (
-                    <Names names={r.names} />
-                  )}
-                  {/* The own pair is bold (D143); the word is for screen readers only. */}
+                  {/* The own pair is on the ball tint (D143); the word is for screen readers only. */}
                   {r.mine && <span className="sr-only"> (ti)</span>}
-                </TableCell>
-                <TableCell className={num}>{r.matches}</TableCell>
-                <TableCell className={num}>{r.wins}</TableCell>
-                <TableCell className={num}>{r.losses}</TableCell>
-                <TableCell className={num}>
+                </td>
+                <td className={num}>{r.matches}</td>
+                <td className={num}>{r.wins}</td>
+                <td className={num}>{r.losses}</td>
+                <td className={num}>
                   {r.setsWon}:{r.setsLost}
-                </TableCell>
-                <TableCell className={cn(num, "hidden sm:table-cell")}>
+                </td>
+                <td className={cn(num, "hidden font-normal text-muted-foreground sm:table-cell")}>
                   {r.gamesWon}:{r.gamesLost}
-                </TableCell>
-                <TableCell className={cn(num, "font-extrabold")}>{r.points}</TableCell>
-              </TableRow>
+                </td>
+                <td className={cn(num, "pr-2.5 font-extrabold")}>{r.points}</td>
+              </tr>
             );
           })}
-        </TableBody>
-      </Table>
-      {!ranked && <p className="text-xs text-muted-foreground">Még nincs végleges eredmény: a sorrend a kiemelés.</p>}
-      {legend && <StandingsLegend zones={zones} />}
+        </tbody>
+      </table>
+      {!ranked && <p className="m-0 text-caption text-muted-foreground">Még nincs végleges eredmény: a sorrend a kiemelés.</p>}
     </div>
   );
 }
 
-// What the marks and the abbreviations mean: under one table, or once on a page of several.
-export function StandingsLegend({ zones = true }: { zones?: boolean }) {
+// What the marks and the abbreviations mean, once on the page (one line).
+export function StandingsLegend({ children }: { children?: React.ReactNode }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {zones && (
-        <>
-          <span className="inline-flex items-center gap-0.5">
-            <ChevronUp aria-hidden className="size-3.5 text-emerald-600" /> feljut
-          </span>
-          <span className="inline-flex items-center gap-0.5">
-            <ChevronDown aria-hidden className="size-3.5 text-rose-600" /> kiesik a kör végén
-          </span>
-        </>
-      )}
-      <span>M: meccs · Gy: győzelem · V: vereség · P: pont (győzelem 3, vereség 1, játék nélkül 0)</span>
-    </p>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-caption text-muted-foreground">
+      <span>
+        <span className="text-success">▲</span> feljut · <span className="text-danger">▼</span> kiesik a kör végén · M meccs · Gy győzelem · V vereség · P
+        pont (győzelem 3, vereség 1, játék nélkül 0)
+      </span>
+      {children}
+    </div>
   );
 }

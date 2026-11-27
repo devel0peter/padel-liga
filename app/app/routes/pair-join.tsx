@@ -2,7 +2,9 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/pair-join";
 import { AuthPage } from "~/components/auth";
+import { TeamBadge } from "~/components/blocks";
 import { Button } from "~/components/ui/button";
+import { initials } from "~/lib/auth/rules";
 import { getUser, requireUser } from "~/lib/auth/session.server";
 import { acceptPairLink, pairLinkPath, pairLinkView } from "~/lib/pair-links.server";
 import { PAIR_SECTION_PATH, pairSectionUrl } from "~/lib/pairs";
@@ -13,6 +15,9 @@ import { CONTACT_EMAIL, SITE_NAME } from "~/lib/site";
 // which come back here (through the first-login page for a new account).
 // Logged in: "Elfogadom" makes the pair, or why it can't. Shows the owner's
 // name only.
+//
+// Direction A (D181, #425): who invites and where sit in a team-style card,
+// the pair to be ("TE" is the reader); "Elfogadom" is the one yellow button.
 
 export const pairInvitation = (name: string) => `${name} meghívott, hogy legyél a párja.`;
 
@@ -35,6 +40,20 @@ export async function action({ request, params }: Route.ActionArgs) {
   return { error: result.error };
 }
 
+// The pair this link would make: the owner's initials and "TE", their name
+// and the league. Never an email or phone.
+function Invitation({ name, league }: { name: string; league: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-3">
+      <TeamBadge pairId={0} initials={[initials(name, ""), "TE"]} size={40} on="surface-2" />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[17px] leading-snug font-bold break-words">{name}</span>
+        <span className="text-caption text-muted-foreground">{league}</span>
+      </span>
+    </div>
+  );
+}
+
 export default function PairJoin({ loaderData: d, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   if (!d.view)
@@ -47,20 +66,21 @@ export default function PairJoin({ loaderData: d, actionData }: Route.ComponentP
     );
   const error = actionData?.error ?? d.view.refusal;
   return (
-    <AuthPage title="Meghívás párnak" intro={`${pairInvitation(d.view.ownerName)} (${d.view.league})`}>
+    <AuthPage title="Meghívás párnak" intro={pairInvitation(d.view.ownerName)}>
+      <Invitation name={d.view.ownerName} league={d.view.league} />
       {!d.loggedIn ? (
         <div className="grid gap-3">
           <p className="text-sm text-muted-foreground">Regisztrálj vagy lépj be, és utána egy gombnyomással párban vagytok.</p>
-          <Button asChild className="h-11 px-6 text-base">
+          <Button asChild size="xl">
             <Link to={d.register}>Regisztrálok</Link>
           </Button>
-          <Button asChild variant="outline" className="h-11 px-6 text-base">
+          <Button asChild variant="secondary" size="xl">
             <Link to={d.login}>Már van fiókom, belépek</Link>
           </Button>
         </div>
       ) : error ? (
         <div className="grid gap-3">
-          <p role="alert" className="font-semibold text-destructive">
+          <p role="alert" className="font-semibold text-danger">
             {error}
           </p>
           <Link to={PAIR_SECTION_PATH} className="underline">
@@ -70,7 +90,7 @@ export default function PairJoin({ loaderData: d, actionData }: Route.ComponentP
       ) : (
         <Form method="post" className="grid gap-3">
           <p className="text-sm text-muted-foreground">Egy ligában egy párod lehet. Ha elfogadod, nevezni már együtt tudtok.</p>
-          <Button type="submit" disabled={busy} className="h-11 px-6 text-base">
+          <Button type="submit" size="xl" disabled={busy}>
             Elfogadom
           </Button>
         </Form>

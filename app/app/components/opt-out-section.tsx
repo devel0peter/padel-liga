@@ -27,12 +27,12 @@ export function OptOutForm({ seasonId, view }: { seasonId: number; view: OptOutV
   const busy = fetcher.state !== "idle";
   const send = (intent: "opt_out" | "undo_opt_out") => fetcher.submit({ intent, season: String(seasonId) }, { method: "post" });
   return (
-    <div className="grid gap-2">
-      <p>{view.text}</p>
+    <div className="grid gap-1">
+      <p className="m-0 font-semibold">{view.text}</p>
       {view.action === "opt_out" && view.confirm && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="justify-self-start" disabled={busy}>
+            <Button variant="link" className="h-11 justify-self-start px-0 text-muted-foreground underline" disabled={busy}>
               {OPT_OUT}
             </Button>
           </AlertDialogTrigger>
@@ -51,12 +51,12 @@ export function OptOutForm({ seasonId, view }: { seasonId: number; view: OptOutV
         </AlertDialog>
       )}
       {view.action === "undo" && (
-        <Button variant="outline" size="sm" className="justify-self-start" disabled={busy} onClick={() => send("undo_opt_out")}>
+        <Button variant="secondary" size="xl" className="justify-self-start" disabled={busy} onClick={() => send("undo_opt_out")}>
           {UNDO_OPT_OUT}
         </Button>
       )}
       {fetcher.state === "idle" && fetcher.data?.error && (
-        <p role="alert" className="font-semibold text-destructive">
+        <p role="alert" className="m-0 font-semibold text-danger">
           {fetcher.data.error}
         </p>
       )}

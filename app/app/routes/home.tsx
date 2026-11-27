@@ -197,7 +197,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                           e.preventDefault();
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
-                        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
+                        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court-deep bg-court-deep py-2 pr-4 pl-3 font-bold text-white no-underline"
                       >
                         <span className="relative flex size-2.5">
                           <span className="absolute inline-flex size-full rounded-full bg-ball opacity-75 motion-safe:animate-ping" />

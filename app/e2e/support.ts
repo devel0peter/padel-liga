@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 
 import { ADMIN, LEAGUE, ORGANIZER, OUTSIDER, PAIR_PLAYERS, SOLO_PLAYERS } from "../app/lib/seed";
 import { APP_DIR, AUTH_DIR, SERVER_LOG, wranglerLocal } from "./env";
@@ -47,6 +47,21 @@ export const LONE = { torok: pair(6)[0], lakatos: pair(8)[0] };
 export const GROUP_PAIRS = [PAIRS.p1, PAIRS.p2, PAIRS.p3, PAIRS.p4, PAIRS.p5, PAIRS.solo];
 
 export const levelLabel = (p: Player) => LEVEL_LABELS[p.level];
+
+// The name forms ask "Vezetéknév" and "Keresztnév" (#419): every seeded name
+// is "Vezetéknév Keresztnév", so the surname is its first word.
+export const surname = (p: { name: string }) => p.name.split(" ")[0]!;
+export const firstName = (p: { name: string }) => p.name.slice(p.name.indexOf(" ") + 1);
+
+// Fills a name form's two fields (welcome, Profil).
+export async function fillName(scope: Page | Locator, p: { name: string }): Promise<void> {
+  await scope.getByLabel("Vezetéknév").fill(surname(p));
+  await scope.getByLabel("Keresztnév").fill(firstName(p));
+}
+
+// The player pages name a pair by its team label (#419), the two surnames
+// ("Kovács / Nagy"); no two seeded players share a surname.
+export const teamLabel = (a: { name: string }, b: { name: string }) => `${surname(a)} / ${surname(b)}`;
 
 // Opens a page and waits until it is interactive: dialogs, selects and
 // fetcher buttons do nothing before React hydrates, and the dev server loads
@@ -136,12 +151,14 @@ export async function save(context: BrowserContext, email: string): Promise<void
   await context.storageState({ path: authFile(email) });
 }
 
-// "Üdv!": name, level, phone number, Férfi or Nő, consent, Kész. Nothing is
-// prefilled since the interest list went (#333).
+// "Üdv!": name (Vezetéknév, Keresztnév, #419), level, phone number, Férfi
+// or Nő, consent, Kész. Nothing is prefilled since the interest list went
+// (#333).
 export async function completeWelcome(page: Page, player: Player): Promise<void> {
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
-  await expect(page.getByLabel("Neved")).toHaveValue("");
-  await page.getByLabel("Neved").fill(player.name);
+  await expect(page.getByLabel("Vezetéknév")).toHaveValue("");
+  await expect(page.getByLabel("Keresztnév")).toHaveValue("");
+  await fillName(page, player);
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: new RegExp(`^${levelLabel(player)}`) }).click();
   // Never prefilled (#133): the player picks.

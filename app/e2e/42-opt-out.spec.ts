@@ -32,7 +32,7 @@ test("43. Nem folytatom on Ligáim: the confirmation, the partner's notice, Pár
     const { context, page } = await as(browser, anna);
     await visit(page, "/leagues");
     const section = content(page).getByRole("region", { name: "Következő kör" });
-    await expect(section).toContainText(/^Következő körBenne vagytok a 2\. körben \(\w+\. \d+-t[óő]l\)\. Ha nem folytatnád, jelezd \w+\. \d+\., 23:59-ig\./);
+    await expect(section).toContainText(/^Benne vagytok a 2\. körben \(\w+\. \d+-t[óő]l\)\. Ha nem folytatnád, jelezd \w+\. \d+\., 23:59-ig\./);
     await test.info().attach("Ligáim, default in", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
     // The confirmation says what happens; Mégse changes nothing.

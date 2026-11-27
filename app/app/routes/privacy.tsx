@@ -1,5 +1,6 @@
 import type { Route } from "./+types/privacy";
-import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
+import { ReadingPage, readingHeading, readingLink, readingList, readingTitle } from "~/components/reading";
+import { cn } from "~/lib/utils";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
@@ -16,30 +17,25 @@ export function meta({}: Route.MetaArgs) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-3">
-      <h2 className="font-display text-2xl font-extrabold">{title}</h2>
+      <h2 className={readingHeading}>{title}</h2>
       {children}
     </section>
   );
 }
 
-const list = "grid list-disc gap-1.5 pl-5";
+const list = cn(readingList, "list-disc");
 
 export default function Privacy() {
   const mail = (
-    <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+    <a href={`mailto:${CONTACT_EMAIL}`} className={readingLink}>
       {CONTACT_EMAIL}
     </a>
   );
 
   return (
-    <>
-      <SiteHeader cta={false} />
-      <main className="py-10 text-[1.0625rem] leading-relaxed">
-        <Wrap className="grid max-w-3xl gap-10">
+    <ReadingPage cta={false} className="gap-10">
           <div className="grid gap-3">
-            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] font-black">
-              Adatkezelési tájékoztató
-            </h1>
+            <h1 className={readingTitle}>Adatkezelési tájékoztató</h1>
             <p className="text-muted-foreground">
               Röviden és érthetően arról, mit kezelünk rólad, miért, és mit
               tehetsz vele. Hatályos: {EFFECTIVE_FROM}
@@ -436,15 +432,12 @@ export default function Privacy() {
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti
               Adatvédelmi és Információszabadság Hatóságnál (
-              <a href="https://naih.hu" className="underline">
+              <a href="https://naih.hu" className={readingLink}>
                 naih.hu
               </a>
               ).
             </p>
           </Section>
-        </Wrap>
-      </main>
-      <SiteFooter />
-    </>
+    </ReadingPage>
   );
 }

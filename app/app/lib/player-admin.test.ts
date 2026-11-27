@@ -2,21 +2,33 @@ import { describe, expect, it } from "vitest";
 
 import { adminProfilePath, changedFields, profileLink, editDetail, LEVEL_LOCKED_ADMIN, validateAdminProfile, type EditableProfile } from "./player-admin";
 
-const FULL: EditableProfile = { name: "Kovács Anna", phone: "+36301234567", level: "kezdo", sex: "female" };
-const EMPTY: EditableProfile = { name: "Régi Fiók", phone: null, level: null, sex: null };
-const form = (o: Partial<Record<keyof EditableProfile, string>> = {}) => ({ name: "Kovács Anna", phone: "06 30 123 4567", level: "kezdo", sex: "female", ...o });
+const FULL: EditableProfile = { surname: "Kovács", firstName: "Anna", phone: "+36301234567", level: "kezdo", sex: "female" };
+// An old one-word account (#419: the migration gave it only a surname).
+const EMPTY: EditableProfile = { surname: "Régi", firstName: null, phone: null, level: null, sex: null };
+const form = (o: Partial<Record<keyof EditableProfile, string>> = {}) => ({
+  surname: "Kovács",
+  firstName: "Anna",
+  phone: "06 30 123 4567",
+  level: "kezdo",
+  sex: "female",
+  ...o,
+});
 
 describe("validateAdminProfile (#301, D156)", () => {
-  it("saves a corrected name and a phone in any Hungarian format, as E.164", () => {
-    expect(validateAdminProfile(form({ name: "  Kovács   Anna ", phone: "+36 20 987 6543" }), FULL, false)).toEqual({
+  it("saves a corrected name in two parts, the full name with it, and a phone in any Hungarian format, as E.164", () => {
+    expect(validateAdminProfile(form({ surname: "  Kiss-Nagy ", firstName: " Anna   Mária ", phone: "+36 20 987 6543" }), FULL, false)).toEqual({
       ok: true,
-      value: { name: "Kovács Anna", phone: "+36209876543", level: "kezdo", sex: "female" },
+      value: { name: "Kiss-Nagy Anna Mária", surname: "Kiss-Nagy", firstName: "Anna Mária", phone: "+36209876543", level: "kezdo", sex: "female" },
     });
   });
 
-  it("refuses a too short or too long name", () => {
-    expect(validateAdminProfile(form({ name: "A" }), FULL, false)).toMatchObject({ ok: false, errors: { name: "Add meg a nevét." } });
-    expect(validateAdminProfile(form({ name: "x".repeat(81) }), FULL, false)).toMatchObject({ ok: false, errors: { name: "Legfeljebb 80 karakter." } });
+  it("refuses a missing surname, emptying a first name, and a too long name", () => {
+    expect(validateAdminProfile(form({ surname: " " }), FULL, false)).toMatchObject({ ok: false, errors: { surname: "Add meg a vezetéknevét." } });
+    expect(validateAdminProfile(form({ firstName: "" }), FULL, false)).toMatchObject({ ok: false, errors: { firstName: expect.stringMatching(/nem törölheted/) } });
+    expect(validateAdminProfile(form({ firstName: "x".repeat(80) }), FULL, false)).toMatchObject({
+      ok: false,
+      errors: { firstName: "A teljes neve legfeljebb 80 karakter." },
+    });
   });
 
   it("refuses a bad phone number, and emptying one that is there", () => {
@@ -25,7 +37,10 @@ describe("validateAdminProfile (#301, D156)", () => {
   });
 
   it("lets a field the player never filled in stay empty", () => {
-    expect(validateAdminProfile({ name: "Régi Fiók", phone: "", level: "", sex: "" }, EMPTY, false)).toEqual({ ok: true, value: EMPTY });
+    expect(validateAdminProfile({ surname: "Régi", firstName: "", phone: "", level: "", sex: "" }, EMPTY, false)).toEqual({
+      ok: true,
+      value: { ...EMPTY, name: "Régi" },
+    });
   });
 
   it("refuses emptying a level or sex that is there, and unknown values", () => {
@@ -47,13 +62,13 @@ describe("validateAdminProfile (#301, D156)", () => {
 describe("changedFields and editDetail", () => {
   it("names the fields whose value changes, in form order", () => {
     expect(changedFields(FULL, FULL)).toEqual([]);
-    expect(changedFields(FULL, { ...FULL, sex: "male", name: "Kovács A." })).toEqual(["name", "sex"]);
+    expect(changedFields(FULL, { ...FULL, sex: "male", firstName: "Anikó" })).toEqual(["firstName", "sex"]);
     expect(changedFields(EMPTY, { ...EMPTY, phone: "+36301234567" })).toEqual(["phone"]);
   });
 
   it("Napló's detail names the fields, never their values", () => {
-    const detail = editDetail(["name", "phone", "level", "sex"]);
-    expect(detail).toBe("Módosítva: név, telefonszám, szint, nem");
+    const detail = editDetail(["surname", "firstName", "phone", "level", "sex"]);
+    expect(detail).toBe("Módosítva: vezetéknév, keresztnév, telefonszám, szint, nem");
     expect(detail).not.toMatch(/\d/);
   });
 });

@@ -3,17 +3,55 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/archivo/wdth.css";
 
-/* Dark mode follows the system setting; there is no toggle. */
-@custom-variant dark (@media (prefers-color-scheme: dark));
-
+/* Direction A ("Eredményjelző", D181): the app is dark for everyone, with no
+   light palette and no switch. <html> carries class="dark", so the `dark:`
+   styles of the shadcn components always apply. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Archivo Variable', system-ui, sans-serif;
-  --color-court: var(--court);
-  --color-court-deep: var(--court-deep);
+
+  /* Type (D181): body 15 px, captions and section labels 13 px. The display
+     style is the `type-display` utility below. */
+  --text-body: 15px;
+  --text-body--line-height: 1.45;
+  --text-caption: 13px;
+  --text-caption--line-height: 1.4;
+
+  /* Direction A's roles. */
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-soft-foreground: var(--soft-foreground);
+  --color-hairline: var(--hairline);
   --color-ball: var(--ball);
   --color-ball-foreground: var(--ball-foreground);
+  --color-ball-tint: var(--ball-tint);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-danger-tint-hover: var(--danger-tint-hover);
+  --color-division-bronz: var(--division-bronz);
+  --color-division-rez: var(--division-rez);
+  --color-division-rookie: var(--division-rookie);
+
+  /* Older names, still used by pages built before D181. */
+  --color-court: var(--court);
+  --color-court-deep: var(--court-deep);
+  --color-court-foreground: var(--court-foreground);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-bg: var(--nav-active-bg);
+  --color-nav-active-foreground: var(--nav-active-foreground);
+
+  /* shadcn/ui. */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -22,8 +60,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-nav-active: var(--nav-active);
-  --color-nav-active-bg: var(--nav-active-bg);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -56,83 +92,112 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* The values, from the approved mockups (docs/ui/mockups, #417). Every text
+   colour here reaches 4.5:1 on every surface it sits on (the table is in
+   #418's PR and docs/ui-guidelines.md). */
 :root {
-  /* Brand: padel court blue, ball yellow, glass. */
-  --court: #1e5ba8;
-  --court-deep: #173f75;
+  color-scheme: dark;
+
+  /* Ground and surfaces, darkest first. */
+  --ground: #0a1424;
+  --sidebar: #0d1a2e;
+  --surface: #111f36; /* cards */
+  --surface-2: #1a2c49; /* tiles, chips and set boxes on a card */
+  --surface-3: #1f3355; /* secondary buttons, the active tab, progress tracks */
+  --surface-4: #26406a; /* the winner's set boxes */
+  --hairline: rgb(255 255 255 / 0.07); /* dividers inside a card */
+
+  /* Text. */
+  --foreground: #eef3f9;
+  --soft-foreground: #c9d4e2; /* nav items, neutral icons */
+  --muted-foreground: #a3b3c9;
+
+  /* The ball: the one primary action, the active nav item, the player's own row. */
   --ball: #dceb3c;
   --ball-foreground: #10233d;
-  --background: #fbfcfd;
-  --foreground: #10233d;
-  --card: #fbfcfd;
-  --card-foreground: #10233d;
-  --popover: #ffffff;
-  --popover-foreground: #10233d;
-  --primary: #1e5ba8;
-  --primary-foreground: #ffffff;
-  --secondary: #e9f1f8;
-  --secondary-foreground: #10233d;
-  --muted: #e9f1f8;
-  --muted-foreground: #4a5b70;
-  --accent: #e9f1f8;
-  --accent-foreground: #10233d;
-  --destructive: #b42318;
-  --border: color-mix(in srgb, #10233d 15%, transparent);
-  --input: color-mix(in srgb, #10233d 35%, transparent);
-  --ring: #1e5ba8;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  /* App sidebar (app/routes/app.tsx): a shade off the page, brand blue for
-     the current page. */
-  --sidebar: #f2f6fa;
-  --sidebar-foreground: #10233d;
-  --sidebar-primary: #1e5ba8;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e4ecf5;
-  --sidebar-accent-foreground: #10233d;
-  --sidebar-border: color-mix(in srgb, #10233d 12%, transparent);
-  --sidebar-ring: #1e5ba8;
-  --nav-active: #174a8c;
-  --nav-active-bg: #d6e4f5;
-}
+  --ball-tint: color-mix(in srgb, var(--ball) 10%, transparent);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --court: #2a6cc0;
-    --court-deep: #1b4a85;
-    --background: #0e1b2e;
-    --foreground: #e8eef5;
-    --card: #0e1b2e;
-    --card-foreground: #e8eef5;
-    --popover: #16273f;
-    --popover-foreground: #e8eef5;
-    --primary: #2a6cc0;
-    --primary-foreground: #ffffff;
-    --secondary: #16273f;
-    --secondary-foreground: #e8eef5;
-    --muted: #16273f;
-    --muted-foreground: #a9b6c6;
-    --accent: #16273f;
-    --accent-foreground: #e8eef5;
-    --destructive: #f97066;
-    --border: color-mix(in srgb, #e8eef5 15%, transparent);
-    --input: color-mix(in srgb, #e8eef5 35%, transparent);
-    --ring: #5b9be6;
-    --sidebar: #0a1626;
-    --sidebar-foreground: #e8eef5;
-    --sidebar-primary: #2a6cc0;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #16273f;
-    --sidebar-accent-foreground: #e8eef5;
-    --sidebar-border: color-mix(in srgb, #e8eef5 12%, transparent);
-    --sidebar-ring: #5b9be6;
-    --nav-active: #b9d6f8;
-    --nav-active-bg: #1c3a60;
-  }
+  /* Status, each with a 16% tint for pill backgrounds. The tints are solid
+     (mixed into the card colour), so the status text on them reads the same
+     on any surface: a see-through tint over the lighter surfaces dropped
+     under 4.5:1. */
+  --success: #5fd492;
+  --success-tint: color-mix(in srgb, var(--success) 16%, var(--surface));
+  --warning: #f7b955; /* "Rád vár" */
+  --warning-tint: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  --info: #7cb2ff; /* "Időpont kell" */
+  --info-tint: color-mix(in srgb, var(--info) 16%, var(--surface));
+  --danger: #ff8f80;
+  --danger-tint: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  /* A destructive button under the pointer: a step stronger, still 4.5:1. */
+  --danger-tint-hover: color-mix(in srgb, var(--danger) 22%, var(--surface));
+
+  /* Division dots. */
+  --division-bronz: #d08a4a;
+  --division-rez: #3fbf9f;
+  --division-rookie: #9b7bff;
+
+  /* TeamBadge (components/blocks/team-badge.tsx): two shades per pair, the
+     pair id picks the hue. White initials reach 4.5:1 on each. */
+  --team-0: #3a5a8c;
+  --team-0-light: #4a6ea6;
+  --team-1: #2f6b5a;
+  --team-1-light: #367664;
+  --team-2: #6b3a5a;
+  --team-2-light: #83507a;
+  --team-3: #6b5a2f;
+  --team-3-light: #7a6838;
+  --team-4: #7a3f36;
+  --team-4-light: #8f4f45;
+  --team-5: #4f4386;
+  --team-5-light: #61559c;
+  --team-6: #3c6a35;
+  --team-6-light: #467440;
+  --team-7: #44546b;
+  --team-7-light: #56677f;
+
+  /* shadcn/ui roles, mapped onto direction A so the organizer and admin pages
+     keep their layout and read on the dark ground. */
+  --background: var(--ground);
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--foreground);
+  --primary: var(--ball);
+  --primary-foreground: var(--ball-foreground);
+  --secondary: var(--surface-3);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-2);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--danger);
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.18);
+  --ring: var(--info);
+  --chart-1: var(--ball);
+  --chart-2: var(--info);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--division-rookie);
+  --radius: 0.625rem;
+
+  /* App sidebar (app/routes/app.tsx). */
+  --sidebar-foreground: var(--soft-foreground);
+  --sidebar-primary: var(--ball);
+  --sidebar-primary-foreground: var(--ball-foreground);
+  --sidebar-accent: var(--surface);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--info);
+
+  /* Older names: the court blue becomes the info blue (light, for text on the
+     dark ground); "nav active" is the ball, as the active nav item. */
+  --court: var(--info);
+  --court-deep: #263f68; /* a court-blue fill: white 10.5:1, the ball on a 20% ball tint 5.1:1 */
+  --court-foreground: var(--ball-foreground);
+  --nav-active: var(--ball);
+  --nav-active-bg: var(--ball-tint);
+  --nav-active-foreground: var(--ball-foreground);
 }
 
 @layer base {
@@ -152,10 +217,30 @@
   }
 }
 
-/* Archivo's width axis: headings are set wider than body text. */
+/* Archivo's width axis: headings are set wider than body text. Pages built
+   before D181; direction A's pages use `type-display`. */
 @utility font-display {
   font-stretch: 115%;
   line-height: 1.08;
+}
+
+/* Direction A's display type (D181): heavy, condensed, upper case, for page
+   titles, team names in headers and big numbers. The size comes from the
+   caller. */
+@utility type-display {
+  font-weight: 800;
+  font-stretch: 75%;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* A section label: 13 px, bold, spaced, upper case. */
+@utility type-label {
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* Page-load bar (root.tsx NavigationProgress): grows towards 90% while busy,
@@ -177,4 +262,18 @@
     transform: scaleX(1);
     transition: opacity 0ms linear 120ms;
   }
+}
+
+/* The sidebar's nav (routes/app.tsx): when the organizer's and the Admin's
+   sections don't fit, it scrolls, and shows it: a thin scrollbar (the shadcn
+   content hides it; unlayered, this wins) and a shadow at each edge that has
+   more items behind it (the covers scroll with the list, the shadows stay). */
+[data-sidebar="content"].shell-nav {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 50%, transparent) transparent;
+  background:
+    linear-gradient(var(--sidebar) 40%, transparent) top / 100% 32px no-repeat local,
+    linear-gradient(transparent, var(--sidebar) 60%) bottom / 100% 32px no-repeat local,
+    linear-gradient(rgb(0 0 0 / 0.7), transparent) top / 100% 20px no-repeat scroll,
+    linear-gradient(transparent, rgb(0 0 0 / 0.7)) bottom / 100% 20px no-repeat scroll;
 }

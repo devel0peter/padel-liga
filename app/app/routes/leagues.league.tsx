@@ -1,5 +1,5 @@
 import type { Route } from "./+types/leagues.league";
-import { AppPage } from "~/components/app-page";
+import { Page, PageHeader } from "~/components/blocks";
 import { LeagueCard } from "~/components/league-card";
 import { requireUser } from "~/lib/auth/session.server";
 import { myLeagueCard, myLeaguesAction, withOrigin } from "~/lib/my-leagues.server";
@@ -27,8 +27,13 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function MyLeague({ loaderData: d, actionData }: Route.ComponentProps) {
   return (
-    <AppPage title="Ligáim" back={d.several ? { to: "/leagues", label: "Összes ligám" } : undefined}>
+    <Page>
+      <PageHeader
+        back={d.several ? { to: "/leagues", label: "Összes ligám" } : undefined}
+        eyebrow={["Ligáim", d.card.season?.name].filter(Boolean).join(" · ")}
+        title={d.card.league.name}
+      />
       <LeagueCard card={d.card} actionData={actionData} />
-    </AppPage>
+    </Page>
   );
 }

@@ -22,7 +22,7 @@ const post = (cookie: string, fields: Record<string, string>) =>
   new Request("http://localhost/profile", {
     method: "POST",
     headers: { Cookie: cookie },
-    body: new URLSearchParams({ intent: "profile", name: "Nagy Anna", phone: "+36 30 123 4567", sex: "female", ...fields }),
+    body: new URLSearchParams({ intent: "profile", surname: "Nagy", first_name: "Anna", phone: "+36 30 123 4567", sex: "female", ...fields }),
   });
 const level = (id: string) => h.raw.prepare("select level from users where id = ?").get(id).level as string;
 
@@ -67,9 +67,15 @@ describe("Profil: level lock and Élő-pont", () => {
   });
 
   it("saves the other fields of a locked player, without a level in the form or with the same one", async () => {
-    expect(await P.action(args(post(placed, { name: "Új Anna" })))).toMatchObject({ saved: true });
-    expect(await P.action(args(post(placed, { name: "Újabb Anna", level: "halado" })))).toMatchObject({ saved: true });
-    expect(h.raw.prepare("select name, level from users where id = 'placed'").get()).toEqual({ name: "Újabb Anna", level: "halado" });
+    expect(await P.action(args(post(placed, { surname: "Új" })))).toMatchObject({ saved: true });
+    expect(await P.action(args(post(placed, { surname: "Újabb", level: "halado" })))).toMatchObject({ saved: true });
+    // The name in two parts, and the full name with them (#419).
+    expect(h.raw.prepare("select name, surname, first_name, level from users where id = 'placed'").get()).toEqual({
+      name: "Újabb Anna",
+      surname: "Újabb",
+      first_name: "Anna",
+      level: "halado",
+    });
   });
 
   it("shows the starting Élő-pont of the level, nothing without one", async () => {

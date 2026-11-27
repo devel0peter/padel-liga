@@ -120,7 +120,7 @@ describe("who has a profile", () => {
     match(g1, 2, 1, 1, "final", played([[4, 1], [4, 2]]));
     const p = await pairProfile(1, DURING);
     expect(p!.pair.players).toEqual([
-      { id: "ua", name: "Anna" },
+      { id: "ua", name: "Anna", surname: null, firstName: null },
       { id: null, name: "Törölt játékos" },
     ]);
     // Also where the pair appears as an opponent.
@@ -139,7 +139,14 @@ describe("before the league starts", () => {
     expect(anna).toMatchObject({ started: false, elo: null, eloHistory: [], matches: [] });
     expect(anna!.pairs).toEqual([
       {
-        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }] },
+        pair: {
+          id: 1,
+          players: [
+            { id: "ua", name: "Anna", surname: null, firstName: null },
+            { id: "ub", name: "Bea", surname: null, firstName: null },
+          ],
+          label: "Anna / Bea",
+        },
         league: "Padelpárbaj Győr",
         latest: { season: "2026/27 tél", phase: 1, group: 1, division: "Bronz divízió", place: null, withdrawn: false },
       },
@@ -166,6 +173,22 @@ describe("once the league has started", () => {
     // An unplayed match has no result to show.
     h.raw.exec(`update matches set outcome = '{"kind":"unplayed"}', status = 'final' where week = 3`);
     expect((await pairProfile(2, DURING))!.matches).toHaveLength(1);
+  });
+
+  it("names the pairs by their players' surnames, the clash rule over the page (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("ua", "Nagy", "Anna");
+    named("ub", "Kiss", "Bea");
+    named("uc", "Nagy", "Cili");
+    match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    const pair = (await pairProfile(1, DURING))!;
+    // Dóra has no surname yet: her full name.
+    expect([pair.pair.label, pair.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    const anna = (await playerProfile("ua", DURING))!;
+    expect([anna.pairs[0]!.pair.label, anna.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    // The player's own name line keeps the full name.
+    expect(anna.player.name).toBe("Nagy Anna");
   });
 
   it("the summary (D136): seasons, rounds, matches, wins, losses, for the player and the pair", async () => {

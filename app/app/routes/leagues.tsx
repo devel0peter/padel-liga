@@ -1,5 +1,5 @@
 import type { Route } from "./+types/leagues";
-import { AppPage } from "~/components/app-page";
+import { Page, PageHeader } from "~/components/blocks";
 import { ChooseLeague } from "~/components/choose-league";
 import { LeagueCard } from "~/components/league-card";
 import { requireUser } from "~/lib/auth/session.server";
@@ -31,25 +31,31 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function MyLeagues({ loaderData: d, actionData }: Route.ComponentProps) {
   const several = d.cards.length > 1;
+  const [only] = d.cards;
+  // One league: its card alone, the league as the title (#423, mockup P06).
   return (
-    <AppPage title="Ligáim">
+    <Page>
+      <PageHeader
+        eyebrow={!several && only ? ["Ligáim", only.season?.name].filter(Boolean).join(" · ") : undefined}
+        title={!several && only ? only.league.name : "Ligáim"}
+      />
       {d.cards.length === 0 &&
         (d.choices.length > 0 ? (
           <ChooseLeague choices={d.choices} offered={false} />
         ) : (
-          <p className="text-muted-foreground">Még nem vagy egyik ligában sem.</p>
+          <p className="m-0 text-muted-foreground">Még nem vagy egyik ligában sem.</p>
         ))}
       {several ? (
-        <ul aria-label="Ligáim" className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <ul aria-label="Ligáim" className="m-0 flex list-none flex-col gap-10 p-0">
           {d.cards.map((card) => (
-            <li key={card.league.slug} className="grid">
+            <li key={card.league.slug}>
               <LeagueCard card={card} actionData={actionData} link={`/leagues/${card.league.slug}`} />
             </li>
           ))}
         </ul>
       ) : (
-        d.cards[0] && <LeagueCard card={d.cards[0]} actionData={actionData} />
+        only && <LeagueCard card={only} actionData={actionData} />
       )}
-    </AppPage>
+    </Page>
   );
 }

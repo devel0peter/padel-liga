@@ -17,19 +17,22 @@ test("41. Ligáim in the sidebar and on the phone bar; the card with the round, 
   await page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Ligáim", exact: true }).click();
   await expect(page).toHaveURL(/\/leagues$/);
   const main = content(page);
-  await expect(main.getByRole("heading", { level: 1 })).toHaveText("Ligáim");
-
-  // One league: its card alone, no list around it.
+  // One league: its card alone, the league as the title (#423), no list around it.
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText("Padelpárbaj Mintaváros");
   await expect(main.getByRole("list", { name: "Ligáim" })).toHaveCount(0);
   const card = main.getByRole("region", { name: "Padelpárbaj Mintaváros" });
-  await expect(card.getByRole("heading", { name: "Padelpárbaj Mintaváros" })).toBeVisible();
-  // Round 1 with its dates and deadline once it runs; before its first day, when it starts.
-  await expect(card.getByRole("region", { name: "Kör", exact: true })).toContainText(/1\. kör: .+ – .+Határidő: .+ \d\d:\d\d|Az 1\. kör .+ indul\./);
-  await expect(card.getByRole("region", { name: "Párod" })).toHaveText(`Párod${partner.name}`);
-  await expect(card.getByRole("region", { name: "Helyetek" })).toContainText(/Az 1\. csoportban vagytok/);
-  const summary = card.getByRole("region", { name: "A liga" });
-  await expect(summary).toContainText(/Lejátszott meccsek: \d+ \/ \d+/);
-  await expect(card.getByRole("region", { name: "A szezonod" })).toContainText("Élő-pontod");
+  // Round 1 with its deadline once it runs; before its first day, when it starts.
+  const summary = card.getByRole("region", { name: "Kör", exact: true });
+  await expect(summary).toContainText(/1\. kör.+\d\d:\d\d-ig|Az 1\. kör .+ indul\./);
+  await expect(card.getByRole("region", { name: "Párod" })).toContainText(`Párod${partner.name}`);
+  await expect(card.getByRole("region", { name: "Párod" }).getByRole("link", { name: new RegExp(partner.name) })).toHaveAttribute("href", /^\/players\//);
+  const place = card.getByRole("region", { name: "Helyetek" });
+  await expect(place).toContainText(/Az 1\. csoportban vagytok/);
+  await expect(summary).toContainText(/A ligában \d+ \/ \d+ meccs kész/);
+  await expect(place).toContainText("Élő-pontod");
+  // The season's calendar is folded under the round (moved from Kezdőlap, D184).
+  await card.getByText("Szezon naptár").click();
+  await expect(card.getByRole("list").filter({ hasText: "1. kör:" })).toBeVisible();
   await expect(card.getByRole("link", { name: "Szabályzat" })).toHaveAttribute("href", "/rules");
   // No email address or phone number anywhere on the page.
   await expect(main).not.toContainText("@");
@@ -37,7 +40,8 @@ test("41. Ligáim in the sidebar and on the phone bar; the card with the round, 
 
   // The summary is the Tabella's: its groups and its pairs.
   const text = (await summary.textContent()) ?? "";
-  const [, round, pairs, groups] = /(\d+)\. kör: (\d+) pár, (\d+) csoport/.exec(text)!;
+  const [, round] = /(\d+)\. kör/.exec(text)!;
+  const [, pairs, groups] = /(\d+) pár, (\d+) csoport/.exec(text)!;
   await card.getByRole("link", { name: "Tabella" }).click();
   await expect(page).toHaveURL(/\/league\/minta$/);
   const tables = content(page).getByRole("table", { name: /^\d+\. csoport tabellája$/ });

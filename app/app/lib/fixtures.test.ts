@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureInput } from "./fixtures";
 
 const START = new Date("2026-11-01T23:00:00Z"); // Mon 2 Nov 00:00 Budapest
-const pairs = [1, 2, 3, 4].map((id) => ({ id, names: [`P${id}A`, `P${id}B`] as [string, string] }));
+const pairs = [1, 2, 3, 4].map((id) => ({ id, label: `P${id}A / P${id}B` }));
 const m = (id: number, a: number, b: number, week: number, extra: Partial<FixtureInput> = {}): FixtureInput => ({
   id,
   a,
@@ -37,7 +37,7 @@ describe("fixtureWeeks", () => {
     const weeks = fixtureWeeks(pairs.slice(0, 3), matches, { setGames: SHORT_SETS, phaseStartsAt: START, currentWeek: 1 });
     expect(weeks.map((w) => w.matches.length)).toEqual([1, 1, 1]);
     // With pair 4 gone, its opponent of the week rests.
-    expect(weeks.map((w) => w.resting?.[0])).toEqual(["P1A", "P2A", "P3A"]);
+    expect(weeks.map((w) => w.resting)).toEqual(["P1A / P1B", "P2A / P2B", "P3A / P3B"]);
   });
 
   it("keeps the venue of a scheduled match and the state of a stored status", () => {

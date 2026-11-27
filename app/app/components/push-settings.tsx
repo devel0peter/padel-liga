@@ -16,7 +16,9 @@ import { PUSH_NOTICES } from "~/lib/push/device";
 const IPHONE =
   "iPhone-on iOS 16.4 vagy újabb kell, és a Padelpárbajt a főképernyőhöz kell adnod (Safariban Megosztás → Főképernyőhöz adás), aztán onnan megnyitnod.";
 
-export function PushSettings({ vapidPublicKey, enabled }: { vapidPublicKey: string | null; enabled: boolean }) {
+// `compact`: the switch alone with one line (Értesítések' side card, #423);
+// the device's test and turn-off buttons stay on Profil.
+export function PushSettings({ vapidPublicKey, enabled, compact = false }: { vapidPublicKey: string | null; enabled: boolean; compact?: boolean }) {
   const { state, error, busy, subscribe: subscribeDevice, unsubscribe: unsubscribeDevice } = usePushDevice(vapidPublicKey);
   const channel = useFetcher();
   const test = useFetcher<{ ok?: true; devices?: number; error?: string }>();
@@ -31,6 +33,19 @@ export function PushSettings({ vapidPublicKey, enabled }: { vapidPublicKey: stri
   }
 
   const notice = PUSH_NOTICES;
+
+  if (compact)
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <div className="grid gap-0.5">
+          <Label htmlFor="channel-push">Push ezen az eszközön</Label>
+          <p className="text-caption text-muted-foreground">
+            {error ?? (!vapidPublicKey ? "Még nincs beállítva." : on && notice[state] ? notice[state] : CHANNELS.push.description)}
+          </p>
+        </div>
+        <Switch id="channel-push" checked={on} disabled={busy || state === "checking" || !vapidPublicKey} onCheckedChange={toggle} />
+      </div>
+    );
 
   return (
     <div className="grid gap-3">

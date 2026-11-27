@@ -1,16 +1,12 @@
 import type { Division } from "@padel-liga/rules";
-import { ListOrdered, Table2 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
+import { ChevronRight } from "lucide-react";
+import { Link, useParams } from "react-router";
 
 import type { Route } from "./+types/league";
-import { AppPage } from "~/components/app-page";
+import { Page, PageHeader, Segmented, StatusPill } from "~/components/blocks";
 import { FixtureList } from "~/components/fixture-list";
 import { HelpTip } from "~/components/help-tip";
 import { StandingsLegend, StandingsTable } from "~/components/standings-table";
-import { Badge } from "~/components/ui/badge";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { DIVISION_DOT } from "~/lib/division-colors";
 import type { LadderBand, LadderGroup } from "~/lib/ladder";
 import { withArticle } from "~/lib/groups";
 import { requireUser } from "~/lib/auth/session.server";
@@ -19,13 +15,13 @@ import { pairPath } from "~/lib/profiles";
 import { SITE_NAME } from "~/lib/site";
 import { cn } from "~/lib/utils";
 
-// The league page, the player's "Tabella" (#30, spec section 14): the phase's
-// groups top-down, each a card with its division and its table; the group's
-// matches beside its table when there is room, behind a "Mérkőzések" switch
-// when there isn't; every group open, in division bands on a faint colour of
-// their own (D143). For logged-in players only, inside the app
-// shell (D134): a visitor goes to the login page and comes back. Names only:
-// no email or phone is selected anywhere on the way here, and no rating.
+// The league page, the player's "Tabella" (#30, spec section 14; direction A,
+// #422, mockup P04): the round's groups top-down by division, each a card
+// with one line per pair; the group's matches behind a row under its table,
+// the own group's open under it on wider screens. On a phone a "Csoportok /
+// Ranglista" switch leads to the Ranglista (D183; the sidebar has it on wider
+// screens). For logged-in players only, inside the app shell (D134). Names
+// only: no email or phone is selected anywhere on the way here, and no rating.
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const page = await ladderPage(params.league ?? "", new Date(), await pairIdsOf(user.id));
@@ -40,97 +36,87 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-// "Tabella | Meccsek" in the card's header, only on a card too narrow for the
-// two side by side (D143). Pressed state for a screen reader.
-function ViewSwitch({ view, onChange, count }: { view: "table" | "matches"; onChange: (v: "table" | "matches") => void; count: number }) {
-  const item = (v: "table" | "matches", icon: React.ReactNode, text: string) => (
-    <button
-      type="button"
-      aria-pressed={view === v}
-      onClick={() => onChange(v)}
-      className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&_svg]:size-3.5",
-        view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {icon}
-      {text}
-    </button>
-  );
+/** The phone's switch between the Tabella and the Ranglista (D183); wider screens have the sidebar item. */
+export function TableSwitch({ slug, value }: { slug: string; value: "groups" | "rankings" }) {
   return (
-    <div role="group" aria-label="Nézet" className="inline-flex rounded-lg bg-muted p-0.5 @[46rem]/group:hidden">
-      {item("table", <Table2 aria-hidden />, "Tabella")}
-      {item("matches", <ListOrdered aria-hidden />, `Meccsek (${count})`)}
+    <div className="md:hidden">
+      <Segmented
+        label="Nézet"
+        value={value}
+        options={[
+          { value: "groups", label: "Csoportok", to: `/league/${slug}` },
+          { value: "rankings", label: "Ranglista", to: `/league/${slug}/rankings` },
+        ]}
+      />
     </div>
   );
 }
 
-// One group: its table and, beside it, its matches by week when the card is
-// wide enough (a container query on the card, 46rem); on a narrower card one
-// of the two shows at a time, switched in the header (D143).
-function GroupCard({ group, division, label }: { group: LadderGroup; division: Division; label: string }) {
-  const [view, setView] = useState<"table" | "matches">("table");
+// "A csoport meccsei (6)": the group's matches open in place (a native
+// disclosure, so it works before the page's script loads).
+function MatchesRow({ group, title }: { group: LadderGroup; title: string }) {
   const count = group.weeks.reduce((n, w) => n + w.matches.length, 0);
   return (
-    <Card role="region" aria-label={`${group.number}. csoport`} className={cn("@container/group", group.mine && "ring-2 ring-nav-active/60")}>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={3} className="font-display text-lg font-bold whitespace-nowrap">{group.number}. csoport</CardTitle>
-        <CardDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span aria-hidden className={`size-2 rounded-full ${DIVISION_DOT[division]}`} />
-          {label}
-          {/* On a phone the badge sits here; the header's right side has only the switch. */}
-          {group.mine && (
-            <Badge variant="secondary" className="@[30rem]/group:hidden">
-              A ti csoportotok
-            </Badge>
-          )}
-        </CardDescription>
-        {/* The badge and the switch side by side once the card has room (D143). */}
-        <CardAction className="flex items-center justify-end gap-2">
-          {group.mine && (
-            <Badge variant="secondary" className="hidden @[30rem]/group:inline-flex">
-              A ti csoportotok
-            </Badge>
-          )}
-          <ViewSwitch view={view} onChange={setView} count={count} />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 @[46rem]/group:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[46rem]/group:gap-6">
-          <div className={cn("grid content-start gap-2", view === "matches" && "hidden @[46rem]/group:grid")}>
-            <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} legend={false} />
-            {group.withdrawn.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Visszalépett: {group.withdrawn.join(", ")}. A meccseik nem számítanak.
-              </p>
-            )}
-          </div>
-          <div className={cn("grid content-start gap-2", view === "table" && "hidden @[46rem]/group:grid")}>
-            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} compact />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <details className="group/matches border-t border-hairline pt-1">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold text-ball [&::-webkit-details-marker]:hidden">
+        {title} ({count})
+        <ChevronRight aria-hidden className="size-5 transition-transform group-open/matches:rotate-90" />
+      </summary>
+      <div className="pt-2 pb-1">
+        <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
+      </div>
+    </details>
   );
 }
 
-// Faint division colours behind each band of the ladder (D143), the dots' hues.
-const BAND: Record<Division, string> = {
-  bronz: "bg-amber-50 ring-amber-200/70 dark:bg-amber-950/25 dark:ring-amber-900/50",
-  rez: "bg-teal-50 ring-teal-200/70 dark:bg-teal-950/25 dark:ring-teal-900/50",
-  rookie: "bg-violet-50 ring-violet-200/70 dark:bg-violet-950/25 dark:ring-violet-900/50",
-};
-
-// A division of the ladder: its name, then its groups top-down, on its colour.
-function Band({ band }: { band: LadderBand }) {
+// One group: its table, the pairs withdrawn from it, its matches. The own
+// group is outlined and, from lg up, shows its matches open under the table.
+function GroupCard({ group }: { group: LadderGroup }) {
   return (
-    <section aria-label={band.label} className={cn("-mx-2 grid gap-4 rounded-2xl p-2 ring-1 sm:mx-0 sm:p-4", BAND[band.division])}>
-      <h2 className="flex items-center gap-2 px-1 font-display text-base font-bold">
-        <span aria-hidden className={`size-2.5 rounded-full ${DIVISION_DOT[band.division]}`} />
+    <section
+      aria-label={`${group.number}. csoport`}
+      className={cn("flex break-inside-avoid flex-col gap-3 rounded-2xl bg-surface p-4 md:p-5", group.mine && "inset-ring inset-ring-ball/40")}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="m-0 text-lg font-bold">{group.number}. csoport</h3>
+        {group.mine && (
+          <StatusPill tone="neutral" className="bg-ball-tint text-ball">
+            A ti csoportotok
+          </StatusPill>
+        )}
+      </div>
+      <StandingsTable rows={group.rows} ranked={group.ranked} linkFor={pairPath} label={`${group.number}. csoport tabellája`} />
+      {group.withdrawn.length > 0 && <p className="m-0 text-caption text-muted-foreground">Visszalépett: {group.withdrawn.join(", ")}. A meccseik nem számítanak.</p>}
+      {group.mine ? (
+        <>
+          <div className="hidden flex-col gap-2 border-t border-hairline pt-3 lg:flex">
+            <h4 className="type-label m-0 text-muted-foreground">A csoport meccsei</h4>
+            <FixtureList weeks={group.weeks} label={`${group.number}. csoport meccsei`} />
+          </div>
+          <div className="lg:hidden">
+            <MatchesRow group={group} title="A csoport meccsei" />
+          </div>
+        </>
+      ) : (
+        <MatchesRow group={group} title="A csoport meccsei" />
+      )}
+    </section>
+  );
+}
+
+const DOT: Record<Division, string> = { bronz: "bg-division-bronz", rez: "bg-division-rez", rookie: "bg-division-rookie" };
+
+// A division of the ladder: its name with its dot, then its groups top-down.
+function Band({ band, top }: { band: LadderBand; top: boolean }) {
+  return (
+    <section aria-label={band.label} className="flex flex-col gap-3">
+      <h2 className="m-0 flex items-center gap-2 text-[17px] font-bold">
+        <span aria-hidden className={cn("size-2.5 rounded-full", DOT[band.division])} />
         {band.label}
+        {top && <span className="text-caption font-normal text-muted-foreground">· a létra csúcsa</span>}
       </h2>
       {band.groups.map((g) => (
-        <GroupCard key={g.number} group={g} division={band.division} label={band.label} />
+        <GroupCard key={g.number} group={g} />
       ))}
     </section>
   );
@@ -142,7 +128,7 @@ const POINTS: [title: string, text: string][] = [
   ["Egy fel, egy le", "A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül."],
 ];
 
-// "Hogyan működik a létra?" behind the "?" by the title (D138).
+// "Hogyan működik a létra?" behind the "?" by the legend (D138).
 function Explainer() {
   return (
     <HelpTip label="Hogyan működik a létra?">
@@ -162,44 +148,40 @@ function Explainer() {
 }
 
 export default function League({ loaderData: page }: Route.ComponentProps) {
+  const slug = useParams().league ?? "";
   const where = [page.league.name, page.season].filter(Boolean).join(" · ");
   if (page.kind === "waiting")
     return (
-      <AppPage title="Tabella" description={where}>
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">Még nincsenek kint a csoportok</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>
-              {page.starting ??
-                (page.next
-                  ? `${capitalize(withArticle(page.next.round))} kör ${page.next.startsOn} indul. A csoportok az indulás előtt kerülnek ki ide.`
-                  : "A következő szezon időpontja hamarosan kiderül.")}
-            </p>
-          </CardContent>
-        </Card>
-      </AppPage>
+      <Page>
+        <PageHeader eyebrow={where} title="Tabella" />
+        <TableSwitch slug={slug} value="groups" />
+        <section className="flex max-w-2xl flex-col gap-1.5 rounded-2xl bg-surface p-4 md:p-5">
+          <h2 className="m-0 text-lg font-bold">Még nincsenek kint a csoportok</h2>
+          <p className="m-0 text-sm text-muted-foreground">
+            {page.starting ??
+              (page.next
+                ? `${capitalize(withArticle(page.next.round))} kör ${page.next.startsOn} indul. A csoportok az indulás előtt kerülnek ki ide.`
+                : "A következő szezon időpontja hamarosan kiderül.")}
+          </p>
+        </section>
+      </Page>
     );
+  const round = page.started
+    ? `${page.phase}. kör, ${page.extension ? "hosszabbítás" : `${page.week}. hét`} (${page.weekFrom} – ${page.weekTo})`
+    : `${page.phase}. kör, indul ${page.startsOn}`;
   return (
-    <AppPage
-      title="Tabella"
-      help={<Explainer />}
-      description={
-        <>
-          {where} · {page.started
-            ? `${page.phase}. kör, ${page.extension ? "hosszabbítás" : `${page.week}. hét`} (${page.weekFrom} – ${page.weekTo})`
-            : `${page.phase}. kör, indul ${page.startsOn}`}
-        </>
-      }
-    >
-      <StandingsLegend />
-      {/* Down the ladder, band by band, every group open (D143). */}
-      <div className="grid gap-6">
-        {page.bands.map((band) => (
-          <Band key={band.division} band={band} />
+    <Page>
+      <PageHeader eyebrow={`${where} · ${round}`} title="Tabella" />
+      <TableSwitch slug={slug} value="groups" />
+      {/* Down the ladder, band by band; two columns on wide screens. */}
+      <div className="gap-x-8 lg:columns-2 [&>*]:mb-6">
+        {page.bands.map((band, i) => (
+          <Band key={band.division} band={band} top={i === 0 && band.division === "bronz"} />
         ))}
       </div>
-    </AppPage>
+      <StandingsLegend>
+        <Explainer />
+      </StandingsLegend>
+    </Page>
   );
 }

@@ -37,7 +37,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
   const played = panel.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);
-  await expect(played).toContainText(/\((10:8|8:10)\)/);
+  await expect(played).toContainText(/(10:8|8:10)$/);
   await expect(panel).not.toContainText("egyik fél sem játszott");
   await expect(panel.getByText("Mindkét pár vereséget kap (0:4, 0:4)")).toHaveCount(1);
   await context.close();

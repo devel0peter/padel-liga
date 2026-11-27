@@ -6,7 +6,9 @@ import { ADMIN, as } from "./support";
 test("1. the Admin lands on Kezdőlap with the season card and both sidebar sections", async ({ browser }) => {
   const { context, page } = await as(browser, ADMIN.email);
   await page.goto("/home");
-  await expect(page.getByRole("heading", { name: "Kezdőlap" })).toBeVisible();
+  // The title greets (#420); the tab still says Kezdőlap.
+  await expect(page).toHaveTitle(/^Kezdőlap/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Szia/);
   const card = page.locator("[data-slot=card]", { hasText: "Teszt szezon" });
   await expect(card).toContainText("Padelpárbaj Mintaváros");
   await expect(card).toContainText("Nevezés:");

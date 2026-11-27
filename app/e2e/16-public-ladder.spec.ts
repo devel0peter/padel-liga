@@ -51,8 +51,8 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   // The groups sit in their division's band (D143).
   await expect(main.getByRole("region", { name: "Bronz divízió", exact: true }).getByRole("region", { name: "1. csoport" })).toHaveCount(1);
 
-  // The matches sit beside the table on a wide card (D143): every week with one match in a group of 3.
-  await expect(first.getByRole("group", { name: "Nézet" })).toBeHidden();
+  // The own group's matches are open under its table on a wide screen (#422):
+  // every week with one match in a group of 3.
   const panel = first.getByRole("group", { name: "1. csoport meccsei" });
   for (const week of ["1. hét", "2. hét", "3. hét"]) await expect(panel.getByRole("region", { name: week, exact: true })).toBeVisible();
   await expect(panel.getByRole("listitem")).toHaveCount(3);
@@ -83,18 +83,27 @@ test("a player opens the Tabella from the sidebar: the groups, their tables, and
   await page.mouse.move(0, 0);
   await expect(tip).toBeHidden();
 
-  // On a phone the card shows one of the two; the header's switch flips to the matches and back (D143).
+  // Another group's matches open from the row under its table (#422).
+  const second = main.getByRole("region", { name: "2. csoport" });
+  await expect(second.getByRole("group", { name: "2. csoport meccsei" })).toBeHidden();
+  await second.getByText(/^A csoport meccsei \(\d+\)$/).click();
+  await expect(second.getByRole("group", { name: "2. csoport meccsei" })).toBeVisible();
+
+  // On a phone the own group's matches open from the same row, and the
+  // "Csoportok / Ranglista" switch leads to the Ranglista and back (D183).
   await page.setViewportSize({ width: 390, height: 844 });
-  const view = first.getByRole("group", { name: "Nézet" });
   await expect(first.getByRole("table")).toBeVisible();
   await expect(panel).toBeHidden();
-  await view.getByRole("button", { name: "Meccsek (3)" }).click();
-  await expect(view.getByRole("button", { name: "Meccsek (3)" })).toHaveAttribute("aria-pressed", "true");
+  await first.getByText("A csoport meccsei (3)").click();
   await expect(panel).toBeVisible();
-  await expect(first.getByRole("table")).toBeHidden();
-  await view.getByRole("button", { name: "Tabella" }).click();
-  await expect(first.getByRole("table")).toBeVisible();
+  const view = main.getByRole("navigation", { name: "Nézet" });
+  await expect(view.getByRole("link", { name: "Csoportok" })).toHaveAttribute("aria-current", "page");
+  await view.getByRole("link", { name: "Ranglista" }).click();
+  await expect(page).toHaveURL(/\/league\/minta\/rankings$/);
+  await content(page).getByRole("navigation", { name: "Nézet" }).getByRole("link", { name: "Csoportok" }).click();
+  await expect(page).toHaveURL(/\/league\/minta$/);
   await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(content(page).getByRole("navigation", { name: "Nézet" })).toBeHidden();
 
   // Not for search engines or link previews.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);

@@ -92,6 +92,25 @@ describe("rankingsPage (D137)", () => {
     expect(page.players.find((r) => r.key === "ub")!.matches).toBe(0);
   });
 
+  it("gives each player their pair's label and division, and the viewer their last change, rounded (#422)", async () => {
+    h.raw.prepare("insert into matches (id, group_id, pair_a, pair_b, week, deadline, status) values (1, 1, 1, 2, 1, ?, 'final')").run(sec("2026-11-29T22:59:00Z"));
+    h.raw
+      .prepare("insert into elo_changes (match_id, user_id, rating_before, rating_after, delta, k, at) values (1, 'ua', 1400, 1412.4, 12.4, 40, ?)")
+      .run(sec("2026-11-12T10:00:00Z"));
+    const page = (await rankingsPage("gyor", "ua", DURING))!;
+    const anna = page.players.find((r) => r.key === "ua")!;
+    expect([anna.pair, anna.division, anna.delta]).toEqual(["Anna / Bea", "Bronz", 12]);
+    // Only the viewer's change shows.
+    expect(page.players.find((r) => r.key === "ub")!.delta).toBeNull();
+    expect(page.pairs.map((r) => r.division)).toEqual(["Bronz", "Bronz"]);
+  });
+
+  it("a player without an active pair has no pair or division", async () => {
+    h.raw.exec("update pairs set status = 'dissolved' where id = 2");
+    const page = (await rankingsPage("gyor", "ua", DURING))!;
+    expect(page.players.find((r) => r.key === "uc")).toMatchObject({ pair: null, division: null });
+  });
+
   it("lists only pairs that have been in a published group, and their players", async () => {
     user("ue", "Emma");
     user("uf", "Flóra");

@@ -40,12 +40,13 @@ test("33a. once round 1 has started: every placed player and pair by Élő-pont,
     const players = main.getByRole("table", { name: "Játékosok Élő-pont szerint" });
     await expect(players.locator("tbody tr")).toHaveCount(GROUP_PAIRS.flat().length);
     await expect(players.locator("tbody tr").filter({ hasText: anna.name })).toContainText("(te)");
-    // Highest first.
-    const elos = (await players.locator("tbody tr td:nth-child(3)").allTextContents()).map(Number);
+    // Highest first. Columns: #, Játékos, Pár, Divízió, Élő-pont, Meccs (#422); her own with its last change.
+    const elos = (await players.locator("tbody tr td:nth-child(5)").allTextContents()).map((t) => Number(t.replace(/[+−]\d+$/, "")));
     expect(elos).toEqual([...elos].sort((x, y) => y - x));
     await expect(players.getByRole("link", { name: anna.name })).toHaveAttribute("href", /^\/players\//);
 
-    await main.getByRole("tab", { name: "Párok" }).click();
+    await expect(players.locator("tbody tr").filter({ hasText: anna.name })).toContainText(teamLabel(anna, PAIRS.p1[1]));
+    await main.getByRole("link", { name: "Párok", exact: true }).click();
     await expect(page).toHaveURL(/\?view=pairs$/);
     const pairs = main.getByRole("table", { name: "Párok Élő-pont szerint" });
     await expect(pairs.locator("tbody tr")).toHaveCount(GROUP_PAIRS.length);

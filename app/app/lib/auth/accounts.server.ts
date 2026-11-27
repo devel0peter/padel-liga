@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
 import { leagueAdminInvites, leagueAdmins, oauthAccounts, users } from "~/db/schema";
@@ -36,11 +36,15 @@ async function acceptOrganizerInvites(userId: string, email: string): Promise<vo
   ]);
 }
 
+// A new name clears the surname the player picked from the old one (#419,
+// D182); the same name keeps it. SQLite reads the old row on the right.
+export const surnameFor = (name: string) => sql`case when ${users.name} = ${name} then ${users.surname} else null end`;
+
 // First login: the profile and the privacy consent.
 export async function saveProfile(userId: string, profile: ProfileInput): Promise<void> {
   await db
     .update(users)
-    .set({ name: profile.name, level: profile.level, phone: profile.phone, sex: profile.sex, consentAt: new Date() })
+    .set({ name: profile.name, surname: surnameFor(profile.name), level: profile.level, phone: profile.phone, sex: profile.sex, consentAt: new Date() })
     .where(eq(users.id, userId));
 }
 
@@ -48,7 +52,7 @@ export async function saveProfile(userId: string, profile: ProfileInput): Promis
 export async function updateProfile(userId: string, profile: Omit<ProfileInput, "consent">): Promise<void> {
   await db
     .update(users)
-    .set({ name: profile.name, level: profile.level, phone: profile.phone, sex: profile.sex })
+    .set({ name: profile.name, surname: surnameFor(profile.name), level: profile.level, phone: profile.phone, sex: profile.sex })
     .where(eq(users.id, userId));
 }
 

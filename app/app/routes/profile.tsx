@@ -18,6 +18,7 @@ import { ProfileFields } from "~/components/profile-fields";
 import { FormerPairs, PairSection } from "~/components/pair-section";
 import { PlayerProfileView } from "~/components/player-profile-view";
 import { PushSettings } from "~/components/push-settings";
+import { SURNAME_INTENT, SurnameSetting } from "~/components/surname-choice";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -44,6 +45,7 @@ import {
   type PushTopic,
 } from "~/lib/notifications";
 import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import { pickSurname, surnameView } from "~/lib/names.server";
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
@@ -93,6 +95,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     // What other players see on /players/<id> (#36, D112), once the player
     // has been in a published group: the "Játékosprofil" tab (D136).
     profile,
+    // "Neved a tabellában" (#419): the label and the chips.
+    surname: await surnameView(user),
     phone: formatPhone(user.phone),
     sex: user.sex,
     initials: initials(user.name, user.email),
@@ -123,6 +127,11 @@ export async function action({ request }: Route.ActionArgs) {
     const result = await deleteOwnAccount(user.id);
     if (!result.ok) return data({ deleteError: result.error }, { status: 409 });
     return redirect("/?accountDeleted=1", { headers: { "Set-Cookie": await destroySession(request) } });
+  }
+  // "Neved a tabellában" (#419): one of the player's own name parts.
+  if (form.get("intent") === SURNAME_INTENT) {
+    if (!(await pickSurname(user, form.get("surname")))) return data({ surnameError: true }, { status: 400 });
+    return { surnameSaved: true };
   }
   if (form.get("intent") === "profile") {
     // A missing phone field must not clear the saved number.
@@ -294,6 +303,10 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
         </TabsContent>
 
         <TabsContent value="settings" className="grid max-w-2xl gap-6">
+          <Block id="neved-a-tabellaban" title="Neved a tabellában" description="Így látják a többiek a párosotokat a tabellákban és a meccseknél.">
+            <SurnameSetting view={d.surname} />
+          </Block>
+
           <Block id="adatok" title="Adataid">
             {!d.level && (
               <p role="status" className="rounded-md border border-dashed p-3 text-sm">

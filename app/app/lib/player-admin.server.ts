@@ -200,7 +200,8 @@ export async function updatePlayerByAdmin(
   await db.batch([
     db
       .update(users)
-      .set(result.value)
+      // A new name clears the surname the player picked (#419).
+      .set(fields.includes("name") ? { ...result.value, surname: null } : result.value)
       .where(and(eq(users.id, userId), isNull(users.deletedAt))),
     auditEntry({ actorId, action: "user.update", target: `user:${userId}`, detail: editDetail(fields) }),
   ]);

@@ -22,6 +22,9 @@ const PREFIXES = new Set(["dr", "ifj", "id", "özv", "prof"]);
 // How words compare: NFC, lowercased.
 const key = (word: string) => word.normalize("NFC").toLocaleLowerCase("hu");
 
+/** Whether two words are the same name part, whatever their case or Unicode form. */
+export const sameWord = (x: string, y: string) => key(x) === key(y);
+
 const isPrefix = (word: string) => PREFIXES.has(key(word).replace(/\.$/, ""));
 
 /** Whether a word is a given name on the list; a hyphenated one when every part is ("Anna-Mária"), so "Kiss-Nagy" is not. */
@@ -83,7 +86,7 @@ export type NameInfo = {
 export function nameInfo(player: NamedPlayer): NameInfo {
   const parts = nameParts(player.name);
   const ruled = surnameByRules(player.name);
-  const picked = player.surname ? parts.findIndex((p) => key(p) === key(player.surname!)) : -1;
+  const picked = player.surname ? parts.findIndex((p) => sameWord(p, player.surname!)) : -1;
   const index = picked >= 0 ? picked : ruled.index;
   if (index < 0) return { parts, surname: NAMELESS, given: null, sure: false, confirmed: false };
   const rest = parts.filter((_, i) => i !== index);

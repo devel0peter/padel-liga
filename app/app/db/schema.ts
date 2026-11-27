@@ -165,6 +165,10 @@ export const users = sqliteTable("users", {
   // Lowercased; the same email is the same account whichever way they log in.
   email: text("email").notNull().unique(),
   name: text("name").notNull().default(""),
+  // Which part of `name` is the surname, as the player picked it (#419,
+  // D182): one of the name's own words, for the team label "Kovács / Nagy".
+  // Null: worked out by the rules in lib/names.ts. Changing the name clears it.
+  surname: text("surname"),
   // Profile picture URL from Google (refreshed at each Google login); none for
   // email-code accounts, which show initials.
   imageUrl: text("image_url"),

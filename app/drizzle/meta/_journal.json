@@ -414,6 +414,13 @@
       "when": 1795564290580,
       "tag": "0071_partner_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1795810229093,
+      "tag": "0072_user_surname",
+      "breakpoints": true
     }
   ]
 }

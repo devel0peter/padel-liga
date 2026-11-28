@@ -13,7 +13,7 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { can } from "~/lib/auth/permissions";
 import { clubsAction, clubsData, clubsScope } from "~/lib/clubs-page.server";
 import { formatDateTime } from "~/lib/format";
-import { parseMinEntries } from "~/lib/seasons";
+import { MIN_ENTRIES_RANGE, parseMinEntries } from "~/lib/seasons";
 import { LOCAL_RULES_MAX } from "~/lib/leagues";
 import { getLeagueSettings, organizersByLeague, updateLeagueContact, updateLeagueLocalRules } from "~/lib/leagues.server";
 import { leagueAuditLog } from "~/lib/organizer-log.server";
@@ -209,7 +209,15 @@ export default function LeagueSettings({ loaderData, actionData }: Route.Compone
               <input type="hidden" name="intent" value="min-entries" />
               <div className="grid gap-1">
                 <Label htmlFor="minEntries">Minimum párok száma</Label>
-                <Input id="minEntries" name="minEntries" type="number" min={4} max={200} defaultValue={settings.minEntries} className="w-32" />
+                <Input
+                  id="minEntries"
+                  name="minEntries"
+                  type="number"
+                  min={MIN_ENTRIES_RANGE.min}
+                  max={MIN_ENTRIES_RANGE.max}
+                  defaultValue={settings.minEntries}
+                  className="w-32"
+                />
               </div>
               <Button type="submit" size="xl" variant="secondary" disabled={busy}>
                 Mentés

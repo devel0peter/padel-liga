@@ -6,7 +6,8 @@
 export const FEEDBACK_KINDS = ["bug", "idea", "other", "rating"] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 // What the form offers; a rating only comes from the prompt.
-export const FORM_KINDS = ["bug", "idea", "other"] as const satisfies readonly FeedbackKind[];
+// The form's two choices (#446): "Egyéb" is gone, old rows keep it.
+export const FORM_KINDS = ["bug", "idea"] as const satisfies readonly FeedbackKind[];
 export type FormKind = (typeof FORM_KINDS)[number];
 
 export const KIND_LABELS: Record<FeedbackKind, string> = {
@@ -18,6 +19,16 @@ export const KIND_LABELS: Record<FeedbackKind, string> = {
 
 export const MESSAGE_MAX = 2000;
 
+// The form's choices as the player reads them, and what the box asks (#446).
+export const FORM_CHOICES: Record<FormKind, { label: string; placeholder: string }> = {
+  bug: { label: "Valami nem működik", placeholder: "Mi történt? Pl. a Tabellán nem látom a meccsünket." },
+  idea: { label: "Ötletem van", placeholder: "Mit csinálnál másképp, vagy mi hiányzik?" },
+};
+
+// The rating (#446): 1–5 tennis balls.
+export const RATING_MAX = 5;
+export const RATING_LABELS = ["", "Nagyon rossz", "Nem tetszik", "Elmegy", "Tetszik", "Nagyon tetszik"] as const;
+
 export const isFeedbackKind = (value: unknown): value is FeedbackKind => FEEDBACK_KINDS.includes(value as FeedbackKind);
 export const isFormKind = (value: unknown): value is FormKind => FORM_KINDS.includes(value as FormKind);
 
@@ -27,7 +38,7 @@ export const ERRORS = {
   kind: "Válaszd ki, miről szól.",
   empty: "Írd le pár szóban, mit szeretnél.",
   tooLong: `Legfeljebb ${MESSAGE_MAX} karakter lehet.`,
-  rating: "1 és 5 csillag között válassz.",
+  rating: "Válassz 1 és 5 labda között.",
   limit: "Most túl sok üzenet jött, próbáld újra egy kicsit később.",
 } as const;
 

@@ -1,9 +1,10 @@
 import { proposalErrors, type SetGames } from "@padel-liga/rules";
-import { CalendarClock, CalendarPlus, ChevronRight, Download, Mail, MapPin, Phone } from "lucide-react";
+import { Bug, CalendarClock, CalendarPlus, ChevronRight, Download, Mail, MapPin, Phone } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
+import { FeedbackDialog } from "~/components/feedback-form";
 import { OverflowRow, Page, PageHeader, SectionLabel, StatusPill, TeamBadge, TeamName, teamHue } from "~/components/blocks";
 import { GroupMessage } from "~/components/group-message";
 import { DayHourPicker, RangePicker, StartPicker } from "~/components/slot-picker";
@@ -1089,6 +1090,16 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               </div>
             </OverflowRow>
           )}
+          {/* Something wrong on this page: the form opens here (#446). */}
+          <FeedbackDialog from={`/matches/${m.id}`}>
+            <button
+              type="button"
+              className="flex min-h-11 w-fit cursor-pointer items-center gap-2 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Bug aria-hidden className="size-5" />
+              Valami nem működik ezen az oldalon?
+            </button>
+          </FeedbackDialog>
         </div>
       </div>
     </Page>

@@ -115,9 +115,10 @@ export default function Privacy() {
               töröljük.
             </p>
             <p>
-              Ha visszajelzést küldesz (a Visszajelzés oldalon, belépve vagy
-              anélkül): az üzenetedet, a típusát (hiba, ötlet vagy egyéb), az
-              oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil
+              Ha visszajelzést küldesz (a „Hiba vagy ötlet” ablakban, belépve
+              vagy anélkül, vagy belépve értékeled az oldalt 1–5 labdával): az
+              üzenetedet, a típusát (hiba, ötlet vagy értékelés), az
+              értékelésed számát, az oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil
               vagy számítógép) és a böngésződ nevét, az oldal verzióját, és ha
               be vagy lépve, a fiókodat. A teljes böngészőazonosítót és az
               IP-címedet nem tároljuk.

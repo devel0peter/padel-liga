@@ -1,5 +1,6 @@
+import { Bug, Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Form, useFetcher, useNavigation } from "react-router";
+import { Form, useFetcher, useLocation, useNavigation } from "react-router";
 
 import { FieldError, invalid } from "~/components/auth";
 import { Turnstile } from "~/components/turnstile";
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "~/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Textarea } from "~/components/ui/textarea";
-import { FORM_KINDS, KIND_LABELS, MESSAGE_MAX } from "~/lib/feedback";
+import { FORM_CHOICES, FORM_KINDS, isFormKind, MESSAGE_MAX, RATING_LABELS, RATING_MAX, type FormKind } from "~/lib/feedback";
 import { CONTACT_EMAIL } from "~/lib/site";
 
 // Visszajelzés's form (#240, spec 19, D94), shared by the /feedback page and
@@ -29,10 +30,15 @@ export type FeedbackFormData = {
 
 export type FeedbackAnswer = { ok: true } | { ok: false; error: string; kind: string; message: string };
 
-export const FEEDBACK_INTRO = "Valami nem működik, vagy van egy ötleted? Írd meg nekünk.";
+// The form's name (#446; Peter decides the final wording), its line and the thank-you.
+export const FEEDBACK_TITLE = "Hiba vagy ötlet";
+export const FEEDBACK_INTRO = "Írd meg röviden, megnézzük.";
 export const THANKS_TITLE = "Köszi, megkaptuk!";
 export const THANKS_TEXT = "Elolvassuk, és ha kell, javítjuk.";
 
+// The form (#446): what it is about as two large choices, one box whose
+// hint says what to write, the contact line. What we store with it (page,
+// device, browser, version, account) isn't listed on the form any more.
 export function FeedbackFields({
   data,
   failed,
@@ -49,33 +55,27 @@ export function FeedbackFields({
   FormTag?: typeof Form;
 }) {
   const [botOk, setBotOk] = useState(false);
+  const [kind, setKind] = useState<FormKind>(isFormKind(failed?.kind) ? failed.kind : "bug");
   const blocked = Boolean(data.turnstileSiteKey) && !botOk;
-  const context = [
-    ["Oldal", data.page || "–"],
-    ["Időpont", data.sentAt],
-    ["Eszköz", data.device],
-    ["Böngésző", data.browser],
-    ["Verzió", data.version],
-    ...(data.account ? [["Fiók", data.account]] : []),
-  ];
   return (
-    <FormTag method="post" action="/feedback" className="grid gap-5">
+    <FormTag method="post" action="/feedback" className="grid gap-4">
       <input type="hidden" name="from" value={data.from} />
-      <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-semibold">Miről szól?</legend>
-        <RadioGroup name="kind" required defaultValue={failed?.kind || undefined} className="flex flex-wrap gap-x-6 gap-y-1">
-          {FORM_KINDS.map((kind) => (
-            <div key={kind} className="flex min-h-11 items-center gap-2">
-              <RadioGroupItem id={`kind-${kind}`} value={kind} className="size-5" />
-              <Label htmlFor={`kind-${kind}`} className="text-base font-normal">
-                {KIND_LABELS[kind]}
-              </Label>
-            </div>
-          ))}
-        </RadioGroup>
-      </fieldset>
+      <RadioGroup name="kind" value={kind} onValueChange={(v) => isFormKind(v) && setKind(v)} aria-label="Miről szól?" className="grid grid-cols-2 gap-2">
+        {FORM_KINDS.map((k) => (
+          <Label
+            key={k}
+            htmlFor={`kind-${k}`}
+            className="relative flex min-h-14 cursor-pointer items-center gap-2.5 rounded-xl bg-surface-3 px-3.5 py-3 text-[15px] font-semibold has-[[data-state=checked]]:bg-ball-tint has-[[data-state=checked]]:text-ball has-[[data-state=checked]]:inset-ring-2 has-[[data-state=checked]]:inset-ring-ball"
+          >
+            {/* The whole card is the radio: an invisible button over it. */}
+            <RadioGroupItem id={`kind-${k}`} value={k} className="absolute inset-0 size-full rounded-xl border-0 opacity-0" />
+            {k === "bug" ? <Bug aria-hidden className="size-5 shrink-0" /> : <Lightbulb aria-hidden className="size-5 shrink-0" />}
+            {FORM_CHOICES[k].label}
+          </Label>
+        ))}
+      </RadioGroup>
       <div className="grid gap-1.5">
-        <Label htmlFor="message" className="font-semibold">
+        <Label htmlFor="message" className="sr-only">
           Üzenet
         </Label>
         <Textarea
@@ -84,36 +84,128 @@ export function FeedbackFields({
           required
           maxLength={MESSAGE_MAX}
           rows={5}
+          placeholder={FORM_CHOICES[kind].placeholder}
           defaultValue={failed?.message}
           className="bg-background text-base"
           {...invalid("message", failed?.error)}
         />
-        <p className="text-sm text-muted-foreground">Ne írj bele jelszót, és mások személyes adatait se.</p>
-      </div>
-      <div className="grid gap-1.5 rounded-xl bg-surface-2 px-3.5 py-3 text-sm">
-        <p className="font-semibold">Ezt küldjük el veled:</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
-          {context.map(([label, value]) => (
-            <div key={label} className="contents">
-              <dt>{label}</dt>
-              <dd className="min-w-0 break-words text-foreground">{value}</dd>
-            </div>
-          ))}
-        </dl>
       </div>
       {data.turnstileSiteKey && <Turnstile siteKey={data.turnstileSiteKey} action="feedback" resetKey={answer} onReady={setBotOk} />}
       <FieldError id="message-error" message={failed?.error} />
       <Button type="submit" size="xl" disabled={busy || blocked}>
         {busy ? "Küldés…" : "Küldés"}
       </Button>
-      <p className="text-sm text-muted-foreground">
-        E-mailben nem válaszolunk. Ha választ szeretnél, írj ide:{" "}
+      <p className="m-0 text-caption text-muted-foreground">
+        Választ vársz?{" "}
         <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
           {CONTACT_EMAIL}
         </a>
-        .
       </p>
     </FormTag>
+  );
+}
+
+// A tennis ball (#446): the rating's mark, filled when chosen.
+function Ball({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="size-10">
+      <circle cx="16" cy="16" r="14" className={on ? "fill-ball" : "fill-surface-3"} />
+      <path d="M5 8.5c5 2.5 7 6.5 7 7.5s-2 5-7 7.5M27 8.5c-5 2.5-7 6.5-7 7.5s2 5 7 7.5" fill="none" strokeWidth="1.8" className={on ? "stroke-ball-foreground/40" : "stroke-surface-4"} />
+    </svg>
+  );
+}
+
+/**
+ * "Hogy tetszik a Padelpárbaj?" (#446): 1–5 tennis balls and an optional
+ * comment, stored as a rating. For logged-in players only (Kezdőlap's tip
+ * card, Profil). `onSent`: the card hides itself.
+ */
+export function RatingDialog({
+  children,
+  onSent,
+  onDismiss,
+}: {
+  children: React.ReactNode;
+  onSent?: () => void;
+  // Closed without sending (the tip card counts it as "Most nem", #446).
+  onDismiss?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [round, setRound] = useState(0);
+  const [rating, setRating] = useState(0);
+  const location = useLocation();
+  const sender = useFetcher<FeedbackAnswer>({ key: `rating-${round}` });
+  const sent = sender.data?.ok === true && sender.state === "idle";
+  const failed = sender.data && !sender.data.ok ? sender.data.error : null;
+  useEffect(() => {
+    if (sent) onSent?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sent]);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next && sent) {
+          setRound((r) => r + 1);
+          setRating(0);
+        }
+        if (!next && !sent) onDismiss?.();
+      }}
+    >
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+        {sent ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="type-display text-[28px]">{THANKS_TITLE}</DialogTitle>
+              <DialogDescription>Köszi, hogy szántál rá egy percet.</DialogDescription>
+            </DialogHeader>
+            <Button size="xl" onClick={() => setOpen(false)}>
+              Bezárom
+            </Button>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="type-display text-[28px]">Hogy tetszik a Padelpárbaj?</DialogTitle>
+              <DialogDescription>Egytől öt labdáig.</DialogDescription>
+            </DialogHeader>
+            <sender.Form method="post" action="/feedback" className="grid gap-4">
+              <input type="hidden" name="kind" value="rating" />
+              <input type="hidden" name="from" value={location.pathname + location.search} />
+              <RadioGroup
+                name="rating"
+                value={rating ? String(rating) : ""}
+                onValueChange={(v) => setRating(Number(v))}
+                aria-label="Értékelés"
+                className="flex flex-wrap items-center gap-1"
+              >
+                {Array.from({ length: RATING_MAX }, (_, i) => i + 1).map((n) => (
+                  <Label key={n} htmlFor={`rating-${n}`} className="relative cursor-pointer rounded-full p-0.5 has-focus-visible:outline-2 has-focus-visible:outline-ring">
+                    <RadioGroupItem id={`rating-${n}`} value={String(n)} aria-label={`${n} labda: ${RATING_LABELS[n]}`} className="absolute inset-0 size-full rounded-full border-0 opacity-0" />
+                    <Ball on={n <= rating} />
+                  </Label>
+                ))}
+              </RadioGroup>
+              <p className="m-0 min-h-5 text-sm font-semibold text-ball">{rating ? RATING_LABELS[rating] : ""}</p>
+              <Label htmlFor="rating-message" className="sr-only">
+                Mit javítanál?
+              </Label>
+              <Textarea id="rating-message" name="message" maxLength={MESSAGE_MAX} rows={3} placeholder="Mit javítanál? (nem kötelező)" className="bg-background text-base" />
+              {failed && (
+                <p role="alert" className="m-0 text-sm font-semibold text-danger">
+                  {failed}
+                </p>
+              )}
+              <Button type="submit" size="xl" disabled={!rating || sender.state !== "idle"}>
+                Küldés
+              </Button>
+            </sender.Form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -159,7 +251,7 @@ export function FeedbackDialog({ from, children }: { from: string; children: Rea
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle className="type-display text-[28px]">Visszajelzés</DialogTitle>
+              <DialogTitle className="type-display text-[28px]">{FEEDBACK_TITLE}</DialogTitle>
               <DialogDescription>{FEEDBACK_INTRO}</DialogDescription>
             </DialogHeader>
             {loader.data ? (

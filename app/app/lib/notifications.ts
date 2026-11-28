@@ -30,6 +30,10 @@ export const NOTIFICATION_KINDS = {
     label: "Partnercsere jóváhagyásra vár",
     description: "Ha a ligádban egy állandó partnercserét az új partner elfogadott, és te hagyod jóvá vagy utasítod el.",
   },
+  round_draft_ready: {
+    label: "Körváltás tervezete",
+    description: "Ha elkészült a következő kör csoportbeosztásának tervezete, és átnézheted, közzéteheted.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -201,7 +205,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
   if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
-  return ["result_disputed", "no_show_reported", "partner_change_waiting"];
+  return ["result_disputed", "no_show_reported", "partner_change_waiting", "round_draft_ready"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -721,6 +725,7 @@ const TONES: Record<string, NoticeTone> = {
   match_deadline_soon: "warning",
   match_no_proposal: "warning",
   partner_change_waiting: "warning",
+  round_draft_ready: "warning",
   // A time to pick.
   match_proposal: "info",
   match_tomorrow: "info",
@@ -738,3 +743,21 @@ const TONES: Record<string, NoticeTone> = {
 };
 
 export const noticeTone = (kind: string): NoticeTone => TONES[kind] ?? "neutral";
+
+// To the league's Szervezők and Admins when the Monday cron drafts the next
+// round's groups (#432). No names.
+export function roundDraftReadyMessage(input: {
+  leagueSlug: string;
+  leagueName: string;
+  seasonId: number;
+  phase: number;
+  blockers: number;
+  url?: string;
+}): Message {
+  const base = "Nézd át és tedd közzé.";
+  return {
+    title: `${input.leagueName}: kész ${withArticle(input.phase)} kör tervezete`,
+    body: input.blockers > 0 ? `${base} Előtte ${input.blockers} döntés vár rád.` : base,
+    url: input.url ?? `/admin/leagues/${input.leagueSlug}/seasons/${input.seasonId}/groups?phase=${input.phase}`,
+  };
+}

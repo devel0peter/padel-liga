@@ -37,11 +37,35 @@ import {
 
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
+import { roundDraftReadyMessage } from "./notifications";
+
 describe("kindsFor", () => {
-  it("offers disputed results, no-shows and partner changes waiting for approval (#416) to Szervezők and Admins only (no new signups since #333; a temporary substitute needs no approval since #400)", () => {
+  it("offers organizer kinds to Szervezők and Admins only", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "no_show_reported", "partner_change_waiting"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "no_show_reported", "partner_change_waiting"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual([
+      "result_disputed",
+      "no_show_reported",
+      "partner_change_waiting",
+      "round_draft_ready",
+    ]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual([
+      "result_disputed",
+      "no_show_reported",
+      "partner_change_waiting",
+      "round_draft_ready",
+    ]);
+  });
+});
+
+describe("roundDraftReadyMessage (#432)", () => {
+  it("builds Hungarian notice without names and includes blocker count only when > 0", () => {
+    const clean = roundDraftReadyMessage({ leagueSlug: "gyor", leagueName: "Győri liga", seasonId: 3, phase: 2, blockers: 0 });
+    expect(clean.title).toBe("Győri liga: kész a 2. kör tervezete");
+    expect(clean.body).toBe("Nézd át és tedd közzé.");
+    expect(clean.url).toBe("/admin/leagues/gyor/seasons/3/groups?phase=2");
+
+    const blocked = roundDraftReadyMessage({ leagueSlug: "gyor", leagueName: "Győri liga", seasonId: 3, phase: 2, blockers: 2 });
+    expect(blocked.body).toBe("Nézd át és tedd közzé. Előtte 2 döntés vár rád.");
   });
 });
 

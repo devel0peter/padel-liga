@@ -13,6 +13,7 @@ import {
   partnerChangeWaitingMessage,
   resultDisputedMessage,
   noShowReportedMessage,
+  roundDraftReadyMessage,
   pushPayload,
   pushWanted,
   TEST_MESSAGE,
@@ -50,9 +51,9 @@ export function vapidPublicKey(): string | null {
 // A fan-out (e.g. the groups published to every player) must stay within a
 // Workers Free request's D1 queries, so lookups and inserts go in a few
 // multi-row statements, not one per user (#115). D1 allows 100 bound
-// parameters per statement; a notification row binds up to 7.
+// parameters per statement; a notification row binds up to 9.
 const ID_CHUNK = 90;
-const INSERT_CHUNK = 14;
+const INSERT_CHUNK = 10;
 
 function chunks<T>(list: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -437,7 +438,7 @@ export async function notifyPartnerChangeWaiting(input: { leagueId: number; leag
 
 // The league's Szervezők and every Admin, once each, accounts being deleted
 // and `except` (the player whose step it is) left out.
-async function leagueStaff(leagueId: number, except: string): Promise<string[]> {
+export async function leagueStaff(leagueId: number, except = ""): Promise<string[]> {
   const [organizers, admins] = await Promise.all([
     db
       .select({ id: users.id })
@@ -468,6 +469,32 @@ export async function notifyNoShowReported(input: {
     await notify("no_show_reported", (await leagueStaff(input.leagueId, input.reportedBy)).map((userId) => ({ userId, message })));
   } catch (error) {
     logError("notification failed", { kind: "no_show_reported", error });
+  }
+}
+
+// The Monday cron drafted the next round's groups (#432): tell the league's
+// Szervezők and every Admin, in the app and by push (their own switch), never
+// by email. Rebuilding by hand does not call this. Never throws.
+export async function notifyRoundDraftReady(
+  input: {
+    leagueId: number;
+    leagueSlug: string;
+    leagueName: string;
+    seasonId: number;
+    phase: number;
+    blockers: number;
+  },
+  createdAt?: Date,
+): Promise<void> {
+  try {
+    const message = roundDraftReadyMessage(input);
+    await notify(
+      "round_draft_ready",
+      (await leagueStaff(input.leagueId)).map((userId) => ({ userId, message })),
+      createdAt,
+    );
+  } catch (error) {
+    logError("notification failed", { kind: "round_draft_ready", error });
   }
 }
 

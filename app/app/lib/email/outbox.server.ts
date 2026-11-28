@@ -372,6 +372,7 @@ export async function createBroadcast(input: {
   // The Admin's or Szervező's account id, for the audit log (#225, #387).
   actorId: string;
   leagueId?: number | null;
+  createdAt?: Date;
 }): Promise<number> {
   const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
   const leagueId = input.leagueId ?? null;
@@ -385,6 +386,7 @@ export async function createBroadcast(input: {
         audience: input.audience,
         recipients: recipients.length,
         createdBy: input.createdBy,
+        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
       })
       .returning({ id: broadcasts.id }),
     auditEntry({

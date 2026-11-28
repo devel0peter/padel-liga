@@ -90,15 +90,13 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     const [{ id: orgId }] = d1(`select id from users where email = '${ORGANIZER.email}'`) as { id: string }[];
     expect(d1(`select count(*) n from notifications where user_id = '${orgId}' and kind = 'partner_change_waiting'`)[0]!.n).toBeGreaterThan(0);
 
-    // The Szervező approves it on Párok, seeing how often the two changed partner.
+    // The Szervező approves it on Döntések (#434), seeing how often the two changed partner.
     const org = await as(browser, ORGANIZER.email);
-    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/pairs`);
-    const changes = content(org.page).getByRole("region", { name: "Állandó partnercserék" });
-    await expect(changes).toContainText(`${m.starter_name}: ${m.leaving} helyett ${OUTSIDER.name}`);
-    await expect(changes).toContainText("Jóváhagyásra vár");
-    await expect(changes).toContainText(`${OUTSIDER.name}: még nem cserélt partnert ebben a szezonban.`);
-    await changes.getByRole("button", { name: "Jóváhagyom" }).click();
-    await expect(changes.getByRole("button", { name: "Visszavonás" })).toBeVisible();
+    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/disputes`);
+    const decisions = content(org.page);
+    await expect(decisions).toContainText(`${m.starter_name}: ${m.leaving} helyett ${OUTSIDER.name}`);
+    await decisions.getByRole("button", { name: "Jóváhagyom" }).click();
+    await expect(decisions).not.toContainText(`${m.starter_name}: ${m.leaving} helyett ${OUTSIDER.name}`);
 
     // The leaving player: one email naming who replaces them.
     const [final] = await waitForEmails(offset, 1, (e) => /Új partner a helyeden/.test(e.subject));
@@ -111,13 +109,14 @@ test("44. Állandó partnercsere: asked on Ligáim, accepted, the new partner pl
     await expect(content(starter.page)).toContainText(`${m.leaving} helyett ${OUTSIDER.name} játszik`);
 
     // Párok counts the pair's match with an absent player this season.
-    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/pairs`);
+    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/players?tab=pairs`);
     await expect(content(org.page)).toContainText(/Helyettessel: \d+ meccs ebben a szezonban/);
 
-    // The Szervező undoes it on Párok: the mark goes.
-    await changes.getByRole("button", { name: "Visszavonás" }).click();
-    await org.page.getByRole("alertdialog").getByRole("button", { name: "Visszavonás" }).click();
-    await expect(changes.getByRole("button", { name: "Visszavonás" })).toHaveCount(0);
+    // The Szervező undoes it on Döntések → Lezárt: the mark goes.
+    await visit(org.page, `/admin/leagues/${LEAGUE.slug}/disputes?tab=closed`);
+    const closed = content(org.page);
+    await closed.getByRole("button", { name: "Visszavonás" }).first().click();
+    await expect(closed.getByRole("button", { name: "Visszavonás" })).toHaveCount(0);
     expect(d1(`select count(*) n from match_absences where match_id = ${match.id}`)[0]!.n).toBe(0);
     await visit(starter.page, `/matches/${match.id}`);
     await expect(content(starter.page)).not.toContainText(`${m.leaving} helyett`);

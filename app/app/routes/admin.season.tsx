@@ -303,6 +303,7 @@ export default function AdminSeason({ loaderData, actionData }: Route.ComponentP
 
       {tab === "entries" && (
         <section className="grid gap-3">
+          <p className="text-sm text-muted-foreground">{entries.length} nevezett pár. A nevezett párok kerülnek a csoportokba.</p>
           {entries.length === 0 ? (
             <p className="py-6 text-center text-muted-foreground">Még nincs nevezett pár.</p>
           ) : (

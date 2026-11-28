@@ -41,25 +41,23 @@ test("Nem jöttek el: a player reports after the slot, the Szervező confirms th
   await expect(main.getByRole("button", { name: "Nem jöttek el" })).toHaveCount(0);
   await reporter.context.close();
 
-  // The Szervező: told, finds it on Viták, confirms on the decision page.
+  // The Szervező: told, finds it on Döntések, confirms on the unified match page (#433, #434).
   const org = await as(browser, ORGANIZER.email);
   await visit(org.page, "/notifications");
   await expect(content(org.page)).toContainText("Nem jöttek el");
   await visit(org.page, "/admin/leagues/minta/disputes");
   const list = content(org.page);
-  await expect(list).toContainText("Nem jöttek el (1)");
-  const item = list.getByRole("listitem").filter({ hasText: "nem jött el" });
-  await expect(item).toContainText(`${m!.opp_a} – ${m!.opp_b} nem jött el`);
+  await expect(list).toContainText("Nem jöttek el");
   await expect(list).not.toContainText("@");
-  await item.getByRole("link", { name: "Döntök" }).click();
-  await org.page.waitForURL(`**/matches/${m!.id}/decide`);
+  await list.getByRole("link", { name: /Döntök|Megnyitás/ }).first().click();
+  await org.page.waitForURL(`**/matches/${m!.id}*`);
   const decide = content(org.page);
-  await expect(decide).toContainText("Nem jöttek el: döntés");
-  await decide.getByLabel("Indoklás (nem kötelező, mindkét pár látja)").fill("A klub is megerősítette.");
-  await decide.getByRole("button", { name: "Jóváhagyom" }).click();
+  await expect(decide).toContainText("Döntésre vár: nem jöttek el");
+  await decide.getByLabel("Indoklás (opcionális, mindkét pár látja)").fill("A klub is megerősítette.");
+  await decide.getByRole("button", { name: /Jóváhagyom/ }).click();
   await expect(decide).toContainText("Jóváhagytad");
-  await expect(decide).not.toContainText("Nem jöttek el: döntés");
-  await expect(decide).toContainText("Nem jöttek el: a szervező jóváhagyta a bejelentést. A klub is megerősítette.");
+  await expect(decide).not.toContainText("Döntésre vár: nem jöttek el");
+  await expect(decide).toContainText("A klub is megerősítette.");
   await org.context.close();
 
   // The match is a 4-0 4-0 walkover; the other pair sees why and got a strike.

@@ -162,6 +162,8 @@ export default function LeagueMatch({ loaderData, actionData }: Route.ComponentP
         </div>
       </section>
 
+      <FormFeedback result={actionData} intent="no-show" />
+
       {noShow && (
         <section className="grid gap-3 rounded-2xl border border-warning/40 bg-surface p-4 sm:p-5" aria-label="Nem jöttek el bejelentés">
           <SectionLabel tone="warning">Döntésre vár: nem jöttek el</SectionLabel>
@@ -175,7 +177,6 @@ export default function LeagueMatch({ loaderData, actionData }: Route.ComponentP
               <Label htmlFor="ns-reason">Indoklás (opcionális, mindkét pár látja)</Label>
               <Textarea id="ns-reason" name="reason" maxLength={NO_SHOW_REASON_MAX} rows={2} />
             </div>
-            <FormFeedback result={actionData} intent="no-show" />
             <div className="flex flex-wrap gap-2">
               <Button type="submit" size="xl" name="intent" value="no-show-confirm" disabled={busy}>
                 Jóváhagyom (játék nélkül)

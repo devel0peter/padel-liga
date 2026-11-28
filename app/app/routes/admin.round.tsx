@@ -716,7 +716,7 @@ export default function AdminRound({ loaderData, actionData }: Route.ComponentPr
 
               {groupsData.publishedAt && (
                 <p className="text-sm text-muted-foreground">
-                  Közzétéve: {formatDateTime(groupsData.publishedAt)} · {groupsData.groups.length} csoport · {groupsData.players} játékos.
+                  Közzétéve: {formatDateTime(groupsData.publishedAt)} · {groupsData.groups.length} csoport · {groupsData.players} játékos. A csoportok már nem módosíthatók.
                 </p>
               )}
 
@@ -728,64 +728,69 @@ export default function AdminRound({ loaderData, actionData }: Route.ComponentPr
 
               {/* Draft / Generate / Publish controls */}
               {!groupsData.publishedAt && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {phaseNumber === FIRST_PHASE ? (
-                    <>
-                      {groupsData.splitProblem ? (
-                        <p className="text-sm text-muted-foreground">{groupsData.splitProblem}</p>
-                      ) : (
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="generate" />
-                          <Button type="submit" variant={groupsData.draft ? "outline" : "default"} disabled={busy}>
-                            {groupsData.draft ? <RefreshCw className="size-4" /> : <Sparkles className="size-4" />}
-                            {groupsData.draft ? "Újraszámolás" : `Csoportjavaslat (${groupsData.eligibleCount} pár)`}
-                          </Button>
-                        </Form>
-                      )}
-                    </>
-                  ) : groupsData.switch && (groupsData.switch.state === "running" || groupsData.switch.state === "resolving") ? (
-                    <p className="text-sm text-muted-foreground">{waitingText(groupsData.switch.state, groupsData.switch.endingPhase)}</p>
-                  ) : !groupsData.switch ? (
-                    <p className="text-sm text-muted-foreground">{NOTHING_TO_DRAFT}</p>
-                  ) : (
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="generate" />
-                      <Button type="submit" variant={groupsData.draft ? "outline" : "default"} disabled={busy}>
-                        {groupsData.draft ? <RefreshCw className="size-4" /> : <Sparkles className="size-4" />}
-                        {groupsData.draft ? "Tervezet újraszámolása" : "Tervezet elkészítése"}
-                      </Button>
-                    </Form>
+                <div className="grid gap-2">
+                  {phaseNumber === FIRST_PHASE && (
+                    <p className="text-sm text-muted-foreground">{groupsData.eligibleCount} nevezett pár van.</p>
                   )}
-
-                  {groupsData.draft && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button disabled={busy || Boolean(groupsData.blocker)}>
-                          <Send className="size-4" />
-                          Közzététel
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Közzéteszed {withArticle(phaseNumber)} kör csoportjait?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Létrejönnek a meccsek, és mind a(z) {groupsData.players} játékos megkapja az e-mailt a csoportbeosztásról. Utána a csoportok már nem módosíthatók.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Mégse</AlertDialogCancel>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {phaseNumber === FIRST_PHASE ? (
+                      <>
+                        {groupsData.splitProblem ? (
+                          <p className="text-sm text-muted-foreground">{groupsData.splitProblem}</p>
+                        ) : (
                           <Form method="post">
-                            <input type="hidden" name="intent" value="publish" />
-                            <AlertDialogAction type="submit" disabled={busy}>
-                              Közzéteszem
-                            </AlertDialogAction>
+                            <input type="hidden" name="intent" value="generate" />
+                            <Button type="submit" variant={groupsData.draft ? "outline" : "default"} disabled={busy}>
+                              {groupsData.draft ? <RefreshCw className="size-4" /> : <Sparkles className="size-4" />}
+                              {groupsData.draft ? "Újragenerálás" : "Csoportok javaslata"}
+                            </Button>
                           </Form>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
+                        )}
+                      </>
+                    ) : groupsData.switch && (groupsData.switch.state === "running" || groupsData.switch.state === "resolving") ? (
+                      <p className="text-sm text-muted-foreground">{waitingText(groupsData.switch.state, groupsData.switch.endingPhase)}</p>
+                    ) : !groupsData.switch ? (
+                      <p className="text-sm text-muted-foreground">{NOTHING_TO_DRAFT}</p>
+                    ) : (
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="generate" />
+                        <Button type="submit" variant={groupsData.draft ? "outline" : "default"} disabled={busy}>
+                          {groupsData.draft ? <RefreshCw className="size-4" /> : <Sparkles className="size-4" />}
+                          {groupsData.draft ? "Tervezet újraszámolása" : "Tervezet elkészítése"}
+                        </Button>
+                      </Form>
+                    )}
 
-                  {groupsData.blocker && <p className="text-sm text-destructive">{groupsData.blocker}</p>}
+                    {groupsData.draft && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button disabled={busy || Boolean(groupsData.blocker)}>
+                            <Send className="size-4" />
+                            Közzététel
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Közzéteszed a csoportokat?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Létrejönnek {withArticle(phaseNumber)} kör meccsei, és mind a {groupsData.players} játékos most értesítést kap e-mailben. Utána a csoportok már nem módosíthatók.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Mégse</AlertDialogCancel>
+                            <Form method="post">
+                              <input type="hidden" name="intent" value="publish" />
+                              <AlertDialogAction type="submit" disabled={busy}>
+                                Közzététel
+                              </AlertDialogAction>
+                            </Form>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+
+                    {groupsData.blocker && <p className="text-sm text-destructive">{groupsData.blocker}</p>}
+                  </div>
                 </div>
               )}
 

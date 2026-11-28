@@ -67,7 +67,7 @@ async function freshDb() {
     )
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
-    h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)").run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
+    h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)").run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('o', 'o@x.hu', 'Org', 'versenyzo', 1)`);
   h.raw.exec(`insert into users (id, email, name, level, consent_at, platform_role) values ('adm', 'adm@x.hu', 'Admin', 'versenyzo', 1, 'superadmin')`);
@@ -219,12 +219,11 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     expect(page!.result).toMatchObject({ status: "final", how: "organizer" });
   });
 
-  it("confirming gives the absent pair's two players a strike with source no_show, never a substitute", async () => {
+  it("confirming gives the absent pair's two players a strike with source no_show, also one marked absent (#400)", async () => {
     const { id, report } = await reported();
-    // An approved substitute stood in for p3b.
-    h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'Helyettes', 'halado', 1)`);
+    // A temporary substitute was to stand in for p3b.
     h.raw
-      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at) values (?, 3, 'p3b', 's', 'approved', ?)")
+      .prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 3, 'p3b', 'p3a', ?)")
       .run(id, sec(NOW.toISOString()));
     await N.decideNoShow("o", 1, report, "confirm", "Az ellenfél is megerősítette.", at("2026-11-13", 9));
     expect(all("select user_id, pair_id, source, match_id, season_id from strikes order by user_id")).toEqual([
@@ -251,9 +250,9 @@ describe("the organizer's decision (#33 requirement 2)", () => {
     const { report } = await reported();
     await N.decideNoShow("o", 1, report, "confirm", "", at("2026-11-13", 9));
     const page: any = await L.ladderPage("gyor", at("2026-11-13", 10));
-    const group = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.rows.some((r: any) => r.names.includes("Játékos 1A")));
-    expect(group.rows.find((r: any) => r.names.includes("Játékos 1A"))).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
-    expect(group.rows.find((r: any) => r.names.includes("Játékos 3A"))).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
+    const group = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.rows.some((r: any) => r.label.split(" / ").includes("Játékos 1A")));
+    expect(group.rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"))).toMatchObject({ points: 3, matches: 1, setDiff: 2, gameDiff: 8 });
+    expect(group.rows.find((r: any) => r.label.split(" / ").includes("Játékos 3A"))).toMatchObject({ points: 0, matches: 1, setDiff: -2, gameDiff: -8 });
   });
 
   it("rejecting leaves the match as it was, keeps the reason, tells both pairs, audited", async () => {

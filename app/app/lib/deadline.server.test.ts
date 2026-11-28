@@ -63,7 +63,7 @@ async function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('o', 'o@x.hu', 'Org', 'versenyzo', 1)`);
@@ -146,6 +146,27 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
     expect(page!.result).toMatchObject({ status: "final", how: "deadline" });
     expect(page!.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect(page!.log.at(-1)).toMatchObject({ who: "Padelpárbaj", by: "auto", text: "Lejárt a határidő, a meccsnaplóból döntöttünk: Játék nélküli vereség (0:4, 0:4)" });
+  });
+
+  it("a sets-to-6 round (#396): the walkover reads 6:0, 6:0, both losing 0:6, 0:6, and the table counts 12 games", async () => {
+    h.raw.exec("update season_phases set set_games = 6 where season_id = 1 and number = 1");
+    const id = await propose(1, 3);
+    await resolveDeadlines(MONDAY_6, undefined, 25);
+    const winner = matchOf(1, 3).pair_a === 1 ? "a" : "b";
+    const told = all("select user_id, body from notifications where url = ? and kind = 'match_decided' order by id", `/matches/${id}`);
+    expect(told.find((n: any) => n.user_id === "p1a").body).toBe("Játék nélküli győzelem nektek (6:0, 6:0). A részletek a meccs oldalán.");
+    expect(told.find((n: any) => n.user_id === "p3a").body).toBe("Játék nélküli vereség (0:6, 0:6). A részletek a meccs oldalán.");
+    expect(one("select detail from audit_log where action = 'match.deadline' and target = ?", `match:${id}`)).toEqual({
+      detail: `Játék nélküli győzelem: ${winner === "a" ? "A pár" : "B pár"} (6:0, 6:0)`,
+    });
+    const both = matchOf(1, 4).id;
+    expect(one("select detail from audit_log where action = 'match.deadline' and target = ?", `match:${both}`)).toEqual({
+      detail: "Mindkét pár vereséget kap (0:6, 0:6)",
+    });
+    const page: any = await L.ladderPage("gyor", MONDAY_6);
+    const pair1 = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.number === 1).rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"));
+    // 1–3 won 6:0, 6:0; 1–4 and 1–2 lost 0:6, 0:6 by both being inactive.
+    expect(pair1).toMatchObject({ points: 3, matches: 3, setDiff: 2 - 4, gameDiff: 12 - 24 });
   });
 
   it("neither side active: both lose 0-4 0-4, all four players get a strike", async () => {
@@ -256,7 +277,7 @@ describe("resolving unplayed matches at the deadline (#11)", () => {
     await resolveDeadlines(MONDAY_6, undefined, 25);
     const page: any = await L.ladderPage("gyor", MONDAY_6);
     const group1 = page.bands.flatMap((b: any) => b.groups).find((g: any) => g.number === 1);
-    const pair1 = group1.rows.find((r: any) => r.names.includes("Játékos 1A"));
+    const pair1 = group1.rows.find((r: any) => r.label.split(" / ").includes("Játékos 1A"));
     // 1–3 won by walkover, 1–4 and 1–2 lost by both being inactive.
     expect(pair1).toMatchObject({ points: 3, matches: 3, setDiff: 2 - 4, gameDiff: 8 - 16 });
   });
@@ -338,17 +359,17 @@ describe("strikes (#294)", () => {
     expect(all("select body from notifications where user_id = 'p1a' and kind = 'strike' order by id")[0].body).toMatch(/^Nem jelentetek meg egy lefixált meccsen\. Ebben a szezonban 1 fekete pontod van/);
   });
 
-  it("an approved substitute (#37) never gets a strike: the pair's two players do (spec 8)", async () => {
+  it("a player marked absent (#400) gets the strike with their partner; anyone else never does (spec 8)", async () => {
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('sub', 'sub@x.hu', 'Helyettes', 'halado', 1)`);
     const id = matchOf(1, 3).id;
     h.raw
-      .prepare("insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_by, requested_at) values (?, 3, 'p3a', 'sub', 'approved', 'p3b', ?)")
+      .prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 3, 'p3a', 'p3b', ?)")
       .run(id, sec(NOW.toISOString()));
-    // The deadline: neither side active, all four of the pairs' players, not the substitute.
+    // The deadline: neither side active, all four of the pairs' players, the absent one too.
     await resolveDeadlines(MONDAY_6, undefined, 25);
     expect(all("select user_id from strikes where match_id = ? order by user_id", id).map((r: any) => r.user_id)).toEqual(["p1a", "p1b", "p3a", "p3b"]);
-    // A no-show (#33) passes the pair's two players; a caller that names who was on court
-    // instead (the substitute and the partner) gets the substitute dropped: only p3b is struck.
+    // A no-show (#33) passes the pair's two players; a caller that names anyone
+    // else (a substitute) gets them dropped: only p3b is struck.
     const other = matchOf(3, 4).id;
     // (Pair 3 did nothing all phase: each of its matches gave a strike above.)
     const before = all("select count(*) n from strikes where user_id = 'p3b'")[0].n;

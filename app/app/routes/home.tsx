@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { data, Link } from "react-router";
+import { data, Link, redirect } from "react-router";
 
 import type { Route } from "./+types/home";
 import { LadderDemo } from "~/components/ladder-demo";
@@ -24,7 +24,6 @@ import { entryCounts } from "~/lib/season-entries.server";
 import { CONTACT_EMAIL, organizationJsonLd, pageMeta } from "~/lib/site";
 import { isNewLanding, landingSource, withoutTracking } from "~/lib/traffic";
 import { normalizeRef } from "~/lib/slug";
-import { substitutesEnabled } from "~/lib/substitutes";
 
 // A tagged link (`?ref=`) keeps its tag in og:url: Facebook sends clicks on
 // the link preview card to og:url, so a bare one would drop the source.
@@ -43,6 +42,8 @@ export function meta({ location }: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // A logged-in user wants their own page, not the landing page (#444).
+  if (await getUser(request)) throw redirect("/home");
   const listed = await listedCities();
   // A listed city with a league shows where it is and sends visitors to
   // registration (#83). There is no interest form any more (#332, D123):
@@ -76,7 +77,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Back from the player's own "Fiók törlése" (#38), logged out. Only for a
   // visitor without a session, so a link with it can't tell a logged-in
   // player their account is gone.
-  const accountDeleted = params.get("accountDeleted") === "1" && !(await getUser(request));
+  // Only a logged-out visitor gets here (above), e.g. right after deleting the account.
+  const accountDeleted = params.get("accountDeleted") === "1";
   return { ref, cities, accountDeleted };
 }
 
@@ -106,7 +108,7 @@ const RULES = [
   ["Határidő", "Minden meccsnek megvan a maga hete, érdemes akkor lejátszani. Ha nem jön össze, a kör végéig, a 3. hét vasárnapjáig pótolhatjátok."],
   ["Időpontok", "Megadjátok, mikor értek rá, legalább 2 különböző napra (pl. szombat 14–18), a másik pár ebből választ egy órát."],
   ["Elmaradt meccs", "Ha a kör végéig sem jön össze, és csak az egyik pár próbált egyeztetni, ők nyernek. Ha egyik sem, mindkettő vereséget kap."],
-  ["Meccs", "2 nyert szettig, egy szett 4 játékig, 4:4-nél tie-break, 1:1-nél szuper tie-break 10 pontig. Arany ponttal: 40:40-nél egy pont dönt. Egy óra pályafoglalás általában elég."],
+  ["Meccs", "2 nyert szettig, egy szett 6 játékig, 6:6-nál tie-break, 1:1-nél szuper tie-break 10 pontig. Arany ponttal: 40:40-nél egy pont dönt. Egy óra pályafoglalás általában elég."],
   ["Eredmény", "Az egyik pár rögzíti, a másik megerősíti az oldalon."],
   ["Párcsere", "Csak két kör között lehet. Mindenkinek van egyéni Élő-pontja, így új párral is a megfelelő csoportba kerülsz."],
 ];
@@ -119,10 +121,8 @@ const FAQ = [
   ["Mi van, ha egy héten nem érünk rá?", "Semmi gond: a meccset a kör végéig, a 3. hét vasárnapjáig pótolhatjátok. Azért érdemes a saját hetén lejátszani, különben a kör végére torlódnak a meccsek. Ha a kör végéig sem jön össze, az a pár nyer, amelyik próbált egyeztetni."],
   [
     "Mi van, ha megsérül a párom?",
-    // No substitutes in the first season (D145).
-    substitutesEnabled()
-      ? "A szervező jóváhagyásával helyettes játszhat helyette, egy vagy több meccsen. A pár csak két kör között cserélhető végleg."
-      : "Ebben a szezonban még nincs helyettes. Ha nem tudjátok folytatni, szólj a szervezőnek. A pár két kör között cserélhető.",
+    // A temporary substitute, unnamed, no approval (#400, D175).
+    "Egy-egy meccsen helyettes játszhat helyette, bárki, jóváhagyás nélkül: a meccs oldalán jelöld, hogy ő nem játszik. A pár csak két kör között cserélhető végleg.",
   ],
   ["Ki szervezi?", "Padelesek, akiknek ugyanez volt a problémájuk: sok a hétvégi verseny, de nehéz rendszeres meccset összehozni."],
 ];
@@ -200,7 +200,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                           e.preventDefault();
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
-                        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court bg-court py-2 pr-4 pl-3 font-bold text-white no-underline"
+                        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-court-deep bg-court-deep py-2 pr-4 pl-3 font-bold text-white no-underline"
                       >
                         <span className="relative flex size-2.5">
                           <span className="absolute inline-flex size-full rounded-full bg-ball opacity-75 motion-safe:animate-ping" />

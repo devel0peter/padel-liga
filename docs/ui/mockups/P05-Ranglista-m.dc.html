@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<title>Ranglista · mobil</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#dceb3c}a:hover{color:#eef59a}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; box-sizing: border-box; background: #0a1424; color: #eef3f9; font-family: 'Archivo', system-ui, sans-serif; display: flex; flex-direction: column">
+  <main style="padding: 24px 16px 28px; display: flex; flex-direction: column; gap: 18px">
+    <header style="display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 13px; color: #a3b3c9">Mintaváros · Teszt szezon</span>
+      <h1 style="margin: 0; font-size: 38px; line-height: 1; font-weight: 800; font-stretch: 75%; text-transform: uppercase">Tabella</h1>
+    </header>
+    <div role="tablist" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #111f36">
+      <button type="button" role="tab" aria-selected="false" style="height: 40px; border: 0; border-radius: 9px; background: transparent; color: #a3b3c9; font: inherit; font-weight: 600; font-size: 15px">Csoportok</button>
+      <button type="button" role="tab" aria-selected="true" style="height: 40px; border: 0; border-radius: 9px; background: #1f3355; color: #eef3f9; font: inherit; font-weight: 700; font-size: 15px">Ranglista</button>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+      <div style="display: flex; gap: 6px">
+        <button type="button" aria-pressed="true" style="height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: #eef3f9; color: #10233d; font: inherit; font-size: 14px; font-weight: 700">Játékosok</button>
+        <button type="button" aria-pressed="false" style="height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: #111f36; color: #eef3f9; font: inherit; font-size: 14px; font-weight: 600">Párok</button>
+      </div>
+      <a href="#" style="font-size: 13px; font-weight: 700; text-decoration: none">Mi az Élő-pont?</a>
+    </div>
+
+    <section aria-label="Ranglista" style="background: #111f36; border-radius: 16px; padding: 8px; display: flex; flex-direction: column">
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; padding: 8px; font-size: 12px; color: #a3b3c9"><span>#</span><span>Játékos</span><span style="text-align: right">Élő-pont</span><span style="text-align: right">Meccs</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; border-radius: 10px; background: rgba(220, 235, 60, 0.1); font-size: 15px; font-weight: 700"><span style="color: #dceb3c">1.</span><span>Kovács Anna <span style="font-size: 11px; font-weight: 800; color: #dceb3c">TE</span></span><span style="text-align: right">1604 <span style="font-size: 11px; color: #5fd492">+4</span></span><span style="text-align: right">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">1.</span><span>Nagy Bence</span><span style="text-align: right; font-weight: 700">1604</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">3.</span><span>Szabó Eszter</span><span style="text-align: right; font-weight: 700">1420</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">3.</span><span>Tóth Gergő</span><span style="text-align: right; font-weight: 700">1420</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">5.</span><span>Horváth Zsófia</span><span style="text-align: right; font-weight: 700">1380</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">5.</span><span>Molnár Dávid</span><span style="text-align: right; font-weight: 700">1380</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">7.</span><span>Mészáros Réka</span><span style="text-align: right; font-weight: 700">1220</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">7.</span><span>Simon Levente</span><span style="text-align: right; font-weight: 700">1220</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">9.</span><span>Juhász Bálint</span><span style="text-align: right; font-weight: 700">1200</span><span style="text-align: right; color: #a3b3c9">0</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">9.</span><span>Kiss Miklós</span><span style="text-align: right; font-weight: 700">1200</span><span style="text-align: right; color: #a3b3c9">0</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">9.</span><span>Takács Nóra</span><span style="text-align: right; font-weight: 700">1200</span><span style="text-align: right; color: #a3b3c9">0</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">9.</span><span>Varga Dóra</span><span style="text-align: right; font-weight: 700">1200</span><span style="text-align: right; color: #a3b3c9">0</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">13.</span><span>Farkas Lilla</span><span style="text-align: right; font-weight: 700">1196</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">13.</span><span>Papp Ádám</span><span style="text-align: right; font-weight: 700">1196</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">15.</span><span>Fehér Márk</span><span style="text-align: right; font-weight: 700">1180</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) 64px 44px; gap: 8px; align-items: center; padding: 10px 8px; font-size: 15px"><span style="color: #a3b3c9">15.</span><span>Török Hanna</span><span style="text-align: right; font-weight: 700">1180</span><span style="text-align: right; color: #a3b3c9">1</span></div>
+      <button type="button" style="height: 44px; margin-top: 4px; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); background: transparent; color: #dceb3c; font: inherit; font-size: 14px; font-weight: 700">Még 6 játékos</button>
+    </section>
+    <p style="margin: 0; font-size: 12px; color: #a3b3c9">Azonos Élő-pontnál közös a hely. Meccs: ami változtatott az Élő-ponton.</p>
+  </main>
+
+  <nav aria-label="Fő menü" style="margin-top: auto; background: #0d1a2e; border-top: 1px solid rgba(255, 255, 255, 0.08); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 8px 4px 12px">
+    <a href="#" style="text-decoration: none; color: #a3b3c9; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path></svg>Kezdőlap</a>
+    <a href="#" style="text-decoration: none; color: #dceb3c; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>Tabella</a>
+    <a href="#" style="text-decoration: none; color: #a3b3c9; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path></svg>Ligáim</a>
+    <a href="#" style="text-decoration: none; color: #a3b3c9; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>Értesítések</a>
+    <a href="#" style="text-decoration: none; color: #a3b3c9; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><span style="width: 22px; height: 22px; border-radius: 99px; background: #1f3355; color: #eef3f9; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">KA</span>Profil</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

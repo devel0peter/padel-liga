@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL, type SQLWra
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
+import { changesEndedByDeletion, partnerChangeDeletion, tellChangesEnded } from "~/lib/partner-changes.server";
 import {
   accountInvites,
   auditLog,
@@ -23,6 +24,7 @@ import {
   oauthAccounts,
   pairInvites,
   pairLinks,
+  partnerChanges,
   pairs,
   partnerSearches,
   pushSubscriptions,
@@ -206,7 +208,10 @@ export async function deleteAccount(actorId: string, userId: string, now = new D
   // Both write their audit entries in their batch (#225): who and when only,
   // no name or email of the deleted person; the pairs an anonymize
   // dissolved are logged as any dissolve.
+  // The permanent partner changes the deletion ends, read first for their notices (#402).
+  const ending = await changesEndedByDeletion(userId, now);
   const done = plan.mode === "remove" ? await remove(actorId, userId, email, mail) : await anonymize(actorId, userId, email, mail, now);
+  if (done) await tellChangesEnded(ending, userId);
   if (!done) {
     // Something changed since the check: say why from the state now.
     const again = await planDeletion(actorId, userId, now, by);
@@ -253,6 +258,11 @@ async function remove(actorId: string, userId: string, email: string, mail: Mail
           ),
         ),
       db.delete(matchSubstitutes).where(and(eq(matchSubstitutes.substituteId, userId), ne(matchSubstitutes.status, "approved"))),
+      // Its partner changes (#402): no history without a published group.
+      ...partnerChangeDeletion(userId, new Date(), sql`1`),
+      db
+        .delete(partnerChanges)
+        .where(or(eq(partnerChanges.startedBy, userId), eq(partnerChanges.leavingId, userId), eq(partnerChanges.partnerId, userId))),
       // Before the account's delete, so a player's own deletion (#38) can
       // name them as the actor (the row then sets it to null: Napló shows
       // "Törölt játékos"). A failed delete rolls the entry back with it.
@@ -349,6 +359,9 @@ async function anonymize(
       .update(users)
       .set({
         name: DELETED_NAME,
+        // The name's parts go with it (#419).
+        surname: null,
+        firstName: null,
         email: anonymizedEmail(userId),
         imageUrl: null,
         phone: null,
@@ -364,6 +377,7 @@ async function anonymize(
     ...personalDataStatements(userId, email, mail, gone),
     ...withdrawalReasonStatements(userId, gone),
     ...clearStrikeReasons(userId, gone),
+    ...partnerChangeDeletion(userId, now, gone),
   ]);
   return updated.length > 0 ? active : false;
 }

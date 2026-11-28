@@ -2,14 +2,18 @@
 // spec 10, D107). Pure, so every rule is unit tested; the D1 side is
 // round-switch.server.ts.
 
+import type { LeaveReason } from "@padel-liga/rules";
+
 import { withArticle } from "./groups";
 
-/** Why a pair of the ending phase is not in the next phase's draft. */
-export type LeaveReason = "withdrawn" | "strikes" | "dissolved" | "taken_out";
+/** Why a pair of the ending phase is not in the next phase's draft (packages/rules leaveReason). */
+export type { LeaveReason };
 
 export const LEAVE_REASONS: Record<LeaveReason, string> = {
   withdrawn: "visszalépett a kör közben",
   strikes: "3 fekete pont",
+  // A player opted out on Ligáim before the deadline (#395).
+  opted_out: "nem folytatja",
   dissolved: "a pár megszűnt",
   taken_out: "kivetted a szezonból",
 };
@@ -21,6 +25,12 @@ export type Origin = { kind: "continuing"; group: number; place: number } | { ki
 export function movement(origin: Origin, to: number): "up" | "down" | "stay" | "new" {
   if (origin.kind === "new") return "new";
   return to < origin.group ? "up" : to > origin.group ? "down" : "stay";
+}
+
+// A pair formed by a permanent partner change (#403): "Partnercsere: <távozó>
+// helyett <új partner>", on the draft and the preview; null for any other.
+export function changeText(change: { leaving: string; partner: string } | undefined): string | null {
+  return change ? `Partnercsere: ${change.leaving} helyett ${change.partner}` : null;
 }
 
 // "3. csoport, 1. hely", or "Új pár".

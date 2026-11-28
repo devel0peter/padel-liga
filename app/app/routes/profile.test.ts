@@ -22,7 +22,7 @@ const post = (cookie: string, fields: Record<string, string>) =>
   new Request("http://localhost/profile", {
     method: "POST",
     headers: { Cookie: cookie },
-    body: new URLSearchParams({ intent: "profile", name: "Nagy Anna", phone: "+36 30 123 4567", sex: "female", ...fields }),
+    body: new URLSearchParams({ intent: "profile", surname: "Nagy", first_name: "Anna", phone: "+36 30 123 4567", sex: "female", ...fields }),
   });
 const level = (id: string) => h.raw.prepare("select level from users where id = ?").get(id).level as string;
 
@@ -67,9 +67,15 @@ describe("Profil: level lock and Élő-pont", () => {
   });
 
   it("saves the other fields of a locked player, without a level in the form or with the same one", async () => {
-    expect(await P.action(args(post(placed, { name: "Új Anna" })))).toMatchObject({ saved: true });
-    expect(await P.action(args(post(placed, { name: "Újabb Anna", level: "halado" })))).toMatchObject({ saved: true });
-    expect(h.raw.prepare("select name, level from users where id = 'placed'").get()).toEqual({ name: "Újabb Anna", level: "halado" });
+    expect(await P.action(args(post(placed, { surname: "Új" })))).toMatchObject({ saved: true });
+    expect(await P.action(args(post(placed, { surname: "Újabb", level: "halado" })))).toMatchObject({ saved: true });
+    // The name in two parts, and the full name with them (#419).
+    expect(h.raw.prepare("select name, surname, first_name, level from users where id = 'placed'").get()).toEqual({
+      name: "Újabb Anna",
+      surname: "Újabb",
+      first_name: "Anna",
+      level: "halado",
+    });
   });
 
   it("shows the starting Élő-pont of the level, nothing without one", async () => {
@@ -100,6 +106,18 @@ describe("Profil: level lock and Élő-pont", () => {
     const bad = await P.action(args(topic({ topic: "channel:push", enabled: "0" })));
     expect((bad as any).init?.status).toBe(400);
     expect(h.raw.prepare("select count(*) as n from notification_opt_outs").get().n).toBe(0);
+  });
+
+  // "Nem kérek tippeket" (#444): off for a new player; on and off again.
+  it("saves Nem kérek tippeket", async () => {
+    const off = async () => ((await P.loader(args(get(free)))) as any).tipsOff;
+    expect(await off()).toBe(false);
+    const tips = (enabled: string) =>
+      new Request("http://localhost/profile", { method: "POST", headers: { Cookie: free }, body: new URLSearchParams({ intent: "tips", enabled }) });
+    expect(await P.action(args(tips("1")))).toEqual({ ok: true });
+    expect(await off()).toBe(true);
+    expect(await P.action(args(tips("0")))).toEqual({ ok: true });
+    expect(await off()).toBe(false);
   });
 });
 
@@ -229,7 +247,7 @@ describe("Profil: Párod and Korábbi párjaid", () => {
         league: expect.objectContaining({ id: 1, name: "Padelpárbaj Győr" }),
         pair: { id: 2, partnerName: "Kis Béla", partnerEmail: "bela@x.hu", partnerPhone: "+36 30 123 4568" },
         link: null,
-        seeking: null,
+        search: null,
       }),
     ]);
   });
@@ -254,9 +272,9 @@ describe("Profil: Párod and Korábbi párjaid", () => {
     h.raw.exec(`insert into league_members (league_id, user_id, source) values (2, 'lone', 'chosen')`);
     const d: any = await P.loader(args(get(lone)));
     expect(d.pair.multi).toBe(true);
-    expect(d.pair.overview.map((o: any) => [o.league.name, o.pair, o.seeking])).toEqual([
-      ["Padelpárbaj Győr", null, false],
-      ["Padelpárbaj Győr 2", null, false],
+    expect(d.pair.overview.map((o: any) => [o.league.name, o.pair, o.search, o.finder])).toEqual([
+      ["Padelpárbaj Győr", null, { seeking: false, listed: false }, "/leagues/gyor#parkereso"],
+      ["Padelpárbaj Győr 2", null, { seeking: false, listed: false }, "/leagues/gyor2#parkereso"],
     ]);
     expect(d.pair.overview.every((o: any) => /\/pair\/join\/[\w-]+$/.test(o.link))).toBe(true);
     expect(d.former).toEqual([]);
@@ -266,7 +284,8 @@ describe("Profil: Párod and Korábbi párjaid", () => {
     expect(await P.action(args(form(lone, { intent: "partner_search", league: "1", seeking: "1" })))).toEqual({ intent: "partner_search", ok: true });
     expect(h.raw.prepare("select seeking from partner_searches where user_id = 'lone' and league_id = 1").get().seeking).toBe(1);
     const d: any = await P.loader(args(get(lone)));
-    expect(d.pair.overview[0].seeking).toBe(true);
+    // Her own switch-on is under the Párkereső wording (#398): listed.
+    expect(d.pair.overview[0].search).toEqual({ seeking: true, listed: true });
     // Not a league of hers: refused.
     const refused: any = await P.action(args(form(lone, { intent: "partner_search", league: "2", seeking: "1" }))).catch((e) => e);
     expect(refused.status).toBe(400);

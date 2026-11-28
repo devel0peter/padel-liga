@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SETS_TO_SIX, SHORT_SETS } from "./results";
 import {
   currentElo,
   expectedScore,
@@ -85,19 +86,29 @@ describe("playerK and sideK (spec 11, D104)", () => {
 
 describe("ratedWinner (spec 8, 11)", () => {
   it("rates only a played match, by who won it", () => {
-    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [4, 2]] } })).toBe("a");
-    expect(ratedWinner({ kind: "played", score: { sets: [[1, 4], [2, 4]] } })).toBe("b");
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [4, 2]] } }, SHORT_SETS)).toBe("a");
+    expect(ratedWinner({ kind: "played", score: { sets: [[1, 4], [2, 4]] } }, SHORT_SETS)).toBe("b");
   });
 
   it("decides a 1-1 match by the super tie-break", () => {
-    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [8, 10] } })).toBe("b");
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 1], [2, 4]], superTieBreak: [8, 10] } }, SHORT_SETS)).toBe("b");
   });
 
   it("doesn't rate a walkover, a both-inactive or an unplayed match, or none at all", () => {
-    expect(ratedWinner({ kind: "walkover", winner: "a" })).toBeNull();
-    expect(ratedWinner({ kind: "both-inactive" })).toBeNull();
-    expect(ratedWinner({ kind: "unplayed" })).toBeNull();
-    expect(ratedWinner(null)).toBeNull();
+    expect(ratedWinner({ kind: "walkover", winner: "a" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "both-inactive" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "unplayed" }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner(null, SHORT_SETS)).toBeNull();
+  });
+
+  it("rates a sets-to-6 match the same way, only by who won (#396)", () => {
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [7, 6]] } }, SETS_TO_SIX)).toBe("a");
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [5, 7]], superTieBreak: [9, 11] } }, SETS_TO_SIX)).toBe("b");
+  });
+
+  it("rates nothing for a score its round's format can't produce", () => {
+    expect(ratedWinner({ kind: "played", score: { sets: [[6, 4], [6, 3]] } }, SHORT_SETS)).toBeNull();
+    expect(ratedWinner({ kind: "played", score: { sets: [[4, 2], [4, 1]] } }, SETS_TO_SIX)).toBeNull();
   });
 });
 
@@ -141,10 +152,10 @@ describe("matchEloChanges (spec 11)", () => {
     expect(changes.map((c) => c.k)).toEqual([30, 30, 20, 20]);
   });
 
-  it("changes only the four players who played (a substitute instead of the absent partner)", () => {
-    const st = states({ p: fresh(1200), sub: fresh(1000), r: fresh(1200), s: fresh(1200) });
-    const changes = matchEloChanges(m(1, ["p", "sub"], ["r", "s"]), st);
-    expect(changes.map((c) => c.playerId).sort()).toEqual(["p", "r", "s", "sub"]);
+  it("changes the four players, except one marked absent (a temporary substitute played instead, #400)", () => {
+    const st = states({ p: fresh(1200), q: fresh(1000), r: fresh(1200), s: fresh(1200) });
+    expect(matchEloChanges(m(1, ["p", "q"], ["r", "s"]), st).map((c) => c.playerId).sort()).toEqual(["p", "q", "r", "s"]);
+    expect(matchEloChanges({ ...m(1, ["p", "q"], ["r", "s"]), absent: ["q"] }, st).map((c) => c.playerId).sort()).toEqual(["p", "r", "s"]);
   });
 });
 

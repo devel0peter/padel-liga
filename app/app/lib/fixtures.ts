@@ -3,11 +3,11 @@
 // for the public league page and the player's Kezdőlap. Pure (no I/O); the
 // loaders hand in what is stored. Names only.
 
-import { DIVISION_NAMES, PHASES_PER_SEASON, divisionOf, type MatchOutcome } from "@padel-liga/rules";
+import { DIVISION_NAMES, PHASES_PER_SEASON, divisionOf, type MatchOutcome, type SetGames } from "@padel-liga/rules";
 
 import { formatSlot } from "./format";
 import { weekRange } from "./groups";
-import { MATCH_LOST_BOTH_TEXT, winnerOf } from "./results";
+import { bothLostText, walkoverScoreText, winnerOf } from "./results";
 
 /**
  * Where a match stands, for lists: "final" counts in the table, "pending" waits
@@ -16,7 +16,8 @@ import { MATCH_LOST_BOTH_TEXT, winnerOf } from "./results";
  */
 export type FixtureState = "final" | "pending" | "disputed" | "scheduled" | "open";
 
-export type FixtureSide = { names: [string, string]; mine: boolean };
+/** A side of a match: the pair's team label ("Kovács / Nagy", #419) and whether it is the viewer's. */
+export type FixtureSide = { label: string; mine: boolean };
 
 export type FixtureMatch = {
   week: number;
@@ -43,7 +44,7 @@ export type FixtureWeek = {
   current: boolean;
   matches: FixtureMatch[];
   /** A group of 3: the pair that rests this week. */
-  resting: [string, string] | null;
+  resting: string | null;
 };
 
 export type FixtureInput = {
@@ -74,14 +75,14 @@ const stateOf = (m: FixtureInput): FixtureState => {
   }
 };
 
-function noteOf(outcome: MatchOutcome): string | null {
+function noteOf(outcome: MatchOutcome, setGames: SetGames): string | null {
   switch (outcome.kind) {
     case "played":
       return null;
     case "walkover":
-      return "Játék nélküli győzelem (4:0, 4:0)";
+      return `Játék nélküli győzelem (${walkoverScoreText(setGames)})`;
     case "both-inactive":
-      return MATCH_LOST_BOTH_TEXT;
+      return bothLostText(setGames);
     case "unplayed":
       return "Elmaradt, nem számít";
   }
@@ -94,17 +95,19 @@ function noteOf(outcome: MatchOutcome): string | null {
  * to mark, or null when none is (before the phase or after it).
  */
 export function fixtureWeeks(
-  pairs: readonly { id: number; names: [string, string] }[],
+  pairs: readonly { id: number; label: string }[],
   matches: readonly FixtureInput[],
   opts: {
     phaseStartsAt: Date;
     currentWeek: number | null;
     mine?: number | null;
+    /** The round's set format (D173): a walkover reads 6:0, 6:0 or 4:0, 4:0. */
+    setGames: SetGames;
   },
 ): FixtureWeek[] {
   const byId = new Map(pairs.map((p) => [p.id, p]));
   const side = (id: number): FixtureSide => ({
-    names: byId.get(id)?.names ?? ["Névtelen", "Névtelen"],
+    label: byId.get(id)?.label ?? "Névtelen / Névtelen",
     mine: id === opts.mine,
   });
   const shown = matches.filter((m) => byId.has(m.a) && byId.has(m.b));
@@ -116,7 +119,7 @@ export function fixtureWeeks(
       week,
       range: weekRange(opts.phaseStartsAt, week),
       current: opts.currentWeek === week,
-      resting: list.length > 0 && idle.length === 1 ? idle[0]!.names : null,
+      resting: list.length > 0 && idle.length === 1 ? idle[0]!.label : null,
       matches: list.map((m) => {
         const played = m.outcome?.kind === "played" ? m.outcome.score : null;
         return {
@@ -129,7 +132,7 @@ export function fixtureWeeks(
           sets: played ? played.sets.map(([x, y]) => [x, y] as [number, number]) : null,
           superTieBreak: played?.superTieBreak ? [played.superTieBreak[0], played.superTieBreak[1]] : null,
           winner: m.outcome ? winnerOf(m.outcome) : null,
-          note: m.outcome ? noteOf(m.outcome) : null,
+          note: m.outcome ? noteOf(m.outcome, opts.setGames) : null,
           href: opts.mine != null && (m.a === opts.mine || m.b === opts.mine) ? `/matches/${m.id}` : null,
         };
       }),

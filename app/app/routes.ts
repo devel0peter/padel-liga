@@ -20,6 +20,9 @@ export default [
   route("pair/join/:token", "routes/pair-join.tsx"),
   route("notifications/:id", "routes/notification-open.ts"),
   route("health", "routes/health.ts"),
+  // The building blocks' gallery (D181, #418): local development only, a
+  // production build answers 404 (its loader).
+  route("dev/ui", "routes/dev.ui.tsx"),
   // The old Párom address: leads to Profil's Párod section (D141).
   route("pair", "routes/pair.ts"),
   // Every page for a logged-in user: one sidebar layout (app.tsx). The admin
@@ -33,6 +36,9 @@ export default [
     route("league/:league", "routes/league.tsx"),
     // The Ranglista: players and pairs by Élő-pont (D137).
     route("league/:league/rankings", "routes/rankings.tsx"),
+    // Ligáim: the player's leagues, one card each (#394).
+    route("leagues", "routes/leagues.tsx"),
+    route("leagues/:league", "routes/leagues.league.tsx"),
     // Pair and player profiles: for logged-in members only (D112).
     route("players/:id", "routes/player-profile.tsx"),
     route("pairs/:id", "routes/pair-profile.tsx"),
@@ -65,7 +71,6 @@ export default [
       route("admin/leagues/:league/matches", "routes/admin.league-matches.tsx"),
       route("admin/leagues/:league/matches/:id", "routes/admin.league-match.tsx"),
       route("admin/leagues/:league/disputes", "routes/admin.league-disputes.tsx"),
-      route("admin/leagues/:league/substitutes", "routes/admin.league-substitutes.tsx"),
       route("admin/leagues/:league/matches/:id/decide", "routes/admin.match-decide.tsx"),
     ]),
   ]),

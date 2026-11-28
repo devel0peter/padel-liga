@@ -1,9 +1,10 @@
 import type { Route } from "./+types/privacy";
-import { SiteFooter, SiteHeader, Wrap } from "~/components/site";
+import { ReadingPage, readingHeading, readingLink, readingList, readingTitle } from "~/components/reading";
+import { cn } from "~/lib/utils";
 import { CONTACT_EMAIL, DATA_CONTROLLER, pageMeta } from "~/lib/site";
 
 // Spec section 17. Update the effective date whenever the content changes.
-const EFFECTIVE_FROM = "2026. 11. 12.";
+const EFFECTIVE_FROM = "2026. 11. 28.";
 
 export function meta({}: Route.MetaArgs) {
   return pageMeta({
@@ -16,30 +17,25 @@ export function meta({}: Route.MetaArgs) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-3">
-      <h2 className="font-display text-2xl font-extrabold">{title}</h2>
+      <h2 className={readingHeading}>{title}</h2>
       {children}
     </section>
   );
 }
 
-const list = "grid list-disc gap-1.5 pl-5";
+const list = cn(readingList, "list-disc");
 
 export default function Privacy() {
   const mail = (
-    <a href={`mailto:${CONTACT_EMAIL}`} className="underline">
+    <a href={`mailto:${CONTACT_EMAIL}`} className={readingLink}>
       {CONTACT_EMAIL}
     </a>
   );
 
   return (
-    <>
-      <SiteHeader cta={false} />
-      <main className="py-10 text-[1.0625rem] leading-relaxed">
-        <Wrap className="grid max-w-3xl gap-10">
+    <ReadingPage cta={false} className="gap-10">
           <div className="grid gap-3">
-            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] font-black">
-              Adatkezelési tájékoztató
-            </h1>
+            <h1 className={readingTitle}>Adatkezelési tájékoztató</h1>
             <p className="text-muted-foreground">
               Röviden és érthetően arról, mit kezelünk rólad, miért, és mit
               tehetsz vele. Hatályos: {EFFECTIVE_FROM}
@@ -119,9 +115,10 @@ export default function Privacy() {
               töröljük.
             </p>
             <p>
-              Ha visszajelzést küldesz (a Visszajelzés oldalon, belépve vagy
-              anélkül): az üzenetedet, a típusát (hiba, ötlet vagy egyéb), az
-              oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil
+              Ha visszajelzést küldesz (a „Visszajelzés küldése” ablakban, belépve
+              vagy anélkül, vagy belépve értékeled az oldalt 1–5 labdával): az
+              üzenetedet, a típusát (hiba, ötlet vagy értékelés), az
+              értékelésed számát, az oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil
               vagy számítógép) és a böngésződ nevét, az oldal verzióját, és ha
               be vagy lépve, a fiókodat. A teljes böngészőazonosítót és az
               IP-címedet nem tároljuk.
@@ -148,7 +145,9 @@ export default function Privacy() {
               első szezonja összegyűjti a szükséges nevezéseket, minden nevezett
               játékosnak egy levelet küldünk az indulás napjával. Ha a szervező
               meghosszabbítja a futó kört, a kör minden játékosának küldünk egy
-              levelet az új határidővel.
+              levelet az új határidővel. Állandó partnercserénél az új partnernek
+              küldünk egy levelet a kéréssel, a távozó játékosnak pedig egyet, amikor
+              a csere végleges.
             </p>
             <p>
               Ha elakadsz a nevezés előtt (nem fejezted be a regisztrációt;
@@ -229,15 +228,18 @@ export default function Privacy() {
                 amit mindkét pár lát.
               </li>
               <li>
-                <strong>A helyettes kérést</strong> (ki kérte, ki helyett ki
-                játszana, és a szervező döntése) a pár és a liga szervezője meg
-                az oldal adminja látja; a szervező a két játékos Élő-pontját is,
-                hogy dönthessen. A jóváhagyott helyettes nevét az ellenfeleid is
-                látják a meccs oldalán. A szervező indoklását csak a pár látja,
-                és ha törlöd a fiókodat, töröljük. Ha regisztráltál, a neved
-                (csak a neved, soha az e-mail-címed vagy a telefonszámod)
-                megjelenhet a ligád játékosainak helyettes-választó listájában,
-                amikor egy meccsükre helyettest kérnek.
+                <strong>Ha helyettes játszik helyetted</strong>, azt tároljuk,
+                hogy melyik meccsen nem játszottál, ki jelölte és mikor. A meccs
+                négy játékosa látja. A helyettes nevét nem kérjük és nem
+                tároljuk.
+              </li>
+              <li>
+                <strong>Állandó partnercserénél</strong> azt tároljuk, ki kérte,
+                kinek a helyére, ki az új partner, mikor válaszolt, a szervező
+                döntését (ki, mikor, elutasításnál az indoklást), és ha visszavonta, ki és mikor. Hármótok és a liga szervezője látja, a
+                csoportbeosztásban a szervező is. Amíg az új pár el nem indul, a
+                meccs négy játékosa látja, hogy az új partner játszik a távozó
+                helyett. E-mail-címet vagy telefonszámot ehhez senkinek nem mutatunk.
               </li>
               <li>
                 <strong>A „nem jöttek el” bejelentést</strong> (melyik pár
@@ -284,6 +286,14 @@ export default function Privacy() {
               másik párkeresővel. Erről az oldalon és e-mailben is szólunk, benne
               a párod nevével, e-mail-címével és telefonszámával. A jelzés
               alapból ki van kapcsolva, és bármikor kikapcsolhatod.
+            </p>
+            <p>
+              A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét,
+              Élő-pontját, azt, hogy mióta keres párt, valamint a
+              telefonszámát és az e-mail-címét. A liga többi pár nélküli
+              játékosa ugyanezt látja róluk, telefonszám és e-mail-cím nélkül. Ha
+              felhívod vagy írsz valakinek, az a saját telefonodról vagy
+              levelezésedből megy: mi nem küldünk és nem tárolunk róla semmit.
             </p>
           </Section>
 
@@ -355,8 +365,8 @@ export default function Privacy() {
               <li>
                 <strong>Fiókok:</strong> amíg nem törlöd (a Profil oldalon) vagy
                 nem kéred a törlést. Ha még nem
-                játszottál kihirdetett csoportban, és jóváhagyott helyettes sem
-                voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
+                játszottál kihirdetett csoportban, és korábban jóváhagyott
+                helyettes sem voltál, a fiókodat mindenestül töröljük. Ha már igen, anonimizáljuk: a neved helyén „Törölt
                 játékos” áll, hogy a korábbi eredmények megmaradjanak, de ne
                 lehessen hozzád kötni őket. Az e-mail-címedet, a
                 telefonszámodat, a nemedet, a belépéseidet és az eszközeidet
@@ -423,15 +433,12 @@ export default function Privacy() {
             <p>
               Ha úgy érzed, megsértettük a jogaidat, panaszt tehetsz a Nemzeti
               Adatvédelmi és Információszabadság Hatóságnál (
-              <a href="https://naih.hu" className="underline">
+              <a href="https://naih.hu" className={readingLink}>
                 naih.hu
               </a>
               ).
             </p>
           </Section>
-        </Wrap>
-      </main>
-      <SiteFooter />
-    </>
+    </ReadingPage>
   );
 }

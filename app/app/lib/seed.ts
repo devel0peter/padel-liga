@@ -13,12 +13,14 @@
 // says. A second league in a second city, with one player who joined it,
 // shows that a league's pages only hold its own players (#331).
 
-import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar } from "@padel-liga/rules";
+import { addDays, budapestDay, budapestTime, isMonday, phaseCalendar, SETS_TO_SIX, SHORT_SETS } from "@padel-liga/rules";
 
 export const SEED_EMAIL_DOMAIN = "example.test";
 export const CITY = { slug: "minta", name: "Mintaváros" } as const;
 export const LEAGUE = { slug: "minta", name: "Padelpárbaj Mintaváros" } as const;
 export const SEASON_NAME = "Teszt szezon";
+/** The seed season's set format by round, like Győr's season 1: short sets in round 1, then sets to 6 (D173). */
+export const seedSetGames = (round: number) => (round === 1 ? SHORT_SETS : SETS_TO_SIX);
 // The second league (#331): listed, no season, one player.
 export const OTHER_CITY = { slug: "pelda", name: "Példaváros" } as const;
 export const OTHER_LEAGUE = { slug: "pelda", name: "Padelpárbaj Példaváros" } as const;
@@ -38,6 +40,14 @@ type Level = "kezdo" | "kozephalado" | "halado" | "versenyzo";
 type Person = { name: string; email: string };
 
 const person = (name: string, local: string): Person => ({ name, email: `${local}@${SEED_EMAIL_DOMAIN}` });
+
+// A seeded name's two parts (#419): every seeded name is "Vezetéknév
+// Keresztnév", so the surname is the first word, as the first-login page
+// would store it.
+export function seedNameParts(name: string): { surname: string; firstName: string } {
+  const space = name.indexOf(" ");
+  return { surname: name.slice(0, space), firstName: name.slice(space + 1) };
+}
 
 // The walkthrough's players, who register themselves (none has an account):
 // ten pairs-to-be, each with one level both pick on the first-login page.
@@ -107,6 +117,11 @@ export function assertLocalArgs(args: readonly string[]): void {
 
 const q = (s: string | null): string => (s === null ? "NULL" : `'${s.replaceAll("'", "''")}'`);
 const secs = (d: Date): number => Math.floor(d.getTime() / 1000);
+// "'Kovács', 'Anna'": the surname and first_name values of a seeded name.
+const parts = (name: string): string => {
+  const { surname, firstName } = seedNameParts(name);
+  return `${q(surname)}, ${q(firstName)}`;
+};
 
 const SEED_USERS = `select id from users where lower(email) like '%@${SEED_EMAIL_DOMAIN}'`;
 const SEED_LEAGUES = `select id from leagues where slug in (${q(LEAGUE.slug)}, ${q(OTHER_LEAGUE.slug)})`;
@@ -166,10 +181,10 @@ export function insertStatements(now: Date): string[] {
   // they log in with an email code and land on the app, not on /welcome. The
   // second league's player too, with a phone number like every new player.
   out.push(
-    `insert into users (id, email, name, platform_role, level, sex, phone, consent_at) values ` +
-      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, 'superadmin', 'halado', 'male', NULL, ${secs(now)}), ` +
-      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, 'player', 'halado', 'female', NULL, ${secs(now)}), ` +
-      `(${q(OUTSIDER.id)}, ${q(OUTSIDER.email)}, ${q(OUTSIDER.name)}, 'player', 'kozephalado', 'female', '+36301112233', ${secs(now)})`,
+    `insert into users (id, email, name, surname, first_name, platform_role, level, sex, phone, consent_at) values ` +
+      `(${q(ADMIN.id)}, ${q(ADMIN.email)}, ${q(ADMIN.name)}, ${parts(ADMIN.name)}, 'superadmin', 'halado', 'male', NULL, ${secs(now)}), ` +
+      `(${q(ORGANIZER.id)}, ${q(ORGANIZER.email)}, ${q(ORGANIZER.name)}, ${parts(ORGANIZER.name)}, 'player', 'halado', 'female', NULL, ${secs(now)}), ` +
+      `(${q(OUTSIDER.id)}, ${q(OUTSIDER.email)}, ${q(OUTSIDER.name)}, ${parts(OUTSIDER.name)}, 'player', 'kozephalado', 'female', '+36301112233', ${secs(now)})`,
   );
   out.push(
     `insert into league_admins (league_id, user_id, granted_by) select id, ${q(ORGANIZER.id)}, ${q(ADMIN.id)} ` +
@@ -190,10 +205,12 @@ export function insertStatements(now: Date): string[] {
       `select id, ${q(SEASON_NAME)}, ${secs(opensAt)}, ${secs(closesAt)}, ${q(start)}, '[]' ` +
       `from leagues where slug = ${q(LEAGUE.slug)}`,
   );
+  // The season stands for Győr's first one: its round 1 keeps short sets,
+  // every later round plays sets to 6 (D173, #396).
   for (const p of phases)
     out.push(
-      `insert into season_phases (season_id, number, starts_at, deadline) ` +
-        `select s.id, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)} from seasons s ` +
+      `insert into season_phases (season_id, number, starts_at, deadline, set_games) ` +
+        `select s.id, ${p.number}, ${secs(p.startsAt)}, ${secs(p.deadline)}, ${seedSetGames(p.number)} from seasons s ` +
         `join leagues l on l.id = s.league_id where l.slug = ${q(LEAGUE.slug)} and s.name = ${q(SEASON_NAME)}`,
     );
   return out;

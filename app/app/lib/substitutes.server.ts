@@ -1,458 +1,265 @@
-import {
-  approvalRefusal,
-  currentElo,
-  isLiveSubstitute,
-  rejectionRefusal,
-  requestRefusal,
-  revocationRefusal,
-  substituteClosesAt,
-  substituteOpen,
-  withdrawalRefusal,
-  type Side,
-  type SubstituteStatus,
-} from "@padel-liga/rules";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { absenceClosesAt, absenceOpen, markRefusal, resultAbsences, unmarkRefusal, type Side } from "@padel-liga/rules";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, matches, matchSubstitutes, pairs, seasons, users } from "~/db/schema";
-import { auditIfChanged } from "~/lib/audit.server";
+import { matchAbsences, matches, partnerChanges, users } from "~/db/schema";
 import { logError, logInfo } from "~/lib/log";
-import { substituteAnnouncedMessage, substituteDecidedMessage, substituteRevokedMessage, type Message, type PlayerKind } from "~/lib/notifications";
-import { notifyPlayers, notifySubstituteRequested } from "~/lib/notifications.server";
+import { absenceMarkedMessage, type Message } from "~/lib/notifications";
+import { notifyPlayers } from "~/lib/notifications.server";
 
-import { pairName } from "./groups";
-import { memberOf } from "./league-members.server";
-import { groupMembers, loadMatch, NOT_FOUND, noWithdrawnPair, sideOf, type MatchContext } from "./matches.server";
-import { SUBSTITUTE_CHANGED, SUBSTITUTE_REASON_MAX, SUBSTITUTE_REFUSALS, SUBSTITUTES_OFF, substitutesEnabled, substituteStatusLabel } from "./substitutes";
+import { loadMatch, NOT_FOUND, sideOf, type MatchContext } from "./matches.server";
+import { chunks } from "./result-log.server";
+import { ABSENCE_CHANGED, ABSENCE_REFUSALS } from "./substitutes";
 
-// Substitutes (#37, spec 4, D109) in D1. A player of either pair asks for a
-// substitute for an absent player of their pair, from the match page, before
-// the match starts (its agreed start, or the deadline while none is agreed);
-// the asker can withdraw it while it waits. The league's organizer approves
-// or rejects it (optional reason) and may revoke an approval until the start;
-// each of those writes an audit entry (D91). Only an approved substitute
-// changes who played (Elo, elo.server.ts). Notices are in the app and by push
-// only, never by email (D83). Names only: no email or phone leaves this
-// module, and the substitute gets no notice and no match page.
+// Temporary substitutes (#400, spec 4, D175) in D1: a pair marks which of its
+// players doesn't play a match, and anyone (no account needed) plays
+// instead. No name, no approval. Either player of a pair marks one of the
+// pair on the match page before the match (its agreed start, or the deadline
+// while none is agreed) and can take the mark back until then; after a
+// sudden injury the pair that records the result ticks it on the result
+// form, and the opponents confirm it with the result. The absent player's
+// Elo doesn't change for that match (elo.server.ts). Notices go to the
+// match's other three players, in the app and by push only, never by email
+// (D83). Players' own steps: no audit entry (D91 is for organizers).
 
 export type StepResult = { ok: true; notice: string } | { ok: false; error: string; notFound?: true };
 
-const absentUser = alias(users, "sub_absent_user");
-const substituteUser = alias(users, "sub_substitute_user");
-
 const NAMELESS = "Törölt játékos";
 
-type RequestRow = {
-  id: number;
-  matchId: number;
-  pairId: number;
-  absentId: string;
-  substituteId: string;
-  status: SubstituteStatus;
-  requestedBy: string | null;
-  reason: string | null;
-  absentName: string;
-  substituteName: string;
-};
+// `substitute`: the new partner of the permanent partner change that made
+// the mark (#402, D178), by name; null for a pair's own mark (no name, #400).
+export type AbsenceMark = { pairId: number; absentId: string; name: string; afterMatch: boolean; substitute: string | null };
 
-const requestColumns = {
-  id: matchSubstitutes.id,
-  matchId: matchSubstitutes.matchId,
-  pairId: matchSubstitutes.pairId,
-  absentId: matchSubstitutes.absentId,
-  substituteId: matchSubstitutes.substituteId,
-  status: matchSubstitutes.status,
-  requestedBy: matchSubstitutes.requestedBy,
-  reason: matchSubstitutes.reason,
-  absentName: absentUser.name,
-  substituteName: substituteUser.name,
-};
+const changePartner = alias(users, "absence_change_partner");
 
-async function requestsOf(matchId: number): Promise<RequestRow[]> {
-  const rows = await db
-    .select(requestColumns)
-    .from(matchSubstitutes)
-    .innerJoin(absentUser, eq(absentUser.id, matchSubstitutes.absentId))
-    .innerJoin(substituteUser, eq(substituteUser.id, matchSubstitutes.substituteId))
-    .where(eq(matchSubstitutes.matchId, matchId))
-    .orderBy(desc(matchSubstitutes.id));
-  return rows.map((r) => ({ ...r, absentName: r.absentName || NAMELESS, substituteName: r.substituteName || NAMELESS }));
+/** The marks of these matches, by match. */
+export async function absencesOf(matchIds: readonly number[]): Promise<Map<number, AbsenceMark[]>> {
+  const out = new Map<number, AbsenceMark[]>();
+  for (const ids of chunks([...new Set(matchIds)])) {
+    if (ids.length === 0) continue;
+    const rows = await db
+      .select({
+        matchId: matchAbsences.matchId,
+        pairId: matchAbsences.pairId,
+        absentId: matchAbsences.absentId,
+        name: users.name,
+        afterMatch: matchAbsences.afterMatch,
+        substitute: changePartner.name,
+        substituteDeleted: changePartner.deletedAt,
+      })
+      .from(matchAbsences)
+      .innerJoin(users, eq(users.id, matchAbsences.absentId))
+      .leftJoin(partnerChanges, eq(partnerChanges.id, matchAbsences.partnerChangeId))
+      .leftJoin(changePartner, eq(changePartner.id, partnerChanges.partnerId))
+      .where(inArray(matchAbsences.matchId, ids))
+      .orderBy(asc(matchAbsences.id));
+    for (const { matchId, substituteDeleted, ...r } of rows)
+      out.set(matchId, [
+        ...(out.get(matchId) ?? []),
+        { ...r, name: r.name || NAMELESS, substitute: r.substitute === null ? null : substituteDeleted ? NAMELESS : r.substitute || "Névtelen" },
+      ]);
+  }
+  return out;
+}
+
+const marksOf = async (matchId: number) => (await absencesOf([matchId])).get(matchId) ?? [];
+
+/**
+ * The marks of one match for the organizer's match and decision pages:
+ * `played` once the match was played or its start passed (the window is
+ * closed), as the four players read it on the match page.
+ */
+export async function organizerAbsences(matchId: number, now = new Date()): Promise<{ id: string; name: string; played: boolean; substitute: string | null }[]> {
+  const ctx = await loadMatch(matchId);
+  if (!ctx) return [];
+  const { open } = windowOf(ctx.match, ctx.voided, now);
+  return (await marksOf(matchId)).map((m) => ({ id: m.absentId, name: m.name, played: m.afterMatch || !open, substitute: m.substitute }));
 }
 
 // The window of a match from its mirrored status (matches.server keeps
 // scheduled_at in step with the log): before the agreed start, or the
 // deadline while none is agreed; closed once a result is recorded.
 function windowOf(m: { status: string; scheduledAt: Date | null; deadline: Date }, voided: boolean, now: Date) {
-  const closesAt = substituteClosesAt({ scheduledAt: m.status === "scheduled" ? m.scheduledAt : null, deadline: m.deadline });
+  const closesAt = absenceClosesAt({ scheduledAt: m.status === "scheduled" ? m.scheduledAt : null, deadline: m.deadline });
   const hasResult = m.status !== "open" && m.status !== "scheduled";
-  return { closesAt, open: substituteOpen({ closesAt, hasResult, voided }, now) };
+  return { closesAt, open: absenceOpen({ closesAt, hasResult, voided }, now) };
 }
 
-const matchPlayersOf = (ctx: MatchContext) => [...ctx.pairs.a.players, ...ctx.pairs.b.players].map((p) => p.id);
-
-// The players of the group's pairs that are not withdrawn (#34): they can't
-// stand in for anyone in that group.
-async function groupPlayersOf(groupId: number): Promise<Set<string>> {
-  const members = (await groupMembers([groupId])).get(groupId) ?? [];
-  return new Set(members.filter((p) => !p.withdrawn).flatMap((p) => p.players.map((x) => x.id)));
-}
-
-// The league's registered players (first-login page done, not deleted), by
-// the D128 rule (league-members.server.ts), by name. No address leaves here.
-async function leaguePlayers(leagueId: number): Promise<{ id: string; name: string }[]> {
-  const accounts = await db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(and(isNotNull(users.consentAt), isNull(users.deletedAt), memberOf(leagueId, users.id)))
-    .orderBy(asc(users.name), asc(users.id));
-  return accounts.map(({ id, name }) => ({ id, name: name || "Névtelen" }));
-}
-
-const live = (rows: readonly RequestRow[]) => rows.filter((r) => isLiveSubstitute(r.status));
-
-// --- The match page ------------------------------------------------------------
-
-export type SubstitutePanel = {
-  open: boolean;
-  closesAt: Date;
-  // Approved substitutes of both pairs: every player of the match sees them.
-  approved: { id: number; ours: boolean; absent: string; substitute: string }[];
-  // The own pair's requests not approved (waiting, rejected, withdrawn, revoked), newest first.
-  ours: { id: number; absent: string; substitute: string; status: SubstituteStatus; label: string; reason: string | null; canWithdraw: boolean }[];
-  // The form, while the window is open and a player of the pair has no live
-  // request: whom to replace, and who may stand in.
-  form: { absent: { id: string; name: string }[]; candidates: { id: string; name: string }[] } | null;
-};
-
-export async function substitutePanel(ctx: MatchContext, side: Side, userId: string, now = new Date()): Promise<SubstitutePanel> {
-  const ours = ctx.pairs[side];
-  const { open, closesAt } = windowOf(ctx.match, ctx.voided, now);
-  const rows = await requestsOf(ctx.match.id);
-  const taken = new Set(live(rows).map((r) => r.absentId));
-  const absent = ours.players.filter((p) => !taken.has(p.id)).map((p) => ({ id: p.id, name: p.name }));
-  let form: SubstitutePanel["form"] = null;
-  if (open && absent.length > 0) {
-    const excluded = new Set([...matchPlayersOf(ctx), ...(await groupPlayersOf(ctx.match.groupId)), ...live(rows).map((r) => r.substituteId)]);
-    form = { absent, candidates: (await leaguePlayers(ctx.leagueId)).filter((p) => !excluded.has(p.id)) };
-  }
-  return {
-    open,
-    closesAt,
-    approved: rows
-      .filter((r) => r.status === "approved")
-      .map((r) => ({ id: r.id, ours: r.pairId === ours.pairId, absent: r.absentName, substitute: r.substituteName })),
-    // An approved one is in `approved` already.
-    ours: rows
-      .filter((r) => r.pairId === ours.pairId && r.status !== "approved")
-      .map((r) => ({
-        id: r.id,
-        absent: r.absentName,
-        substitute: r.substituteName,
-        status: r.status,
-        label: substituteStatusLabel(r.status, open),
-        reason: r.status === "rejected" || r.status === "revoked" ? r.reason : null,
-        canWithdraw: withdrawalRefusal(r, userId) === null,
-      })),
-    form,
-  };
-}
-
-// The insert fails (NOT NULL) when the match took a step since it was read,
-// and the unique index refuses a second live request for the same player.
-const lostRace = (e: unknown) =>
-  /NOT NULL constraint failed: match_substitutes\.match_id|UNIQUE constraint failed: match_substitutes/i.test(`${e} ${(e as Error)?.cause ?? ""}`);
-
+// The insert's match_id, only while the match is still at `revision`:
+// otherwise it comes out null, NOT NULL fails and nothing is written.
 const guardedMatch = (matchId: number, revision: number) =>
   sql<number>`(select ${matches.id} from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${revision})`;
 
-/** A player of the match asks for a substitute for an absent player of their pair. */
-export async function requestSubstitute(
-  userId: string,
-  matchId: number,
-  input: { absentId: string; substituteId: string },
-  now = new Date(),
-): Promise<StepResult> {
+export const absenceLostRace = (e: unknown) =>
+  /NOT NULL constraint failed: match_absences\.match_id|UNIQUE constraint failed: match_absences/i.test(`${e} ${(e as Error)?.cause ?? ""}`);
+
+// --- The match page ------------------------------------------------------------
+
+type Person = { id: string; name: string };
+
+export type AbsencePanel = {
+  open: boolean;
+  closesAt: Date;
+  // Every mark of both pairs: all four players see them.
+  marked: { absentId: string; name: string; ours: boolean; afterMatch: boolean; canUnmark: boolean; substitute: string | null }[];
+  // While the window is open: the own pair's players not marked yet.
+  form: Person[] | null;
+  // The result form's ticks (#400), while this pair can record the result:
+  // its two players, each ticked if marked now.
+  resultForm: (Person & { marked: boolean })[] | null;
+};
+
+/**
+ * The match page's Helyettes part for a player of `side`. `canRecord`: this
+ * pair can record (or correct) the result now, so the result form offers
+ * the ticks.
+ */
+export async function absencePanel(ctx: MatchContext, side: Side, now = new Date(), canRecord = false): Promise<AbsencePanel> {
+  const ours = ctx.pairs[side];
+  const { open, closesAt } = windowOf(ctx.match, ctx.voided, now);
+  const marks = await marksOf(ctx.match.id);
+  const markedIds = new Set(marks.map((m) => m.absentId));
+  const players = ours.players.map((p) => ({ id: p.id, name: p.name }));
+  const free = players.filter((p) => !markedIds.has(p.id));
+  return {
+    open,
+    closesAt,
+    marked: marks.map((m) => ({ ...m, ours: m.pairId === ours.pairId, canUnmark: open && m.pairId === ours.pairId })),
+    form: open && free.length > 0 ? free : null,
+    resultForm: canRecord && !ctx.voided ? players.map((p) => ({ ...p, marked: markedIds.has(p.id) })) : null,
+  };
+}
+
+/** A mark of one player on one match, for a batch (#402 marks the leaving player on every remaining match). */
+export type AbsenceInput = {
+  matchId: number;
+  // The match's revision when it was read: nothing is written if it moved on.
+  revision: number;
+  pairId: number;
+  absentId: string;
+  markedBy: string | null;
+  afterMatch: boolean;
+  now: Date;
+  // The permanent partner change that marks it (#402), if any.
+  partnerChangeId?: number | null;
+};
+
+export function absenceInsert(a: AbsenceInput) {
+  return db.insert(matchAbsences).values({
+    matchId: guardedMatch(a.matchId, a.revision),
+    pairId: a.pairId,
+    absentId: a.absentId,
+    markedBy: a.markedBy,
+    markedAt: a.now,
+    afterMatch: a.afterMatch,
+    partnerChangeId: a.partnerChangeId ?? null,
+  });
+}
+
+/**
+ * Marks one player as not playing one match, on its own (#402 calls it for
+ * each remaining match of a leaving player). The caller has checked who may
+ * (markRefusal). False when the match moved on since `revision`, or the
+ * player is already marked on it: nothing is written.
+ */
+export async function markAbsent(a: AbsenceInput): Promise<boolean> {
+  try {
+    await absenceInsert(a);
+    return true;
+  } catch (e) {
+    if (absenceLostRace(e)) return false;
+    throw e;
+  }
+}
+
+// The match's other three players, besides `actorId`, with one message each.
+async function tellOthers(ctx: MatchContext, actorId: string, message: Message): Promise<void> {
+  const players = [...ctx.pairs.a.players, ...ctx.pairs.b.players].filter((p) => p.id !== actorId);
+  try {
+    await notifyPlayers(
+      "absence_marked",
+      players.map((p) => ({ userId: p.id, message })),
+    );
+  } catch (error) {
+    logError("absence notification failed", { matchId: ctx.match.id, error });
+  }
+}
+
+async function playerStep(userId: string, matchId: number, absentId: string, now: Date, kind: "mark" | "unmark"): Promise<StepResult> {
   const ctx = await loadMatch(matchId);
   if (!ctx) return { ok: false, error: NOT_FOUND, notFound: true };
   const side = sideOf(ctx, userId);
   if (!side) return { ok: false, error: NOT_FOUND, notFound: true };
-  // Hidden in the first season (D145).
-  if (!substitutesEnabled()) return { ok: false, error: SUBSTITUTES_OFF };
-  if (!input.substituteId) return { ok: false, error: "Válaszd ki a helyettest a listából." };
   const pair = ctx.pairs[side];
   const { open } = windowOf(ctx.match, ctx.voided, now);
-  const rows = await requestsOf(matchId);
-  const refusal = requestRefusal({
-    open,
-    pair: pair.players.map((p) => p.id),
-    absentId: input.absentId,
-    matchPlayers: matchPlayersOf(ctx),
-    groupPlayers: open ? await groupPlayersOf(ctx.match.groupId) : new Set(),
-    registered: open && (await leaguePlayers(ctx.leagueId)).some((p) => p.id === input.substituteId),
-    substituteId: input.substituteId,
-    live: live(rows),
-  });
-  if (refusal) return { ok: false, error: SUBSTITUTE_REFUSALS[refusal] };
-  try {
-    await db.insert(matchSubstitutes).values({
-      matchId: guardedMatch(matchId, ctx.match.revision),
-      pairId: pair.pairId,
-      absentId: input.absentId,
-      substituteId: input.substituteId,
-      status: "requested",
-      requestedBy: userId,
-      requestedAt: now,
-    });
-  } catch (e) {
-    if (lostRace(e)) return { ok: false, error: SUBSTITUTE_CHANGED };
-    throw e;
+  const marks = await marksOf(matchId);
+  const check = { open, pair: pair.players.map((p) => p.id), absentId, marked: marks.map((m) => m.absentId) };
+  const refusal = kind === "mark" ? markRefusal(check) : unmarkRefusal(check);
+  if (refusal) return { ok: false, error: ABSENCE_REFUSALS[refusal] };
+  const name = pair.players.find((p) => p.id === absentId)?.name || NAMELESS;
+  if (kind === "mark") {
+    const done = await markAbsent({ matchId, revision: ctx.match.revision, pairId: pair.pairId, absentId, markedBy: userId, afterMatch: false, now });
+    if (!done) return { ok: false, error: ABSENCE_CHANGED };
+  } else {
+    const removed = await db
+      .delete(matchAbsences)
+      .where(
+        and(
+          eq(matchAbsences.matchId, matchId),
+          eq(matchAbsences.absentId, absentId),
+          sql`exists (select 1 from ${matches} where ${matches.id} = ${matchId} and ${matches.revision} = ${ctx.match.revision})`,
+        ),
+      )
+      .returning({ id: matchAbsences.id });
+    if (removed.length === 0) return { ok: false, error: ABSENCE_CHANGED };
   }
-  logInfo("substitute requested", { matchId });
-  await notifySubstituteRequested({ leagueId: ctx.leagueId, leagueSlug: ctx.leagueSlug, leagueName: ctx.league, week: ctx.match.week, requestedBy: userId });
-  return { ok: true, notice: "Elküldtük a kérést a szervezőnek. Szólunk, ha döntött." };
+  logInfo(kind === "mark" ? "absence marked" : "absence unmarked", { matchId });
+  await tellOthers(ctx, userId, absenceMarkedMessage({ matchId, name, withdrawn: kind === "unmark" }));
+  return kind === "mark"
+    ? { ok: true, notice: "Rendben, helyettes jön helyette. A többiek is látják." }
+    : { ok: true, notice: "Visszavontad: mégis ő játszik." };
 }
 
-/** The asking player takes back their request while it waits. */
-export async function withdrawSubstitute(userId: string, matchId: number, requestId: number): Promise<StepResult> {
-  const ctx = await loadMatch(matchId);
-  if (!ctx || !sideOf(ctx, userId)) return { ok: false, error: NOT_FOUND, notFound: true };
-  if (!substitutesEnabled()) return { ok: false, error: SUBSTITUTES_OFF };
-  const row = (await requestsOf(matchId)).find((r) => r.id === requestId);
-  if (!row) return { ok: false, error: NOT_FOUND, notFound: true };
-  const refusal = withdrawalRefusal(row, userId);
-  if (refusal) return { ok: false, error: SUBSTITUTE_REFUSALS[refusal] };
-  const done = await db
-    .update(matchSubstitutes)
-    .set({ status: "withdrawn" })
-    .where(and(eq(matchSubstitutes.id, requestId), eq(matchSubstitutes.status, "requested")))
-    .returning({ id: matchSubstitutes.id });
-  if (done.length === 0) return { ok: false, error: SUBSTITUTE_CHANGED };
-  return { ok: true, notice: "Visszavontad a kérést." };
-}
+/** A player of the match marks a player of their own pair as not playing it, before the match. */
+export const markAbsence = (userId: string, matchId: number, absentId: string, now = new Date()) => playerStep(userId, matchId, absentId, now, "mark");
 
-// --- The organizer's list ----------------------------------------------------------
+/** A player of the pair takes a mark back, before the match. */
+export const unmarkAbsence = (userId: string, matchId: number, absentId: string, now = new Date()) => playerStep(userId, matchId, absentId, now, "unmark");
 
-export type SubstituteRequest = {
-  id: number;
-  matchId: number;
-  season: string;
-  phase: number;
-  groupNumber: number;
-  week: number;
-  // The asking pair and its opponents.
-  pair: string;
-  opponents: string;
-  // The same pairs' players, for the Admin's links to their profiles (#301).
-  pairPlayers: { id: string; name: string }[];
-  opponentPlayers: { id: string; name: string }[];
-  // id: for the Admin's link to the player's profile (#301).
-  absent: { id: string; name: string; elo: number | null };
-  substitute: { id: string; name: string; elo: number | null };
-  status: SubstituteStatus;
-  open: boolean;
-  closesAt: Date;
-  // The agreed start, or null while none is agreed (closesAt is the deadline).
-  startsAt: Date | null;
-};
-
-const pa = alias(users, "sub_pa");
-const pb = alias(users, "sub_pb");
-const askingPair = alias(pairs, "sub_pair");
-const otherPair = alias(pairs, "sub_other_pair");
-const oa = alias(users, "sub_oa");
-const ob = alias(users, "sub_ob");
+// --- The result form (#400) --------------------------------------------------------
 
 /**
- * The league's live requests: waiting ones and approvals, with both players'
- * current Elo. Matches of a withdrawn pair (#34) are left out: they don't
- * count, so nothing there is decided. Only matches not started yet: a
- * waiting request then lapses, and an approval can no longer be revoked.
+ * The marks of the recording pair's players the result form ticks: exactly
+ * those (resultAbsences), so a correction can add or drop one, also one
+ * from before the match. The statements go in the result's batch, guarded
+ * by the match's revision like the result itself. `added`: the names newly
+ * marked, for the notice.
  */
-export async function leagueSubstitutes(leagueId: number, now = new Date()): Promise<{ waiting: SubstituteRequest[]; approved: SubstituteRequest[] }> {
-  const rows = await db
-    .select({
-      id: matchSubstitutes.id,
-      matchId: matches.id,
-      status: matchSubstitutes.status,
-      matchStatus: matches.status,
-      scheduledAt: matches.scheduledAt,
-      deadline: matches.deadline,
-      week: matches.week,
-      season: seasons.name,
-      phase: groups.phase,
-      groupNumber: groups.number,
-      paId: pa.id,
-      pa: pa.name,
-      pbId: pb.id,
-      pb: pb.name,
-      oaId: oa.id,
-      oa: oa.name,
-      obId: ob.id,
-      ob: ob.name,
-      absentId: absentUser.id,
-      absentName: absentUser.name,
-      absentElo: absentUser.elo,
-      absentLevel: absentUser.level,
-      substituteId: substituteUser.id,
-      substituteName: substituteUser.name,
-      substituteElo: substituteUser.elo,
-      substituteLevel: substituteUser.level,
-    })
-    .from(matchSubstitutes)
-    .innerJoin(matches, eq(matches.id, matchSubstitutes.matchId))
-    .innerJoin(groups, eq(groups.id, matches.groupId))
-    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
-    .innerJoin(askingPair, eq(askingPair.id, matchSubstitutes.pairId))
-    .innerJoin(pa, eq(pa.id, askingPair.playerA))
-    .innerJoin(pb, eq(pb.id, askingPair.playerB))
-    .innerJoin(otherPair, sql`${otherPair.id} = case when ${matches.pairA} = ${matchSubstitutes.pairId} then ${matches.pairB} else ${matches.pairA} end`)
-    .innerJoin(oa, eq(oa.id, otherPair.playerA))
-    .innerJoin(ob, eq(ob.id, otherPair.playerB))
-    .innerJoin(absentUser, eq(absentUser.id, matchSubstitutes.absentId))
-    .innerJoin(substituteUser, eq(substituteUser.id, matchSubstitutes.substituteId))
-    .where(
-      and(
-        eq(seasons.leagueId, leagueId),
-        isNotNull(groups.publishedAt),
-        inArray(matchSubstitutes.status, ["requested", "approved"]),
-        noWithdrawnPair,
-      ),
-    )
-    .orderBy(asc(matches.deadline), asc(matchSubstitutes.id));
-  const list = rows.map((r): SubstituteRequest => {
-    const { open, closesAt } = windowOf({ status: r.matchStatus, scheduledAt: r.scheduledAt, deadline: r.deadline }, false, now);
-    return {
-      id: r.id,
-      matchId: r.matchId,
-      season: r.season,
-      phase: r.phase,
-      groupNumber: r.groupNumber,
-      week: r.week,
-      pair: pairName([{ name: r.pa || NAMELESS }, { name: r.pb || NAMELESS }]),
-      opponents: pairName([{ name: r.oa || NAMELESS }, { name: r.ob || NAMELESS }]),
-      pairPlayers: [
-        { id: r.paId, name: r.pa || NAMELESS },
-        { id: r.pbId, name: r.pb || NAMELESS },
-      ],
-      opponentPlayers: [
-        { id: r.oaId, name: r.oa || NAMELESS },
-        { id: r.obId, name: r.ob || NAMELESS },
-      ],
-      absent: { id: r.absentId, name: r.absentName || NAMELESS, elo: currentElo(r.absentElo, r.absentLevel) },
-      substitute: { id: r.substituteId, name: r.substituteName || NAMELESS, elo: currentElo(r.substituteElo, r.substituteLevel) },
-      status: r.status,
-      open,
-      closesAt,
-      startsAt: r.matchStatus === "scheduled" ? r.scheduledAt : null,
-    };
-  });
-  return {
-    waiting: list.filter((r) => r.status === "requested" && r.open),
-    approved: list.filter((r) => r.status === "approved" && r.open),
-  };
-}
-
-// --- The organizer's decision --------------------------------------------------------
-
-export type SubstituteDecision = "approve" | "reject" | "revoke";
-
-const NOT_IN_LEAGUE = "Nincs ilyen kérés ebben a ligában.";
-
-const ACTIONS = { approve: "substitute.approve", reject: "substitute.reject", revoke: "substitute.revoke" } as const;
-const STATUS_AFTER = { approve: "approved", reject: "rejected", revoke: "revoked" } as const;
-const STATUS_BEFORE = { approve: "requested", reject: "requested", revoke: "approved" } as const;
-const NOTICES = {
-  approve: "Jóváhagytad a helyettest. Mindkét pár értesítést kap.",
-  reject: "Elutasítottad a kérést. A pár értesítést kap.",
-  revoke: "Visszavontad a jóváhagyást. Mindkét pár értesítést kap.",
-};
-
-/**
- * The league's organizer approves, rejects or revokes a request (optional
- * reason, at most SUBSTITUTE_REASON_MAX characters), with an audit entry in
- * the same batch; then the pairs are told in the app and by push.
- */
-export async function decideSubstitute(
+export async function resultAbsenceSteps(
+  ctx: MatchContext,
+  side: Side,
   userId: string,
-  leagueId: number,
-  requestId: number,
-  decision: SubstituteDecision,
-  reason: string,
-  now = new Date(),
-): Promise<StepResult> {
-  const [found] = await db
-    .select({ matchId: matchSubstitutes.matchId, leagueId: seasons.leagueId })
-    .from(matchSubstitutes)
-    .innerJoin(matches, eq(matches.id, matchSubstitutes.matchId))
-    .innerJoin(groups, eq(groups.id, matches.groupId))
-    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
-    .where(eq(matchSubstitutes.id, requestId));
-  if (!found || found.leagueId !== leagueId) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
-  const ctx = await loadMatch(found.matchId);
-  if (!ctx) return { ok: false, error: NOT_IN_LEAGUE, notFound: true };
-  const rows = await requestsOf(found.matchId);
-  const row = rows.find((r) => r.id === requestId)!;
-  const text = reason.trim();
-  if (text.length > SUBSTITUTE_REASON_MAX) return { ok: false, error: `Az indoklás legfeljebb ${SUBSTITUTE_REASON_MAX} karakter lehet.` };
-  const { open } = windowOf(ctx.match, ctx.voided, now);
-
-  let refusal;
-  if (decision === "approve")
-    refusal = approvalRefusal({
-      status: row.status,
-      open,
-      matchPlayers: matchPlayersOf(ctx),
-      groupPlayers: await groupPlayersOf(ctx.match.groupId),
-      registered: (await leaguePlayers(ctx.leagueId)).some((p) => p.id === row.substituteId),
-      substituteId: row.substituteId,
-      live: live(rows).filter((r) => r.id !== requestId),
-    });
-  else if (decision === "reject") refusal = rejectionRefusal(row.status);
-  else refusal = revocationRefusal(row.status, open);
-  if (refusal) return { ok: false, error: SUBSTITUTE_REFUSALS[refusal] };
-
-  // Approving or revoking only while the match took no step since it was
-  // read (its start may have moved); a rejection needs no such guard.
-  const guard =
-    decision === "reject" ? sql`1` : sql`exists (select 1 from ${matches} where ${matches.id} = ${ctx.match.id} and ${matches.revision} = ${ctx.match.revision})`;
-  const [changed] = await db.batch([
-    db
-      .update(matchSubstitutes)
-      .set({ status: STATUS_AFTER[decision], decidedBy: userId, decidedAt: now, reason: decision === "approve" ? null : text || null })
-      .where(and(eq(matchSubstitutes.id, requestId), eq(matchSubstitutes.status, STATUS_BEFORE[decision]), guard))
-      .returning({ id: matchSubstitutes.id }),
-    // Ids, never names (D91): "<absent> -> <substitute>".
-    auditIfChanged({
-      actorId: userId,
-      action: ACTIONS[decision],
-      target: `match:${ctx.match.id}`,
-      detail: `user:${row.absentId} -> user:${row.substituteId}`,
-      leagueId,
-    }),
-  ]);
-  if (changed.length === 0) return { ok: false, error: SUBSTITUTE_CHANGED };
-
-  await tellPairs(ctx, row, decision);
-  return { ok: true, notice: NOTICES[decision] };
+  ticked: readonly string[],
+  now: Date,
+): Promise<{ statements: BatchItem<"sqlite">[]; added: string[] }> {
+  const pair = ctx.pairs[side];
+  const ids = pair.players.map((p) => p.id);
+  const current = (await marksOf(ctx.match.id)).map((m) => m.absentId);
+  const { add, remove } = resultAbsences(ids, current, ticked);
+  const revision = ctx.match.revision;
+  const guard = sql`exists (select 1 from ${matches} where ${matches.id} = ${ctx.match.id} and ${matches.revision} = ${revision})`;
+  const statements: BatchItem<"sqlite">[] = [
+    ...remove.map((absentId) =>
+      db.delete(matchAbsences).where(and(eq(matchAbsences.matchId, ctx.match.id), eq(matchAbsences.absentId, absentId), guard)),
+    ),
+    ...add.map((absentId) => absenceInsert({ matchId: ctx.match.id, revision, pairId: pair.pairId, absentId, markedBy: userId, afterMatch: true, now })),
+  ];
+  return { statements, added: add.map((id) => pair.players.find((p) => p.id === id)?.name || NAMELESS) };
 }
 
-// spec 13, D109: the asking pair on every decision, the opponents on an
-// approval and a revocation. In the app and by push only.
-async function tellPairs(ctx: MatchContext, row: RequestRow, decision: SubstituteDecision): Promise<void> {
-  const asking = ctx.pairs.a.pairId === row.pairId ? ctx.pairs.a : ctx.pairs.b;
-  const other = asking === ctx.pairs.a ? ctx.pairs.b : ctx.pairs.a;
-  const notice = { matchId: ctx.match.id, substitute: row.substituteName, absent: row.absentName };
-  const to = (players: { id: string }[], message: Message) => players.map((p) => ({ userId: p.id, message }));
-  const send: [PlayerKind, { userId: string; message: Message }[]][] =
-    decision === "approve"
-      ? [["substitute_approved", [...to(asking.players, substituteDecidedMessage({ ...notice, approved: true })), ...to(other.players, substituteAnnouncedMessage(notice))]]]
-      : decision === "reject"
-        ? [["substitute_rejected", to(asking.players, substituteDecidedMessage({ ...notice, approved: false }))]]
-        : [["substitute_revoked", [...to(asking.players, substituteRevokedMessage({ ...notice, ours: true })), ...to(other.players, substituteRevokedMessage({ ...notice, ours: false }))]]];
-  try {
-    for (const [kind, messages] of send) await notifyPlayers(kind, messages);
-  } catch (error) {
-    logError("substitute notification failed", { matchId: ctx.match.id, error });
-  }
+/** After the result went in: the other three are told who didn't play (#400). */
+export async function tellResultAbsences(ctx: MatchContext, userId: string, added: readonly string[]): Promise<void> {
+  for (const name of added) await tellOthers(ctx, userId, absenceMarkedMessage({ matchId: ctx.match.id, name, played: true }));
 }

@@ -23,7 +23,6 @@ const { pairCandidates } = await import("~/lib/pairs.server");
 const { leaguePairsAudience } = await import("~/lib/league-pairs-view.server");
 const { findUserIdByEmail } = await import("~/lib/auth/accounts.server");
 const { sendLoginCode } = await import("~/lib/auth/login-code.server");
-const { updateElo } = await import("~/lib/elo.server");
 const { ladderPage } = await import("~/lib/ladder.server");
 const { pairProfile, playerProfile } = await import("~/lib/profiles.server");
 
@@ -51,7 +50,7 @@ function freshDb() {
   h.raw
     .prepare("insert into seasons (id, league_id, name, registration_opens_at, registration_closes_at, first_phase_start) values (1, 1, 'Tél', ?, ?, '2026-11-09')")
     .run(sec("2026-10-28T23:00:00Z"), sec("2026-11-06T22:59:00Z"));
-  h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, 1, ?, ?), (1, 2, ?, ?)").run(
+  h.raw.prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, 1, ?, ?, 4), (1, 2, ?, ?, 4)").run(
     sec("2026-11-08T23:00:00Z"),
     sec("2026-11-29T22:59:00Z"),
     sec("2026-11-29T23:00:00Z"),
@@ -291,7 +290,7 @@ describe("deleting an account (#152)", () => {
     ]);
   });
 
-  it("anonymizes, never removes, an approved substitute, so the Elo replay still rates who played (#37)", async () => {
+  it("anonymizes, never removes, a substitute approved under D109, so the row stays resolvable (#37; retired by #400)", async () => {
     publishPairOne();
     h.raw.exec(`insert into users (id, email, name, level, consent_at) values ('s', 's@x.hu', 'S', 'kezdo', 1)`);
     h.raw.exec(`update matches set status = 'final', outcome = '{"kind":"played","score":{"sets":[[4,1],[4,2]]}}' where id = 1`);
@@ -299,10 +298,6 @@ describe("deleting an account (#152)", () => {
     expect(await D.deleteAccount("admin", "s", AFTER)).toEqual({ ok: true, mode: "anonymize" });
     expect(one("select substitute_id, status from match_substitutes")).toEqual({ substitute_id: "s", status: "approved" });
     expect(one("select name, email from users where id = 's'")).toEqual({ name: DELETED_NAME, email: "deleted-s@deleted.invalid" });
-    await updateElo(AFTER);
-    expect(all("select user_id from elo_changes order by user_id")).toEqual(["a", "c", "d", "s"].map((user_id) => ({ user_id })));
-    expect(n("select elo from users where id = 'b'")).toBeNull();
-    expect(n("select elo from users where id = 's'")).toBeGreaterThan(1000);
   });
 
   it("removes a substitute who was never approved, with their requests (#37)", async () => {
@@ -454,13 +449,18 @@ describe("a player deleting their own account (#38)", () => {
     };
     const points = (page: Awaited<ReturnType<typeof table>>) =>
       page.bands.flatMap((b) => b.groups.flatMap((g) => g.rows.map((r) => [r.points, r.matches])));
+    // The name's two parts (#419) go with the name.
+    h.raw.prepare("update users set surname = 'Teszt', first_name = 'Anna' where id = 'a'").run();
     const before = await table();
-    expect(JSON.stringify(before)).toContain(OLD.name);
+    // The table shows the team label (#419): the surname, "Teszt".
+    expect(JSON.stringify(before)).toContain("Teszt");
 
     expect(await D.planOwnDeletion("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
     expect(await D.deleteOwnAccount("a", AFTER)).toEqual({ ok: true, mode: "anonymize" });
 
     const after = await table();
+    expect(one("select surname, first_name from users where id = 'a'")).toEqual({ surname: null, first_name: null });
+    expect(JSON.stringify(after)).not.toContain("Teszt");
     expect(points(after)).toEqual(points(before));
     expect(points(after)).toContainEqual([3, 1]);
     expect(JSON.stringify(after)).toContain(DELETED_NAME);

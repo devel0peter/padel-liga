@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
 import { rowSelect } from "~/db/insert-select";
-import { groupPairs, groups, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
+import { groupPairs, groups, pairs, partnerChanges, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { listedLeagues, memberOf, pairMemberStatements } from "~/lib/league-members.server";
 import { notInRunningGroup, pairInRunningGroup } from "~/lib/groups.server";
 import { auditEntry, auditIfChanged } from "~/lib/audit.server";
@@ -34,10 +34,21 @@ export async function pairLeagues(): Promise<PairLeague[]> {
   return (await listedLeagues()).map(({ id, name }) => ({ id, name }));
 }
 
-// Either player in an active pair of the league.
+// Either player in an active pair of the league, or committed to one: the
+// new partner of a final permanent partner change there (#402, D178), whose
+// pair starts at the next round switch. Every way of forming a pair checks
+// this, so such a player can't be paired elsewhere in the meantime.
 export function activePairWith(leagueId: number, userIds: string[]) {
-  return sql`exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
-    and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))`;
+  return sql`(exists (select 1 from ${pairs} where ${pairs.leagueId} = ${leagueId} and ${pairs.status} = 'active'
+    and (${inArray(pairs.playerA, userIds)} or ${inArray(pairs.playerB, userIds)}))
+    or ${committedPartner(leagueId, userIds)})`;
+}
+
+// The new partner of an accepted (waiting for the organizer, #416) or final
+// permanent partner change in the league (#402).
+export function committedPartner(leagueId: number, userIds: string[] | SQL) {
+  const who = Array.isArray(userIds) ? sql`(${sql.join(userIds.map((u) => sql`${u}`), sql`, `)})` : sql`(${userIds})`;
+  return sql`exists (select 1 from ${partnerChanges} pc where pc.league_id = ${leagueId} and pc.status in ('accepted', 'final') and pc.partner_id in ${who})`;
 }
 
 export type PairOverview = {
@@ -100,6 +111,9 @@ export type LeaguePairRow = {
   lockedIn: number[];
   // The entry in the league's current (or next) season, if any.
   entry: { seasonId: number; season: string; status: EntryStatus; joinsPhase: number | null } | null;
+  // That entry's opt-out on Ligáim (#395): the round it ends after, and
+  // whether that round's deadline has passed; null: default in.
+  optOut: { round: number; ended: boolean } | null;
   // "Benevezés" or "Kivétel a szezonból" for an active pair (#154), or none.
   entryAction: OrganizerEntryAction | null;
   // The league's first home season (current or next), so "not entered" can
@@ -169,6 +183,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
             seasonId: seasonEntries.seasonId,
             status: seasonEntries.status,
             joinsPhase: seasonEntries.joinsPhase,
+            optOutPhase: seasonEntries.optOutPhase,
           })
           .from(seasonEntries)
           .where(
@@ -181,6 +196,8 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
   ]);
   return rows.map((r) => {
     const entry = homeEntry(seasons, entries, r.id);
+    const optOutPhase = entry ? (entries.find((e) => e.pairId === r.id && e.seasonId === entry.seasonId)?.optOutPhase ?? null) : null;
+    const optOutEnd = seasons.find((s) => s.id === entry?.seasonId)?.phases.find((p) => p.number === optOutPhase)?.deadline;
     return {
       id: r.id,
       players: [
@@ -193,6 +210,7 @@ export async function leaguePairs(leagueId: number, now = new Date()): Promise<L
       locked: locked.has(r.id),
       lockedIn: locked.get(r.id) ?? [],
       entry,
+      optOut: entry?.status === "approved" && optOutPhase !== null ? { round: optOutPhase, ended: !!optOutEnd && optOutEnd < now } : null,
       entryAction: r.status === "active" ? organizerEntryAction(seasons, entry, now) : null,
       season: seasons[0]?.name ?? null,
     };
@@ -217,6 +235,7 @@ export async function pairCandidates(league: { id: number }): Promise<PairCandid
         memberOf(league.id, users.id),
         sql`not exists (select 1 from ${pairs} where ${pairs.leagueId} = ${league.id} and ${pairs.status} = 'active'
           and (${pairs.playerA} = ${users.id} or ${pairs.playerB} = ${users.id}))`,
+        sql`not ${committedPartner(league.id, sql`${users.id}`)}`,
       ),
     )
     .orderBy(asc(users.name), asc(users.id));

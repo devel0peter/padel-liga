@@ -3,6 +3,7 @@ import { enteredNotice } from "~/components/season-entry";
 import { playerLeagues } from "~/lib/league-members.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { pairOverview } from "~/lib/pairs.server";
+import { finderPath } from "~/lib/partner-search";
 import { partnerSearchState, setPartnerSearch } from "~/lib/partner-search.server";
 import { pairPath } from "~/lib/profiles";
 import { profilePairIds } from "~/lib/profiles.server";
@@ -38,7 +39,9 @@ export async function pairSection(user: User, request: Request) {
       ...o,
       profile: o.pair && open.has(o.pair.id) ? pairPath(o.pair.id) : null,
       link: link ? url.origin + pairLinkPath(link.token) : null,
-      seeking: o.pair ? null : (searching.get(o.league.id) ?? false),
+      search: o.pair ? null : (searching.get(o.league.id) ?? { seeking: false, listed: false }),
+      // The league's Párkereső (#398).
+      finder: o.pair ? undefined : finderPath(leagues.find((l) => l.id === o.league.id)?.slug),
     };
   });
   // The seasons the home page shows (the current or next one per league),

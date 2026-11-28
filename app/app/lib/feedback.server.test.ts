@@ -148,18 +148,27 @@ describe("the form's send (#240)", () => {
   it("refuses an empty or too long message, a rating or an unknown type from the form, and stores nothing", async () => {
     expect(await F.submitFeedback(form({ kind: "bug", message: "  " }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.empty });
     expect(await F.submitFeedback(form({ kind: "bug", message: "a".repeat(2001) }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.tooLong });
-    expect(await F.submitFeedback(form({ kind: "rating", message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.kind });
+    // A rating only from a logged-in player, with 1–5 (#446); "Egyéb" is gone from the form.
+    expect(await F.submitFeedback(form({ kind: "rating", message: "x" }), request(), null, NOW)).toEqual({ ok: false, error: ERRORS.kind });
+    expect(await F.submitFeedback(form({ kind: "rating", message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.rating });
+    expect(await F.submitFeedback(form({ kind: "rating", rating: "6" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.rating });
+    expect(await F.submitFeedback(form({ kind: "other", message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.kind });
     expect(await F.submitFeedback(form({ message: "x" }), request(), "u1", NOW)).toEqual({ ok: false, error: ERRORS.kind });
     // Checked before the bot check, which a visitor's empty message never reaches.
-    expect(await F.submitFeedback(form({ kind: "other", message: "" }), request(), null, NOW)).toEqual({ ok: false, error: ERRORS.empty });
+    expect(await F.submitFeedback(form({ kind: "idea", message: "" }), request(), null, NOW)).toEqual({ ok: false, error: ERRORS.empty });
     expect(h.botCalls).toBe(0);
     expect(rows()).toEqual([]);
   });
 
   it("over the limit: the Hungarian error, and nothing more is stored", async () => {
-    for (let i = 0; i < 5; i++) await F.submitFeedback(form({ kind: "other", message: `m${i}` }), request(), "u1", minutes(i));
-    expect(await F.submitFeedback(form({ kind: "other", message: "m6" }), request(), "u1", minutes(6))).toEqual({ ok: false, error: ERRORS.limit });
+    for (let i = 0; i < 5; i++) await F.submitFeedback(form({ kind: "idea", message: `m${i}` }), request(), "u1", minutes(i));
+    expect(await F.submitFeedback(form({ kind: "idea", message: "m6" }), request(), "u1", minutes(6))).toEqual({ ok: false, error: ERRORS.limit });
     expect(rows()).toHaveLength(5);
+  });
+
+  it("stores a logged-in player's rating with its balls and optional comment (#446)", async () => {
+    expect(await F.submitFeedback(form({ kind: "rating", rating: "4", message: "" }), request(), "u1", NOW)).toEqual({ ok: true });
+    expect(h.raw.prepare("select kind, rating, message from feedback").all()).toEqual([{ kind: "rating", rating: 4, message: "" }]);
   });
 });
 

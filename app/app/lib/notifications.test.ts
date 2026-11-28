@@ -1,11 +1,9 @@
+import { SHORT_SETS } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
+  absenceMarkedMessage,
   channelEnabled,
-  substituteAnnouncedMessage,
-  substituteDecidedMessage,
-  substituteRequestedMessage,
-  substituteRevokedMessage,
   noShowDecidedMessage,
   noShowReportedMessage,
   channelKey,
@@ -40,10 +38,10 @@ import {
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
 describe("kindsFor", () => {
-  it("offers disputed results and no-shows to Szervezők and Admins only (no new signups since #333; no substitutes this season, D145)", () => {
+  it("offers disputed results, no-shows and partner changes waiting for approval (#416) to Szervezők and Admins only (no new signups since #333; a temporary substitute needs no approval since #400)", () => {
     expect(kindsFor({ platformRole: "player", leagues: [] })).toEqual([]);
-    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "no_show_reported"]);
-    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "no_show_reported"]);
+    expect(kindsFor({ platformRole: "player", leagues: [gyor] })).toEqual(["result_disputed", "no_show_reported", "partner_change_waiting"]);
+    expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual(["result_disputed", "no_show_reported", "partner_change_waiting"]);
   });
 });
 
@@ -332,30 +330,21 @@ describe("pairWithdrawnMessage (#34)", () => {
   });
 });
 
-describe("substitute notices (#37, D109)", () => {
-  const n = { matchId: 7, substitute: "Nagy Béla", absent: "Kiss Anna" };
-
-  it("tells the organizers without names, linking to Helyettesek", () => {
-    expect(substituteRequestedMessage({ leagueSlug: "gyor", leagueName: "Padelpárbaj Győr", week: 2 })).toEqual({
-      title: "Helyettes kérés · Padelpárbaj Győr",
-      body: "Egy pár helyettest kér a 2. heti meccsére. A jóváhagyás rád vár.",
-      url: "/admin/leagues/gyor/substitutes",
+describe("temporary substitute notices (#400, D175)", () => {
+  it("tells the other three who doesn't play, before or after the match, and when it's taken back", () => {
+    expect(absenceMarkedMessage({ matchId: 7, name: "Kiss Anna" })).toEqual({
+      title: "Helyettes a meccseteken",
+      body: "Kiss Anna helyett helyettes játszik a meccseteken.",
+      url: "/matches/7",
     });
+    expect(absenceMarkedMessage({ matchId: 7, name: "Kiss Anna", played: true }).body).toBe(
+      "Kiss Anna helyett helyettes játszott a meccseteken. Az eredménnyel együtt ezt is megerősítitek.",
+    );
+    expect(absenceMarkedMessage({ matchId: 7, name: "Kiss Anna", withdrawn: true }).body).toBe("Mégis Kiss Anna játszik a meccseteken.");
   });
 
-  it("tells the asking pair the decision, never the reason", () => {
-    expect(substituteDecidedMessage({ ...n, approved: true })).toMatchObject({ title: "Jóváhagyták a helyettest", url: "/matches/7" });
-    expect(substituteDecidedMessage({ ...n, approved: false }).body).toBe("Nagy Béla nem játszhat Kiss Anna helyett. A részleteket a meccs oldalán látod.");
-  });
-
-  it("tells the opponents who plays, and when it's revoked", () => {
-    expect(substituteAnnouncedMessage(n).body).toBe("Kiss Anna helyett Nagy Béla játszik a meccseteken.");
-    expect(substituteRevokedMessage({ ...n, ours: false }).body).toBe("Kiss Anna helyett mégsem Nagy Béla játszik a meccseteken.");
-    expect(substituteRevokedMessage({ ...n, ours: true }).body).toMatch(/^Nagy Béla mégsem játszhat Kiss Anna helyett/);
-  });
-
-  it("are not digest items (no email, D83)", () => {
-    for (const kind of ["substitute_approved", "substitute_rejected", "substitute_revoked"] as const) expect(DIGEST_KINDS).not.toContain(kind);
+  it("is not a digest item (no email, D83)", () => {
+    expect(DIGEST_KINDS).not.toContain("absence_marked");
   });
 });
 
@@ -369,13 +358,39 @@ describe("no-show notices (#33, D108)", () => {
   });
 
   it("tells each pair the decision from its own side, never the reason; not digest items", () => {
-    const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true });
-    const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false });
+    const won = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: SHORT_SETS });
+    const lost = noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: SHORT_SETS });
     expect(won).toMatchObject({ title: "Jóváhagyta a szervező: nem jöttek el", url: "/matches/7" });
     expect(won.body).toContain("4:0, 4:0");
     expect(lost.body).toContain("fekete pontot");
-    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true }).title).toBe("A szervező elutasította a bejelentésed");
-    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: true, setGames: SHORT_SETS }).title).toBe("A szervező elutasította a bejelentésed");
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: false, reported: false, setGames: SHORT_SETS }).title).toBe("A szervező elutasította az ellenfeleitek bejelentését");
     for (const kind of ["no_show_confirmed", "no_show_rejected"] as const) expect(DIGEST_KINDS).not.toContain(kind);
+  });
+
+  it("names the walkover in the round's set format (#396)", () => {
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: SHORT_SETS }).body).toBe(
+      "4:0, 4:0-ra megnyertétek a meccset. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: SHORT_SETS }).body).toBe(
+      "A meccset 0:4, 0:4-re elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: true, setGames: 6 }).body).toBe(
+      "6:0, 6:0-ra megnyertétek a meccset. A részletek a meccs oldalán.",
+    );
+    expect(noShowDecidedMessage({ matchId: 7, confirmed: true, reported: false, setGames: 6 }).body).toBe(
+      "A meccset 0:6, 0:6-ra elvesztettétek, és fekete pontot kaptatok. A részletek a meccs oldalán.",
+    );
+  });
+});
+
+describe("noticeTone (#423)", () => {
+  it("colours an item by what it asks of the player", async () => {
+    const { noticeTone } = await import("./notifications");
+    expect(noticeTone("match_result")).toBe("warning");
+    expect(noticeTone("match_proposal")).toBe("info");
+    expect(noticeTone("match_result_confirmed")).toBe("success");
+    expect(noticeTone("strike")).toBe("danger");
+    expect(noticeTone("groups_published")).toBe("neutral");
   });
 });

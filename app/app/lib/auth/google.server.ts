@@ -9,7 +9,7 @@ import { leagueOfReturnTo } from "~/lib/league-members";
 import { joinFromRegisterButton } from "~/lib/league-members.server";
 
 import { createUser, findUserIdByEmail, setProfileImage } from "./accounts.server";
-import { googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
+import { googleNameParts, googlePicture, normalizeEmail, parseCookies, resolveGoogleLogin, safeReturnTo, serializeCookie } from "./rules";
 import { createSession } from "./session.server";
 import { timingSafeEqual } from "./tokens";
 import { logInfo, logWarn } from "~/lib/log";
@@ -56,7 +56,15 @@ export function startGoogleLogin(request: Request): Response {
   });
 }
 
-type GoogleClaims = { sub: string; email?: string; email_verified?: boolean; name?: string; picture?: string };
+type GoogleClaims = {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  family_name?: string;
+  given_name?: string;
+  picture?: string;
+};
 
 export async function finishGoogleLogin(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
@@ -99,8 +107,12 @@ export async function finishGoogleLogin(request: Request): Promise<Response> {
       await db.insert(oauthAccounts).values({ provider: "google", providerUserId: claims.sub, userId }).onConflictDoNothing();
       break;
     case "create":
-      // Google's name pre-fills the first-login page; they can change it there.
-      userId = await createUser(email, (claims.name ?? "").trim().slice(0, 80));
+      // Google's name pre-fills the first-login page (Vezetéknév, Keresztnév,
+      // #419); they can change it there.
+      {
+        const { name, ...parts } = googleNameParts(claims);
+        userId = await createUser(email, name, parts);
+      }
       await db.insert(oauthAccounts).values({ provider: "google", providerUserId: claims.sub, userId }).onConflictDoNothing();
       break;
   }

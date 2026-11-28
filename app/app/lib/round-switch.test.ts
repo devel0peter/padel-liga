@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { LEAVE_REASONS, movement, originText, previewText, shownPhase, undecidedText, waitingText } from "./round-switch";
+import { changeText, LEAVE_REASONS, movement, originText, previewText, shownPhase, undecidedText, waitingText } from "./round-switch";
+
+describe("changeText (#403: Csoportok and the preview mark a partner change)", () => {
+  it("names who leaves and who comes, and nothing for other pairs", () => {
+    expect(changeText({ leaving: "Béla", partner: "Cili" })).toBe("Partnercsere: Béla helyett Cili");
+    expect(changeText(undefined)).toBeNull();
+  });
+});
 
 describe("movement and originText (#35: the draft shows where each pair comes from)", () => {
   it("tells up, down, stay and new", () => {
@@ -16,7 +23,8 @@ describe("movement and originText (#35: the draft shows where each pair comes fr
   });
 
   it("has a Hungarian reason for every leaver", () => {
-    expect(Object.keys(LEAVE_REASONS).sort()).toEqual(["dissolved", "strikes", "taken_out", "withdrawn"]);
+    expect(Object.keys(LEAVE_REASONS).sort()).toEqual(["dissolved", "opted_out", "strikes", "taken_out", "withdrawn"]);
+    expect(LEAVE_REASONS.opted_out).toBe("nem folytatja");
   });
 });
 

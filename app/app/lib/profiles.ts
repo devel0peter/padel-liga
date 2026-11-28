@@ -3,34 +3,53 @@
 // profiles.server.ts reads the database and hands in what is stored. Names,
 // results and ratings only: nothing here can carry an email or phone.
 
-import { DIVISION_NAMES, divisionOf, type MatchOutcome, type Side } from "@padel-liga/rules";
+import { DIVISION_NAMES, divisionOf, type MatchOutcome, type SetGames, type Side } from "@padel-liga/rules";
 
 import { DELETED_NAME } from "./account-deletion";
 import { signed } from "./format";
 import { countedOutcome, groupTable } from "./ladder";
-import { MATCH_LOST_BOTH_TEXT, scoreText, winnerOf } from "./results";
+import { teamLabel, teamLabeler } from "./names";
+import { bothLostText, scoreText, walkoverScoreText, winnerOf } from "./results";
 
 /**
  * A player as a profile names them. A deleted or anonymized account has no
  * profile, no old name and no id: its account id was public in its old
  * profile's address, so keeping it would tie the anonymized results back to
- * the person (D60).
+ * the person (D60). `surname`, `firstName`: the name's two parts (#419),
+ * for the team label; only where a pair is named.
  */
-export type ProfilePerson = { id: string | null; name: string };
+export type ProfilePerson = { id: string | null; name: string; surname?: string | null; firstName?: string | null };
 
-export function personView(p: { id: string; name: string | null; deletedAt: Date | null }): ProfilePerson {
+export function personView(p: {
+  id: string;
+  name: string | null;
+  surname?: string | null;
+  firstName?: string | null;
+  deletedAt: Date | null;
+}): ProfilePerson {
   if (p.deletedAt) return { id: null, name: DELETED_NAME };
-  return { id: p.id, name: p.name || "Névtelen" };
+  return { id: p.id, name: p.name || "Névtelen", ...(p.surname !== undefined && { surname: p.surname, firstName: p.firstName ?? null }) };
 }
 
 /** Where a player links: their profile, or nowhere for a deleted account. */
 export const playerPath = (p: ProfilePerson) => (p.id ? `/players/${p.id}` : null);
 export const pairPath = (pairId: number) => `/pairs/${pairId}`;
 
-/** A pair named on a profile: its two players and its page. */
-export type ProfilePair = { id: number; players: [ProfilePerson, ProfilePerson] };
+/** A pair named on a profile: its two players, its team label ("Kovács / Nagy", #419) and its page. */
+export type ProfilePair = { id: number; players: [ProfilePerson, ProfilePerson]; label: string };
 
-export const pairName = (p: ProfilePair) => `${p.players[0].name} – ${p.players[1].name}`;
+/** A pair with the label it has alone; pageLabels applies the clash rule over a page. */
+export const profilePairOf = (id: number, players: [ProfilePerson, ProfilePerson]): ProfilePair => ({ id, players, label: teamLabel(players) });
+
+/**
+ * The team labels of the pairs one profile page shows (#419): its own
+ * pairs and their opponents are one screen for the clash rule. Returns the
+ * pair with its label on that page.
+ */
+export function pageLabels(shown: readonly ProfilePair[]): (pair: ProfilePair) => ProfilePair {
+  const label = teamLabeler(shown.flatMap((p) => p.players));
+  return (pair) => ({ ...pair, label: label(pair.players) });
+}
 
 /** A published group a pair played in, with what its table needs. */
 export type GroupInput = {
@@ -42,6 +61,8 @@ export type GroupInput = {
   position: number;
   groupCount: number;
   startsAt: Date;
+  /** Its round's set format (D173, #396). */
+  setGames: SetGames;
   /** The group's pairs: their rating for the tiebreak, withdrawn mid-phase (#34). */
   pairs: { id: number; elo: number; withdrawn: boolean }[];
   matches: { a: number; b: number; status: string; outcome: MatchOutcome | null }[];
@@ -74,6 +95,7 @@ export function groupHistory(pairId: number, groups: readonly GroupInput[], now:
         const table = groupTable(
           g.pairs,
           g.matches.map((m) => ({ a: m.a, b: m.b, outcome: countedOutcome(m) })),
+          g.setGames,
         );
         place = table.find((r) => r.pairId === pairId)?.rank ?? null;
       }
@@ -95,6 +117,8 @@ export type ProfileMatchInput = {
   phase: number;
   /** The phase's first day: orders the matches. */
   startsAt: Date;
+  /** Its round's set format (D173, #396): a walkover reads 6:0, 6:0 or 4:0, 4:0. */
+  setGames: SetGames;
   week: number;
   scheduledAt: Date | null;
   status: string;
@@ -124,16 +148,16 @@ export type ProfileMatchView = {
   elo: { delta: string; after: number } | null;
 };
 
-function sideText(outcome: MatchOutcome, side: Side): { verdict: string; result: string } | null {
+function sideText(outcome: MatchOutcome, side: Side, setGames: SetGames): { verdict: string; result: string } | null {
   switch (outcome.kind) {
     case "played":
       return { verdict: winnerOf(outcome) === side ? "Győzelem" : "Vereség", result: scoreText(outcome.score, side) };
     case "walkover":
       return outcome.winner === side
-        ? { verdict: "Győzelem", result: "Játék nélkül (4:0, 4:0)" }
-        : { verdict: "Vereség", result: "Játék nélkül (0:4, 0:4)" };
+        ? { verdict: "Győzelem", result: `Játék nélkül (${walkoverScoreText(setGames)})` }
+        : { verdict: "Vereség", result: `Játék nélkül (${walkoverScoreText(setGames, false)})` };
     case "both-inactive":
-      return { verdict: "Vereség", result: MATCH_LOST_BOTH_TEXT };
+      return { verdict: "Vereség", result: bothLostText(setGames) };
     case "unplayed":
       return null;
   }
@@ -160,7 +184,7 @@ export function matchViews(
     const outcome = countedOutcome(m);
     const side: Side | null = ownPairs.has(m.a.id) ? "a" : ownPairs.has(m.b.id) ? "b" : null;
     if (!outcome || !side) continue;
-    const text = sideText(outcome, side);
+    const text = sideText(outcome, side, m.setGames);
     if (!text) continue;
     const change = elo.get(m.id);
     views.push({

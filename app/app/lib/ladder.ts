@@ -14,20 +14,23 @@ import {
   type GroupMatch,
   type MatchOutcome,
   type MatchScore,
+  type SetGames,
   validateScore,
 } from "@padel-liga/rules";
 
 import { fixtureWeeks, moveZones, type FixtureWeek, type Zone } from "./fixtures";
+import { teamLabeler, type NamedPlayer } from "./names";
 
 const divisionLabel = (division: Division) => `${DIVISION_NAMES[division]} divízió`;
 
 /**
- * A pair as the ladder shows it: the two players' names and the pair's rating
- * for the last tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
+ * A pair as the ladder shows it: the two players' names (with their two
+ * parts, for the team label, #419) and the pair's rating for the last
+ * tiebreak. `withdrawn`: taken out mid-phase (#34, rules 2).
  */
 export type LadderPair = {
   id: number;
-  names: [string, string];
+  players: [NamedPlayer, NamedPlayer];
   elo: number;
   withdrawn?: boolean;
 };
@@ -53,6 +56,8 @@ export type LadderGroupInput = {
   number: number;
   pairs: LadderPair[];
   matches: LadderMatch[];
+  /** Its round's set format (D173, #396). */
+  setGames: SetGames;
 };
 
 /** A table row as groupTable computes it (the rules engine's numbers). */
@@ -72,7 +77,8 @@ export type TableRow = {
   gameDiff: number;
 };
 
-export type LadderRow = TableRow & { names: [string, string]; zone: Zone; mine: boolean };
+/** `label`: the pair's team label, "Kovács / Nagy" (#419). */
+export type LadderRow = TableRow & { label: string; zone: Zone; mine: boolean };
 
 export type LadderGroup = {
   number: number;
@@ -83,8 +89,8 @@ export type LadderGroup = {
   rows: LadderRow[];
   /** Every match of the group by week (D133); no database id leaves the server. */
   weeks: FixtureWeek[];
-  /** Pairs withdrawn mid-phase: out of the table, with all of their matches. */
-  withdrawn: [string, string][];
+  /** Pairs withdrawn mid-phase, by team label: out of the table, with all of their matches. */
+  withdrawn: string[];
 };
 
 export type LadderBand = {
@@ -107,11 +113,12 @@ const isPair = (x: unknown) => Array.isArray(x) && x.length === 2;
 
 /**
  * Whether a stored outcome is one a table can count (#190, D115): a known
- * kind, a walkover with its winner, a played match with a valid score. Every
+ * kind, a walkover with its winner, a played match with a valid score in its
+ * round's set format (`setGames`, D173). Every
  * write is validated, so a bad one means a bug or a hand edit; the rules engine
  * throws on it, and the public league page skips the match instead of failing.
  */
-export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
+export function isValidOutcome(outcome: unknown, setGames: SetGames): outcome is MatchOutcome {
   if (!outcome || typeof outcome !== "object") return false;
   const o = outcome as { kind?: unknown; winner?: unknown; score?: unknown };
   switch (o.kind) {
@@ -125,7 +132,7 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
       if (!score || typeof score !== "object" || !Array.isArray(score.sets) || !score.sets.every(isPair)) return false;
       // null is no super tie-break, as validateScore reads it.
       if (score.superTieBreak != null && !isPair(score.superTieBreak)) return false;
-      return validateScore(score as MatchScore).ok;
+      return validateScore(score as MatchScore, setGames).ok;
     }
     default:
       return false;
@@ -137,10 +144,12 @@ export function isValidOutcome(outcome: unknown): outcome is MatchOutcome {
  * are left out). The one standing computation of the public ladder and of the
  * player's own group card on Kezdőlap (#201): same order, same numbers. A pair
  * withdrawn mid-phase (#34, rules 2) is left out with all of its matches.
+ * `setGames`: the round's set format (D173), for walkovers and score checks.
  */
 export function groupTable(
   pairs: readonly { id: number; elo: number; withdrawn?: boolean }[],
   matches: readonly { a: number; b: number; outcome: MatchOutcome | null }[],
+  setGames: SetGames,
 ): TableRow[] {
   const decided: GroupMatch[] = matches.flatMap((m) => (m.outcome ? [{ a: String(m.a), b: String(m.b), outcome: m.outcome }] : []));
   return groupStandings(
@@ -150,6 +159,7 @@ export function groupTable(
       withdrawn: !!p.withdrawn,
     })),
     decided,
+    setGames,
   ).map((r) => ({
     pairId: Number(r.id),
     rank: r.rank,
@@ -187,9 +197,11 @@ export function buildLadder(
   const ordered = [...groups].sort((x, y) => x.number - y.number);
   const bands = new Map<Division, LadderGroup[]>(DIVISIONS.map((d) => [d, []]));
   ordered.forEach((group, index) => {
-    const byId = new Map(group.pairs.map((p) => [p.id, p]));
-    const names = (id: number) => byId.get(id)!.names;
-    const standings = groupTable(group.pairs, group.matches);
+    // One group card is one screen for the clash rule (#419): its table,
+    // its matches and its withdrawn pairs.
+    const label = teamLabeler(group.pairs.flatMap((p) => p.players));
+    const labels = new Map(group.pairs.map((p) => [p.id, label(p.players)]));
+    const standings = groupTable(group.pairs, group.matches, group.setGames);
     const ranked = isRanked(standings);
     const zones = moveZones(standings.length, index + 1, ordered.length, ranked);
     bands.get(divisionOf(index + 1, ordered.length))!.push({
@@ -198,18 +210,18 @@ export function buildLadder(
       ranked,
       rows: standings.map((r, i) => ({
         ...r,
-        names: names(r.pairId),
+        label: labels.get(r.pairId)!,
         zone: zones[i]!,
         mine: mine.has(r.pairId),
       })),
       // A withdrawn pair's matches leave the group (rules 2): fixtureWeeks
       // lists only the matches of the pairs given.
       weeks: fixtureWeeks(
-        group.pairs.filter((p) => !p.withdrawn),
+        group.pairs.filter((p) => !p.withdrawn).map((p) => ({ id: p.id, label: labels.get(p.id)! })),
         group.matches,
-        { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null },
+        { phaseStartsAt, currentWeek: week, mine: group.pairs.find((p) => mine.has(p.id))?.id ?? null, setGames: group.setGames },
       ),
-      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => p.names),
+      withdrawn: group.pairs.filter((p) => p.withdrawn).map((p) => labels.get(p.id)!),
     });
   });
   return DIVISIONS.map((division) => ({

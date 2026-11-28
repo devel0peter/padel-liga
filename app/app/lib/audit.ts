@@ -36,9 +36,22 @@ export const AUDIT_ACTIONS = {
   "pair.dissolve": "Pár felbontása",
   "pair.change": "Partnercsere",
   "pair.link": "Pár párlinkkel",
+  // Permanent partner change (#402): the players' steps, the organizer's
+  // undo and the new pair's start at the round switch publish (#403).
+  "partner_change.request": "Állandó partnercsere kérése",
+  "partner_change.withdraw": "Állandó partnercsere: kérés visszavonva",
+  "partner_change.accept": "Állandó partnercsere elfogadva",
+  "partner_change.decline": "Állandó partnercsere elutasítva",
+  "partner_change.approve": "Állandó partnercsere jóváhagyása",
+  "partner_change.reject": "Állandó partnercsere elutasítása",
+  "partner_change.undo": "Állandó partnercsere visszavonása",
+  "partner_change.start": "Állandó partnercsere: az új pár indul",
   "season_entry.enter": "Benevezés",
   "season_entry.remove": "Kivétel a szezonból",
   "season_entry.withdraw": "Kivétel kihirdetett csoportból",
+  // A player on Ligáim (#395).
+  "season_entry.opt_out": "Nem folytatja a következő körben",
+  "season_entry.opt_out_undo": "Mégis folytatja",
   "partner_search.on": "Párkeresés be",
   "partner_search.off": "Párkeresés ki",
   "league.join": "Csatlakozás ligához",
@@ -56,6 +69,7 @@ export const AUDIT_ACTIONS = {
   "match.no_show_confirm": "Nem jöttek el: jóváhagyás",
   "match.no_show_reject": "Nem jöttek el: elutasítás",
   "strike.cancel": "Fekete pont törlése",
+  // The organizer's approval of a named substitute (D109), retired by #400: older entries only.
   "substitute.approve": "Helyettes jóváhagyása",
   "substitute.reject": "Helyettes elutasítása",
   "substitute.revoke": "Helyettes visszavonása",

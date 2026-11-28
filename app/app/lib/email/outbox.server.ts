@@ -34,6 +34,8 @@ import {
   matchResult,
   matchTomorrow,
   pairCreated,
+  partnerChange,
+  type PartnerChangeEmail,
   seasonEntered,
   seasonStart,
   roundExtended,
@@ -193,6 +195,15 @@ export async function queueSeasonEntered(
 ): Promise<void> {
   if (await isSuppressed(toEmail)) return;
   sendAfterResponse(await enqueue([{ kind: "season_entry_decision", toEmail, ...seasonEntered(input) }]));
+}
+
+// A permanent partner change (#402, D178): the new partner when asked, the
+// leaving player once it is final; one email each, right after the
+// response. An unsubscribed or bounced address, or a player who switched
+// email off (#115), gets nothing; the in-app notice and push still have it.
+export async function queuePartnerChangeEmail(toEmail: string, input: PartnerChangeEmail): Promise<void> {
+  if (await isSuppressed(toEmail)) return;
+  sendAfterResponse(await enqueue([{ kind: "partner_change", toEmail, ...partnerChange(input) }]));
 }
 
 // The groups are published (#24, D22): one email per player, sent right after the response

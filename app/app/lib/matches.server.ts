@@ -14,6 +14,8 @@ import {
   schedulingActions,
   schedulingState,
   contactDue,
+  DIVISION_NAMES,
+  divisionOf,
   unloggedAutoFix,
   type AutoFix,
   type SchedulingActions,
@@ -21,6 +23,7 @@ import {
   type ResultState,
   type SchedulingEventKind,
   type SchedulingState,
+  type SetGames,
   type Side,
   type SlotError,
   type SlotRange,
@@ -48,6 +51,7 @@ import { eventText, fixesAtText, schedulingEmailDue, type ContactChannel } from 
 import { calendarLinks, calendarSlot, type CalendarEvent, type CalendarLinks } from "./calendar";
 import { SITE_URL } from "./site";
 import { pairName } from "./groups";
+import { badgeInitials, teamLabeler } from "./names";
 import { COURT_MAX, venueLine } from "./matches";
 import { countedOutcome, groupTable, isRanked, isValidOutcome, phaseSpan, type TableRow } from "./ladder";
 import { fixtureWeeks, ladderStanding, moveZones, type FixtureWeek, type Zone } from "./fixtures";
@@ -64,7 +68,8 @@ import { logError } from "~/lib/log";
 // the current phase's opponents (spec 3, D135) and, for "Írj mindenkinek",
 // the partner (D147); otherwise addresses go only to the outbox.
 
-export type Person = { id: string; name: string; email: string; phone: string | null };
+// `surname`, `firstName`: the name's two parts (#419), for the team label.
+export type Person = { id: string; name: string; surname: string | null; firstName: string | null; email: string; phone: string | null };
 // `elo`: the pair's rating, the last tiebreak of the table (D20).
 // `withdrawn`: taken out of the group mid-phase (#34); its matches there
 // don't count and can't be played.
@@ -77,6 +82,8 @@ const pairPlayerColumns = {
   pairId: pairs.id,
   aId: playerA.id,
   aName: playerA.name,
+  aSurname: playerA.surname,
+  aFirstName: playerA.firstName,
   aEmail: playerA.email,
   aPhone: playerA.phone,
   aLevel: playerA.level,
@@ -85,15 +92,31 @@ const pairPlayerColumns = {
   bElo: playerB.elo,
   bId: playerB.id,
   bName: playerB.name,
+  bSurname: playerB.surname,
+  bFirstName: playerB.firstName,
   bEmail: playerB.email,
   bPhone: playerB.phone,
 };
 
-type PairPlayerRow = { pairId: number; aId: string; aName: string; aEmail: string; aPhone: string | null; bId: string; bName: string; bEmail: string; bPhone: string | null };
+type PairPlayerRow = {
+  pairId: number;
+  aId: string;
+  aName: string;
+  aSurname: string | null;
+  aFirstName: string | null;
+  aEmail: string;
+  aPhone: string | null;
+  bId: string;
+  bName: string;
+  bSurname: string | null;
+  bFirstName: string | null;
+  bEmail: string;
+  bPhone: string | null;
+};
 
 const toPlayers = (r: PairPlayerRow): [Person, Person] => [
-  { id: r.aId, name: r.aName || "Névtelen", email: r.aEmail, phone: r.aPhone },
-  { id: r.bId, name: r.bName || "Névtelen", email: r.bEmail, phone: r.bPhone },
+  { id: r.aId, name: r.aName || "Névtelen", surname: r.aSurname, firstName: r.aFirstName, email: r.aEmail, phone: r.aPhone },
+  { id: r.bId, name: r.bName || "Névtelen", surname: r.bSurname, firstName: r.bFirstName, email: r.bEmail, phone: r.bPhone },
 ];
 
 // The pairs of these groups with their players, by group, in seed order.
@@ -237,11 +260,18 @@ function groupMessageOf(ours: readonly Person[], theirs: readonly Person[], user
   };
 }
 
+// A pair's badge (#420, TeamBadge): the pair id picks the colour.
+export type TeamBadgeData = { pairId: number; initials: [string, string] };
+
+const badgeOf = (p: PairPlayers): TeamBadgeData => ({ pairId: p.pairId, initials: [badgeInitials(p.players[0]), badgeInitials(p.players[1])] });
+
 export type HomeMatch = {
   id: number;
   week: number;
   // The other pair: names, phones and email addresses (only the current phase is listed here).
   opponents: string;
+  // The other pair's badge (#420): its id (the colour) and its players' initials.
+  badge: TeamBadgeData | null;
   contacts: Opponent[];
   // Írj mindenkinek (D147); null once the result is final.
   message: GroupMessageData | null;
@@ -250,10 +280,15 @@ export type HomeMatch = {
   venue: string | null;
   // The result, once recorded (#28).
   result: ResultState;
+  // Its round's set format (D173), for the walkover score in the status.
+  setGames: SetGames;
 };
 
 export type HomeGroup = {
   groupId: number;
+  // The player's own pair in it.
+  pairId: number;
+  seasonId: number;
   league: string;
   /** The public league page is /league/<leagueSlug>. */
   leagueSlug: string;
@@ -261,14 +296,19 @@ export type HomeGroup = {
   phase: number;
   number: number;
   groupCount: number;
+  // "Bronz" (spec 4): the group's division now.
+  division: string;
   phaseStartsAt: Date;
   deadline: Date;
+  // The week being played (1–3); null before the round starts and during an extension (#356).
+  week: number | null;
   // Every pair of the group in table order (#201), names only; `mine` marks
   // the player's. The table is the public league page's, from final results
   // only; before any result every `matches` is 0 and the order is the table's
   // tiebreak alone: Elo, then seed (groupStandings). A
   // pair withdrawn mid-phase (#34) is not in it, with all of its matches.
-  pairs: (TableRow & { name: string; names: [string, string]; mine: boolean; zone: Zone })[];
+  // `label`: the team label (#419), the clash rule over the whole group.
+  pairs: (TableRow & { label: string; mine: boolean; zone: Zone })[];
   // False before any final result: the order is only the seeding (D85).
   ranked: boolean;
   // "még 1 feljutás a divízió éléig, 3 kör van hátra" (spec 14).
@@ -300,6 +340,7 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       leagueSlug: leagues.slug,
       startsAt: seasonPhases.startsAt,
       deadline: seasonPhases.deadline,
+      setGames: seasonPhases.setGames,
     })
     .from(groupPairs)
     .innerJoin(groups, eq(groups.id, groupPairs.groupId))
@@ -352,31 +393,42 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
       const table = groupTable(
         pairsOf.map((p) => ({ id: p.pairId, elo: p.elo, withdrawn: p.withdrawn })),
         groupMatches.map((m) => ({ a: m.pairA, b: m.pairB, outcome: countedOutcome(m) })),
+        g.setGames,
       );
       const ranked = isRanked(table);
       const groupCountNow = await groupCount(g.seasonId, g.phase);
       const zones = moveZones(table.length, g.number, groupCountNow, ranked);
-      const namesOf = (players: readonly { name: string }[]) => [players[0]?.name || "Névtelen", players[1]?.name || "Névtelen"] as [string, string];
+      // One screen (#419): the group's table, matches and withdrawn pairs
+      // share the clash rule, so every player of the group counts.
+      const label = teamLabeler(pairsOf.flatMap((p) => p.players));
+      const labelOf = (pairId: number) => {
+        const p = byId.get(pairId);
+        return p ? label(p.players) : "";
+      };
       // No week is current during an extension (#356).
       const { week, started, extension } = phaseSpan(budapestDay(g.startsAt), budapestDay(g.deadline), budapestDay(now));
       return {
         groupId: g.groupId,
+        pairId: g.pairId,
+        seasonId: g.seasonId,
         league: g.league,
         leagueSlug: g.leagueSlug,
         season: g.season,
         phase: g.phase,
         number: g.number,
         groupCount: groupCountNow,
+        division: DIVISION_NAMES[divisionOf(g.number, groupCountNow)],
         phaseStartsAt: g.startsAt,
         deadline: g.deadline,
+        week: started && !extension ? week : null,
         pairs: table.map((row, i) => {
           const p = byId.get(row.pairId)!;
-          return { ...row, name: pairName(p.players), names: namesOf(p.players), mine: p.pairId === g.pairId, zone: zones[i]! };
+          return { ...row, label: label(p.players), mine: p.pairId === g.pairId, zone: zones[i]! };
         }),
         ranked,
         standing: ladderStanding(g.number, groupCountNow, g.phase),
         fixtures: fixtureWeeks(
-          pairsOf.filter((p) => !p.withdrawn).map((p) => ({ id: p.pairId, names: namesOf(p.players) })),
+          pairsOf.filter((p) => !p.withdrawn).map((p) => ({ id: p.pairId, label: label(p.players) })),
           groupMatches.map((m) => {
             const counted = countedOutcome(m);
             return {
@@ -386,13 +438,13 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
               week: m.week,
               status: m.status,
               scheduledAt: m.scheduledAt,
-              outcome: counted && isValidOutcome(counted) ? counted : null,
+              outcome: counted && isValidOutcome(counted, g.setGames) ? counted : null,
               venue: venueOf(m),
             };
           }),
-          { phaseStartsAt: g.startsAt, currentWeek: started && !extension ? week : null, mine: g.pairId },
+          { phaseStartsAt: g.startsAt, currentWeek: started && !extension ? week : null, mine: g.pairId, setGames: g.setGames },
         ),
-        withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => pairName(p.players)),
+        withdrawn: pairsOf.filter((p) => p.withdrawn).map((p) => label(p.players)),
         matches: own.map((m) => {
           const side: Side = m.pairA === g.pairId ? "a" : "b";
           const them = other(m);
@@ -402,13 +454,15 @@ export async function currentGroups(userId: string, now = new Date()): Promise<H
           return {
             id: m.id,
             week: m.week,
-            opponents: them ? pairName(them.players) : "",
+            opponents: them ? labelOf(them.pairId) : "",
+            badge: them ? badgeOf(them) : null,
             contacts: (them?.players ?? []).map(contactOf),
             message: them && us && result.status !== "final" ? groupMessageOf(us.players, them.players, userId) : null,
             side,
             state,
             venue: venueOf(m),
             result,
+            setGames: g.setGames,
           };
         }),
       };
@@ -499,6 +553,8 @@ export type MatchContext = {
   seasonId: number;
   phase: number;
   phaseStartsAt: Date;
+  // The round's set format (D173, #396): what its results are checked against.
+  setGames: SetGames;
   pairs: { a: PairPlayers; b: PairPlayers };
   events: StoredEvent[];
   // A pair of the match was withdrawn mid-phase (#34): it doesn't count and
@@ -519,6 +575,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
       leagueSlug: leagues.slug,
       city: leagues.city,
       phaseStartsAt: seasonPhases.startsAt,
+      setGames: seasonPhases.setGames,
     })
     .from(matches)
     .innerJoin(groups, eq(groups.id, matches.groupId))
@@ -543,6 +600,7 @@ export async function loadMatch(matchId: number): Promise<MatchContext | null> {
     seasonId: row.seasonId,
     phase: row.phase,
     phaseStartsAt: row.phaseStartsAt,
+    setGames: row.setGames,
     pairs: { a, b },
     events: (await eventsOf([matchId])).get(matchId) ?? [],
     voided: a.withdrawn || b.withdrawn,
@@ -566,6 +624,8 @@ export type MatchPage = {
   deadline: Date;
   phase: number;
   phaseStartsAt: Date;
+  // The round's set format (D173, #396): the result form's hint and checks.
+  setGames: SetGames;
   league: string;
   season: string;
   groupNumber: number;
@@ -573,6 +633,8 @@ export type MatchPage = {
   side: Side;
   us: string;
   opponents: string;
+  // The two pairs' badges (#421): the pair id (the colour) and the initials.
+  badges: { us: TeamBadgeData; them: TeamBadgeData };
   // Only while the phase runs (spec 3); empty afterwards.
   contacts: Opponent[];
   // Írj mindenkinek (D147): while `contacts` shows and the result isn't final.
@@ -614,11 +676,12 @@ export function voided(m: { pairA: number; pairB: number }, members: ReadonlyMap
 
 const withdrawnOf = (ctx: MatchContext): PairPlayers => (ctx.pairs.a.withdrawn ? ctx.pairs.a : ctx.pairs.b);
 
-// On the match page of a withdrawn pair's match (#34).
-export function voidedText(withdrawn: PairPlayers, ourPairId: number): string {
+// On the match page of a withdrawn pair's match (#34). `label`: the
+// withdrawn pair's team label on that page (#419).
+export function voidedText(withdrawn: PairPlayers, ourPairId: number, label: string): string {
   return withdrawn.pairId === ourPairId
     ? "Visszaléptetek a körből: ez a meccs elmarad, és nem számít bele a tabellába."
-    : `${pairName(withdrawn.players)} visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.`;
+    : `${label} visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.`;
 }
 
 // The same as a condition on `matches`, for queries that read matches alone.
@@ -636,6 +699,8 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
   const state = stateOf(ctx, now);
   const running = ctx.match.deadline.getTime() >= now.getTime();
   const [ours, theirs] = side === "a" ? [ctx.pairs.a, ctx.pairs.b] : [ctx.pairs.b, ctx.pairs.a];
+  // The page names the two pairs by team label (#419), the clash rule over its four players.
+  const label = teamLabeler([...ours.players, ...theirs.players]);
   // A withdrawn pair's match (#34): the two are no opponents any more.
   const reachable = running && !ctx.voided;
   const cityClubs = await db
@@ -677,7 +742,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
       who: d.kind === "organizer" ? d.userName || "Szervező" : "Padelpárbaj",
       ours: false,
       by: d.kind === "organizer" ? ("organizer" as const) : ("auto" as const),
-      text: decisionText(d, side),
+      text: decisionText(d, side, ctx.setGames),
     })),
   ]
     // By time; at the same second, in the order they were written.
@@ -689,13 +754,15 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     deadline: ctx.match.deadline,
     phase: ctx.phase,
     phaseStartsAt: ctx.phaseStartsAt,
+    setGames: ctx.setGames,
     league: ctx.league,
     season: ctx.season,
     groupNumber: ctx.groupNumber,
     groupCount: ctx.groupCount,
     side,
-    us: pairName(ours.players),
-    opponents: pairName(theirs.players),
+    us: label(ours.players),
+    opponents: label(theirs.players),
+    badges: { us: badgeOf(ours), them: badgeOf(theirs) },
     contacts: reachable ? theirs.players.map(contactOf) : [],
     message: reachable && result.status !== "final" ? groupMessageOf(ours.players, theirs.players, userId) : null,
     state,
@@ -711,7 +778,7 @@ export async function matchPage(matchId: number, userId: string, now = new Date(
     resultActions: ctx.voided ? NO_RESULT_ACTIONS : resultActions(result, side),
     autoAcceptAt: ctx.voided ? null : autoAcceptAt(result),
     log,
-    voided: ctx.voided ? voidedText(withdrawnOf(ctx), ours.pairId) : null,
+    voided: ctx.voided ? voidedText(withdrawnOf(ctx), ours.pairId, label(withdrawnOf(ctx).players)) : null,
     // Not once the match has a result or ruling (played or decided: nothing to
     // plan any more); a voided match keeps the link that removes the entry.
     calendar: result.status === "none" || ctx.voided ? calendarLinks(calendarEventOf(ctx, side, venues)) : null,

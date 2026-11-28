@@ -1,13 +1,13 @@
-import { flipScore, type MatchScore, type ResultState, type Side } from "@padel-liga/rules";
+import { flipScore, type MatchScore, type ResultState, type SetGames, type Side } from "@padel-liga/rules";
 import { ChevronRight } from "lucide-react";
 import { Form, useNavigation } from "react-router";
 
+import { ScoreBoard } from "~/components/blocks";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { NOTE_MAX, autoAcceptLine, outcomeText, scoreText } from "~/lib/results";
-import { cn } from "~/lib/utils";
+import { NOTE_MAX, autoAcceptLine, outcomeText, resultHelp, scoreText } from "~/lib/results";
 
 // The result on the match page (#28, D133): record it, correct your own while
 // it waits, confirm or dispute the other pair's; a disputed or final result is
@@ -19,7 +19,7 @@ export type Feedback = { intent: string; ok: boolean; message: string } | undefi
 export function FormFeedback({ result, intent }: { result: Feedback; intent: string | string[] }) {
   if (!result || !(Array.isArray(intent) ? intent : [intent]).includes(result.intent)) return null;
   return (
-    <p role={result.ok ? "status" : "alert"} className={result.ok ? "font-medium" : "font-semibold text-destructive"}>
+    <p role={result.ok ? "status" : "alert"} className={result.ok ? "font-medium" : "font-semibold text-danger"}>
       {result.message}
     </p>
   );
@@ -83,47 +83,14 @@ export function ScoreFields({
   );
 }
 
-// A score as a small board (D133): our pair on top, sets side by side, the
-// super tie-break last, the winning numbers in bold. `score` is in a/b order.
-export function ScoreBoard({ score, side, us, them }: { score: MatchScore; side: Side; us: string; them: string }) {
+// A score as the scoreboard block (D181, #421): our pair on top, a box per
+// set, the super tie-break last, the winner marked. `score` is in a/b order.
+export function ResultBoard({ score, side, us, them }: { score: MatchScore; side: Side; us: string; them: string }) {
   const s = side === "a" ? score : flipScore(score);
-  const cols = [...s.sets, ...(s.superTieBreak ? [s.superTieBreak] : [])];
-  const won = (i: number) => cols.filter(([x, y]) => (i === 0 ? x > y : y > x)).length;
+  const sets = [...s.sets, ...(s.superTieBreak ? [s.superTieBreak] : [])];
+  const won = (i: 0 | 1) => s.sets.filter(([x, y]) => (i === 0 ? x > y : y > x)).length;
   const winner = s.superTieBreak ? (s.superTieBreak[0] > s.superTieBreak[1] ? 0 : 1) : won(0) > won(1) ? 0 : 1;
-  return (
-    <table className="w-full max-w-sm border-separate border-spacing-y-1 text-sm" aria-label="Eredmény">
-      <thead className="sr-only">
-        <tr>
-          <th>Pár</th>
-          {cols.map((_, i) => (
-            <th key={i}>{i < s.sets.length ? `${i + 1}. szett` : "Szuper tie-break"}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {[us, them].map((name, row) => (
-          <tr key={row}>
-            <th scope="row" className={cn("pr-3 text-left break-words", row === winner ? "font-bold" : "font-normal text-muted-foreground")}>
-              {name}
-              {row === winner && <span className="ml-1.5 rounded bg-emerald-100 px-1 text-[10px] font-bold text-emerald-800 uppercase">nyert</span>}
-            </th>
-            {cols.map((c, i) => (
-              <td
-                key={i}
-                className={cn(
-                  "h-9 w-9 rounded-md bg-muted text-center text-base tabular-nums",
-                  c[row]! > c[1 - row]! ? "font-extrabold text-foreground" : "font-medium text-muted-foreground",
-                  i >= s.sets.length && "text-sm",
-                )}
-              >
-                {c[row]}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  return <ScoreBoard teams={[us, them]} sets={sets} winner={winner} />;
 }
 
 type View = {
@@ -133,6 +100,8 @@ type View = {
   result: ResultState;
   resultActions: { record: boolean; confirm: boolean; dispute: boolean };
   autoAcceptAt: Date | null;
+  // The round's set format (D173, #396).
+  setGames: SetGames;
 };
 
 // The result as it stands (D77): ours waiting, disputed or final. Nothing to do.
@@ -155,7 +124,7 @@ export function ResultStatus({ m }: { m: View }) {
   if (r.status === "final")
     return (
       <p className="text-sm">
-        <span className="font-semibold">Végeredmény:</span> {outcomeText(r.outcome, m.side)}
+        <span className="font-semibold">Végeredmény:</span> {outcomeText(r.outcome, m.side, m.setGames)}
         {r.how === "auto_accepted"
           ? " (48 óra után magától elfogadva)"
           : r.how === "organizer"
@@ -177,29 +146,29 @@ export function ConfirmResult({ m, feedback }: { m: View; feedback: Feedback }) 
   return (
     <div className="grid gap-4">
       <div className="grid gap-1">
-        <p className="font-display text-lg font-bold">Megerősíted az eredményt?</p>
+        <h2 className="m-0 text-[22px] leading-tight font-extrabold md:text-[26px]">Megerősíted az eredményt?</h2>
         <p className="text-sm text-muted-foreground">
           Az ellenfeletek ezt rögzítette (ti vagytok elöl): <strong className="text-foreground">{scoreText(r.score, m.side)}</strong>.{" "}
           {m.autoAcceptAt && autoAcceptLine(m.autoAcceptAt)}
         </p>
       </div>
-      <ScoreBoard score={r.score} side={m.side} us={m.us} them={m.opponents} />
+      <ResultBoard score={r.score} side={m.side} us={m.us} them={m.opponents} />
       {m.resultActions.confirm && (
-        <Form method="post">
+        <Form method="post" className="grid sm:flex">
           <input type="hidden" name="intent" value="result-confirm" />
-          <Button type="submit" size="lg" disabled={busy}>
+          <Button type="submit" size="xl" disabled={busy}>
             Megerősítem
           </Button>
         </Form>
       )}
       {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-confirm" />}
       {m.resultActions.dispute && (
-        <details className="group rounded-lg border" open={feedback?.intent === "result-dispute" && !feedback.ok}>
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 font-semibold [&::-webkit-details-marker]:hidden">
-            <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" />
+        <details className="group rounded-xl bg-surface-2" open={feedback?.intent === "result-dispute" && !feedback.ok}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3.5 font-semibold [&::-webkit-details-marker]:hidden">
+            <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
             Nem így volt?
           </summary>
-          <Form method="post" className="grid gap-3 border-t p-3">
+          <Form method="post" className="grid gap-3 border-t border-hairline p-3.5">
             <p className="text-sm text-muted-foreground">Írd be, szerintetek mi lett az eredmény. A szervező dönt, addig a meccs nem számít.</p>
             <input type="hidden" name="intent" value="result-dispute" />
             <ScoreFields id="dispute" columns={["Ti", "Ők"]} />
@@ -209,7 +178,7 @@ export function ConfirmResult({ m, feedback }: { m: View; feedback: Feedback }) 
             </div>
             {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-dispute" />}
             <div>
-              <Button type="submit" variant="outline" disabled={busy}>
+              <Button type="submit" variant="secondary" size="xl" disabled={busy}>
                 Vitatom az eredményt
               </Button>
             </div>
@@ -220,23 +189,31 @@ export function ConfirmResult({ m, feedback }: { m: View; feedback: Feedback }) 
   );
 }
 
-export const RESULT_HELP =
-  "Csak a végeredményt írd be: 2 nyert szettig, egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4); 1:1-nél szuper tie-break 10 pontig. Ha félbemaradt a meccs, egy új időpontban fejezzétek be, és utána rögzítsétek.";
-
 // Recording the result, or correcting ours while it waits (D77). `children`:
 // more fields above the button (the match page's venue, D146).
-export function RecordResult({ m, feedback, children }: { m: View; feedback: Feedback; children?: React.ReactNode }) {
+// `primary`: the page's main step, the one yellow button (D181); folded, a secondary one.
+export function RecordResult({
+  m,
+  feedback,
+  primary = false,
+  children,
+}: {
+  m: View;
+  feedback: Feedback;
+  primary?: boolean;
+  children?: React.ReactNode;
+}) {
   const busy = useNavigation().state !== "idle";
   const correcting = m.result.status === "recorded";
   return (
     <Form method="post" className="grid gap-3">
-      <p className="text-sm text-muted-foreground">{RESULT_HELP}</p>
+      <p className="text-sm text-muted-foreground">{resultHelp(m.setGames)}</p>
       <input type="hidden" name="intent" value="result-record" />
       <ScoreFields id="record" columns={["Ti", "Ők"]} />
       {children}
       {feedback && !feedback.ok && <FormFeedback result={feedback} intent="result-record" />}
       <div>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" size="xl" variant={primary ? "default" : "secondary"} disabled={busy}>
           {correcting ? "Javítom az eredményt" : "Rögzítem az eredményt"}
         </Button>
       </div>

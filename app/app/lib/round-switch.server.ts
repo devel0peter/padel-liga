@@ -1,17 +1,28 @@
-import { isFastSwitch, roundSwitchDraft, type MatchOutcome } from "@padel-liga/rules";
-import { and, asc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import {
+  changeAtSwitch,
+  changeLeaveReason,
+  isFastSwitch,
+  leaveReason,
+  optedOutAfter,
+  roundSwitchDraft,
+  type MatchOutcome,
+  type PartnerChange,
+} from "@padel-liga/rules";
+import { and, asc, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { groups, jobRuns, leagues, matches, noShowReports, seasonPhases, seasons } from "~/db/schema";
+import { groups, jobRuns, leagues, matches, noShowReports, seasonEntries, seasonPhases, seasons } from "~/db/schema";
 import type { RunBudget, Usage } from "~/lib/run-usage";
 
 import { phaseProjection } from "./deadline-projection.server";
 import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
+import { markChangesAfterPublish, startChangesAtPublish, switchChanges, type SwitchChange } from "./partner-changes.server";
 import { resultsOf } from "./result-log.server";
 import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin, OUTDATED_DRAFT } from "./round-switch";
+import { averageElo } from "./season-entries";
 import { getSeason } from "./seasons.server";
 import { pairsLeavingAfterPhase } from "./strikes.server";
 
@@ -51,6 +62,14 @@ export type RoundSwitch = {
   // What blocks publishing: the ending phase's disputed results and waiting
   // no-show reports (#33).
   disputes: { matchId: number; kind: "disputed" | "no_show"; group: number; pairs: [GroupPair, GroupPair] }[];
+  // Permanent partner changes starting at this switch (#403, D179), by the
+  // pair id in the draft: who leaves and who comes ("Partnercsere: <távozó>
+  // helyett <új partner>"). Before the publish the old pair's id stands for
+  // the new pair (the new pair's players and rating, the old pair's spot).
+  changes: Map<number, { leaving: string; partner: string }>;
+  // A new pair already started at this switch (a publish that failed after
+  // starting it), to the old pair's id: the stored draft basis names the old one.
+  spots: Map<number, number>;
 };
 
 /**
@@ -75,7 +94,7 @@ export async function roundSwitch(
   const stored = await phaseGroups(seasonId, endingPhase);
   if (stored.length === 0 || stored.some((g) => !g.publishedAt)) return null;
 
-  const [[league], [first], rows, entered, strikeLeavers] = await Promise.all([
+  const [[league], [first], rows, entered, strikeLeavers, optedOut, switching] = await Promise.all([
     db.select({ fastSwitches: leagues.fastSwitches }).from(leagues).where(eq(leagues.id, season.leagueId)),
     // The league's first season: the one created first.
     db.select({ id: sql<number>`min(${seasons.id})` }).from(seasons).where(eq(seasons.leagueId, season.leagueId)),
@@ -91,6 +110,13 @@ export async function roundSwitch(
       .orderBy(asc(matches.id)),
     enteredPairs(seasonId),
     projection ? projection.leaving.map((pairId) => ({ pairId })) : pairsLeavingAfterPhase(seasonId, endingPhase),
+    // The season's opt-outs on Ligáim (#395), whatever happened to the pair
+    // or its entry since; optedOutAfter picks the ones that end by now.
+    db
+      .select({ pairId: seasonEntries.pairId, optOutPhase: seasonEntries.optOutPhase, optedOutBy: seasonEntries.optedOutBy })
+      .from(seasonEntries)
+      .where(and(eq(seasonEntries.seasonId, seasonId), isNotNull(seasonEntries.optOutPhase))),
+    switchChanges(seasonId, nextPhase),
   ]);
 
   const withdrawn = new Set(stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((p) => p.pairId)));
@@ -132,17 +158,36 @@ export async function roundSwitch(
     const table = groupTable(
       g.pairs.map((p) => ({ id: p.pairId, elo: p.averageElo, withdrawn: p.withdrawn })),
       counted.filter((m) => m.groupId === g.id).map((m) => ({ a: m.pairA, b: m.pairB, outcome: outcomeOf(m) })),
+      g.setGames,
     );
     return { number: g.number, rows: table.map((r) => ({ pair: byId.get(r.pairId)!, place: r.rank })) };
   });
 
   // A pair of the tables leaves after promotion and relegation (spec 8, 10):
-  // a 3rd strike, dissolved since, or taken out of the season since (its
-  // entry no longer counts).
+  // a 3rd strike, opted out (#395), dissolved since, or taken out of the
+  // season since (its entry no longer counts). Everyone else plays on:
+  // default in (packages/rules leaveReason).
   const entry = new Map(entered.map((p) => [p.pairId, p]));
   const strikes = new Set(strikeLeavers.map((p) => p.pairId));
-  const reasonOf = (p: GroupPair): LeaveReason | null =>
-    strikes.has(p.pairId) ? "strikes" : !p.active ? "dissolved" : !entry.has(p.pairId) ? "taken_out" : null;
+  const out = new Set(optedOut.filter((p) => optedOutAfter(p.optOutPhase, endingPhase)).map((p) => p.pairId));
+  // A permanent partner change (#403) at this switch (packages/rules
+  // changeAtSwitch): the staying player's own opt-out (#395) ends it, and its
+  // old pair leaves as "Nem folytatja" like any opted-out pair (the publish
+  // then ends the change and tells its players); otherwise the old pair
+  // leaves only by strikes (the leaving player's opt-out changes nothing) and
+  // is dissolved once its new pair starts, which takes its spot.
+  const optOutBy = new Map(optedOut.filter((p) => out.has(p.pairId)).map((p) => [p.pairId, p.optedOutBy]));
+  const optedOutBy = (c: SwitchChange) =>
+    !out.has(c.oldPairId) ? null : c.status === "final" && optOutBy.get(c.oldPairId) === c.staying.id ? ("staying" as const) : ("leaving" as const);
+  const changes = switching.filter((c) => changeAtSwitch({ strikes: strikes.has(c.oldPairId), optedOutBy: optedOutBy(c) }) !== "ends");
+  const changeOf = new Map(changes.map((c) => [c.oldPairId, c]));
+  const reasonOf = (p: GroupPair): LeaveReason | null => {
+    const c = changeOf.get(p.pairId);
+    return c
+      ? changeLeaveReason({ strikes: strikes.has(p.pairId), optedOutBy: optedOutBy(c) })
+      : leaveReason({ strikes: strikes.has(p.pairId), optedOut: out.has(p.pairId), active: p.active, entered: entry.has(p.pairId) });
+  };
+  const changing = new Set(changes.map((c) => c.oldPairId));
   const continuing = new Set(tables.flatMap((t) => t.rows.map((r) => r.pair.pairId)));
   const leaving = [
     ...stored.flatMap((g) => g.pairs.filter((p) => p.withdrawn).map((pair) => ({ pair, reason: "withdrawn" as const }))),
@@ -155,26 +200,57 @@ export async function roundSwitch(
 
   // New pairs: entered for a later phase, joining by this one, not playing
   // on from the ending phase (a late entry, a re-formed pair, or a pair the
-  // organizer entered again after a withdrawal), in entry order.
-  const newPairs = entered
-    .filter((p) => p.joinsPhase > 1 && p.joinsPhase <= nextPhase && !continuing.has(p.pairId) && !strikes.has(p.pairId))
+  // organizer entered again after a withdrawal), in entry order. Never a pair
+  // that opted out (#395): its entry stays approved, so a late entry that
+  // left would otherwise come back at the switch after the one it left in
+  // (entering again clears the opt-out). A partner change's new pair is
+  // placed by its change, below.
+  const changePairs = new Set(changes.flatMap((c) => (c.newPairId === null ? [] : [c.newPairId])));
+  const newPairs: RoundSwitch["newPairs"] = entered
+    .filter(
+      (p) =>
+        p.joinsPhase > 1 &&
+        p.joinsPhase <= nextPhase &&
+        !continuing.has(p.pairId) &&
+        !strikes.has(p.pairId) &&
+        !out.has(p.pairId) &&
+        !changePairs.has(p.pairId),
+    )
     // Rated by the pair's average current Elo, the level's starting value for
     // a player without a rated match, with no discount (D107f).
     .map((pair) => ({ pair, rating: pair.averageElo }));
 
+  // The new pairs of partner changes (#403): each takes its old pair's spot,
+  // or is placed as a new pair when the old pair left by strikes or isn't
+  // in the tables (withdrawn mid-phase).
+  const pairById = new Map(stored.flatMap((g) => g.pairs.map((p) => [p.pairId, p])));
+  const changed = changes.flatMap((c) => {
+    const pair = changePair(c, pairById.get(c.oldPairId), entry);
+    return pair ? [{ change: c, old: pairById.get(c.oldPairId) ?? pair, pair }] : [];
+  });
   const fast = isFastSwitch({ firstSeason: first?.id === seasonId, endingPhase, fastSwitches: league?.fastSwitches ?? 1 });
   const draft = roundSwitchDraft({
     tables: tables.map((t) => t.rows.map((r) => r.pair)),
     fast,
     leaves: (p) => leaves.has(p.pairId),
     newPairs: newPairs.map((n) => n.pair),
+    changes: changed.map(({ old, pair }): PartnerChange<GroupPair> => ({ old, pair })),
   });
 
   const origins = new Map<number, Origin>();
   for (const t of tables) for (const r of t.rows) origins.set(r.pair.pairId, { kind: "continuing", group: t.number, place: r.place });
   for (const n of newPairs) origins.set(n.pair.pairId, { kind: "new" });
+  const changeInfo = new Map<number, { leaving: string; partner: string }>();
+  const spots = new Map<number, number>();
+  for (const { change, pair } of changed) {
+    const kept = continuing.has(change.oldPairId) && !leaves.has(change.oldPairId);
+    const origin = origins.get(change.oldPairId);
+    origins.set(pair.pairId, kept && origin ? origin : { kind: "new" });
+    changeInfo.set(pair.pairId, { leaving: change.leaving, partner: change.partner.name });
+    if (pair.pairId !== change.oldPairId) spots.set(pair.pairId, change.oldPairId);
+    if (!kept) newPairs.push({ pair, rating: pair.averageElo });
+  }
 
-  const pairById = new Map(stored.flatMap((g) => g.pairs.map((p) => [p.pairId, p])));
   const numberOf = new Map(stored.map((g) => [g.id, g.number]));
   const disputes = counted
     .filter((m) => m.status === "disputed" || (m.status !== "final" && noShow.has(m.id)))
@@ -187,9 +263,28 @@ export async function roundSwitch(
 
   // A pair withdrawn mid-phase and entered again plays on as a new pair, so
   // it is not listed as leaving.
-  const placed = new Set(newPairs.map((n) => n.pair.pairId));
+  // A partner change's old pair that left by strikes stays listed: its new
+  // pair is placed as a new pair under the same id until the publish.
+  const placed = new Set(newPairs.filter((n) => !changing.has(n.pair.pairId)).map((n) => n.pair.pairId));
   const shownLeaving = leaving.filter((l) => !placed.has(l.pair.pairId));
-  return { endingPhase, nextPhase, state, fast, tables, leaving: shownLeaving, newPairs, draft, origins, disputes };
+  return { endingPhase, nextPhase, state, fast, tables, leaving: shownLeaving, newPairs, draft, origins, disputes, changes: changeInfo, spots };
+}
+
+/**
+ * The pair a permanent partner change puts in the draft (#403): the new pair
+ * once it exists; before that the old pair's row with the new pair's players
+ * and rating (the average Elo of the staying player and the new partner,
+ * D107f), so the draft keeps the old pair's id until the publish starts the
+ * new pair (startChangesAtPublish). Null when neither is there.
+ */
+function changePair(c: SwitchChange, old: GroupPair | undefined, entered: ReadonlyMap<number, GroupPair>): GroupPair | null {
+  if (c.status === "started") return c.newPairId === null ? null : (entered.get(c.newPairId) ?? null);
+  if (!old) return null;
+  const person = (p: SwitchChange["staying"]) => ({ id: p.id, name: p.name, level: p.level, email: p.email });
+  // The staying player keeps their column, as the new pair will.
+  const stayingFirst = old.players[0].id === c.staying.id;
+  const players: GroupPair["players"] = stayingFirst ? [person(c.staying), person(c.partner)] : [person(c.partner), person(c.staying)];
+  return { ...old, players, averageElo: averageElo(c.staying, c.partner) ?? old.averageElo, active: true };
 }
 
 /** The pairs a phase-n draft must hold exactly: the continuing pairs that stay and the new pairs. */
@@ -206,7 +301,8 @@ export function draftPairIds(s: RoundSwitch): number[] {
  * Elo change alone (a result accepted later) never makes it outdated.
  */
 export function draftBasis(s: RoundSwitch): string {
-  return s.draft.map((g) => g.map((p) => p.pairId).sort((a, b) => a - b).join(",")).join("|");
+  // A partner change's new pair counts as the old pair it stands for (#403).
+  return s.draft.map((g) => g.map((p) => s.spots.get(p.pairId) ?? p.pairId).sort((a, b) => a - b).join(",")).join("|");
 }
 
 /** Whether a stored phase-n draft no longer matches what the switch computes now. */
@@ -266,12 +362,23 @@ export async function generateRoundSwitchDraft(seasonId: number, nextPhase: numb
  * have changed: rebuild it first); then as phase 1 (publishPhase).
  */
 export async function publishRoundSwitch(seasonId: number, nextPhase: number, actorId: string, now = new Date()): Promise<Result> {
-  const [s, stored] = await Promise.all([roundSwitch(seasonId, nextPhase, now), phaseGroups(seasonId, nextPhase)]);
+  const [first, stored] = await Promise.all([roundSwitch(seasonId, nextPhase, now), phaseGroups(seasonId, nextPhase)]);
+  let s = first;
   if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
   if (s.disputes.length > 0) return { ok: false, error: DISPUTES_FIRST };
-  if (stored.length > 0 && !stored.some((g) => g.publishedAt) && draftOutdated(stored, s)) return { ok: false, error: OUTDATED_DRAFT };
-  return publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
+  const draft = stored.length > 0 && !stored.some((g) => g.publishedAt);
+  if (draft && draftOutdated(stored, s)) return { ok: false, error: OUTDATED_DRAFT };
+  // The new pairs of partner changes start now and take their old pairs'
+  // rows in the draft (#403 req 2), before the matches are made.
+  if (draft && (await startChangesAtPublish(seasonId, nextPhase, actorId, now)) > 0) {
+    s = await roundSwitch(seasonId, nextPhase, now);
+    if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
+  }
+  const result = await publishPhase(seasonId, nextPhase, actorId, draftPairIds(s), now);
+  // A change made after this draft: its new partner plays the old pair's new matches too (#402).
+  if (result.ok) await markChangesAfterPublish(seasonId, nextPhase, now);
+  return result;
 }
 
 // --- The cron step -----------------------------------------------------------
@@ -281,8 +388,9 @@ export const ROUND_LOOKUP_QUERIES = 1;
 
 // One run drafts at most one switch: the Elo replay, the switch's reads
 // (season 2, groups 2, league, first season, matches, entries, strikes 2,
-// recorded results, no-show reports), the write batch and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 12 + 2, calls: 0 };
+// opt-outs, recorded results, no-show reports, partner changes #403), the
+// write batch and the job mark.
+export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 14 + 2, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 

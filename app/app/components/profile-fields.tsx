@@ -5,25 +5,47 @@ import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { LEVELS } from "~/lib/interest";
 import { LEVEL_LOCKED_NOTE } from "~/lib/profile-level";
-import { SEXES, type ProfileErrors } from "~/lib/auth/rules";
+import { MAX_NAME, SEXES, type ProfileErrors } from "~/lib/auth/rules";
 
 // The name, level and phone fields shared by the first-login page (welcome)
 // and the profile page, so both ask the same way.
 
-export function NameField({ error, defaultValue }: { error?: string; defaultValue: string }) {
+// The name in two parts (#419, D182): the tables show the surname
+// ("Kovács / Nagy"), the rest of the app "<Vezetéknév> <Keresztnév>".
+export function NameFields({
+  errors,
+  values,
+}: {
+  errors: { surname?: string; firstName?: string };
+  values: { surname: string; firstName: string };
+}) {
   return (
-    <Field name="name" label="Neved" error={error}>
-      <Input
-        id="name"
-        name="name"
-        autoComplete="name"
-        required
-        maxLength={80}
-        defaultValue={defaultValue}
-        className={inputClass}
-        {...invalid("name", error)}
-      />
-    </Field>
+    <div className="grid gap-5 sm:grid-cols-2 sm:gap-4">
+      <Field name="surname" label="Vezetéknév" error={errors.surname}>
+        <Input
+          id="surname"
+          name="surname"
+          autoComplete="family-name"
+          required
+          maxLength={MAX_NAME}
+          defaultValue={values.surname}
+          className={inputClass}
+          {...invalid("surname", errors.surname)}
+        />
+      </Field>
+      <Field name="first_name" label="Keresztnév" error={errors.firstName}>
+        <Input
+          id="first_name"
+          name="first_name"
+          autoComplete="given-name"
+          required
+          maxLength={MAX_NAME}
+          defaultValue={values.firstName}
+          className={inputClass}
+          {...invalid("first_name", errors.firstName)}
+        />
+      </Field>
+    </div>
   );
 }
 
@@ -126,12 +148,12 @@ export function ProfileFields({
   levelLocked = false,
 }: {
   errors: ProfileErrors;
-  values: { name: string; level: string | null; phone: string; sex: string | null };
+  values: { surname: string; firstName: string; level: string | null; phone: string; sex: string | null };
   levelLocked?: boolean;
 }) {
   return (
     <>
-      <NameField error={errors.name} defaultValue={values.name} />
+      <NameFields errors={errors} values={values} />
       <LevelField error={errors.level} defaultValue={values.level} locked={levelLocked} />
       <PhoneField error={errors.phone} defaultValue={values.phone} />
       <SexField error={errors.sex} defaultValue={values.sex} />

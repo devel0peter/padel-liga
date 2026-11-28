@@ -1,5 +1,6 @@
 import { Link, useLocation, useRouteLoaderData } from "react-router";
 
+import { FEEDBACK_LINK, FeedbackDialog } from "~/components/feedback-form";
 import { CONTACT_EMAIL, FACEBOOK_URL, SITE_NAME } from "~/lib/site";
 
 export function Wrap({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -86,7 +87,14 @@ export function SiteFooter() {
           <a href={FACEBOOK_URL}>Facebook</a>
           <Link to="/rules">Szabályzat</Link>
           <Link to="/privacy">Adatkezelési tájékoztató</Link>
-          {pathname !== "/feedback" && <Link to={`/feedback?from=${encodeURIComponent(pathname + search)}`}>Visszajelzés</Link>}
+          {/* In a dialog, without leaving the page (#444). */}
+          {pathname !== "/feedback" && (
+            <FeedbackDialog from={pathname + search}>
+              <button type="button" className="cursor-pointer underline-offset-4 hover:underline">
+                {FEEDBACK_LINK}
+              </button>
+            </FeedbackDialog>
+          )}
         </span>
       </Wrap>
     </footer>

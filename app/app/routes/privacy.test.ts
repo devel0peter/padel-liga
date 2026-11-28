@@ -50,6 +50,11 @@ describe("privacy page (#334)", () => {
     expect(text).not.toContain("az e-mail-címe és a telefonszáma nélkül");
   });
 
+  it("says that a league's seekers see each other's contact data on Párkereső (#398, D177)", () => {
+    expect(text).toContain("A Párkeresőben egy liga párkeresői látják egymás nevét, szintjét, Élő-pontját, azt, hogy mióta keres párt, valamint a telefonszámát és az e-mail-címét.");
+    expect(text).toContain("A liga többi pár nélküli játékosa ugyanezt látja róluk, telefonszám és e-mail-cím nélkül.");
+  });
+
   it("lists the leagues an account joined (D128)", () => {
     expect(text).toContain("melyik ligákhoz csatlakoztál");
   });
@@ -59,10 +64,11 @@ describe("privacy page: feedback (#250, spec 17 and 19)", () => {
   const text = page();
 
   it("says what the feedback form stores, and what it doesn't", () => {
-    expect(text).toContain("Ha visszajelzést küldesz (a Visszajelzés oldalon, belépve vagy anélkül)");
+    expect(text).toContain("Ha visszajelzést küldesz (a „Visszajelzés küldése” ablakban, belépve vagy anélkül, vagy belépve értékeled az oldalt 1–5 labdával)");
     for (const item of [
       "az üzenetedet",
-      "a típusát (hiba, ötlet vagy egyéb)",
+      "a típusát (hiba, ötlet vagy értékelés)",
+      "az értékelésed számát",
       "az oldalt, ahonnan küldted",
       "az idejét",
       "az eszközöd típusát (mobil vagy számítógép) és a böngésződ nevét",

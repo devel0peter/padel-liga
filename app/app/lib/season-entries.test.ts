@@ -81,6 +81,19 @@ describe("joinsPhase (D18, spec section 4)", () => {
     expect(joinsPhase(season.phases, at("2026-11-03T12:00:00Z"), [1])).toBe(2);
     expect(joinsPhase(season.phases, at("2026-11-03T12:00:00Z"), [])).toBe(1);
   });
+
+  it("Győr since #393 (D172): a pair approved during round 1 joins round 2, which starts on 7 Dec", () => {
+    const phases = [
+      { number: 1, startsAt: at("2026-11-08T23:00:00Z"), deadline: at("2026-12-06T22:59:00Z") },
+      { number: 2, startsAt: at("2026-12-06T23:00:00Z"), deadline: at("2027-01-03T22:59:00Z") },
+      { number: 3, startsAt: at("2027-01-03T23:00:00Z"), deadline: at("2027-01-24T22:59:00Z") },
+      { number: 4, startsAt: at("2027-01-24T23:00:00Z"), deadline: at("2027-02-14T22:59:00Z") },
+    ];
+    expect(joinsPhase(phases, at("2026-11-24T12:00:00Z"), [1])).toBe(2);
+    expect(joinsPhase(phases, at("2026-12-06T22:59:59Z"), [1])).toBe(2);
+    // From 7 Dec 00:00 Budapest round 2 runs, so a new pair waits for round 3.
+    expect(joinsPhase(phases, at("2026-12-06T23:00:00Z"), [1])).toBe(3);
+  });
 });
 
 describe("checkEntry (D18)", () => {
@@ -203,7 +216,7 @@ describe("entryView", () => {
 
   it("shows the entry's status and the organizer's note, also after the window", () => {
     const entry = { status: "rejected" as const, joinsPhase: null, note: "Tele vagyunk." };
-    expect(entryView({ ...base, entry })).toEqual({ kind: "status", status: "rejected", text: entryStatusText(entry), note: "Tele vagyunk." });
+    expect(entryView({ ...base, entry })).toEqual({ kind: "status", status: "rejected", text: entryStatusText(entry), note: "Tele vagyunk.", joinsPhase: null });
     expect(entryView({ ...base, entry, now: at("2027-01-30T12:00:00Z") })).toMatchObject({ kind: "status" });
   });
 });

@@ -1,6 +1,7 @@
 import { data, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/admin.match-decide";
+import { OrganizerAbsences } from "~/components/absences";
 import { AppPage } from "~/components/app-page";
 import { PairNames, PersonLink } from "~/components/person-link";
 import { FormFeedback, ScoreFields } from "~/components/match-result";
@@ -16,8 +17,9 @@ import { NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS } from "~/lib/no-shows";
 import { decideNoShow, leagueNoShows } from "~/lib/no-shows.server";
 import { getLeague } from "~/lib/leagues.server";
 import { REASON_MAX } from "@padel-liga/rules";
-import { MATCH_LOST_BOTH_TEXT, neutralScoreText, parseOutcome, versusText, type OutcomeChoice } from "~/lib/results";
+import { bothLostText, neutralScoreText, parseOutcome, versusText, walkoverScoreText, type OutcomeChoice } from "~/lib/results";
 import { SITE_NAME } from "~/lib/site";
+import { organizerAbsences } from "~/lib/substitutes.server";
 
 // Deciding a match (#29): a disputed result, or an override of any match of
 // the league, played or not, with a required reason; and a waiting no-show
@@ -46,7 +48,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!page) throw data(NOT_FOUND, { status: 404 });
   // A waiting no-show report on this match (#33), if any.
   const [noShow] = await leagueNoShows(league.id, id);
-  return { slug: league.slug, page, noShow: noShow ?? null };
+  // Who didn't play (#400): the opponents confirmed or disputed the result with it.
+  const absent = await organizerAbsences(id);
+  return { slug: league.slug, page, noShow: noShow ?? null, absent };
 }
 
 type ActionResult = { intent: string; ok: boolean; message: string };
@@ -76,14 +80,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function MatchDecide({ loaderData, actionData }: Route.ComponentProps) {
-  const { slug, page: m, noShow } = loaderData;
+  const { slug, page: m, noShow, absent } = loaderData;
   const busy = useNavigation().state !== "idle";
   const r = m.result;
   const choices: { value: OutcomeChoice; label: string }[] = [
     { value: "played", label: "Eredmény (lent add meg)" },
-    { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (4:0, 4:0)` },
-    { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (4:0, 4:0)` },
-    { value: "both-inactive", label: MATCH_LOST_BOTH_TEXT },
+    { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (${walkoverScoreText(m.setGames)})` },
+    { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (${walkoverScoreText(m.setGames)})` },
+    { value: "both-inactive", label: bothLostText(m.setGames) },
     { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít bele a tabellába)" },
   ];
   const current: OutcomeChoice | undefined = !m.current
@@ -106,6 +110,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
           <span className="font-medium">2. pár:</span> <PairNames players={m.players.b} />
         </p>
         <p className="font-semibold">{m.label}</p>
+        <OrganizerAbsences absent={absent} />
         {r.status === "disputed" && (
           <>
             <p>
@@ -134,7 +139,7 @@ export default function MatchDecide({ loaderData, actionData }: Route.ComponentP
             <Form key={`ns${noShow.id}`} method="post" className="grid gap-3">
               <input type="hidden" name="report" value={noShow.id} />
               <p className="text-sm">
-                Ha jóváhagyod: 4:0, 4:0 a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
+                Ha jóváhagyod: {walkoverScoreText(m.setGames)} a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
                 bejelentés előtt. Mindkét pár értesítést kap.
               </p>
               <div className="grid gap-1.5">

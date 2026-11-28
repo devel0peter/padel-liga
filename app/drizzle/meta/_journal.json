@@ -372,6 +372,55 @@
       "when": 1794516558951,
       "tag": "0063_drop_email_opens",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1795553497192,
+      "tag": "0064_round2_dec7",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1795553645029,
+      "tag": "0065_sets_to_six",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1795554903049,
+      "tag": "0067_match_absences",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1795559265165,
+      "tag": "0069_parkereso_listed",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1795561598973,
+      "tag": "0070_season_entry_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1795564290580,
+      "tag": "0071_partner_changes",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1795814749304,
+      "tag": "0072_user_name_parts",
+      "breakpoints": true
     }
   ]
 }

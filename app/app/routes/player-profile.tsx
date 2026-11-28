@@ -1,5 +1,5 @@
 import type { Route } from "./+types/player-profile";
-import { AppPage } from "~/components/app-page";
+import { Page, PageHeader } from "~/components/blocks";
 import { PlayerProfileView } from "~/components/player-profile-view";
 import { requireUser } from "~/lib/auth/session.server";
 import { playerProfile } from "~/lib/profiles.server";
@@ -25,8 +25,9 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 export default function PlayerProfile({ loaderData: d }: Route.ComponentProps) {
   return (
-    <AppPage title={d.player.name} description="Játékos">
+    <Page>
+      <PageHeader eyebrow="Játékos" title={d.player.name} />
       <PlayerProfileView profile={d} />
-    </AppPage>
+    </Page>
   );
 }

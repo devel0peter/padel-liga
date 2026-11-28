@@ -5,41 +5,40 @@
 // opens, marks done and reopens on Visszajelzések; a Szervező and a player
 // are refused (#241). Runs after the walkthrough; leaves its bug report, idea
 // and rating for e2e:shots (--data walked) and removes the filler rows.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { ORGANIZER, ADMIN, PAIRS, as, content, d1, d1Delete, d1Insert, visit } from "./support";
 
 const BUG = "E2E: a Tabella nem tölt be";
 const IDEA = "E2E: legyen sötét mód";
 const RATING = "E2E: jó kis liga";
+const RATING_FROM_PROFILE = "E2E: több labda kéne";
 const LIST = "/admin/feedback";
 
-async function send(page: Page, kind: string, message: string) {
+async function send(page: Page | Locator, kind: string, message: string) {
   await page.getByRole("radio", { name: kind, exact: true }).click();
   await page.getByLabel("Üzenet").fill(message);
   await page.getByRole("button", { name: "Küldés" }).click();
 }
 
 test("a logged-in player sends a bug report from the sidebar", async ({ browser }) => {
-  const player = PAIRS.p1[0];
-  const { context, page } = await as(browser, player);
+  const { context, page } = await as(browser, PAIRS.p1[0]);
   await visit(page, "/notifications?from=e2e");
-  await page.getByRole("link", { name: "Visszajelzés", exact: true }).click();
-  await expect(page).toHaveURL(/\/feedback\?from=%2Fnotifications%3Ffrom%3De2e$/);
-  await expect(page.getByRole("heading", { name: "Visszajelzés", level: 1 })).toBeVisible();
-  // What goes along, listed above the button: the page (path only), the account.
-  const main = page.getByRole("main");
-  await expect(main).toContainText("Ezt küldjük el veled:");
-  await expect(main).toContainText("/notifications");
-  await expect(main).not.toContainText("from=e2e");
-  await expect(main).toContainText(player.name);
-  await expect(main).toContainText("hello@padelparbaj.hu");
-  await send(page, "Hiba", BUG);
-  await expect(page.getByRole("heading", { name: "Köszi, megkaptuk!" })).toBeVisible();
+  // A dialog over the page (#444): the address doesn't change.
+  await page.locator("[data-sidebar=sidebar]").getByRole("button", { name: "Visszajelzés", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés küldése" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/notifications\?from=e2e$/);
+  // Two choices and one box (#446); what goes along is stored, not listed.
+  await expect(dialog).not.toContainText("Ezt küldjük el veled");
+  await expect(dialog).toContainText("hello@padelparbaj.hu");
+  await send(dialog, "Hibát találtam", BUG);
+  await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, device, browser, user_id is not null as account from feedback where message = '${BUG}'`)).toEqual([
     { kind: "bug", page: "/notifications", device: "desktop", browser: "Chrome", account: 1 },
   ]);
-  await page.getByRole("link", { name: "Vissza oda, ahonnan jöttél" }).click();
+  await page.getByRole("button", { name: "Bezárom" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page).toHaveURL(/\/notifications\?from=e2e$/);
   await context.close();
 });
@@ -48,20 +47,19 @@ test("a visitor sends an idea from a public page's footer; the 31st in an hour i
   const context = await browser.newContext();
   const page = await context.newPage();
   await visit(page, "/rules");
-  await page.getByRole("contentinfo").getByRole("link", { name: "Visszajelzés" }).click();
-  await expect(page).toHaveURL(/\/feedback\?from=%2Frules$/);
-  await expect(page.getByRole("main")).not.toContainText("Fiók");
-  await send(page, "Ötlet", IDEA);
-  await expect(page.getByRole("heading", { name: "Köszi, megkaptuk!" })).toBeVisible();
+  await page.getByRole("contentinfo").getByRole("button", { name: "Visszajelzés", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés küldése" });
+  await send(dialog, "Ötletem van", IDEA);
+  await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, user_id from feedback where message = '${IDEA}'`)).toEqual([{ kind: "idea", page: "/rules", user_id: null }]);
-  await expect(page.getByRole("link", { name: "Vissza oda, ahonnan jöttél" })).toHaveAttribute("href", "/rules");
+  await expect(page).toHaveURL(/\/rules$/);
 
   // 29 more visitor messages this hour fill the limit of 30.
   const now = Math.floor(Date.now() / 1000);
   const values = Array.from({ length: 29 }, (_, i) => `('idea', 'E2E: kitöltés ${i}', '/', 'desktop', 'Chrome', 'dev', ${now - i})`).join(", ");
   d1Insert(`insert into feedback (kind, message, page, device, browser, app_version, created_at) values ${values}`);
   await visit(page, "/feedback?from=%2Frules");
-  await send(page, "Egyéb", "E2E: harmincegyedik");
+  await send(page, "Ötletem van", "E2E: harmincegyedik");
   await expect(page.getByRole("alert")).toContainText("Most túl sok üzenet jött");
   await expect(page.getByLabel("Üzenet")).toHaveValue("E2E: harmincegyedik");
   expect(d1(`select count(*) as n from feedback where message = 'E2E: harmincegyedik'`)).toEqual([{ n: 0 }]);
@@ -127,4 +125,21 @@ test("the Admin lists, filters, opens, marks done and reopens; a Szervező and a
     await expect(other.page.getByText("Ehhez nincs jogod")).toBeVisible();
     await other.context.close();
   }
+});
+
+test("a player rates the app with tennis balls from Profil (#446)", async ({ browser }) => {
+  const player = PAIRS.p2[0];
+  const { context, page } = await as(browser, player);
+  await visit(page, "/profile");
+  await content(page).getByRole("button", { name: "Értékeld a Padelpárbajt" }).click();
+  const dialog = page.getByRole("dialog", { name: "Hogy tetszik a Padelpárbaj?" });
+  await expect(dialog.getByRole("button", { name: "Küldés" })).toBeDisabled();
+  await dialog.getByRole("radio", { name: /^4 labda/ }).click();
+  await expect(dialog).toContainText("Tetszik");
+  await dialog.getByLabel("Mit javítanál?").fill(RATING_FROM_PROFILE);
+  await dialog.getByRole("button", { name: "Küldés" }).click();
+  await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
+  expect(d1(`select kind, rating, page from feedback where message = '${RATING_FROM_PROFILE}'`)).toEqual([{ kind: "rating", rating: 4, page: "/profile" }]);
+  d1Delete(`delete from feedback where message = '${RATING_FROM_PROFILE}'`);
+  await context.close();
 });

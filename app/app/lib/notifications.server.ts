@@ -6,12 +6,13 @@ import { db } from "~/db/client.server";
 import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
+  TIPS_OFF,
   channelKey,
   disputeRecipients,
   KIND_TOPIC,
   isEnabled,
+  partnerChangeWaitingMessage,
   resultDisputedMessage,
-  substituteRequestedMessage,
   noShowReportedMessage,
   pushPayload,
   pushWanted,
@@ -423,6 +424,18 @@ export async function notifyResultDisputed(input: {
   await notify("result_disputed", (await leagueStaff(input.leagueId, input.disputedBy)).map((userId) => ({ userId, message })));
 }
 
+// An accepted permanent partner change waits for the organizer (#416): the
+// league's Szervezők and the Admins, in the app and by push (their own
+// switch), never by email; the accepting player left out. Never throws.
+export async function notifyPartnerChangeWaiting(input: { leagueId: number; leagueSlug: string; leagueName: string; except: string }): Promise<void> {
+  try {
+    const message = partnerChangeWaitingMessage(input);
+    await notify("partner_change_waiting", (await leagueStaff(input.leagueId, input.except)).map((userId) => ({ userId, message })));
+  } catch (error) {
+    logError("notification failed", { kind: "partner_change_waiting", error });
+  }
+}
+
 // The league's Szervezők and every Admin, once each, accounts being deleted
 // and `except` (the player whose step it is) left out.
 async function leagueStaff(leagueId: number, except: string): Promise<string[]> {
@@ -438,24 +451,6 @@ async function leagueStaff(leagueId: number, except: string): Promise<string[]> 
       .where(and(eq(users.platformRole, "superadmin"), isNull(users.deletedAt))),
   ]);
   return disputeRecipients(organizers.map((o) => o.id), admins.map((a) => a.id), except);
-}
-
-// A pair asked for a substitute (#37, D109): tell the league's Szervezők and
-// the Admins, in the app and by push, never by email; the asking player left
-// out. Never throws: the request is already saved.
-export async function notifySubstituteRequested(input: {
-  leagueId: number;
-  leagueSlug: string;
-  leagueName: string;
-  week: number;
-  requestedBy: string;
-}): Promise<void> {
-  try {
-    const message = substituteRequestedMessage(input);
-    await notify("substitute_requested", (await leagueStaff(input.leagueId, input.requestedBy)).map((userId) => ({ userId, message })));
-  } catch (error) {
-    logError("notification failed", { kind: "substitute_requested", error });
-  }
 }
 
 // A pair reported a no-show (#33, D108): tell the league's Szervezők and the
@@ -493,6 +488,7 @@ export async function listNotifications(userId: string) {
   return db
     .select({
       id: notifications.id,
+      kind: notifications.kind,
       title: notifications.title,
       body: notifications.body,
       readAt: notifications.readAt,
@@ -544,6 +540,11 @@ async function setOptOut(userId: string, kind: string, enabled: boolean): Promis
 
 export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
   await setOptOut(userId, kind, enabled);
+}
+
+// "Nem kérek tippeket" (#444): `off` stores the opt-out.
+export async function setTipsOff(userId: string, off: boolean): Promise<void> {
+  await setOptOut(userId, TIPS_OFF, !off);
 }
 
 // The email and push switches (#115), stored like the kinds.

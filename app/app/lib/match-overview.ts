@@ -4,7 +4,7 @@
 // match-overview.server.ts. Everything is read from the match's log
 // (match_events, D68): there is no second log.
 
-import { addDays, budapestTime, isValidActivity, other, type ResultState, type SchedulingEventKind, type SchedulingState, type Side } from "@padel-liga/rules";
+import { addDays, budapestTime, isValidActivity, other, type ResultState, type SchedulingEventKind, type SchedulingState, type SetGames, type Side } from "@padel-liga/rules";
 
 import { isProjectionKind, type ProjectionKind } from "./deadline-projection";
 import { weekDays } from "./groups";
@@ -45,7 +45,7 @@ export function statusOf(scheduling: SchedulingState, result: ResultState): Over
  * the score and whose confirmation it waits for, a dispute, or the outcome
  * that counts (score and winner, from the 1st pair's side).
  */
-export function resultStatus(result: ResultState, names: Record<Side, string>): { label: string; tone: Tone } | null {
+export function resultStatus(result: ResultState, names: Record<Side, string>, setGames: SetGames): { label: string; tone: Tone } | null {
   switch (result.status) {
     case "none":
       return null;
@@ -54,7 +54,7 @@ export function resultStatus(result: ResultState, names: Record<Side, string>): 
     case "disputed":
       return { label: "Vitatott eredmény, a szervező dönt", tone: "todo" };
     case "final":
-      return { label: `${finalLabel(result.how)}: ${neutralOutcomeText(result.outcome, names)}`, tone: "done" };
+      return { label: `${finalLabel(result.how)}: ${neutralOutcomeText(result.outcome, names, setGames)}`, tone: "done" };
   }
 }
 

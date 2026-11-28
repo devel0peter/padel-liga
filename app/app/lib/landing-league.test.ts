@@ -280,6 +280,30 @@ describe("landing chip and register button", () => {
     });
   });
 
+  it("Győr since #393 (D172): round 2 from 7 Dec through the holidays, the card's copy", () => {
+    // Round 1 extended to 6 Dec, round 2 four weeks, rounds 3-4 with no break.
+    const rounds: [string, string][] = [
+      ["2026-11-09", "2026-12-06"],
+      ["2026-12-07", "2027-01-03"],
+      ["2027-01-04", "2027-01-24"],
+      ["2027-01-25", "2027-02-14"],
+    ];
+    const gyor: LandingSeason = {
+      ...FIRST,
+      phases: rounds.map(([start, end], i) => ({ number: i + 1, startsAt: at(start, 0, 0), deadline: at(end, 23, 59) })),
+      publishedPhases: [1],
+    };
+    const now = leagueLanding([gyor], at("2026-11-24"));
+    expect(now).toMatchObject({ kind: "running", round: 1, joining: { kind: "round", number: 2, start: "2026-12-07" } });
+    const b = landingBlock(now);
+    expect(b.joining).toBe("Nevezz most, és a 2. körtől játszotok (dec. 7.).");
+    expect(b.cta).toBe("Nevezek a 2. körre");
+    // No break: round 2 runs over Christmas and New Year, round 3 follows.
+    expect(leagueLanding([gyor], at("2026-12-24"))).toMatchObject({ kind: "running", round: 2 });
+    expect(leagueLanding([gyor], at("2027-01-03", 23, 59))).toMatchObject({ kind: "running", round: 2 });
+    expect(leagueLanding([gyor], at("2027-01-04", 0, 0))).toMatchObject({ kind: "running", round: 3 });
+  });
+
   it("each state has its own chip", () => {
     expect(landingBlock(leagueLanding([FIRST], at("2026-11-06"))).chip).toBe("hamarosan indul");
     expect(landingBlock(leagueLanding([FIRST], at("2026-12-01"))).chip).toBe("zajlik a 2. kör");

@@ -52,6 +52,12 @@ function useSidebar() {
   return context
 }
 
+// The sidebar's state, or null outside a SidebarProvider (a block that also
+// renders outside the app shell, e.g. PageHeader in the /dev/ui gallery).
+function useOptionalSidebar() {
+  return React.useContext(SidebarContext)
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -699,4 +705,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  useOptionalSidebar,
 }

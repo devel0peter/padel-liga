@@ -13,6 +13,12 @@ export type RankInput = {
   mine: boolean;
   /** Rated matches, for players; null for pairs. */
   matches: number | null;
+  /** A player's active pair in the league, by team label (#422); null without one, and for pairs. */
+  pair?: string | null;
+  /** The division of the pair's newest published group ("Bronz", #422); null before any. */
+  division?: string | null;
+  /** The viewer's last Élő-pont change (#422); null for everyone else. */
+  delta?: number | null;
 };
 
 export type RankRow = Omit<RankInput, "rating"> & {

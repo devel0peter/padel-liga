@@ -273,7 +273,7 @@ Anyone can create an account, no invite needed (#113). Logging in on `/register`
   - Kezdőlap: one card "Melyik ligában játszol?" with Mintaváros (Padelpárbaj Mintaváros) and "Csatlakozom"; Példaváros has no open season, so it is not offered. No season card and no pair link yet; Párod says "Még nem csatlakoztál egyik ligához sem." and links Kezdőlap.
   - After "Csatlakozom": the card is gone; Kezdőlap and Párod show the "Teszt szezon" and "Hívd meg a párodat" with the player's own pair link; Párod also says the organizer finds a partner for those with nobody, with the contact address `hello@padelparbaj.hu`. Napló has a "Csatlakozás ligához" entry by the player.
   - The Szervező can now pick this player on "Párok" (step 14).
-  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok, Játékosok and Helyettes pick never list her.
+  - As `idegen.ilona@example.test` (the second league's player): Kezdőlap shows no Mintaváros season and no card to choose, Párod her own Példaváros pair link with "Párt keresek" on. As the Admin, Példaváros's Játékosok lists only her (and its Párok no one), and Mintaváros's Párok and Játékosok never list her.
 
 ### 16. The new player invites a partner with the pair link (side path)
 
@@ -340,7 +340,7 @@ A player without a pair sends their own link; the partner registers and accepts 
 - Do: open Profil; open the "i" next to "Élő-pont"; on "Beállításaim" (`/profile?tab=settings`), as the second player, change "Szinted" and press "Mentés".
 - Expect:
   - Profil has two tabs (D136): "Játékosprofil" (default: the summary Élő-pont, Szezon, Kör, Meccs, Győzelem, Vereség; then Meccsek and Párod once in a published group) and "Beállításaim" (Adataid, Fiók, Értesítések, Fiók törlése).
-  - Értesítések has, under the push switch, "Miről kérsz push értesítést?" with five topic switches, all on (D159): Időpont-egyeztetés, Emlékeztetők, Eredmények, Csoport és szezon, Mulasztások. With the push switch off they are disabled, with the line "… akkor számítanak, ha bekapcsolod", and keep their values when push is switched back on.
+  - Értesítések has, under the push switch, "Miről kérsz push értesítést?" with five topic switches, all on (D159): Időpont-egyeztetés, Emlékeztetők, Eredmények, Csoport és szezon, Helyettesek és mulasztások. With the push switch off they are disabled, with the line "… akkor számítanak, ha bekapcsolod", and keep their values when push is switched back on.
   - On "Beállításaim" the player in a group sees "Szinted" as plain text with the note "A szinted lezárult: …" and no way to change it; the other fields still save.
   - Both see the Élő-pont with the starting value of the level (kezdő 1000, középhaladó 1200, haladó 1400, versenyző 1600); the "i" opens a short explanation with a link to the Élő section of `/rules`.
   - The player without a group can change the level, and the number follows.
@@ -411,6 +411,7 @@ People stuck before entering get at most one reminder per season, whatever the s
 - Do: under "Eredmény rögzítése" fill 4:3 and 4:1 ("Ti" first) and press "Rögzítem az eredményt"; then 4:1, 2:4 and the super tie-break 10:8, and send again. As the opponent, press "Megerősítem".
 - Expect:
   - Before the result, the group card on Kezdőlap lists the pairs ("(ti)" marks yours) without numbers.
+  - The hint above the fields says "egy szett 4 nyert játékig (5:3, vagy tie-break után 5:4)": the seed season's round 1 keeps short sets, like Győr's (D173). From round 2 the same form says "egy szett 6 nyert játékig (7:5, vagy tie-break után 7:6)", refuses 4:2, 4:1 and takes 6:4, 7:6 (`app/e2e/99-round-switch.spec.ts`).
   - The first try is refused: "1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."
   - The second goes through: "Rögzítettük. A másik pár megerősíti.", the status "Rögzítettétek: 4:1, 2:4, szuper tie-break 10:8, a másik pár megerősítésére vár", with the time it is accepted by itself (48 hours later). Scheduling is gone from the page. The terminal prints "Erősítsd meg a meccs eredményét" to both opponents, with the score from their side (1:4, 4:2, 8:10) and the link.
   - Until the other pair answers, the recording pair can correct it ("Elírtátok? Javítsd ki"); the 48 hours restart.
@@ -470,21 +471,18 @@ Every organizer and system change leaves an entry (#225, #226, decision log (`do
   - Each filter narrows the list and stays in the address, so the reload shows the same list. 50 entries a page, "Régebbiek" for the next.
   - Nothing on the page changes an entry. A Szervező or a player opening `/admin/log` gets the 403 page, and has no Napló in the sidebar.
 
-### 32. A pair asks for a substitute, the Szervező approves (after step 11)
+### 32. A pair marks a player who doesn't play: a temporary substitute (after step 11)
 
-Spec section 4, decision log (`docs/decisions.md`) D109 (#37).
+Spec section 4, decision log (`docs/decisions.md`) D175 (#400; replaces D109's approved substitute).
 
-- Page: a match of step 17 not played yet (`/matches/<id>`), then `/admin/leagues/minta/substitutes` ("Helyettesek" in the sidebar)
-- Accounts: the player of step 17, then `szervezo@example.test`, then one of the opponents
-- Do: on the match, under "Helyettes", pick your partner in "Ki nem tud játszani?" and a player of another group in "Ki helyettesít?", press "Helyettest kérek". As the Szervező, open Helyettesek and press "Jóváhagyom".
+- Page: a match of step 17 not played yet (`/matches/<id>`)
+- Accounts: the player of step 17, then one of the opponents
+- Do: on the match, open "Helyettes kell?", pick your partner in "Ki nem tud játszani?" and press "Helyettes jön helyette". Then press "Mégis <partner> játszik", mark them again, and record the result once played (step 27).
 - Expect:
-  - The picker shows names only, never an address, and never the match's four players or anyone in another pair of your group. "Elküldtük a kérést a szervezőnek. Szólunk, ha döntött." and the request "… helyett …: Jóváhagyásra vár", with "Visszavonom a kérést" for the player who asked (not for the partner).
-  - The Szervező and the Admin get "Helyettes kérés · <liga>" in Értesítések (no names, no email); the asking player doesn't.
-  - Helyettesek: the request under "Jóváhagyásra vár (1)" with the season, round, group and week, the pair and its opponents, the start (or the deadline), and the absent player's and the substitute's Elo side by side with the difference. "Jóváhagyom": "Jóváhagytad a helyettest. Mindkét pár értesítést kap.", and the request moves to "Jóváhagyva, még nem játszották", with "Visszavonom" until the match starts.
-  - Both pairs see "<hiányzó> helyett <helyettes> játszik …" on the match page; the asking pair gets "Jóváhagyták a helyettest", the opponents "Helyettes az ellenfeleteknél" (app and push only, no email). The substitute gets nothing and gets 404 on the match page. The group table and the Tabella show the pair's own names.
-  - "Elutasítom" with a reason instead: only the asking pair is told, and sees "Elutasítva" and "A szervező indoklása: …" on the match page; they can ask again.
-  - After the confirmed result (step 27), the substitute's Elo changes and the absent player's doesn't.
-  - Napló lists "Helyettes jóváhagyása" with the match and "<hiányzó> → <helyettes>". A player opening `/admin/leagues/minta/substitutes` gets 403.
+  - No substitute's name is asked and nothing waits for the Szervező: "Rendben, helyettes jön helyette. A többiek is látják." The "Helyettes" panel shows "<partner> helyett helyettes játszik nálatok", the opponents see "… az ellenfeleiteknél"; the partner and both opponents get "Helyettes a meccseteken" (app and push only, no email), and "Mégsem jön helyettes" after "Mégis … játszik".
+  - From the agreed start on, nothing can be marked or taken back on the match page. The result form instead has "Helyettes játszott valamelyikőtök helyett?" with a tick for each of your pair's players (ticked if marked); ticking one there after a sudden injury tells the other three the same way.
+  - The opponent confirming the result sees who didn't play next to "Megerősíted az eredményt?". After the confirmed result the absent player's Élő-pont doesn't change; the other three change as usual. The group table and the Tabella show the pair's own names.
+  - No "Helyettesek" in the Szervező's sidebar, and no "Helyettes kérés" switch on their profile.
 
 ### 33. A player opens a pair's and a player's profile (after step 29)
 
@@ -634,6 +632,73 @@ The Visszajelzés form and the Admin's list (#240, #241; spec section 19, decisi
   - Csoportok, on the running round's page: below its groups, "Előzetes beosztás: ha most érne véget a kör" with the next round's groups, each pair with its group and place now and an arrow up, down or level ("Új pár" for a new one), the pairs that would leave and why, and "<n> meccs még nem dőlt el". No select, no button. Not shown in the season's last round or once the real draft exists.
   - Right after step 11 (nothing played): every match "Mindkét pár veszít", every player "0 → 2" in the 2nd strike list, nobody leaving; the preview swaps the 1st of group 2 with the last of group 1.
   - A player gets 403.
+
+### 41. A player opens Ligáim (after step 11)
+
+The player's leagues, one card each (#394, decision log (`docs/decisions.md`) D174; `app/e2e/40-ligaim.spec.ts`). Best seen on the running round seed below.
+
+- Page: `/leagues`, then `/leagues/minta` and `/leagues/pelda`
+- Account: `kovacs.anna@example.test`; then `idegen.ilona@example.test`; then a new account in no league
+- Do: open "Ligáim" in the sidebar and, at 390px, in the bottom bar.
+- Expect:
+  - The bottom bar reads Kezdőlap, Tabella, Ligáim, Értesítések, Profil; the sidebar has Ligáim after Ranglista.
+  - Anna (one league): the Mintaváros card alone, with the city and season; "Kör": "1. kör: <start> – <end>" and "Határidő: <deadline>"; "Párod": her partner's name; "Helyetek": "Az 1. csoportban vagytok, most <n>. helyen"; "A liga": "1. kör: <pairs> pár, <groups> csoport" and "Lejátszott meccsek: <final> / <all>", the same as the Tabella; "A szezonod": Meccs, Győzelem, Élő-pontod; Tabella and Szabályzat buttons. No email address or phone number.
+  - Ilona (Példaváros, no pair): "Nincs párod. Hívd meg a párodat, vagy nézd meg a Párkeresőt." ("Hívd meg a párodat" opens Profil's Párod, the other the card's Párkereső, step 42).
+  - `/leagues/pelda` as Anna: 404. In no league: "Melyik ligában játszol?" with "Csatlakozom".
+
+### 42. Players without a partner find each other on Párkereső (after step 11)
+
+The league's seekers see each other, with phone and email only between two seekers (#398, decision log D177; `app/e2e/43-parkereso.spec.ts`). No email goes out.
+
+- Page: `/home`, then `/leagues/minta#parkereso`; `/profile`
+- Account: two or three new accounts registered through Mintaváros's register button (as in step 5), without a pair; `kovacs.anna@example.test`; `idegen.ilona@example.test`
+- Do: as the first, tap "Nézd meg a Párkeresőt" under "Párt keresek" on Kezdőlap, then "Bekapcsolom a párkeresést". As the second, open Párkereső, then tap the same button. As the first, open the second's pair link (Párkereső shows it under "Hívd meg a párodat") as the second and accept.
+- Expect:
+  - Kezdőlap's and Párod's "Párt keresek" text says that the organizer and the league's other seekers see the name, level, Élő-pont, since when they look, phone and email (players without a pair the same without phone and email), and that it can be switched off at any time.
+  - The second, before switching on: the first in the list (name, level, "ma óta keres"), no phone or email, "Az elérhetőségüket akkor látod, ha te is bekapcsolod a párkeresést". After: the first's phone (call, SMS) and email (write); the first sees the second's too. Nobody sees themselves.
+  - A switch from before this change (`listed` = 0 in `partner_searches`, e.g. Ilona's in Példaváros): not listed for others; Párod says "Most csak a szervező látja, hogy párt keresel." with "Bekapcsolom a párkeresést".
+  - Once paired: "Neked már van párod." on both cards, and they are gone from the others' list. Anna (with a pair) sees only that line.
+  - `/leagues/minta` logged out goes to the login; as Ilona (Példaváros) it is 404.
+### 43. A player opts out of the next round on Ligáim, then takes it back (after step 41)
+
+Default in, and "Nem folytatom" until the round's deadline (#395, decision log (`docs/decisions.md`) D176; `app/e2e/42-opt-out.spec.ts`). Needs a running round: best seen on the running round seed below.
+
+- Page: `/leagues`; then `/admin/leagues/minta/pairs` and the season's Csoportok
+- Account: `kovacs.anna@example.test`; then her partner; then the Szervező
+- Do: as Anna, press "Nem folytatom" on the card, read the confirmation, press "Nem folytatom" in it; later press "Mégis folytatom".
+- Expect:
+  - Before: "Következő kör": "Benne vagytok a 2. körben (<start>-tól/-től). Ha nem folytatnád, jelezd <deadline>, 23:59-ig."
+  - The confirmation: the pair leaves the season after round 1, round 1's remaining matches still count and must be played, the partner can go on with a new partner; "Mégse" changes nothing.
+  - After: "Jelezted, hogy nem folytatod: az 1. kör után kiléptek a szezonból. Meggondolhatod …" with "Mégis folytatom". The partner's card says "A párod jelezte, hogy nem folytatja …" with no button, and the partner has one notice "A párod nem folytatja" (no email).
+  - Párok: "Kilép a kör végén" in the pair's Nevezés cell. Csoportok' preview: the pair under "Kimaradnak" with "nem folytatja". Napló: one entry with Anna as actor.
+  - "Mégis folytatom": the card is back to "Benne vagytok …", the partner gets "A párod mégis folytatja", Napló has a second entry.
+  - After the deadline the section is gone; in the season's last round it never shows.
+
+### 44. A player changes partner permanently; the Szervező approves it, then undoes it (after step 11)
+
+"Állandó partnercsere" on Ligáim (#402, #416, decision log (`docs/decisions.md`) D178, D180; `app/e2e/44-partner-change.spec.ts`). Best seen on the running round seed below. Emails are printed by the dev server, never sent.
+
+- Page: `/leagues/minta`, then the match page, then Párok (`/admin/leagues/minta/pairs`)
+- Account: a player of a pair in round 1; then the new partner (a registered player of Mintaváros without a pair); then the Szervező
+- Do: in "Állandó partnercsere" open "Végleg új partnerrel játszanál?", pick the new partner in "Új partner" and press "Kérés küldése". As the new partner, open Ligáim and press "Elfogadom". As the Szervező, press "Jóváhagyom" on the change in "Állandó partnercserék" on Párok; later press "Visszavonás" there and confirm. (Or "Elutasítom" with a reason instead of approving.)
+- Expect:
+  - The picker lists names only (no email or phone): the league's players with no pair. After sending: "Elküldtük." and "Elküldted <név> részére. <nap>-ig válaszolhat." with "Visszavonom"; the partner sees that a change was asked. A second change can't be started while one waits.
+  - The new partner: one email ("<név> állandó partnernek hív") and an in-app notice; on Ligáim "<név> állandó partnernek hív <partner> helyett." with "Elfogadom" and "Nem fogadom el". Unanswered, it disappears after 7 days.
+  - After "Elfogadom": "Elfogadtad.", and "Jóváhagyásra vár" for the starter and the new partner; nothing on the matches yet. The Szervező (and the Admins) get "Partnercsere jóváhagyásra vár" in the app and by push, no email; Párok shows the change with "Jóváhagyásra vár", how often the two changed partner this season, "Jóváhagyom" and "Elutasítom".
+  - After "Jóváhagyom": the new partner's card says "A 2. körtől <név> párja vagy." The leaving player gets one email ("Új partner a helyeden") and an in-app notice; the starter and the new partner an in-app notice. Every remaining match of the pair in round 1 (before its agreed start) shows "<távozó> helyett <új partner> játszik"; the opponents get "Helyettes a meccseteken" naming the new partner. Párok's pair row shows "Helyettessel: <n> meccs ebben a szezonban".
+  - "Elutasítom" instead: the change ends, the three players get "Elutasított partnercsere" with the reason in the app and by push, no email.
+  - Párok: "Állandó partnercserék" with "<maradó>: <távozó> helyett <új partner>" and its state; after "Visszavonás" the marks on matches not played yet are gone and all three get an in-app notice.
+
+### 45. The new pair takes the old pair's spot at the round switch (after step 44, before step 11's round ends)
+
+#403, decision log (`docs/decisions.md`) D179; `app/e2e/45-partner-change-switch.spec.ts`; the rule is unit tested in the rules engine (`keepSpots`).
+
+- Page: the season's Csoportok (`/admin/leagues/minta/seasons/<id>/groups`)
+- Account: the Szervező
+- Do: with a change accepted (step 44, not undone), open Csoportok on the running round's page.
+- Expect:
+  - "Előzetes beosztás": the new pair (the starter and the new partner, its own Élő-pont) in the old pair's spot after promotion and relegation, with "Partnercsere: <távozó> helyett <új partner>". The real draft after the deadline shows the same, and the organizer can still move it.
+  - Publishing the next round dissolves the old pair, makes the new one (Párok: "partnercseréből") and gives it the round's matches; round 1's results stay with the old pair. An old pair that leaves by a 3rd strike: its new pair is placed as a new pair ("Új pár").
 
 ## A running round instead
 

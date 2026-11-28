@@ -29,7 +29,7 @@ function freshDb() {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   STARTS.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
 }
@@ -76,7 +76,11 @@ const scoreOf = (m: FixtureMatch) =>
     : m.note;
 const allMatches = (g: LadderGroup) => g.weeks.flatMap((w) => w.matches);
 const scores = (g: LadderGroup) => allMatches(g).map(scoreOf).filter(Boolean).sort();
-const between = (g: LadderGroup, a: number, b: number) => allMatches(g).find((m) => m.a.names[0] === `Játékos ${a}A` && m.b.names[0] === `Játékos ${b}A`)!;
+// The team label's first player (#419). "Játékos 1011A" has no given name on
+// the list and every player here is "Játékos", so the clash rule spells the
+// whole rest out: "Játékos 1011A / Játékos 1011B".
+const first = (label: string) => label.split(" / ")[0]!;
+const between = (g: LadderGroup, a: number, b: number) => allMatches(g).find((m) => first(m.a.label) === `Játékos ${a}A` && first(m.b.label) === `Játékos ${b}A`)!;
 
 describe("ladderPage", () => {
   it("is null for a league that doesn't exist", async () => {
@@ -133,7 +137,7 @@ describe("ladderPage", () => {
     publish(1, 1);
     const page = await ladderPage("gyor", at("2026-11-10T10:00:00Z"));
     if (page?.kind !== "ladder") throw new Error("no ladder");
-    expect(page.bands[0]!.groups[0]!.rows.map((r) => [r.rank, r.names[0], r.points])).toEqual([
+    expect(page.bands[0]!.groups[0]!.rows.map((r) => [r.rank, first(r.label), r.points])).toEqual([
       [1, "Játékos 1011A", 0],
       [2, "Játékos 1012A", 0],
       [3, "Játékos 1013A", 0],
@@ -173,7 +177,7 @@ describe("ladderPage", () => {
       const page = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
       if (page?.kind !== "ladder") throw new Error("no ladder");
       const group = page.bands[0]!.groups[0]!;
-      return { rows: Object.fromEntries(group.rows.map((r) => [r.names[0].slice(-5, -1), [r.points, r.matches]])), group };
+      return { rows: Object.fromEntries(group.rows.map((r) => [first(r.label).slice(-5, -1), [r.points, r.matches]])), group };
     };
 
     function playSeason() {
@@ -212,7 +216,7 @@ describe("ladderPage", () => {
       expect(rows).toEqual({ "1011": [4, 2], "1012": [4, 2], "1013": [3, 2], "1014": [0, 0] });
       // Sets and games, the walkover as 4:0 4:0 (spec 9). 1011: 2:0 8:3 and 0:2 3:8;
       // 1012: 0:2 3:8 and 2:0 8:0; 1013: 2:0 8:3 and 0:2 0:8.
-      const diffs = Object.fromEntries(group.rows.map((r) => [r.names[0].slice(-5, -1), [r.setDiff, r.gameDiff]]));
+      const diffs = Object.fromEntries(group.rows.map((r) => [first(r.label).slice(-5, -1), [r.setDiff, r.gameDiff]]));
       expect(diffs).toEqual({ "1011": [0, 0], "1012": [0, 3], "1013": [0, -3], "1014": [0, 0] });
     });
 
@@ -340,7 +344,7 @@ describe("ladderPage", () => {
     final.run(JSON.stringify({ kind: "walkover", winner: "b" }), 1011, 1013);
     const page = await ladderPage("gyor", at("2026-11-17T10:00:00Z"));
     const group = page?.kind === "ladder" ? page.bands[0]!.groups[0]! : null;
-    expect(group?.rows.map((r) => [r.names[0], r.points, r.setDiff, r.gameDiff])).toEqual([
+    expect(group?.rows.map((r) => [first(r.label), r.points, r.setDiff, r.gameDiff])).toEqual([
       ["Játékos 1013A", 3, 2, 8],
       ["Játékos 1011A", 3, -1, -6],
       ["Játékos 1012A", 1, -1, -2],

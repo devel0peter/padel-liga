@@ -1,6 +1,6 @@
 // The round switch (spec section 10, szabalyzat section 7, #12): promotion
 // and relegation of the continuing pairs, the pairs that leave (withdrawn,
-// a 3rd strike, dissolved, taken out) removed afterwards with the groups
+// a 3rd strike, opted out, dissolved, taken out) removed afterwards with the groups
 // re-cut top-down, then the new pairs placed one by one. Pure: no I/O.
 import { divisionOf } from "./divisions";
 import { seedOrder } from "./groups";
@@ -194,25 +194,131 @@ function fitToPlan<T extends SeedablePair>(groups: T[][], sizes: readonly number
   }
 }
 
+/**
+ * Why a pair of the ending phase is not in the next phase's draft (spec 8,
+ * 10): withdrawn mid-phase (out of the tables already), a 3rd strike, opted
+ * out ("Nem folytatja", #395), dissolved, or taken out of the season.
+ */
+export type LeaveReason = "withdrawn" | "strikes" | "opted_out" | "dissolved" | "taken_out";
+
+/** What decides whether a pair of the final tables leaves at the switch. */
+export interface LeaverFacts {
+  /** Its 3rd strike sends it off after the phase (spec 8). */
+  readonly strikes: boolean;
+  /** A player of the pair opted out of the next phase before the deadline (#395). */
+  readonly optedOut: boolean;
+  /** The pair is still active (not dissolved). */
+  readonly active: boolean;
+  /** Its season entry still counts (not taken out). */
+  readonly entered: boolean;
+}
+
+/**
+ * The reason a pair of the final tables leaves after promotion and
+ * relegation, or null when it plays on (default in, #395): a 3rd strike
+ * first, then an opt-out, then a dissolved pair, then an entry taken out.
+ * An opted-out pair that dissolves after the deadline (to form new pairs)
+ * still leaves as "Nem folytatja".
+ */
+export function leaveReason(f: LeaverFacts): Exclude<LeaveReason, "withdrawn"> | null {
+  if (f.strikes) return "strikes";
+  if (f.optedOut) return "opted_out";
+  if (!f.active) return "dissolved";
+  if (!f.entered) return "taken_out";
+  return null;
+}
+
+/**
+ * What a permanent partner change does at the round switch it starts at
+ * (#403, D179, with #395's opt-out):
+ * - "ends": the staying player (who would play on in the new pair) opted
+ *   out: the old pair leaves as "Nem folytatja" like any opted-out pair, and
+ *   the change doesn't start.
+ * - "new_pair": the old pair leaves by a 3rd strike: the new pair is placed
+ *   by the new-pair rules.
+ * - "keeps_spot": otherwise the new pair takes the old pair's spot. The
+ *   leaving player's opt-out changes nothing (they leave anyway), nor does a
+ *   dissolved pair or a taken-out entry (the change ends the old pair).
+ */
+export type ChangeAtSwitch = "keeps_spot" | "new_pair" | "ends";
+
+export function changeAtSwitch(f: { readonly strikes: boolean; readonly optedOutBy: "staying" | "leaving" | null }): ChangeAtSwitch {
+  if (f.optedOutBy === "staying") return "ends";
+  if (f.strikes) return "new_pair";
+  return "keeps_spot";
+}
+
+/** The leave reason of the old pair of a partner change (changeAtSwitch): only a 3rd strike or the staying player's opt-out. */
+export function changeLeaveReason(f: { readonly strikes: boolean; readonly optedOutBy: "staying" | "leaving" | null }): "strikes" | "opted_out" | null {
+  const at = changeAtSwitch(f);
+  return at === "ends" ? (f.strikes ? "strikes" : "opted_out") : at === "new_pair" ? "strikes" : null;
+}
+
+/**
+ * Whether an opt-out made in `optOutPhase` (null: none) ends the pair's
+ * season after `endingPhase` (#395): the pair plays the phase it opted out
+ * in to the end and leaves at the switch after it.
+ */
+export function optedOutAfter(optOutPhase: number | null, endingPhase: number): boolean {
+  return optOutPhase !== null && optOutPhase <= endingPhase;
+}
+
 export interface RoundSwitchInput<T extends SeedablePair> {
   /** The ending phase's final tables, top group first, each in table order (withdrawn pairs left out). */
   readonly tables: readonly (readonly T[])[];
   /** Whether this is a fast-calibration switch (isFastSwitch). */
   readonly fast: boolean;
-  /** Pairs of the tables that leave after promotion and relegation: a 3rd strike, dissolved, taken out. */
+  /** Pairs of the tables that leave after promotion and relegation: a 3rd strike, opted out, dissolved, taken out (leaveReason). */
   readonly leaves: (pair: T) => boolean;
   /** New pairs (late entries, re-formed pairs, returning players), in entry order: it breaks rating ties. */
   readonly newPairs: readonly T[];
+  /** Permanent partner changes that start at this switch (#403), in the order they became final. */
+  readonly changes?: readonly PartnerChange<T>[];
+}
+
+/**
+ * A permanent partner change (#402, #403, D179): the pair of the ending
+ * phase's tables (`old`) and the pair formed from its staying player and the
+ * new partner (`pair`), rated as any pair (its players' average Elo).
+ */
+export interface PartnerChange<T> {
+  readonly old: T;
+  readonly pair: T;
+}
+
+/**
+ * The new pairs of permanent partner changes take their old pairs' spots
+ * (#403, spec 10, D179): each old pair still in the groups after promotion,
+ * relegation and the leavers' re-cut is replaced, in place, by its new pair.
+ * A change whose old pair is not there (it left by a 3rd strike, or was
+ * withdrawn mid-phase) has no spot to keep: its new pair comes back in
+ * `unplaced`, for the new-pair rules (placeNewPairs). Returns new groups.
+ */
+export function keepSpots<T>(groups: readonly (readonly T[])[], changes: readonly PartnerChange<T>[]): { groups: T[][]; unplaced: T[] } {
+  const by = new Map(changes.map((c) => [c.old, c.pair]));
+  const kept = new Set<T>();
+  const out = groups.map((g) =>
+    g.map((p) => {
+      const pair = by.get(p);
+      if (pair === undefined) return p;
+      kept.add(p);
+      return pair;
+    }),
+  );
+  return { groups: out, unplaced: changes.filter((c) => !kept.has(c.old)).map((c) => c.pair) };
 }
 
 /**
  * The next phase's draft groups (spec 10): promotion and relegation of the
  * ending phase's tables, the leavers removed and the groups re-cut top-down,
- * then the new pairs placed (placeNewPairs).
+ * the new pairs of permanent partner changes put in their old pairs' spots
+ * (keepSpots, #403), then the new pairs placed (placeNewPairs): the late
+ * entries first, then the partner changes whose old pair left.
  * Each group comes out by seed: average Elo, strongest first (ties keep the
  * order above). Top group first.
  */
 export function roundSwitchDraft<T extends SeedablePair>(input: RoundSwitchInput<T>): T[][] {
   const continuing = recut(promoteAndRelegate(input.tables, input.fast), input.leaves);
-  return placeNewPairs(continuing, input.newPairs).map((g) => seedOrder(g));
+  const { groups, unplaced } = keepSpots(continuing, input.changes ?? []);
+  return placeNewPairs(groups, [...input.newPairs, ...unplaced]).map((g) => seedOrder(g));
 }

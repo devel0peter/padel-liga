@@ -1,7 +1,9 @@
+import { ChevronRight } from "lucide-react";
 import { data, Form, Link, redirect, useFetcher, useFetchers, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/profile";
-import { AppPage } from "~/components/app-page";
+import { ListCard, Page, PageHeader, SectionLabel } from "~/components/blocks";
+import { FEEDBACK_LINK, FeedbackDialog, RatingDialog } from "~/components/feedback-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +21,6 @@ import { FormerPairs, PairSection } from "~/components/pair-section";
 import { PlayerProfileView } from "~/components/player-profile-view";
 import { PushSettings } from "~/components/push-settings";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -32,6 +33,7 @@ import { DELETION_REFUSALS, OWN_DELETION_EFFECTS, ownDeletionNote } from "~/lib/
 import { deleteOwnAccount, planOwnDeletion } from "~/lib/account-deletion.server";
 import {
   channelEnabled,
+  tipsOff,
   CHANNELS,
   isChannel,
   isEnabled,
@@ -40,11 +42,10 @@ import {
   kindsFor,
   NOTIFICATION_KINDS,
   PUSH_TOPICS,
-  pushTopic,
   topicEnabled,
   type PushTopic,
 } from "~/lib/notifications";
-import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTipsOff, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
@@ -84,6 +85,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       ? { effect: `${OWN_DELETION_EFFECTS[deletion.mode]} ${ownDeletionNote(actor.leagues.length > 0)}` }
       : { refused: DELETION_REFUSALS[deletion.refusal] },
     name: user.name,
+    // The name's two parts (#419): an account from before them has the
+    // migration's split of its name, or nothing yet.
+    surname: user.surname ?? "",
+    firstName: user.firstName ?? "",
     email: user.email,
     imageUrl: user.imageUrl,
     level: user.level,
@@ -103,8 +108,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     vapidPublicKey: vapidPublicKey(),
     emailOn: channelEnabled(disabled, "email"),
     pushOn: channelEnabled(disabled, "push"),
+    // "Nem kérek tippeket" (#444).
+    tipsOff: tipsOff(disabled),
     // One push switch per topic (#349), for every account: anyone may play.
-    topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...pushTopic(topic), enabled: topicEnabled(disabled, topic) })),
+    topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...PUSH_TOPICS[topic], enabled: topicEnabled(disabled, topic) })),
     kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
   };
 }
@@ -136,7 +143,7 @@ export async function action({ request }: Route.ActionArgs) {
     });
     if (!level.ok) return data({ saved: false, errors: { level: level.error } as ProfileErrors }, { status: 400 });
     const result = validateProfile(
-      { name: form.get("name"), level: level.level, phone: form.get("phone"), sex: form.get("sex") },
+      { surname: form.get("surname"), firstName: form.get("first_name"), level: level.level, phone: form.get("phone"), sex: form.get("sex") },
       { requireConsent: false },
     );
     if (!result.ok) return data({ saved: false, errors: result.errors }, { status: 400 });
@@ -144,6 +151,10 @@ export async function action({ request }: Route.ActionArgs) {
     return { saved: true, errors: {} as ProfileErrors };
   }
   const enabled = form.get("enabled") === "1";
+  if (form.get("intent") === "tips") {
+    await setTipsOff(user.id, enabled);
+    return { ok: true };
+  }
   if (form.get("intent") === "channel") {
     const channel = form.get("channel");
     if (!isChannel(channel)) return data({ ok: false }, { status: 400 });
@@ -237,13 +248,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 // One block of the settings: a card with a heading (D136).
 function Block({ id, title, description, children }: { id?: string; title: string; description?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <Card role="region" id={id} aria-label={title} className="scroll-mt-6">
-      <CardHeader>
-        <CardTitle role="heading" aria-level={2} className="font-display text-lg font-bold">{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent className="grid gap-4">{children}</CardContent>
-    </Card>
+    <section role="region" id={id} aria-label={title} className="flex scroll-mt-6 flex-col gap-4 rounded-2xl bg-surface p-4 md:p-5">
+      <div className="flex flex-col gap-1">
+        <SectionLabel>{title}</SectionLabel>
+        {description && <p className="m-0 text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -255,24 +266,22 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "settings" ? "settings" : "player";
   return (
-    <AppPage
-      title={
-        <span className="flex items-center gap-3">
-          <Avatar className="size-11">
-            {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
-            <AvatarFallback className="bg-nav-active-bg text-base font-bold text-nav-active">{d.initials}</AvatarFallback>
-          </Avatar>
-          {d.name}
-        </span>
-      }
-      description={d.role}
-    >
+    <Page>
+      <div className="flex items-end gap-4">
+        <Avatar className="mb-1 size-16 md:size-[72px]">
+          {d.imageUrl && <AvatarImage src={d.imageUrl} alt="" referrerPolicy="no-referrer" />}
+          <AvatarFallback className="bg-surface-3 text-xl font-bold text-foreground">{d.initials}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <PageHeader eyebrow={d.role} title={d.name} />
+        </div>
+      </div>
       <Tabs
         value={tab}
         onValueChange={(value) => setParams(value === "settings" ? { tab: "settings" } : {}, { replace: true, preventScrollReset: true })}
         className="gap-6"
       >
-        <TabsList>
+        <TabsList className="h-auto w-full max-w-md rounded-xl bg-surface p-1 [&>button]:h-11 [&>button]:rounded-[9px] [&>button]:text-body [&>button]:font-semibold [&>button]:data-[state=active]:bg-surface-3">
           <TabsTrigger value="player">Játékosprofil</TabsTrigger>
           <TabsTrigger value="settings">Beállításaim</TabsTrigger>
         </TabsList>
@@ -292,6 +301,25 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             )}
             <PlayerProfileView profile={d.profile} own={{ rating: d.rating, rated: d.rated }} />
           </div>
+          {/* The app itself (#446): a rating, a bug or an idea, any time. */}
+          <ListCard label="A Padelpárbajról">
+            <li>
+              <RatingDialog>
+                <button type="button" className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 md:px-5">
+                  <span className="flex-1 text-body">Értékeld a Padelpárbajt</span>
+                  <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
+                </button>
+              </RatingDialog>
+            </li>
+            <li>
+              <FeedbackDialog from="/profile">
+                <button type="button" className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 md:px-5">
+                  <span className="flex-1 text-body">{FEEDBACK_LINK}</span>
+                  <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
+                </button>
+              </FeedbackDialog>
+            </li>
+          </ListCard>
         </TabsContent>
 
         <TabsContent value="settings" className="grid max-w-2xl gap-6">
@@ -303,7 +331,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             )}
             <Form method="post" className="grid gap-5">
               <input type="hidden" name="intent" value="profile" />
-              <ProfileFields errors={errors} values={{ name: d.name, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
+              <ProfileFields errors={errors} values={{ surname: d.surname, firstName: d.firstName, level: d.level, phone: d.phone, sex: d.sex }} levelLocked={d.levelLocked} />
               <div className="flex items-center gap-3">
                 <Button type="submit" disabled={busy}>
                   Mentés
@@ -357,6 +385,15 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             />
             <PushSettings vapidPublicKey={d.vapidPublicKey} enabled={d.pushOn} />
             <PushTopics topics={d.topics} pushOn={d.pushOn} />
+            <div className="border-t border-hairline pt-4">
+              <SettingSwitch
+                id="tips-off"
+                label="Nem kérek tippeket"
+                description="A Kezdőlapon nem mutatunk több tippet az app funkcióiról, egyik eszközödön sem."
+                enabled={d.tipsOff}
+                fields={{ intent: "tips" }}
+              />
+            </div>
             {d.kinds.length > 0 && (
               <div className="grid gap-4 border-t pt-4">
                 <p className="text-sm text-muted-foreground">Szervezőként ezekről is szólunk:</p>
@@ -370,7 +407,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
           <DeleteAccount deletion={d.deletion} />
         </TabsContent>
       </Tabs>
-    </AppPage>
+    </Page>
   );
 }
 

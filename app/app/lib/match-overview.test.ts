@@ -1,4 +1,4 @@
-import { budapestTime, type ResultState, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
+import { budapestTime, SHORT_SETS, type ResultState, type SchedulingEventKind, type SchedulingState } from "@padel-liga/rules";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -65,27 +65,27 @@ describe("result statuses (#28, #29 on the #158 overview)", () => {
   const scheduled: SchedulingState = { status: "scheduled", slot, clubId: null };
 
   it("a recorded result names the score and the pair that has to confirm", () => {
-    expect(resultStatus(recorded, names)).toEqual({ label: "Eredmény: 4:1, 2:4, szuper tie-break 10:8, Kiss Anna – Nagy Béla megerősítésére vár", tone: "waiting" });
+    expect(resultStatus(recorded, names, SHORT_SETS)).toEqual({ label: "Eredmény: 4:1, 2:4, szuper tie-break 10:8, Kiss Anna – Nagy Béla megerősítésére vár", tone: "waiting" });
     expect(statusOf(scheduled, recorded)).toBe("result_pending");
   });
 
   it("a disputed result waits for the organizer", () => {
-    expect(resultStatus(disputed, names)).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "todo" });
+    expect(resultStatus(disputed, names, SHORT_SETS)).toEqual({ label: "Vitatott eredmény, a szervező dönt", tone: "todo" });
     expect(statusOf(scheduled, disputed)).toBe("disputed");
   });
 
   it("a played match with its score and winner; an organizer's decision says so", () => {
     const outcome = { kind: "played" as const, score };
-    expect(resultStatus({ status: "final", outcome, how: "confirmed", at: slot }, names)).toEqual({
+    expect(resultStatus({ status: "final", outcome, how: "confirmed", at: slot }, names, SHORT_SETS)).toEqual({
       label: "Lejátszva: 4:1, 2:4, szuper tie-break 10:8 (nyert: Kiss Anna – Nagy Béla)",
       tone: "done",
     });
-    expect(resultStatus({ status: "final", outcome, how: "organizer", at: slot }, names)?.label).toMatch(/^Döntés: 4:1, 2:4/);
+    expect(resultStatus({ status: "final", outcome, how: "organizer", at: slot }, names, SHORT_SETS)?.label).toMatch(/^Döntés: 4:1, 2:4/);
     expect(statusOf(scheduled, { status: "final", outcome, how: "auto_accepted", at: slot })).toBe("final");
   });
 
   it("without a result: no result line, the scheduling status", () => {
-    expect(resultStatus({ status: "none" }, names)).toBeNull();
+    expect(resultStatus({ status: "none" }, names, SHORT_SETS)).toBeNull();
     expect(statusOf(scheduled, { status: "none" })).toBe("scheduled");
   });
 });

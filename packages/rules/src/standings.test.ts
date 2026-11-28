@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { MatchScore } from "./results";
-import { type GroupMatch, groupStandings, type StandingPair } from "./standings";
+import { type MatchScore, type SetGames, SETS_TO_SIX, SHORT_SETS } from "./results";
+import { type GroupMatch, groupStandings as standingsIn, type StandingPair } from "./standings";
+
+// Short sets unless a test says otherwise (the sets-to-6 rules are at the end).
+const groupStandings = (p: readonly StandingPair[], m: readonly GroupMatch[], g: SetGames = SHORT_SETS) => standingsIn(p, m, g);
 
 const pair = (id: string, elo = 1200, withdrawn = false): StandingPair => ({ id, elo, withdrawn });
 
@@ -343,5 +346,41 @@ describe("bad input", () => {
 
   it("rejects a played match with an invalid score", () => {
     expect(() => groupStandings(ABC, [beat("A", "B", { sets: [[4, 3], [4, 0]] })])).toThrow(/invalid-set/);
+  });
+});
+
+describe("sets to 6 (D173, #396: every round from Győr's round 2 on)", () => {
+  const six = (pairs: StandingPair[], matches: GroupMatch[], id: string) => {
+    const r = groupStandings(pairs, matches, SETS_TO_SIX).find((x) => x.id === id);
+    if (!r) throw new Error(`no row for ${id}`);
+    return r;
+  };
+
+  it("scores a walkover 6-0 6-0: 3 points, 2-0 sets and 12-0 games", () => {
+    const m = [walkover("C", "D")];
+    expect(six(ABCD, m, "C")).toMatchObject({ points: 3, wins: 1, setsWon: 2, setsLost: 0, gamesWon: 12, gamesLost: 0 });
+    expect(six(ABCD, m, "D")).toMatchObject({ points: 0, losses: 1, setsWon: 0, setsLost: 2, gamesWon: 0, gamesLost: 12 });
+  });
+
+  it("gives both sides a 0-point loss, 0-6 0-6, when neither was active", () => {
+    const m = [bothInactive("A", "B")];
+    for (const id of ["A", "B"])
+      expect(six(ABCD, m, id)).toMatchObject({ points: 0, matches: 1, losses: 1, setsLost: 2, gamesWon: 0, gamesLost: 12, setDiff: -2, gameDiff: -12 });
+  });
+
+  it("counts a played match in sets and games as before: 6-4 7-6 is 2-0 and 13-10", () => {
+    const m = [beat("A", "B", { sets: [[6, 4], [7, 6]] })];
+    expect(six(ABCD, m, "A")).toMatchObject({ points: 3, setsWon: 2, setsLost: 0, gamesWon: 13, gamesLost: 10 });
+    expect(six(ABCD, m, "B")).toMatchObject({ points: 1, setsWon: 0, setsLost: 2, gamesWon: 10, gamesLost: 13 });
+  });
+
+  it("counts the super tie-break as one set and a 1-0 game: 6-3 4-6 10-7 gives 2-1 and 11-9", () => {
+    const m = [beat("A", "B", { sets: [[6, 3], [4, 6]], superTieBreak: [10, 7] })];
+    expect(six(ABCD, m, "A")).toMatchObject({ points: 3, setsWon: 2, setsLost: 1, gamesWon: 11, gamesLost: 9 });
+  });
+
+  it("refuses a short-set score in a sets-to-6 table, and a sets-to-6 score in a short-set one", () => {
+    expect(() => groupStandings(ABC, [beat("A", "B", { sets: [[4, 2], [4, 1]] })], SETS_TO_SIX)).toThrow(/invalid-set/);
+    expect(() => groupStandings(ABC, [beat("A", "B", { sets: [[6, 4], [6, 3]] })], SHORT_SETS)).toThrow(/invalid-set/);
   });
 });

@@ -1,12 +1,12 @@
-import { proposalErrors } from "@padel-liga/rules";
-import { CalendarPlus, ChevronRight, Clock, Download, MapPin, Users } from "lucide-react";
+import { proposalErrors, type SetGames } from "@padel-liga/rules";
+import { Bug, CalendarClock, CalendarPlus, ChevronRight, Download, Mail, MapPin, Phone } from "lucide-react";
 import { useState } from "react";
 import { data, Form, useNavigation, useSubmit } from "react-router";
 
 import type { Route } from "./+types/match";
-import { AppPage } from "~/components/app-page";
+import { FeedbackDialog } from "~/components/feedback-form";
+import { OverflowRow, Page, PageHeader, SectionLabel, StatusPill, TeamBadge, TeamName, teamHue } from "~/components/blocks";
 import { GroupMessage } from "~/components/group-message";
-import { Contacts, StatusPill } from "~/components/my-group";
 import { DayHourPicker, RangePicker, StartPicker } from "~/components/slot-picker";
 import {
   AlertDialog,
@@ -27,21 +27,25 @@ import { requireUser } from "~/lib/auth/session.server";
 import type { CalendarLinks } from "~/lib/calendar";
 import { formatDateTime, formatDeadline } from "~/lib/format";
 import { weekRange } from "~/lib/groups";
-import { ConfirmResult, RecordResult, ResultStatus, ScoreBoard } from "~/components/match-result";
-import { COURT_MAX, SCHEDULING_GUIDE, fixesAtText, formatSlot, groupLine, statusView } from "~/lib/matches";
+import { ConfirmResult, RecordResult, ResultBoard, ResultStatus } from "~/components/match-result";
+import { badgeInitials } from "~/lib/names";
+import { COURT_MAX, SCHEDULING_GUIDE, fixesAtText, formatSlot, groupLine, statusView, telHref, type Tone } from "~/lib/matches";
 import { cn } from "~/lib/utils";
 import { loadMatch, matchPage, matchStep, NOT_FOUND, type StepInput } from "~/lib/matches.server";
 import { formatRange, parseRangeField, parseStartField, slotErrorText } from "~/lib/slot-ranges";
-import { parseScore, resultStatusView } from "~/lib/results";
+import { parseScore, resultStatusView, walkoverScoreText, walkoverScoreTo } from "~/lib/results";
 import { resultStep, type ResultInput } from "~/lib/results.server";
 import { SITE_NAME } from "~/lib/site";
-import { substituteLine, substitutesEnabled } from "~/lib/substitutes";
-import { requestSubstitute, substitutePanel, withdrawSubstitute, type SubstitutePanel } from "~/lib/substitutes.server";
+import { absenceLine } from "~/lib/substitutes";
+import { absencePanel, markAbsence, unmarkAbsence, type AbsencePanel } from "~/lib/substitutes.server";
 import { noShowPanel, reportNoShow, withdrawNoShow, type NoShowPanel } from "~/lib/no-shows.server";
 
-// A match (#25, #26, D133): a summary (state, when, where, score, phones,
-// calendar), the one main step of the state, every other step folded, and
-// the log. Only the two pairs' players see it; anyone else gets 404.
+// A match (#25, #26, D133; direction A, #421, mockups P02 and P03): the two
+// teams in the header, the one main step of the state ("Rád vár", the only
+// yellow button), every other step folded as rows, the details (state, when,
+// where, score, calendar), the opponents' contacts, the log newest first and
+// the rare things under "Helyettes, segítség". Only the two pairs' players see
+// it; anyone else gets 404.
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: `Meccs – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
@@ -59,10 +63,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const ctx = await loadMatch(matchId(params));
   const page = ctx && (await matchPage(ctx.match.id, user.id, now, ctx));
   if (!ctx || !page) throw new Response(NOT_FOUND, { status: 404 });
-  // Substitutes (#37) and no-shows (#33): only for the four players, like the
-  // rest of the page. No substitutes in the first season (D145).
+  // Temporary substitutes (#400) and no-shows (#33): only for the four
+  // players, like the rest of the page.
   const [substitutes, noShow] = await Promise.all([
-    substitutesEnabled() ? substitutePanel(ctx, page.side, user.id, now) : null,
+    absencePanel(ctx, page.side, now, page.resultActions.record),
     noShowPanel(ctx, page.side, user.id, now),
   ]);
   // A fixed time that has started: recording the result becomes the main step (D133).
@@ -106,7 +110,14 @@ export async function action({ request, params }: Route.ActionArgs) {
         ? { kind: "confirm" }
         : intent === "result-record"
           ? // Where it was played: read only while no club is known (D146).
-            { kind: "record", score: parseScore(form, page.side), clubId: clubId(form) ?? null, court: String(form.get("court") ?? "") }
+            {
+              kind: "record",
+              score: parseScore(form, page.side),
+              clubId: clubId(form) ?? null,
+              court: String(form.get("court") ?? ""),
+              // The result form's ticks (#400); a form without them leaves the marks.
+              absent: form.has("absent-part") ? form.getAll("absent").map(String) : undefined,
+            }
           : {
               kind: "dispute",
               score: parseScore(form, page.side),
@@ -118,16 +129,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     return fail(done.error);
   }
 
-  // A substitute for an absent player of the pair (#37, D109); while hidden
-  // (D145) both steps refuse.
-  if (intent === "substitute-request" || intent === "substitute-withdraw") {
-    const done =
-      intent === "substitute-request"
-        ? await requestSubstitute(user.id, id, {
-            absentId: String(form.get("absent") ?? ""),
-            substituteId: String(form.get("substitute") ?? ""),
-          })
-        : await withdrawSubstitute(user.id, id, Number(form.get("request")));
+  // A temporary substitute (#400): a player of the own pair marked as not
+  // playing, or the mark taken back, before the match.
+  if (intent === "absence-mark" || intent === "absence-unmark") {
+    const absentId = String(form.get("absent") ?? "");
+    const done = intent === "absence-mark" ? await markAbsence(user.id, id, absentId) : await unmarkAbsence(user.id, id, absentId);
     if (done.ok) return data<ActionResult>({ intent, ok: true, message: done.notice });
     if (done.notFound) throw new Response(NOT_FOUND, { status: 404 });
     return fail(done.error);
@@ -181,7 +187,7 @@ function Feedback({ result, intent, ok = false }: { result: ActionResult | undef
   if (!result || !(Array.isArray(intent) ? intent : [intent]).includes(result.intent)) return null;
   if (result.ok && !ok) return null;
   return (
-    <p role={result.ok ? "status" : "alert"} className={result.ok ? "font-medium" : "font-semibold text-destructive"}>
+    <p role={result.ok ? "status" : "alert"} className={result.ok ? "font-medium" : "font-semibold text-danger"}>
       {result.message}
     </p>
   );
@@ -189,15 +195,31 @@ function Feedback({ result, intent, ok = false }: { result: ActionResult | undef
 
 // The page's two kinds of block (D133, docs/player-ui.md M2): the one main
 // step of the state, open, and every other step folded behind a one-line
-// opener, so nothing is lost but only one thing asks for attention.
-function Panel({ title, description, children, tone }: { title: string; description?: React.ReactNode; children: React.ReactNode; tone?: "main" }) {
+// row, so nothing is lost but only one thing asks for attention. The main
+// step waits on the player: the amber outline and "Rád vár" (D181).
+const CARD = "flex flex-col gap-3.5 rounded-2xl bg-surface p-4 md:px-5 md:py-[18px]";
+
+function Panel({
+  title,
+  description,
+  children,
+  tone,
+  note,
+  id,
+}: {
+  title: string;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+  tone?: "main";
+  // Beside "Rád vár": until when (an auto-accept time).
+  note?: React.ReactNode;
+  id?: string;
+}) {
   return (
-    <section
-      aria-label={title}
-      className={cn("grid max-w-2xl gap-3 rounded-xl border bg-card p-4 sm:p-5", tone === "main" && "border-nav-active ring-1 ring-nav-active/30")}
-    >
-      <div className="grid gap-1">
-        <h2 className="font-display text-lg font-bold">{title}</h2>
+    <section id={id} aria-label={title} className={cn(CARD, "scroll-mt-20", tone === "main" && "inset-ring inset-ring-warning/45")}>
+      {tone === "main" && <WaitsOnYou note={note} />}
+      <div className="flex flex-col gap-1">
+        <h2 className="m-0 text-[22px] leading-tight font-extrabold md:text-[26px]">{title}</h2>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}
       </div>
       {children}
@@ -205,6 +227,18 @@ function Panel({ title, description, children, tone }: { title: string; descript
   );
 }
 
+function WaitsOnYou({ note }: { note?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <StatusPill tone="warning" emphasis>
+        Rád vár
+      </StatusPill>
+      {note && <span className="text-caption text-muted-foreground">{note}</span>}
+    </div>
+  );
+}
+
+// One folded step, a row of the "other ways" card (FOLDS).
 function Fold({
   title,
   hint,
@@ -220,18 +254,21 @@ function Fold({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group max-w-2xl rounded-xl border bg-card" open={open || undefined} aria-label={title}>
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 py-2 [&::-webkit-details-marker]:hidden">
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-        <span className="grid">
-          {heading ? <h2 className="font-semibold">{title}</h2> : <span className="font-semibold">{title}</span>}
-          {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+    <details className="group" open={open || undefined} aria-label={title}>
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2/60 md:px-5 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          {heading ? <h2 className="m-0 text-body font-normal">{title}</h2> : <span className="text-body">{title}</span>}
+          {hint && <span className="text-caption text-muted-foreground">{hint}</span>}
         </span>
+        <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
       </summary>
-      <div className="grid gap-3 border-t px-4 py-4">{children}</div>
+      <div className="grid gap-3 px-4 pt-1 pb-4 md:px-5">{children}</div>
     </details>
   );
 }
+
+// The folded steps as one card of rows, thin lines between them; gone when empty.
+const FOLDS = "overflow-hidden rounded-2xl bg-surface empty:hidden [&>details+details]:border-t [&>details+details]:border-hairline";
 
 function ClubSelect({ clubs, id }: { clubs: { id: number; name: string }[]; id: string }) {
   if (clubs.length === 0) return null;
@@ -261,7 +298,7 @@ const PROPOSE_RULES = "Írjátok meg, mikor értek rá, legalább 2 különböz�
 // same the server would answer with.
 function ClientError({ message }: { message: string | null }) {
   return message ? (
-    <p role="alert" className="font-semibold text-destructive">
+    <p role="alert" className="font-semibold text-danger">
       {message}
     </p>
   ) : null;
@@ -287,7 +324,7 @@ function ProposeForm({ clubs, result, now, deadline }: { clubs: { id: number; na
       <ClientError message={error} />
       {!error && <Feedback result={result} intent="propose" />}
       <div>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" size="xl" variant="secondary" disabled={busy}>
           Elküldöm, mikor érünk rá
         </Button>
       </div>
@@ -334,7 +371,7 @@ function AgreedForm({
       <ClientError message={error} />
       {!error && <Feedback result={result} intent="agreed" />}
       <div>
-        <Button type="submit" variant={primary ? "default" : "outline"} disabled={busy}>
+        <Button type="submit" size="xl" variant={primary ? "default" : "secondary"} disabled={busy}>
           Rögzítem az időpontot
         </Button>
       </div>
@@ -394,11 +431,13 @@ function VenueForm({
   clubId,
   court,
   result,
+  primary = false,
 }: {
   clubs: { id: number; name: string }[];
   clubId: number | null;
   court: string | null;
   result?: ActionResult;
+  primary?: boolean;
 }) {
   const busy = useNavigation().state !== "idle";
   return (
@@ -407,7 +446,7 @@ function VenueForm({
       <VenueFields clubs={clubs} id="venue" label="Helyszín" clubId={clubId} court={court} />
       <Feedback result={result} intent="venue" />
       <div>
-        <Button type="submit" variant="outline" disabled={busy}>
+        <Button type="submit" size="xl" variant={primary ? "default" : "secondary"} disabled={busy}>
           Mentem a helyszínt
         </Button>
       </div>
@@ -418,28 +457,28 @@ function VenueForm({
 // Either pair cancels the scheduled slot until it starts (#27, spec 6.6).
 // Under 24 hours before it the cancellation is late, and the page says what
 // that means before asking.
-function cancelConsequence(late: boolean): string {
+function cancelConsequence(late: boolean, setGames: SetGames): string {
   return late
-    ? "Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek 4:0, 4:0-ra."
+    ? `Már 24 órán belül van a kezdés, ez késői lemondás: utána nektek kell új időpontot ajánlani, és ha a határidőig nem játsszátok le a meccset, az ellenfeleitek nyernek ${walkoverScoreTo(setGames)}.`
     : "Utána újra egyeztettek. Ha a kezdés előtti 24 órában mondjátok le, az késői lemondás: akkor nektek kell új időpontot ajánlani.";
 }
 
-function CancelButton({ late }: { late: boolean }) {
+function CancelButton({ late, setGames }: { late: boolean; setGames: SetGames }) {
   const busy = useNavigation().state !== "idle";
   const submit = useSubmit();
   return (
     <>
-      <p className="text-sm text-muted-foreground">{cancelConsequence(late)}</p>
+      <p className="text-sm text-muted-foreground">{cancelConsequence(late, setGames)}</p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" className="w-fit" disabled={busy}>
+          <Button variant="secondary" className="w-fit" disabled={busy}>
             Lemondom a meccset
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{late ? "Késői lemondás. Biztosan lemondod?" : "Lemondod a meccset?"}</AlertDialogTitle>
-            <AlertDialogDescription>{cancelConsequence(late)} A másik pár értesítést kap.</AlertDialogDescription>
+            <AlertDialogDescription>{cancelConsequence(late, setGames)} A másik pár értesítést kap.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Mégse</AlertDialogCancel>
@@ -453,113 +492,108 @@ function CancelButton({ late }: { late: boolean }) {
   );
 }
 
-// Helyettes (#37, spec 4, D109): either player of the pair asks for a
-// substitute for an absent player until the match starts; the organizer
-// approves. Approved substitutes show to all four players; the pair's own
-// requests (with the organizer's reason) only to the pair.
-function SubstituteBody({ s, deadline, result }: { s: SubstitutePanel; deadline: Date; result?: ActionResult }) {
+// Helyettes (#400, spec 4, D175): either player of a pair marks a player of
+// their own pair as not playing until the match starts, and anyone plays
+// instead; no name, no approval. All four players see every mark; the own
+// pair can take its marks back until the start.
+function AbsenceBody({ s, deadline, result }: { s: AbsencePanel; deadline: Date; result?: ActionResult }) {
   const busy = useNavigation().state !== "idle";
   return (
     <>
-      {s.approved.length > 0 && (
-        <ul className="grid gap-1 text-sm" aria-label="Jóváhagyott helyettesek">
-          {s.approved.map((a) => (
-            <li key={a.id}>
-              <span className="font-medium">{substituteLine(a)}</span> játszik {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
-            </li>
-          ))}
-        </ul>
-      )}
-      {s.ours.length > 0 && (
-        <ul className="grid gap-2 text-sm" aria-label="Kéréseitek">
-          {s.ours.map((r) => (
-            <li key={r.id} className="grid gap-1 rounded-md border p-3">
-              <span className="break-words">
-                {substituteLine(r)}: <span className="font-medium">{r.label}</span>
-              </span>
-              {r.reason && <span className="break-words text-muted-foreground">A szervező indoklása: {r.reason}</span>}
-              {r.canWithdraw && (
-                <Form method="post">
-                  <input type="hidden" name="intent" value="substitute-withdraw" />
-                  <input type="hidden" name="request" value={r.id} />
-                  <Button type="submit" variant="outline" size="sm" disabled={busy}>
-                    Visszavonom a kérést
-                  </Button>
-                </Form>
-              )}
-            </li>
-          ))}
-        </ul>
+      {s.marked.length > 0 && <AbsenceLines s={s} />}
+      {s.marked.some((a) => a.canUnmark) && (
+        <div className="flex flex-wrap gap-2">
+          {s.marked
+            .filter((a) => a.canUnmark)
+            .map((a) => (
+              <Form key={a.absentId} method="post">
+                <input type="hidden" name="intent" value="absence-unmark" />
+                <input type="hidden" name="absent" value={a.absentId} />
+                <Button type="submit" variant="secondary" size="sm" disabled={busy}>
+                  Mégis {a.name} játszik
+                </Button>
+              </Form>
+            ))}
+        </div>
       )}
       {s.form && (
         <Form method="post" className="grid gap-3">
           <p className="text-sm text-muted-foreground">
-            Ha valamelyikőtök nem tud játszani, kérjetek helyettest {s.closesAt.getTime() === deadline.getTime() ? "a határidőig" : "a meccs kezdetéig"}. A
-            szervező hagyja jóvá. A helyettes legyen nagyjából azonos vagy gyengébb szintű, és nem játszhat másik párban a csoportban.
+            Ha valamelyikőtök nem tud játszani, bárki beállhat helyette, jóváhagyás nélkül. Jelöld{" "}
+            {s.closesAt.getTime() === deadline.getTime() ? "a határidőig" : "a meccs kezdetéig"}, hogy ki nem játszik: az ő Élő-pontja nem változik.
           </p>
-          <input type="hidden" name="intent" value="substitute-request" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="substitute-absent">Ki nem tud játszani?</Label>
-              <Select name="absent" defaultValue={s.form.absent.length === 1 ? s.form.absent[0]!.id : undefined} required>
-                <SelectTrigger id="substitute-absent" className="w-full">
-                  <SelectValue placeholder="Válassz" />
-                </SelectTrigger>
-                <SelectContent>
-                  {s.form.absent.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="substitute-player">Ki helyettesít?</Label>
-              {s.form.candidates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Most nincs olyan regisztrált játékos, aki helyettesíthetne.</p>
-              ) : (
-                <Select name="substitute" required>
-                  <SelectTrigger id="substitute-player" className="w-full">
-                    <SelectValue placeholder="Válassz játékost" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {s.form.candidates.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+          <input type="hidden" name="intent" value="absence-mark" />
+          <div className="grid gap-1.5 sm:max-w-xs">
+            <Label htmlFor="absence-player">Ki nem tud játszani?</Label>
+            <Select name="absent" defaultValue={s.form.length === 1 ? s.form[0]!.id : undefined} required>
+              <SelectTrigger id="absence-player" className="w-full">
+                <SelectValue placeholder="Válassz" />
+              </SelectTrigger>
+              <SelectContent>
+                {s.form.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-xs text-muted-foreground">Csak regisztrált játékost választhatsz. Ha nincs a listán, előbb regisztráljon.</p>
-          <Feedback result={result} intent="substitute-request" />
+          <Feedback result={result} intent="absence-mark" />
           <div>
-            <Button type="submit" variant="outline" disabled={busy || s.form.candidates.length === 0}>
-              Helyettest kérek
+            <Button type="submit" variant="secondary" disabled={busy}>
+              Helyettes jön helyette
             </Button>
           </div>
         </Form>
       )}
-      <Feedback result={result} intent="substitute-withdraw" />
+      <Feedback result={result} intent="absence-unmark" />
     </>
   );
 }
 
+// Who doesn't (or didn't) play, for all four players (#400).
+function AbsenceLines({ s }: { s: AbsencePanel }) {
+  return (
+    <ul className="grid gap-1 text-sm" aria-label="Helyettesek">
+      {s.marked.map((a) => (
+        <li key={a.absentId} className="break-words">
+          <span className="font-medium">{absenceLine(a.name, a.afterMatch || !s.open, a.substitute)}</span> {a.ours ? "nálatok" : "az ellenfeleiteknél"}.
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// "Helyettes játszott?" on the result form (#400): after a sudden injury, the
+// recording pair ticks who of them didn't play; a correction can change it.
+function AbsenceTicks({ players }: { players: NonNullable<AbsencePanel["resultForm"]> }) {
+  return (
+    <fieldset className="grid gap-2 rounded-xl bg-surface-2 p-3.5">
+      <legend className="px-1 text-sm font-semibold">Helyettes játszott valamelyikőtök helyett?</legend>
+      <input type="hidden" name="absent-part" value="1" />
+      {players.map((p) => (
+        <label key={p.id} className="flex min-h-11 items-center gap-3 text-sm">
+          <input type="checkbox" name="absent" value={p.id} defaultChecked={p.marked} className="size-5 accent-ball" />
+          {p.name} nem játszott, helyettes állt be
+        </label>
+      ))}
+      <p className="text-xs text-muted-foreground">Bárki lehetett. Az ő Élő-pontja nem változik, az ellenfél az eredménnyel együtt ezt is megerősíti.</p>
+    </fieldset>
+  );
+}
+
 // Nem jöttek el (#33, spec 8, D108): after the agreed slot's start a player
-// of the pair that showed up reports it; the organizer confirms (4-0 4-0 and
+// of the pair that showed up reports it; the organizer confirms (a walkover and
 // a strike for the other pair) or rejects it. Both pairs see a waiting
 // report and the decision with its reason; only the reporter can withdraw.
-function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
+function NoShowBody({ s, result, setGames }: { s: NoShowPanel; result?: ActionResult; setGames: SetGames }) {
   const busy = useNavigation().state !== "idle";
   const submit = useSubmit();
   return (
     <>
       {s.canReport && (
         <p className="text-sm text-muted-foreground">
-          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, 4:0, 4:0-ra nyertek, és ők fekete pontot kapnak.
+          Ha a lefixált időpontban nem jelentek meg, jelezd. A szervező dönt: ha jóváhagyja, {walkoverScoreTo(setGames)} nyertek, és ők fekete pontot kapnak.
         </p>
       )}
       {s.open && (
@@ -573,7 +607,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
             <Form method="post">
               <input type="hidden" name="intent" value="no-show-withdraw" />
               <input type="hidden" name="report" value={s.open.id} />
-              <Button type="submit" variant="outline" size="sm" disabled={busy}>
+              <Button type="submit" variant="secondary" size="sm" disabled={busy}>
                 Visszavonom a bejelentést
               </Button>
             </Form>
@@ -583,12 +617,12 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
       {s.decided.length > 0 && (
         <ul className="grid gap-2 text-sm" aria-label="A szervező döntései">
           {s.decided.map((d) => (
-            <li key={d.id} className="grid gap-1 rounded-md border p-3">
+            <li key={d.id} className="grid gap-1 rounded-xl bg-surface-2 p-3">
               <span className="break-words">
                 {d.confirmed
                   ? d.ours
-                    ? "A szervező jóváhagyta a bejelentéseteket: 4:0, 4:0 nektek."
-                    : "A szervező jóváhagyta, hogy nem jöttetek el: 0:4, 0:4, és fekete pontot kaptatok."
+                    ? `A szervező jóváhagyta a bejelentéseteket: ${walkoverScoreText(setGames)} nektek.`
+                    : `A szervező jóváhagyta, hogy nem jöttetek el: ${walkoverScoreText(setGames, false)}, és fekete pontot kaptatok.`
                   : d.ours
                     ? "A szervező elutasította a bejelentéseteket."
                     : "A szervező elutasította az ellenfeleitek bejelentését."}{" "}
@@ -602,7 +636,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
       {s.canReport && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="w-fit" disabled={busy}>
+            <Button variant="secondary" className="w-fit" disabled={busy}>
               Nem jöttek el
             </Button>
           </AlertDialogTrigger>
@@ -610,7 +644,7 @@ function NoShowBody({ s, result }: { s: NoShowPanel; result?: ActionResult }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Biztosan nem jöttek el?</AlertDialogTitle>
               <AlertDialogDescription>
-                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, 4:0, 4:0-ra nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
+                A szervező értesítést kap, és ő dönt. Ha jóváhagyja, {walkoverScoreTo(setGames)} nyertek, az ellenfeleitek fekete pontot kapnak. Amíg nem döntött, visszavonhatod.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -635,13 +669,13 @@ function CalendarRow({ calendar }: { calendar: CalendarLinks }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{calendar.cancelled ? "Naptár" : "Naptárba"}:</span>
         {calendar.googleUrl && (
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="secondary" size="sm" asChild>
             <a href={calendar.googleUrl} target="_blank" rel="noreferrer">
               <CalendarPlus /> Google Naptár
             </a>
           </Button>
         )}
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="secondary" size="sm" asChild>
           <a href={calendar.icsUrl} download>
             <Download /> .ics letöltése
           </a>
@@ -656,7 +690,7 @@ function CalendarRow({ calendar }: { calendar: CalendarLinks }) {
   );
 }
 
-// When and where, as the summary shows it (docs/player-ui.md M1).
+// When and where, as the details card shows it (docs/player-ui.md M1).
 function whenLine(m: Route.ComponentProps["loaderData"]): string {
   switch (m.state.status) {
     case "scheduled":
@@ -670,22 +704,106 @@ function whenLine(m: Route.ComponentProps["loaderData"]): string {
   }
 }
 
+// The header's eyebrow: division and group, week, and the time once there is
+// one, else the week's days.
+function eyebrowOf(m: Route.ComponentProps["loaderData"]): string {
+  const when =
+    m.state.status === "scheduled" || m.state.status === "agreed_time" ? formatSlot(m.state.slot) : weekRange(m.phaseStartsAt, m.week);
+  return `${groupLine(m.groupNumber, m.groupCount).replace(", ", " · ")} · ${m.week}. hét · ${when}`;
+}
+
 function Fact({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 items-start gap-2">
-      <Icon className="mt-0.5 size-4 shrink-0 text-court" />
-      <div className="grid min-w-0">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="font-medium break-words">{children}</span>
+    <div className="flex min-w-0 items-start gap-3">
+      <Icon aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+      <div className="flex min-w-0 flex-col">
+        <span className="text-caption text-muted-foreground">{label}</span>
+        <span className="text-body break-words">{children}</span>
       </div>
     </div>
+  );
+}
+
+// The state's line: amber when it waits on the player, green once done.
+const TONE_TEXT: Record<Tone, string> = { todo: "text-warning", waiting: "text-soft-foreground", done: "text-success" };
+
+// The two teams as the page's title (mockups P02, P03): badge and team label,
+// "TI" on the player's own, "vs" between them.
+function Teams({ m }: { m: Route.ComponentProps["loaderData"] }) {
+  const team = (badge: { pairId: number; initials: [string, string] }, name: string, own: boolean) => (
+    <span className="flex min-w-0 items-center gap-2.5">
+      <TeamBadge pairId={badge.pairId} initials={badge.initials} size={30} on="ground" />
+      <TeamName name={name} variant="display" own={own} />
+    </span>
+  );
+  return (
+    <span className="flex flex-col gap-1 text-[30px] leading-none md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-2 md:text-[40px]">
+      {team(m.badges.us, m.us, true)}
+      <span className="text-base text-muted-foreground md:text-xl">vs</span>
+      {team(m.badges.them, m.opponents, false)}
+    </span>
+  );
+}
+
+const ICON_BUTTON =
+  "grid size-11 shrink-0 place-items-center rounded-full bg-surface-2 text-foreground transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-ring [&_svg]:size-[18px]";
+
+// The opponents while the match is to be played (D135): tap to call or to
+// write, no numbers on screen; "Írj mindenkinek" under them. On a phone the
+// whole card opens from one row; from md up it is open.
+function ContactsCard({ m, withMessage }: { m: Route.ComponentProps["loaderData"]; withMessage: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hue = `var(--team-${teamHue(m.badges.them.pairId)})`;
+  return (
+    <section aria-label="Elérhetőség" className="overflow-hidden rounded-2xl bg-surface">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left text-body text-foreground transition-colors hover:bg-surface-2/60 md:hidden"
+      >
+        <Phone aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+        <span className="flex-1">Elérhetőség, közös üzenet</span>
+        <ChevronRight aria-hidden className={cn("size-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+      </button>
+      <div className={cn("flex-col gap-3 px-4 pb-4 md:flex md:px-5 md:pt-3", open ? "flex" : "hidden")}>
+        <ul aria-label="Az ellenfelek elérhetősége" className="m-0 list-none p-0 [&>li+li]:border-t [&>li+li]:border-hairline">
+          {m.contacts.map((c) => (
+            <li key={c.name} className="flex min-w-0 items-center gap-3 py-2.5">
+              <span
+                aria-hidden
+                className="grid size-9 shrink-0 place-items-center rounded-full text-[12px] font-bold text-foreground"
+                style={{ backgroundColor: hue }}
+              >
+                {badgeInitials({ name: c.name })}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-body font-bold break-words">{c.name}</span>
+                <span className="text-caption text-muted-foreground">{c.phone ? "ellenfél" : "ellenfél · nincs telefonszáma"}</span>
+              </span>
+              {c.phone && (
+                <a href={telHref(c.phone)} aria-label={`Hívás: ${c.name}`} className={ICON_BUTTON}>
+                  <Phone aria-hidden />
+                </a>
+              )}
+              {c.email && (
+                <a href={`mailto:${c.email}`} aria-label={`E-mail: ${c.name}`} className={ICON_BUTTON}>
+                  <Mail aria-hidden />
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+        {withMessage && <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />}
+      </div>
+    </section>
   );
 }
 
 export default function MatchRoute({ loaderData: m, actionData }: Route.ComponentProps) {
   const busy = useNavigation().state !== "idle";
   const result = actionData as ActionResult | undefined;
-  const status = resultStatusView(m.result, m.side) ?? statusView(m.state, m.side, m.venue);
+  const status = resultStatusView(m.result, m.side, m.setGames) ?? statusView(m.state, m.side, m.venue);
   const r = m.result;
   const theirs = m.state.status !== "to_schedule" && m.state.status !== "scheduled" && m.state.by !== m.side;
   const ours = (m.state.status === "proposed" || m.state.status === "agreed_time") && !theirs;
@@ -702,98 +820,70 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
   // With our own agreed time waiting, recording another one stays folded.
   const talk = m.actions.propose && !!m.message && m.message.to.length > 0;
   const agreedOpen = m.actions.recordAgreed && !theirs && m.state.status !== "agreed_time";
+  const accept = m.state.status === "proposed" && theirs && m.actions.accept.length > 0;
+  const confirmTime = m.state.status === "agreed_time" && m.actions.confirm;
+  // Whether something waits on the player now: the log's newest dot is amber then.
+  const waits = confirmResult || recordMain || accept || confirmTime || venueMain || (talk && !theirs) || agreedOpen;
   const subs = m.substitutes;
-  const substitutesShown = !!subs && (subs.approved.length > 0 || subs.ours.length > 0);
+  const substitutesShown = subs.marked.length > 0;
+  // Who didn't play, ticked on the result form (#400).
+  // Keyed by the marks, so a mark made or taken back above shows at once.
+  const ticks = subs.resultForm ? <AbsenceTicks key={subs.resultForm.map((p) => `${p.id}:${p.marked}`).join()} players={subs.resultForm} /> : null;
   const noShowShown = !!m.noShow.open || m.noShow.decided.length > 0;
+  const showContacts = m.contacts.length > 0 && r.status !== "final";
+  // "Helyettes kell?" sits under "Helyettes, segítség"; after a refused mark
+  // it opens among the steps instead, so its error shows.
+  const subsFold = !!subs.form && !substitutesShown;
+  const subsFailed = subsFold && failed("absence-mark");
+  const help = (subsFold && !subsFailed) || m.actions.propose;
+  const subsBody = <AbsenceBody key={`s${subs.marked.length}`} s={subs} deadline={m.deadline} result={result} />;
 
   return (
-    <AppPage
-      title={`${m.opponents} ellen`}
-      description={`${groupLine(m.groupNumber, m.groupCount)} · ${m.week}. hét (${weekRange(m.phaseStartsAt, m.week)}) · határidő: ${formatDeadline(m.deadline)}`}
-      back={{ to: "/home", label: "Kezdőlap" }}
-    >
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,42rem)_minmax(0,1fr)] xl:items-start">
-        <div className="grid min-w-0 content-start gap-6">
-          <section className="grid max-w-2xl gap-4 rounded-xl border bg-card p-4 sm:p-5" aria-label="Állapot">
-            {m.voided ? (
-              <p role="status" className="font-semibold">
-                {m.voided}
-              </p>
-            ) : (
-              <div>
-                <StatusPill {...status} />
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Fact icon={Clock} label="Időpont">
-                {whenLine(m)}
-              </Fact>
-              <Fact icon={MapPin} label="Helyszín">
-                {m.where ?? "Még nincs megadva"}
-              </Fact>
-            </div>
-            <p className="flex items-center gap-2 text-sm">
-              <Users className="size-4 shrink-0 text-court" />
-              <span>
-                <span className="text-muted-foreground">Ti:</span> {m.us}
-              </span>
-            </p>
-            {r.status === "final" && r.outcome.kind === "played" && <ScoreBoard score={r.outcome.score} side={m.side} us={m.us} them={m.opponents} />}
-            {r.status === "recorded" && !confirmResult && (
-              <ScoreBoard score={r.score} side={m.side} us={m.us} them={m.opponents} />
-            )}
-            {m.contacts.length > 0 && r.status !== "final" && (
-              <div className="grid gap-1.5">
-                <p className="text-sm font-medium">Az ellenfeleitek elérhetősége:</p>
-                <Contacts contacts={m.contacts} />
-                {/* While scheduling, Írjatok egymásnak below has it. */}
-                {!talk && <GroupMessage message={m.message} week={m.week} url={m.url} matchId={m.id} />}
-              </div>
-            )}
-            {m.calendar && <CalendarRow calendar={m.calendar} />}
-            {/* Every step's confirmation shows here: the form that sent it may be folded or gone now. */}
-        {result?.ok ? <Feedback result={result} intent={result.intent} ok /> : <Feedback result={result} intent={["accept", "confirm", "decline", "cancel"]} />}
-          </section>
+    <Page>
+      <PageHeader back={{ to: "/home", label: "Kezdőlap" }} eyebrow={eyebrowOf(m)} title={<Teams m={m} />} />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-x-6">
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* Every step's confirmation shows here: the form that sent it may be folded or gone now. */}
+          {result?.ok ? <Feedback result={result} intent={result.intent} ok /> : <Feedback result={result} intent={["accept", "confirm", "decline", "cancel"]} />}
 
           {/* --- The main step ------------------------------------------------ */}
 
           {confirmResult && (
-            <section
-              id="eredmeny"
-              aria-label="Eredmény"
-              className="grid max-w-2xl scroll-mt-20 gap-3 rounded-xl border border-nav-active bg-card p-4 ring-1 ring-nav-active/30 sm:p-5"
-            >
-              <h2 className="sr-only">Eredmény</h2>
+            <section id="eredmeny" aria-label="Eredmény" className={cn(CARD, "scroll-mt-20 inset-ring inset-ring-warning/45")}>
+              <WaitsOnYou />
+              {/* Confirmed together with who didn't play (#400). */}
+              {substitutesShown && <AbsenceLines s={subs} />}
               <ConfirmResult key={`r${keyed}`} m={m} feedback={result} />
             </section>
           )}
 
-          {/* A confirmed played result is already on the score board above. */}
+          {/* A confirmed played result is on the score board in the details. */}
           {r.status !== "none" && !confirmResult && !(r.status === "final" && r.outcome.kind === "played" && r.how === "confirmed") && (
-            <Panel title="Eredmény">
-                            <ResultStatus m={m} />
+            <Panel title="Eredmény" id="eredmeny">
+              <ResultStatus m={m} />
             </Panel>
           )}
 
           {recordMain && (
-            <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main">
-              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+            <Panel title="Eredmény rögzítése" description="Lejátszottátok? Írjátok be, mi lett. A másik pár megerősíti." tone="main" id="eredmeny">
+              <RecordResult key={`r${keyed}`} m={m} feedback={result} primary>
                 {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+                {ticks}
               </RecordResult>
             </Panel>
           )}
 
-          {m.state.status === "proposed" && theirs && m.actions.accept.length > 0 && (
+          {accept && (
             <Panel
               title="Válasszatok időpontot"
-              description={`Ekkor érnek rá. Egy meccs 60 perc.${m.venue ? ` Helyszín: ${m.venue}.` : ""}`}
+              description={`${m.opponents} ajánlotta. Egy meccs 60 perc.${m.venue ? ` Helyszín: ${m.venue}.` : ""}`}
               tone="main"
             >
               <Form method="post" className="grid gap-4">
                 <input type="hidden" name="intent" value="accept" />
                 <StartPicker ranges={m.actions.accept} />
-                <div>
-                  <Button type="submit" size="lg" disabled={busy}>
+                <div className="grid sm:flex">
+                  <Button type="submit" size="xl" disabled={busy}>
                     Elfogadom
                   </Button>
                 </div>
@@ -801,22 +891,22 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
             </Panel>
           )}
 
-          {m.state.status === "agreed_time" && m.actions.confirm && (
+          {confirmTime && m.state.status === "agreed_time" && (
             <Panel
               title="Megerősíted az időpontot?"
               description={`Az ellenfeletek szerint így beszéltétek meg: ${formatSlot(m.state.slot)}${m.venue ? `, ${m.venue}` : ""}. Fix lesz ${fixesAtText(m.state.fixesAt)}, ha nem jelzitek, hogy nem így beszéltétek.`}
               tone="main"
             >
-              <div className="flex flex-wrap gap-2">
-                <Form method="post">
+              <div className="grid gap-2 sm:flex sm:flex-wrap">
+                <Form method="post" className="grid">
                   <input type="hidden" name="intent" value="confirm" />
-                  <Button type="submit" size="lg" disabled={busy}>
+                  <Button type="submit" size="xl" disabled={busy}>
                     Megerősítem
                   </Button>
                 </Form>
-                <Form method="post">
+                <Form method="post" className="grid">
                   <input type="hidden" name="intent" value="decline" />
-                  <Button type="submit" size="lg" variant="outline" disabled={busy}>
+                  <Button type="submit" size="xl" variant="secondary" disabled={busy}>
                     Nem így beszéltük
                   </Button>
                 </Form>
@@ -835,14 +925,14 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
                     : undefined
               }
             >
-              <ul className="flex flex-wrap gap-2 text-sm">
+              <ul className="m-0 flex list-none flex-wrap gap-2 p-0 text-sm">
                 {m.state.status === "proposed"
                   ? m.state.ranges.map((r) => (
-                      <li key={r.start.getTime()} className="rounded-md bg-muted px-2.5 py-1.5 font-medium">
+                      <li key={r.start.getTime()} className="rounded-[10px] bg-surface-2 px-3 py-2 font-semibold">
                         {formatRange(r)}
                       </li>
                     ))
-                  : m.state.status === "agreed_time" && <li className="rounded-md bg-muted px-2.5 py-1.5 font-medium">{formatSlot(m.state.slot)}</li>}
+                  : m.state.status === "agreed_time" && <li className="rounded-[10px] bg-surface-2 px-3 py-2 font-semibold">{formatSlot(m.state.slot)}</li>}
               </ul>
             </Panel>
           )}
@@ -861,113 +951,157 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
 
           {venueMain && (
             <Panel title="Hol lesz a meccs?" description="Aki lefoglalta a pályát, írja be, hol. Mindkét pár látja." tone="main">
-              <VenueForm key={`v${keyed}`} clubs={m.clubs} clubId={m.state.status === "scheduled" ? m.state.clubId : null} court={null} result={result} />
+              <VenueForm key={`v${keyed}`} clubs={m.clubs} clubId={m.state.status === "scheduled" ? m.state.clubId : null} court={null} result={result} primary />
             </Panel>
           )}
 
           {(noShowShown || (m.noShow.canReport && m.started)) && (
             <Panel title={m.noShow.canReport ? "Nem jött el az ellenfél?" : "Nem jöttek el"}>
-              <NoShowBody s={m.noShow} result={result} />
+              <NoShowBody s={m.noShow} result={result} setGames={m.setGames} />
             </Panel>
           )}
 
-          {subs && substitutesShown && (
+          {substitutesShown && (
             <Panel title="Helyettes">
-              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
+              <AbsenceBody key={`s${subs.marked.length}`} s={subs} deadline={m.deadline} result={result} />
             </Panel>
           )}
 
-          {/* --- Everything else, folded --------------------------------------- */}
+          {/* --- Other ways forward, folded as rows ----------------------------- */}
 
-          {m.actions.recordAgreed && !agreedOpen && (
-            <Fold title={AGREED_TITLE} hint="A másik pár 24 órán belül jelezheti, ha nem így volt." open={failed("agreed")}>
-              <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
-            </Fold>
-          )}
+          <div className={FOLDS}>
+            {m.actions.recordAgreed && !agreedOpen && (
+              <Fold title={AGREED_TITLE} hint="A másik pár 24 órán belül jelezheti, ha nem így volt." open={failed("agreed")}>
+                <AgreedForm key={`a${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
+              </Fold>
+            )}
+            {m.actions.propose && (
+              <Fold
+                title={theirs && m.state.status === "proposed" ? "Egyik sem jó? Adjátok meg, mikor értek rá" : PROPOSE_TITLE}
+                hint={PROPOSE_RULES}
+                open={failed("propose")}
+              >
+                <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
+              </Fold>
+            )}
+            {m.state.status === "scheduled" && m.actions.venue && !venueMain && m.clubs.length > 0 && (
+              <Fold title={m.state.clubId ? "Helyszín módosítása" : "Hol lesz a meccs?"} hint="Aki lefoglalta a pályát, írja be, hol." open={failed("venue")}>
+                <VenueForm key={`v${keyed}`} clubs={m.clubs} clubId={m.state.clubId} court={m.state.court ?? null} result={result} />
+              </Fold>
+            )}
+            {recordFolded && (
+              <Fold
+                title={r.status === "recorded" ? "Elírtátok? Javítsátok ki" : "Már lejátszottátok? Írjátok be az eredményt"}
+                hint={r.status === "recorded" ? "A 48 óra újraindul." : undefined}
+                open={failed("result-record")}
+              >
+                <RecordResult key={`r${keyed}`} m={m} feedback={result}>
+                  {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
+                  {ticks}
+                </RecordResult>
+              </Fold>
+            )}
+            {m.state.status === "scheduled" && m.actions.cancel && (
+              <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: már 24 órán belül van a kezdés." : undefined}>
+                <CancelButton late={m.cancelLate} setGames={m.setGames} />
+              </Fold>
+            )}
+            {m.noShow.canReport && !m.started && !noShowShown && (
+              <Fold title="Nem jött el az ellenfél?" open={failed("no-show-report")}>
+                <NoShowBody s={m.noShow} result={result} setGames={m.setGames} />
+              </Fold>
+            )}
+            {subsFailed && (
+              <Fold title="Helyettes kell?" open>
+                {subsBody}
+              </Fold>
+            )}
+          </div>
 
-          {m.actions.propose && (
-            <Fold
-              title={theirs && m.state.status === "proposed" ? "Egyik sem jó? Adjátok meg, mikor értek rá" : PROPOSE_TITLE}
-              hint={PROPOSE_RULES}
-              open={failed("propose")}
-            >
-              <ProposeForm key={`p${keyed}`} clubs={m.clubs} result={result} now={m.now} deadline={m.deadline} />
-            </Fold>
-          )}
-
-          {m.state.status === "scheduled" && m.actions.venue && !venueMain && m.clubs.length > 0 && (
-            <Fold title={m.state.clubId ? "Helyszín módosítása" : "Hol lesz a meccs?"} hint="Aki lefoglalta a pályát, írja be, hol." open={failed("venue")}>
-              <VenueForm key={`v${keyed}`} clubs={m.clubs} clubId={m.state.clubId} court={m.state.court ?? null} result={result} />
-            </Fold>
-          )}
-
-          {recordFolded && (
-            <Fold
-              title={r.status === "recorded" ? "Elírtátok? Javítsátok ki" : "Már lejátszottátok? Írjátok be az eredményt"}
-              hint={r.status === "recorded" ? "A 48 óra újraindul." : "Ha a meccs megvolt, itt írjátok be."}
-              open={failed("result-record")}
-            >
-              <RecordResult key={`r${keyed}`} m={m} feedback={result}>
-                {m.venueAsked && <VenueFields clubs={m.clubs} id="record" label="Hol játszottatok?" withCourt={false} />}
-              </RecordResult>
-            </Fold>
-          )}
-
-          {m.state.status === "scheduled" && m.actions.cancel && (
-            <Fold title="Mégsem jó az időpont?" hint={m.cancelLate ? "Késői lemondás: már 24 órán belül van a kezdés." : "Lemondhatjátok, utána újra egyeztettek."}>
-              <CancelButton late={m.cancelLate} />
-            </Fold>
-          )}
-
-          {m.noShow.canReport && !m.started && !noShowShown && (
-            <Fold title="Nem jött el az ellenfél?" open={failed("no-show-report")}>
-              <NoShowBody s={m.noShow} result={result} />
-            </Fold>
-          )}
-
-          {subs?.form && !substitutesShown && (
-            <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani." open={failed("substitute-request")}>
-              <SubstituteBody key={`s${subs.ours.length}`} s={subs} deadline={m.deadline} result={result} />
-            </Fold>
-          )}
-
-          {m.actions.propose && (
-            <Fold title="Hogyan egyeztessetek?" heading>
-              {SCHEDULING_GUIDE.map((s) => (
-                <p key={s} className="text-sm">
-                  {s}
-                </p>
-              ))}
-            </Fold>
-          )}
+          {/* --- The details: state, when, where, score, calendar ---------------- */}
+          <section aria-label="Állapot" className={cn(CARD, "gap-3")}>
+            {m.voided ? (
+              <p role="status" className="m-0 font-semibold">
+                {m.voided}
+              </p>
+            ) : (
+              <p className={cn("m-0 text-sm font-semibold", TONE_TEXT[status.tone])}>{status.label}</p>
+            )}
+            <Fact icon={CalendarClock} label="Időpont">
+              {whenLine(m)}
+            </Fact>
+            <Fact icon={MapPin} label="Helyszín">
+              {m.where ?? "Még nincs megadva"}
+            </Fact>
+            <p className="m-0 text-caption text-muted-foreground">Határidő: {formatDeadline(m.deadline)}</p>
+            {r.status === "final" && r.outcome.kind === "played" && <ResultBoard score={r.outcome.score} side={m.side} us={m.us} them={m.opponents} />}
+            {r.status === "recorded" && !confirmResult && <ResultBoard score={r.score} side={m.side} us={m.us} them={m.opponents} />}
+            {m.calendar && <CalendarRow calendar={m.calendar} />}
+          </section>
         </div>
-        <section className="grid max-w-2xl gap-2 xl:sticky xl:top-6" aria-labelledby="naplo">
-          <h2 id="naplo" className="font-display text-lg font-bold">
-            Napló
-          </h2>
-          {m.log.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Még nem történt semmi.</p>
-          ) : (
-            <ol className="grid gap-0 border-l-2 border-muted pl-4 text-sm">
-              {m.log.map((e) => (
-                <li key={e.key} className="relative grid gap-0.5 pb-3 last:pb-0">
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute top-1.5 -left-[1.4rem] size-2.5 rounded-full border-2 border-background",
-                      e.ours ? "bg-nav-active" : "bg-muted-foreground",
-                    )}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {formatDateTime(e.at)} · {e.who} ({e.by === "organizer" ? "szervező" : e.by === "auto" ? "automatikus" : e.ours ? "ti" : "ellenfél"})
-                  </span>
-                  <span className="break-words">{e.text}</span>
-                </li>
-              ))}
-            </ol>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* While scheduling, Írjatok egymásnak has the group message. */}
+          {showContacts && <ContactsCard m={m} withMessage={!talk} />}
+
+          <section aria-labelledby="naplo" className={cn(CARD, "gap-3")}>
+            <SectionLabel id="naplo">Napló</SectionLabel>
+            {m.log.length === 0 ? (
+              <p className="m-0 text-sm text-muted-foreground">Még nem történt semmi.</p>
+            ) : (
+              // Newest first; the newest step's dot in colour.
+              <ol className="m-0 flex list-none flex-col gap-3 p-0">
+                {[...m.log].reverse().map((e, i) => (
+                  <li key={e.key} className="flex min-w-0 gap-3">
+                    <span
+                      aria-hidden
+                      className={cn("mt-[7px] size-2 shrink-0 rounded-full", i === 0 ? (waits ? "bg-warning" : "bg-info") : "bg-muted-foreground/50")}
+                    />
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-sm break-words">{e.text}</span>
+                      <span className="text-caption text-muted-foreground">
+                        {formatDateTime(e.at)} · {e.who} ({e.by === "organizer" ? "szervező" : e.by === "auto" ? "automatikus" : e.ours ? "ti" : "ellenfél"})
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          {/* --- The rare things: a substitute, how scheduling works ------------- */}
+          {help && (
+            <OverflowRow label="Helyettes, segítség">
+              <div className={FOLDS}>
+                {subsFold && !subsFailed && (
+                  <Fold title="Helyettes kell?" hint="Ha valamelyikőtök nem tud játszani, bárki beállhat.">
+                    {subsBody}
+                  </Fold>
+                )}
+                {m.actions.propose && (
+                  <Fold title="Hogyan egyeztessetek?" heading>
+                    {SCHEDULING_GUIDE.map((s) => (
+                      <p key={s} className="m-0 text-sm">
+                        {s}
+                      </p>
+                    ))}
+                  </Fold>
+                )}
+              </div>
+            </OverflowRow>
           )}
-        </section>
+          {/* Something wrong on this page: the form opens here (#446). */}
+          <FeedbackDialog from={`/matches/${m.id}`}>
+            <button
+              type="button"
+              className="flex min-h-11 w-fit cursor-pointer items-center gap-2 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Bug aria-hidden className="size-5" />
+              Hibát találtál ezen az oldalon?
+            </button>
+          </FeedbackDialog>
+        </div>
       </div>
-    </AppPage>
+    </Page>
   );
 }

@@ -3,12 +3,13 @@ import { and, asc, count, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { db } from "~/db/client.server";
-import { cities, groupPairs, groups, matches, pairs, seasonEntries, users } from "~/db/schema";
+import { cities, groupPairs, groups, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 
 import { formatOnDate, formatShortDay } from "./format";
 import { buildLadder, countedOutcome, isValidOutcome, phaseSpan, type LadderBand, type LadderGroupInput } from "./ladder";
 import { getLeague, minEntriesByLeague } from "./leagues.server";
 import { logWarn } from "./log";
+import type { NamedPlayer } from "./names";
 import { averageElo } from "./season-entries";
 import { currentSeason, isWaiting, waitingText, type Season } from "./seasons";
 import { listSeasons } from "./seasons.server";
@@ -47,8 +48,9 @@ const playerB = alias(users, "ladder_player_b");
 
 async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupInput[]> {
   const list = await db
-    .select({ id: groups.id, number: groups.number })
+    .select({ id: groups.id, number: groups.number, setGames: seasonPhases.setGames })
     .from(groups)
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
     .where(and(eq(groups.seasonId, seasonId), eq(groups.phase, phase), isNotNull(groups.publishedAt)))
     .orderBy(asc(groups.number));
   if (list.length === 0) return [];
@@ -62,9 +64,13 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
       pairId: pairs.id,
       withdrawnAt: groupPairs.withdrawnAt,
       nameA: playerA.name,
+      surnameA: playerA.surname,
+      firstNameA: playerA.firstName,
       levelA: playerA.level,
       eloA: playerA.elo,
       nameB: playerB.name,
+      surnameB: playerB.surname,
+      firstNameB: playerB.firstName,
       levelB: playerB.level,
       eloB: playerB.elo,
     })
@@ -91,9 +97,10 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
   // A stored outcome the rules engine can't count (D115, #190: a bug or a hand
   // edit; every write is validated) is skipped, so one bad row can't take the
   // public page down: the match counts nowhere on it and shows no result.
+  const setGamesOf = new Map(list.map((g) => [g.id, g.setGames]));
   const invalid = played.filter((m) => {
     const outcome = countedOutcome(m);
-    return outcome !== null && !isValidOutcome(outcome);
+    return outcome !== null && !isValidOutcome(outcome, setGamesOf.get(m.groupId)!);
   });
   if (invalid.length > 0)
     logWarn("league page skipped invalid outcomes", { count: invalid.length, matchIds: invalid.map((m) => m.id) });
@@ -101,11 +108,15 @@ async function phaseInput(seasonId: number, phase: number): Promise<LadderGroupI
   return list.map((g) => ({
     id: g.id,
     number: g.number,
+    setGames: g.setGames,
     pairs: members
       .filter((m) => m.groupId === g.id)
       .map((m) => ({
         id: m.pairId,
-        names: [m.nameA || "Névtelen", m.nameB || "Névtelen"] as [string, string],
+        players: [
+          { name: m.nameA || "Névtelen", surname: m.surnameA, firstName: m.firstNameA },
+          { name: m.nameB || "Névtelen", surname: m.surnameB, firstName: m.firstNameB },
+        ] as [NamedPlayer, NamedPlayer],
         // The pair's current Elo (#13), the last tiebreak (D20).
         elo: averageElo({ elo: m.eloA, level: m.levelA }, { elo: m.eloB, level: m.levelB }) ?? 0,
         // Withdrawn mid-phase (#34): buildLadder drops it and its matches.

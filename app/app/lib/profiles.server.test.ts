@@ -66,7 +66,7 @@ beforeEach(() => {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   STARTS.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   user("ua", "Anna", "halado", 1412.4);
@@ -120,7 +120,7 @@ describe("who has a profile", () => {
     match(g1, 2, 1, 1, "final", played([[4, 1], [4, 2]]));
     const p = await pairProfile(1, DURING);
     expect(p!.pair.players).toEqual([
-      { id: "ua", name: "Anna" },
+      { id: "ua", name: "Anna", surname: null, firstName: null },
       { id: null, name: "Törölt játékos" },
     ]);
     // Also where the pair appears as an opponent.
@@ -139,7 +139,14 @@ describe("before the league starts", () => {
     expect(anna).toMatchObject({ started: false, elo: null, eloHistory: [], matches: [] });
     expect(anna!.pairs).toEqual([
       {
-        pair: { id: 1, players: [{ id: "ua", name: "Anna" }, { id: "ub", name: "Bea" }] },
+        pair: {
+          id: 1,
+          players: [
+            { id: "ua", name: "Anna", surname: null, firstName: null },
+            { id: "ub", name: "Bea", surname: null, firstName: null },
+          ],
+          label: "Anna / Bea",
+        },
         league: "Padelpárbaj Győr",
         latest: { season: "2026/27 tél", phase: 1, group: 1, division: "Bronz divízió", place: null, withdrawn: false },
       },
@@ -166,6 +173,22 @@ describe("once the league has started", () => {
     // An unplayed match has no result to show.
     h.raw.exec(`update matches set outcome = '{"kind":"unplayed"}', status = 'final' where week = 3`);
     expect((await pairProfile(2, DURING))!.matches).toHaveLength(1);
+  });
+
+  it("names the pairs by their players' surnames, the clash rule over the page (#419)", async () => {
+    const named = (id: string, surname: string, firstName: string) =>
+      h.raw.prepare("update users set name = ?, surname = ?, first_name = ? where id = ?").run(`${surname} ${firstName}`, surname, firstName, id);
+    named("ua", "Nagy", "Anna");
+    named("ub", "Kiss", "Bea");
+    named("uc", "Nagy", "Cili");
+    match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
+    const pair = (await pairProfile(1, DURING))!;
+    // Dóra has no surname yet: her full name.
+    expect([pair.pair.label, pair.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    const anna = (await playerProfile("ua", DURING))!;
+    expect([anna.pairs[0]!.pair.label, anna.matches[0]!.opponents.label]).toEqual(["Nagy A. / Kiss", "Nagy C. / Dóra"]);
+    // The player's own name line keeps the full name.
+    expect(anna.player.name).toBe("Nagy Anna");
   });
 
   it("the summary (D136): seasons, rounds, matches, wins, losses, for the player and the pair", async () => {
@@ -233,31 +256,21 @@ describe("once the league has started", () => {
     ]);
   });
 
-  it("a substitute's match moves their rating and chart, but public pages keep the pair's names (D109)", async () => {
-    // Emma (pair 3) plays for Bea in pair 1 v pair 2; the replay rates the four who played (#37).
+  it("a match played by a temporary substitute leaves the absent player's rating, and pages keep the pair's names (#400)", async () => {
+    // Someone unnamed plays for Bea in pair 1 v pair 2; the replay rates the other three.
     const m = match(g1, 1, 2, 1, "final", played([[4, 1], [4, 2]]));
-    h.raw
-      .prepare(
-        "insert into match_substitutes (match_id, pair_id, absent_id, substitute_id, status, requested_at, decided_at) values (?, 1, 'ub', 'ue', 'approved', ?, ?)",
-      )
-      .run(m, sec("2026-11-10T10:00:00Z"), sec("2026-11-10T12:00:00Z"));
-    for (const [u, before, after] of [["ua", 1400, 1420], ["ue", 1400, 1420], ["uc", 1200, 1180], ["ud", 1200, 1180]] as const) {
+    h.raw.prepare("insert into match_absences (match_id, pair_id, absent_id, marked_by, marked_at) values (?, 1, 'ub', 'ua', ?)").run(m, sec("2026-11-10T10:00:00Z"));
+    for (const [u, before, after] of [["ua", 1400, 1420], ["uc", 1200, 1180], ["ud", 1200, 1180]] as const) {
       eloChange(m, u, before, after, "2026-11-11T10:00:00Z");
       h.raw.prepare("update users set elo = ? where id = ?").run(after, u);
     }
 
-    const emma = await playerProfile("ue", DURING);
-    expect(emma).toMatchObject({ elo: 1420, eloHistory: [1400, 1420], matches: [] });
     const bea = await playerProfile("ub", DURING);
     expect(bea).toMatchObject({ elo: 1400, eloHistory: [] });
     expect(bea!.matches.map((x) => [x.verdict, x.elo])).toEqual([["Győzelem", null]]);
     const anna = await playerProfile("ua", DURING);
     expect(anna!.matches.map((x) => x.elo)).toEqual([{ delta: "+20", after: 1420 }]);
-    // The match names pair 1 as Anna and Bea, on every page: never the substitute.
-    const pages = [await pairProfile(1, DURING), await pairProfile(2, DURING), bea, anna, await playerProfile("uc", DURING)];
-    for (const page of pages) {
-      expect(JSON.stringify(page)).not.toMatch(/Emma|"ue"/);
-    }
+    // The match names pair 1 as Anna and Bea, on every page.
     expect((await playerProfile("uc", DURING))!.matches[0]!.opponents.players.map((p) => p.name)).toEqual(["Anna", "Bea"]);
   });
 

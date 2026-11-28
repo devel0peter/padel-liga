@@ -4,7 +4,7 @@
 // Players only since D134 (step 29).
 import { expect, test } from "@playwright/test";
 
-import { PAIRS, as, content, visit } from "./support";
+import { PAIRS, as, content, surname, visit } from "./support";
 
 const anna = PAIRS.p1[0];
 
@@ -13,7 +13,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
   await visit(page, "/league/minta");
   const group = content(page)
     .getByRole("region", { name: /^\d+\. csoport$/ })
-    .filter({ hasText: anna.name });
+    .filter({ hasText: surname(anna) });
   await expect(group).toHaveCount(1);
 
   // Column order: #, Pár, M, Gy, V, Szett, Játék, P (D133). Read the M and P cells of the body rows.
@@ -24,7 +24,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
   // in the win got 1, the other pair 0, each with one match.
   expect((await column(7)).sort()).toEqual(["0", "1", "3"]);
   expect((await column(2)).sort()).toEqual(["1", "1", "2"]);
-  const annas = group.locator("tbody tr").filter({ hasText: anna.name });
+  const annas = group.locator("tbody tr").filter({ hasText: surname(anna) });
   await expect(annas.locator("td").nth(2)).toHaveText("2");
   await expect(annas.locator("td").nth(3)).toHaveText("1"); // Gy
   await expect(annas.locator("td").nth(4)).toHaveText("1"); // V: the both-lose match
@@ -37,7 +37,7 @@ test("29. the group table counts the confirmed win and the organizer's decision"
   const played = panel.locator('[aria-label^="Eredmény: "]');
   await expect(played).toHaveCount(1);
   await expect(played).toHaveAttribute("aria-label", /^Eredmény: (4:1, 2:4|1:4, 4:2)$/);
-  await expect(played).toContainText(/\((10:8|8:10)\)/);
+  await expect(played).toContainText(/(10:8|8:10)$/);
   await expect(panel).not.toContainText("egyik fél sem játszott");
   await expect(panel.getByText("Mindkét pár vereséget kap (0:4, 0:4)")).toHaveCount(1);
   await context.close();

@@ -38,9 +38,9 @@ const all = (q: string, ...p: any[]) => h.raw.prepare(q).all(...p);
 
 // A first login: the account exists (code login: no name; Google: its name),
 // the first-login page isn't done.
-async function firstLogin(email: string, name = ""): Promise<string> {
+async function firstLogin(email: string, name = "", parts: { surname?: string; firstName?: string } = {}): Promise<string> {
   const id = email.split("@")[0]!;
-  h.raw.prepare("insert into users (id, email, name) values (?, ?, ?)").run(id, email, name);
+  h.raw.prepare("insert into users (id, email, name, surname, first_name) values (?, ?, ?, ?, ?)").run(id, email, name, parts.surname ?? null, parts.firstName ?? null);
   return (await createSession(id)).split(";")[0]!;
 }
 
@@ -70,17 +70,31 @@ describe("first-login page without the interest list (#333)", () => {
   it("takes no name, level or partner from a signup", async () => {
     signup({ name1: "Nagy Anna", email1: "anna@x.hu", name2: "Kovács Béla", level: "halado" });
     const d = await R.loader(args(get(await firstLogin("anna@x.hu"))));
-    expect(d).toEqual({ onlySex: false, name: "", level: null, email: "anna@x.hu", phone: "", returnTo: "/home" });
+    expect(d).toEqual({ onlySex: false, surname: "", firstName: "", level: null, email: "anna@x.hu", phone: "", returnTo: "/home" });
   });
 
-  it("keeps the Google name", async () => {
-    const d = await R.loader(args(get(await firstLogin("anna@x.hu", "Nagy Anna Google"))));
-    expect(d).toMatchObject({ name: "Nagy Anna Google", level: null });
+  it("keeps the Google name's two parts for the Vezetéknév and Keresztnév fields (#419)", async () => {
+    const d = await R.loader(args(get(await firstLogin("anna@x.hu", "Nagy Anna", { surname: "Nagy", firstName: "Anna" }))));
+    expect(d).toMatchObject({ surname: "Nagy", firstName: "Anna", level: null });
+  });
+
+  it("saves the name in two parts, and the full name as '<Vezetéknév> <Keresztnév>' (#419)", async () => {
+    const cookie = await firstLogin("anna@x.hu");
+    const fields = { surname: " Kiss-Nagy ", first_name: "Anna  Mária", level: "halado", phone: "+36 30 123 4567", consent: "on", sex: "female", returnTo: "/home" };
+    expect(await redirectOf(R.action(args(post(cookie, fields))))).toBe("/home");
+    expect(h.raw.prepare("select name, surname, first_name from users where id = 'anna'").get()).toEqual({
+      name: "Kiss-Nagy Anna Mária",
+      surname: "Kiss-Nagy",
+      first_name: "Anna Mária",
+    });
+    expect(await R.action(args(post(await firstLogin("bela@x.hu"), { ...fields, surname: "", first_name: "" })))).toEqual({
+      errors: { surname: "Add meg a vezetékneved.", firstName: "Add meg a keresztneved." },
+    });
   });
 
   it("forms no pair from a signup when both partners have registered", async () => {
     signup({ name1: "Nagy Anna", email1: "anna@x.hu", name2: "Kovács Béla", email2: "bela@x.hu", level: "halado" });
-    const done = { name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", consent: "on", sex: "female", returnTo: "/home" };
+    const done = { surname: "Nagy", first_name: "Anna", level: "halado", phone: "+36 30 123 4567", consent: "on", sex: "female", returnTo: "/home" };
     expect(await redirectOf(R.action(args(post(await firstLogin("anna@x.hu"), done))))).toBe("/home");
     expect(await redirectOf(R.action(args(post(await firstLogin("bela@x.hu"), done))))).toBe("/home");
     await settleBackground();
@@ -95,7 +109,7 @@ describe("Férfi or Nő (#133)", () => {
     h.raw = migratedDatabase();
     h.sent = [];
   });
-  const profile = { name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", consent: "on", returnTo: "/home" };
+  const profile = { surname: "Nagy", first_name: "Anna", level: "halado", phone: "+36 30 123 4567", consent: "on", returnTo: "/home" };
   const row = (id: string) => h.raw.prepare("select sex, consent_at is not null as done from users where id = ?").get(id);
 
   it("can't finish the first login without choosing, and takes no other value", async () => {
@@ -128,7 +142,7 @@ describe("Férfi or Nő (#133)", () => {
     h.raw.prepare("insert into users (id, email, name, level, phone, sex, consent_at) values ('anna', 'anna@x.hu', 'Nagy Anna', 'halado', '+36301234567', 'female', 1)").run();
     const cookie = (await createSession("anna")).split(";")[0]!;
     const save = (sex: string) =>
-      P.action(args(new Request("http://localhost/profile", { method: "POST", headers: { Cookie: cookie }, body: new URLSearchParams({ intent: "profile", name: "Nagy Anna", level: "halado", phone: "+36 30 123 4567", sex }) })));
+      P.action(args(new Request("http://localhost/profile", { method: "POST", headers: { Cookie: cookie }, body: new URLSearchParams({ intent: "profile", surname: "Nagy", first_name: "Anna", level: "halado", phone: "+36 30 123 4567", sex }) })));
     const refused: any = await save("other");
     expect(refused.data.errors).toEqual({ sex: "Válaszd ki: férfi vagy nő." });
     expect(row("anna").sex).toBe("female");

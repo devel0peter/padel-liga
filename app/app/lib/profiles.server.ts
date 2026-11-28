@@ -12,7 +12,9 @@ import {
   formerPairViews,
   groupHistory,
   matchViews,
+  pageLabels,
   personView,
+  profilePairOf,
   playerStats,
   shownElo,
   type EloChangeInput,
@@ -42,11 +44,15 @@ const playerB = alias(users, "profile_player_b");
 const personCols = {
   aId: playerA.id,
   aName: playerA.name,
+  aSurname: playerA.surname,
+  aFirstName: playerA.firstName,
   aDeleted: playerA.deletedAt,
   aLevel: playerA.level,
   aElo: playerA.elo,
   bId: playerB.id,
   bName: playerB.name,
+  bSurname: playerB.surname,
+  bFirstName: playerB.firstName,
   bDeleted: playerB.deletedAt,
   bLevel: playerB.level,
   bElo: playerB.elo,
@@ -56,19 +62,21 @@ type MemberRow = {
   pairId: number;
   aId: string;
   aName: string | null;
+  aSurname: string | null;
+  aFirstName: string | null;
   aDeleted: Date | null;
   bId: string;
   bName: string | null;
+  bSurname: string | null;
+  bFirstName: string | null;
   bDeleted: Date | null;
 };
 
-const profilePair = (r: MemberRow): ProfilePair => ({
-  id: r.pairId,
-  players: [
-    personView({ id: r.aId, name: r.aName, deletedAt: r.aDeleted }),
-    personView({ id: r.bId, name: r.bName, deletedAt: r.bDeleted }),
-  ],
-});
+const profilePair = (r: MemberRow): ProfilePair =>
+  profilePairOf(r.pairId, [
+    personView({ id: r.aId, name: r.aName, surname: r.aSurname, firstName: r.aFirstName, deletedAt: r.aDeleted }),
+    personView({ id: r.bId, name: r.bName, surname: r.bSurname, firstName: r.bFirstName, deletedAt: r.bDeleted }),
+  ]);
 
 /** The published groups, in listed cities, of the pairs `pairFilter` picks. */
 async function publicGroups(pairFilter: SQL) {
@@ -82,6 +90,7 @@ async function publicGroups(pairFilter: SQL) {
       phase: groups.phase,
       number: groups.number,
       startsAt: seasonPhases.startsAt,
+      setGames: seasonPhases.setGames,
     })
     .from(groups)
     .innerJoin(seasons, eq(seasons.id, groups.seasonId))
@@ -152,6 +161,7 @@ async function groupDetails(list: PublicGroup[]) {
       position: siblings.filter((n) => n <= g.number).length,
       groupCount: siblings.length,
       startsAt: g.startsAt,
+      setGames: g.setGames,
       pairs: members
         .filter((m) => m.groupId === g.id)
         .map((m) => ({
@@ -184,6 +194,7 @@ function matchInputs(
         season: g.season,
         phase: g.phase,
         startsAt: g.startsAt,
+        setGames: g.setGames,
         week: m.week,
         scheduledAt: m.scheduledAt,
         status: m.status,
@@ -223,11 +234,14 @@ export async function pairProfile(pairId: number, now = new Date()): Promise<Pai
   const pair = details.pairById.get(pairId)!;
   const own = new Set([pairId]);
   const isStarted = started.has(leagueId);
-  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  const shownMatches = matchViews(own, matchInputs(own, list, details, started), formatShortDate);
+  // The page is one screen for the clash rule (#419): the pair and its opponents.
+  const labelled = pageLabels([pair, ...shownMatches.map((m) => m.opponents)]);
+  const matchList = shownMatches.map((m) => ({ ...m, opponents: labelled(m.opponents) }));
   const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => p.id === pairId));
   const rating = ownGroups.flatMap((g) => g.pairs).find((p) => p.id === pairId)?.elo;
   return {
-    pair,
+    pair: labelled(pair),
     league: league!,
     started: isStarted,
     groups: groupHistory(pairId, details.inputs, now),
@@ -303,7 +317,10 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     .map(({ at: _, ...p }) => p);
 
   const eloByMatch = new Map<number, EloChangeInput>(changes.map((c) => [c.matchId, c]));
-  const matchList = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  const shownMatches = matchViews(own, matchInputs(own, list, details, started), formatShortDate, eloByMatch);
+  // The page is one screen for the clash rule (#419): the player's pairs and their opponents.
+  const labelled = pageLabels([...pairsShown.map((p) => p.pair), ...shownMatches.map((m) => m.opponents)]);
+  const matchList = shownMatches.map((m) => ({ ...m, opponents: labelled(m.opponents) }));
   // A season is one league's: the same name in two leagues is two seasons.
   const leagueOf = new Map(list.map((g) => [g.id, g.leagueId]));
   const ownGroups = details.inputs.filter((g) => g.pairs.some((p) => own.has(p.id)));
@@ -312,7 +329,7 @@ export async function playerProfile(userId: string, now = new Date()): Promise<P
     started: isStarted,
     elo: isStarted && rating !== null ? shownElo(rating) : null,
     eloHistory: isStarted ? eloSeries(changes).map(shownElo) : [],
-    pairs: pairsShown,
+    pairs: pairsShown.map((p) => ({ ...p, pair: labelled(p.pair) })),
     matches: matchList,
     stats: playerStats(
       ownGroups.map((g) => ({ season: `${leagueOf.get(g.id)}:${g.season}`, startsAt: g.startsAt })),
@@ -392,4 +409,39 @@ export async function hasProfile(userId: string): Promise<boolean> {
     .from(pairs)
     .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
   return (await profilePairIds(theirs.map((p) => p.id))).size > 0;
+}
+
+/**
+ * The player's own record in each of `seasonIds` (Ligáim, #394): the final
+ * matches and the wins of their pairs there, counted as their profile's
+ * summary counts them (matchViews, playerStats, D136). A season without a
+ * published group of theirs is left out; before the league starts nothing
+ * counts (spec 17).
+ */
+export async function seasonRecords(
+  userId: string,
+  seasonIds: number[],
+  now = new Date(),
+): Promise<Map<number, { matches: number; wins: number }>> {
+  const out = new Map<number, { matches: number; wins: number }>();
+  if (seasonIds.length === 0) return out;
+  const theirPairs = db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(or(eq(pairs.playerA, userId), eq(pairs.playerB, userId)));
+  const wanted = new Set(seasonIds);
+  const list = (await publicGroups(inArray(groupPairs.pairId, theirPairs))).filter((g) => wanted.has(g.seasonId));
+  if (list.length === 0) return out;
+  const [details, started] = await Promise.all([groupDetails(list), startedLeagues([...new Set(list.map((g) => g.leagueId))], now)]);
+  const own = new Set(
+    [...details.pairById.values()].filter((p) => p.players.some((pl) => pl.id === userId)).map((p) => p.id),
+  );
+  for (const seasonId of wanted) {
+    const groupIds = new Set(list.filter((g) => g.seasonId === seasonId).map((g) => g.id));
+    if (groupIds.size === 0) continue;
+    const scoped = { ...details, matchRows: details.matchRows.filter((m) => groupIds.has(m.groupId)) };
+    const stats = playerStats([], matchViews(own, matchInputs(own, list, scoped, started), formatShortDate), now);
+    out.set(seasonId, { matches: stats.matches, wins: stats.wins });
+  }
+  return out;
 }

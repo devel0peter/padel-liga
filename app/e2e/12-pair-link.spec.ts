@@ -4,7 +4,7 @@
 // pair is made, with no email. Runs after step 15, whose new player sends it.
 import { expect, test } from "@playwright/test";
 
-import { as, content, d1, logOffset, loginCode, visit } from "./support";
+import { as, content, d1, fillName, logOffset, loginCode, visit } from "./support";
 
 const OWNER = "uj.jatekos@example.test";
 const PARTNER = { name: "Link Partner", email: "link.partner@example.test" };
@@ -44,7 +44,7 @@ test("16. a new player invites a partner with their pair link", async ({ browser
 
   // First-login page, then back to the link.
   await expect(page).toHaveURL(/\/welcome\?returnTo=/);
-  await page.getByLabel("Neved").fill(PARTNER.name);
+  await fillName(page, PARTNER);
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: /^Középhaladó/ }).click();
   await page.getByLabel("Telefonszám").fill("+36 30 765 1111");

@@ -6,7 +6,7 @@
 // has no pair, so the earlier steps' lists stay as they were.
 import { expect, test } from "@playwright/test";
 
-import { content, d1, d1Insert, emailsSince, logIn, logOffset, save, visit } from "./support";
+import { content, d1, d1Insert, emailsSince, fillName, logIn, logOffset, save, visit } from "./support";
 
 const NEW_PLAYER = { name: "Új Játékos", email: "uj.jatekos@example.test" };
 
@@ -23,8 +23,8 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(page.getByRole("heading", { name: "Üdv!" })).toBeVisible();
   // Nothing prefilled.
   await expect(content(page)).not.toContainText("A párod:");
-  await expect(page.getByLabel("Neved")).toHaveValue("");
-  await page.getByLabel("Neved").fill(NEW_PLAYER.name);
+  await expect(page.getByLabel("Vezetéknév")).toHaveValue("");
+  await fillName(page, NEW_PLAYER);
   await expect(page.getByLabel("Szinted")).toContainText("Válassz…");
   await page.getByLabel("Szinted").click();
   await page.getByRole("option", { name: /^Középhaladó/ }).click();
@@ -62,7 +62,7 @@ test("15. a new player without an invite or a signup registers", async ({ browse
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
   await visit(page, "/profile");
   await expect(content(page).getByText("Hívd meg a párodat")).toBeVisible();
-  await expect(content(page)).toContainText("a szervező keres neked párt.");
+  await expect(content(page)).toContainText("megtaláljátok egymást a Párkeresőben");
   // The contact address once, and no "if it changes" line without a pair (#124).
   await expect(content(page).getByRole("link", { name: "hello@padelparbaj.hu" })).toHaveAttribute("href", "mailto:hello@padelparbaj.hu");
   await expect(content(page).getByText("hello@padelparbaj.hu")).toHaveCount(1);

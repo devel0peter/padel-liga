@@ -69,7 +69,7 @@ function freshDb({ withPair4 = true } = {}) {
     .run(sec("2026-11-01T23:00:00Z"), sec("2026-11-05T22:59:00Z"));
   PHASES.forEach((start, i) =>
     h.raw
-      .prepare("insert into season_phases (season_id, number, starts_at, deadline) values (1, ?, ?, ?)")
+      .prepare("insert into season_phases (season_id, number, starts_at, deadline, set_games) values (1, ?, ?, ?, 4)")
       .run(i + 1, sec(start), sec(start) + 21 * 86400 - 60),
   );
   const pairIds = withPair4 ? [1, 2, 3, 4, 5] : [1, 2, 3, 5];
@@ -200,7 +200,8 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     expect(group.rows).toEqual(without.rows);
     expect(group.rows.map((r) => r.points)).toEqual([4, 4, 4]);
     expect(group.weeks).toEqual(without.weeks);
-    expect(group.withdrawn).toEqual([["Játékos G", "Játékos H"]]);
+    // By team label (#419): these accounts have no surname, so their full names.
+    expect(group.withdrawn).toEqual(["Játékos G / Játékos H"]);
     expect(without.withdrawn).toEqual([]);
   });
 
@@ -228,12 +229,12 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     // The group card's table (#201) leaves the pair and all its matches out,
     // as if it never played, and names it below.
     expect(mine!.pairs.map((p) => p.pairId)).not.toContain(4);
-    expect(mine!.withdrawn).toEqual(["Játékos G – Játékos H"]);
+    expect(mine!.withdrawn).toEqual(["Játékos G / Játékos H"]);
     expect(mine!.matches.map((m) => m.id)).toEqual([1, 3]);
-    const table = mine!.pairs.map(({ name: _, mine: __, ...r }) => r);
+    const table = mine!.pairs.map(({ label: _, mine: __, ...r }) => r);
     freshDb({ withPair4: false });
     const [never] = await M.currentGroups("a", NOW);
-    expect(table).toEqual(never!.pairs.map(({ name: _, mine: __, ...r }) => r));
+    expect(table).toEqual(never!.pairs.map(({ label: _, mine: __, ...r }) => r));
     expect(table.map((r) => r.points)).toEqual([4, 4, 4]);
     expect(never!.withdrawn).toEqual([]);
   });
@@ -247,7 +248,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
   it("match page and steps: off for both pairs, no scheduling or result step", async () => {
     await withdraw();
     const page = await M.matchPage(6, "c", NOW);
-    expect(page?.voided).toBe("Játékos G – Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
+    expect(page?.voided).toBe("Játékos G / Játékos H visszalépett a körből: ez a meccs elmarad, és nem számít bele a tabellába.");
     expect(page?.actions.propose).toBe(false);
     expect(page?.resultActions).toEqual({ record: false, confirm: false, dispute: false });
     expect((await M.matchPage(6, "g", NOW))?.voided).toMatch(/^Visszaléptetek/);
@@ -331,7 +332,7 @@ describe("the withdrawn pair's matches, for every reader (#34)", () => {
     const seasons = await S.listSeasons(1);
     for (const id of ["g", "h"]) {
       const view = (await E.entryViews({ id, email: `${id}@x.hu`, name: id, level: "halado" } as any, seasons, NOW)).get(1);
-      expect(view).toEqual({ kind: "status", status: "withdrawn", text: TAKEN_OUT_TEXT, note: null });
+      expect(view).toEqual({ kind: "status", status: "withdrawn", text: TAKEN_OUT_TEXT, note: null, joinsPhase: expect.any(Number) });
     }
   });
 });

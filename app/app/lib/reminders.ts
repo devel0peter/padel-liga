@@ -80,6 +80,10 @@ export type ReminderInput = {
   // rejected isn't reminded either.
   entries: readonly { seasonId: number; pairId: number }[];
   partnerSearches: readonly { leagueId: number; userId: string; seeking: boolean; updatedAt: Date }[];
+  // The new partners of accepted or final permanent partner changes (#402,
+  // #416): committed to
+  // a pair that starts at the next round switch, so not "without a pair" (C).
+  committed: readonly { leagueId: number; userId: string }[];
   // Unsubscribed, bounced or complained addresses, lowercase.
   suppressed: ReadonlySet<string>;
   // Keys of the reminders already sent (reminderKey).
@@ -195,7 +199,8 @@ export function dueReminders(input: ReminderInput, leagueIds: readonly number[])
   // keresek" off (its default since #333).
   const active = input.pairs.filter((p) => p.status === "active");
   const inPair = (userId: string, leagueId: number) =>
-    active.some((p) => p.leagueId === leagueId && (p.playerA === userId || p.playerB === userId));
+    active.some((p) => p.leagueId === leagueId && (p.playerA === userId || p.playerB === userId)) ||
+    input.committed.some((c) => c.leagueId === leagueId && c.userId === userId);
   for (const a of input.accounts) {
     if (!a.consentAt || !mailable(a.email, a)) continue;
     for (const league of accountLeagues(a.id)) {

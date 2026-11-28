@@ -49,7 +49,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         ...p,
         matches: p.matches.map((m) => {
           const d = decisions.get(m.id);
-          return { ...m, deadline: d ? projectionKind(d) : null, projection: d ? projectionLine(d, m.names) : null };
+          return { ...m, deadline: d ? projectionKind(d) : null, projection: d ? projectionLine(d, m.names, p.setGames) : null };
         }),
         projection: projection && projectionView(projection),
       };

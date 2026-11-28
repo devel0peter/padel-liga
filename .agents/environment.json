@@ -1,0 +1,3 @@
+{
+  "install": "npm ci && CI=true npm run db:migrate:local -w app && npm exec -w app -- playwright install chromium"
+}

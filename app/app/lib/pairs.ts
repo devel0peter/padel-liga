@@ -10,13 +10,14 @@
 
 // "search": two players who both switched "Párt keresek" on, paired by the
 // organizer (D113, #297; on Párkeresők, on Játékosok or a profile since #301).
-export type PairSource = "signup" | "manual" | "link" | "search";
+export type PairSource = "signup" | "manual" | "link" | "search" | "change";
 
 export const SOURCE_LABELS: Record<PairSource, string> = {
   signup: "jelentkezésből",
   manual: "kézzel",
   link: "linkkel",
   search: "párkeresésből",
+  change: "partnercseréből",
 };
 
 export const DISSOLVE_REFUSED = "Nem bontható fel: a pár kihirdetett csoportban játszik a kör határidejéig.";

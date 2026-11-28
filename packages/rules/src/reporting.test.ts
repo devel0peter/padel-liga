@@ -15,7 +15,7 @@ import {
   type ResultEvent,
   type Ruling,
 } from "./reporting";
-import type { MatchScore } from "./results";
+import { type MatchScore, SETS_TO_SIX, SHORT_SETS } from "./results";
 
 const at = (day: string, h: number, m = 0) => budapestTime(day, h, m);
 const T0 = at("2026-11-12", 20);
@@ -196,17 +196,26 @@ describe("auto-accept after 48 hours (spec 7, #28)", () => {
 
 describe("disputeErrors (#28)", () => {
   it("accepts a different valid version", () => {
-    expect(disputeErrors(WIN_A, WIN_B)).toEqual([]);
+    expect(disputeErrors(WIN_A, WIN_B, SHORT_SETS)).toEqual([]);
   });
 
   it("refuses an invalid version with the engine's Hungarian message", () => {
-    expect(disputeErrors(WIN_A, { sets: [[4, 3], [4, 0]] })).toEqual(["1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."]);
+    expect(disputeErrors(WIN_A, { sets: [[4, 3], [4, 0]] }, SHORT_SETS)).toEqual(["1. szett: 4:3 nem lehet. Lehet 4:0, 4:1, 4:2, 5:3 vagy (tie-break után) 5:4."]);
   });
 
   it("refuses the same score: that is a confirmation", () => {
-    expect(disputeErrors(SPLIT, { sets: [[4, 1], [2, 4]], superTieBreak: [10, 8] })).toEqual([
+    expect(disputeErrors(SPLIT, { sets: [[4, 1], [2, 4]], superTieBreak: [10, 8] }, SHORT_SETS)).toEqual([
       "Ez ugyanaz az eredmény, amit rögzítettek: erősítsd meg inkább.",
     ]);
+  });
+
+  it("checks the version against the round's format: sets to 6 from round 2 (#396)", () => {
+    const six: MatchScore = { sets: [[6, 4], [7, 6]] };
+    expect(disputeErrors(six, { sets: [[4, 6], [6, 7]] }, SETS_TO_SIX)).toEqual([]);
+    expect(disputeErrors(six, { sets: [[6, 4], [4, 1]] }, SETS_TO_SIX)).toEqual([
+      "2. szett: 4:1 nem lehet. Lehet 6:0, 6:1, 6:2, 6:3, 6:4, 7:5 vagy (tie-break után) 7:6.",
+    ]);
+    expect(disputeErrors(WIN_A, { sets: [[6, 4], [6, 3]] }, SHORT_SETS)).toHaveLength(2);
   });
 });
 
@@ -225,15 +234,15 @@ describe("sameScore and flipScore", () => {
 
 describe("decisionErrors (#29)", () => {
   it("an override without a reason is refused", () => {
-    expect(decisionErrors({ kind: "walkover", winner: "a" }, "  ")).toEqual(["Írd meg az indoklást: a döntés a meccs naplójába kerül."]);
+    expect(decisionErrors({ kind: "walkover", winner: "a" }, "  ", SHORT_SETS)).toEqual(["Írd meg az indoklást: a döntés a meccs naplójába kerül."]);
   });
 
   it("a too long reason is refused", () => {
-    expect(decisionErrors({ kind: "unplayed" }, "x".repeat(501))).toEqual(["Az indoklás legfeljebb 500 karakter legyen."]);
+    expect(decisionErrors({ kind: "unplayed" }, "x".repeat(501), SHORT_SETS)).toEqual(["Az indoklás legfeljebb 500 karakter legyen."]);
   });
 
   it("a played outcome needs a valid score", () => {
-    expect(decisionErrors({ kind: "played", score: { sets: [[4, 1], [2, 4]] } }, "Mindkét pár képet küldött")).toEqual([
+    expect(decisionErrors({ kind: "played", score: { sets: [[4, 1], [2, 4]] } }, "Mindkét pár képet küldött", SHORT_SETS)).toEqual([
       "1:1-es szettállásnál add meg a szuper tie-break eredményét.",
     ]);
   });
@@ -245,6 +254,14 @@ describe("decisionErrors (#29)", () => {
       { kind: "both-inactive" },
       { kind: "unplayed" },
     ] as const)
-      expect(decisionErrors(outcome, "A napló alapján")).toEqual([]);
+      expect(decisionErrors(outcome, "A napló alapján", SHORT_SETS)).toEqual([]);
+  });
+
+  it("an organizer's played outcome is checked against the round's format (#396)", () => {
+    const reason = "A napló alapján";
+    expect(decisionErrors({ kind: "played", score: { sets: [[6, 4], [7, 6]] } }, reason, SETS_TO_SIX)).toEqual([]);
+    expect(decisionErrors({ kind: "played", score: { sets: [[4, 2], [4, 1]] } }, reason, SETS_TO_SIX)).toHaveLength(2);
+    expect(decisionErrors({ kind: "played", score: { sets: [[4, 2], [5, 3]] } }, reason, SHORT_SETS)).toEqual([]);
+    expect(decisionErrors({ kind: "played", score: { sets: [[6, 4], [6, 3]] } }, reason, SHORT_SETS)).toHaveLength(2);
   });
 });

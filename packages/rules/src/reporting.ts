@@ -4,7 +4,7 @@
 // organizer, who can also set or override any match's outcome with a reason.
 // Pure: no I/O. The score rules are in results.ts, the table in standings.ts.
 
-import { validateScore, type MatchScore, type Side } from "./results";
+import { validateScore, type MatchScore, type SetGames, type Side } from "./results";
 import { other } from "./scheduling";
 import type { MatchOutcome } from "./standings";
 
@@ -124,11 +124,11 @@ export function flipScore(score: MatchScore): MatchScore {
 
 /**
  * Problems with a dispute's own version, in Hungarian: it must be a valid
- * result (spec 7) and differ from the recorded one (otherwise it is a
- * confirmation).
+ * result in the round's set format (spec 7) and differ from the recorded
+ * one (otherwise it is a confirmation).
  */
-export function disputeErrors(recorded: MatchScore, counter: MatchScore): string[] {
-  const v = validateScore(counter);
+export function disputeErrors(recorded: MatchScore, counter: MatchScore, setGames: SetGames): string[] {
+  const v = validateScore(counter, setGames);
   if (!v.ok) return v.errors.map((e) => e.message);
   return sameScore(recorded, counter) ? ["Ez ugyanaz az eredmény, amit rögzítettek: erősítsd meg inkább."] : [];
 }
@@ -140,12 +140,13 @@ export const REASON_MAX = 500;
 
 /**
  * Problems with an organizer decision or override (#29), in Hungarian: a
- * played outcome needs a valid score (spec 7); every decision needs a reason.
+ * played outcome needs a valid score in the round's set format (spec 7); every
+ * decision needs a reason.
  */
-export function decisionErrors(outcome: MatchOutcome, reason: string): string[] {
+export function decisionErrors(outcome: MatchOutcome, reason: string, setGames: SetGames): string[] {
   const errors: string[] = [];
   if (outcome.kind === "played") {
-    const v = validateScore(outcome.score);
+    const v = validateScore(outcome.score, setGames);
     if (!v.ok) errors.push(...v.errors.map((e) => e.message));
   }
   const r = reason.trim();

@@ -1,8 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-// Substitutes are hidden in the first season (D145); one test switches them on.
-const h = vi.hoisted(() => ({ subs: false }));
-vi.mock("../substitutes", async (original) => ({ ...(await original<typeof import("../substitutes")>()), substitutesEnabled: () => h.subs }));
+import { describe, expect, it } from "vitest";
 
 import { adminHome, appNav, can, navLeagues, roleLabel, type Actor, type Permission } from "./permissions";
 
@@ -97,7 +93,7 @@ describe("sidebar", () => {
     const nav = appNav(superadmin, [gyor, debrecen]);
     expect(nav.map((s) => s.role)).toEqual([undefined, "Szervező", "Admin"]);
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr", "Platform"]);
-    expect(nav[0].items.map((i) => i.to)).toEqual(["/home", "/notifications"]);
+    expect(nav[0].items.map((i) => i.to)).toEqual(["/home", "/leagues", "/notifications"]);
     expect(nav[1].items.map((i) => i.to)).toEqual([
       "/admin/leagues/gyor",
       "/admin/leagues/gyor/seasons",
@@ -107,7 +103,6 @@ describe("sidebar", () => {
       "/admin/leagues/gyor/reminders",
       "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
-      // No "Helyettesek" in the first season (D145).
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -154,14 +149,8 @@ describe("sidebar", () => {
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 
-  it("offers Helyettesek only while substitutes are on (D145)", () => {
-    h.subs = true;
-    try {
-      const items = appNav(organizer, [gyor])[1]!.items;
-      expect(items.at(-1)).toMatchObject({ label: "Helyettesek", to: "/admin/leagues/gyor/substitutes" });
-    } finally {
-      h.subs = false;
-    }
+  it("has no Helyettesek page: a temporary substitute needs no approval (#400, D175)", () => {
+    expect(appNav(superadmin, [gyor]).flatMap((s) => s.items).some((i) => i.to.endsWith("/substitutes"))).toBe(false);
   });
 
   it("Viták (#29): the league's Szervező and the Admin, not another league's Szervező or a player", () => {
@@ -177,8 +166,8 @@ describe("sidebar", () => {
     expect(nav[1].label).toBe("Padelpárbaj Győr");
   });
 
-  it("shows a player only the app home and notifications: no Párom, the pair is in Profil (D141)", () => {
-    expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home", "/notifications"]]);
+  it("shows a player only the app home, Ligáim (#394) and notifications: no Párom, the pair is in Profil (D141)", () => {
+    expect(appNav(player, navLeagues(player, [gyor])).map((s) => s.items.map((i) => i.to))).toEqual([["/home", "/leagues", "/notifications"]]);
     expect(adminHome(player)).toBeNull();
   });
 });

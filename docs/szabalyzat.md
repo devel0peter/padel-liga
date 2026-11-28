@@ -1,12 +1,12 @@
 # Padelpárbaj – Szabályzat
 
-*Hatályos: 2026. 11. 09.*
+*Hatályos: 2026. 11. 28.*
 
 ## Röviden
 - A pároddal jelentkeztek, és szint szerint 4 páros csoportba kerültök.
 - Minden héten egy meccset játszotok a csoport egy másik párjával. Egy kör 3 hétig tart.
 - Az időpontot SMS-ben vagy e-mailben beszélitek meg, és rögzítitek az oldalon. A kör végéig minden meccset le kell játszani.
-- 2 nyert szettig játszotok, egy szett 4 nyert játékig tart, 40:40-nél arany pont dönt.
+- 2 nyert szettig játszotok, egy szett 6 nyert játékig tart (a győri 1. körben még 4-ig), 40:40-nél arany pont dönt.
 - A kör végén a csoport első helyezettje feljebb lép, az utolsó lejjebb kerül.
 - A csoportok három divízióba tartoznak: Bronz, Réz, Rookie. A szezon végén a divíziók győztesei díjat kapnak.
 
@@ -30,7 +30,6 @@ A részleteket lent találod.
 - Egy kör **3 hétig** tart: ennyi idő alatt mindenki mindenkivel játszik a csoportban.
 - A kör végén a csoport **első helyezettje feljebb lép**, az **utolsó lejjebb kerül**.
 - Az új csoportokat a kör utáni hétfőn reggel e-mailben küldjük, és rögtön indul a következő kör.
-- Ünnepek alatt (például karácsony és újév között) a szezon szünetel, ilyenkor nem fut kör.
 - Egy szezon **4 körből** áll. A szezon végéről a 10. pontban olvashatsz.
 - **Divíziók:** a csoportok sorrendje egyetlen létra, amelyet három részre osztunk: felül a **Bronz**, középen a **Réz**, alul a **Rookie** divízió.
   - Minden divízió a csoportok harmadát kapja. Ha a csoportok száma nem osztható hárommal, az egy maradék csoport a Réz divízióé, két maradék csoport közül egy a Rézé, egy a Rookie-é.
@@ -45,16 +44,25 @@ A részleteket lent találod.
   - kapcsold be a „Párt keresek” kapcsolót, és a szervező párt keres neked.
 - Mindkét játékosnak saját fiókja van.
 - A telefonszámod kötelező, az első belépéskor kérjük. Az e-mail-címeddel együtt csak az aktuális kör ellenfelei látják, amíg a meccsetek még hátravan, hogy egyeztetni tudjatok. Nyilvánosan soha nem jelenik meg.
-- **Párcsere csak két kör között lehetséges**, és a szervező intézi: párt felbontani vagy cserélni csak ő tud, ilyenkor szólj neki. Egy körön belül a párok nem változnak. Az új párt a játékosok egyéni Élő-pontja alapján soroljuk be.
-- **Helyettes:** ebben a szezonban még nincs rá lehetőség. Ha a párod nem tud játszani, az elmaradt meccsekre vonatkozó szabályok érvényesek.
+- **Párcsere:** ha a párod végleg kiesik (sérülés, költözés), bármikor cserélhetsz partnert magad is, a szezon utolsó körének határidejéig: a Ligáim oldalon az **Állandó partnercsere** résznél válaszd ki az új partnered a liga pár nélküli játékosai közül. Ezt a pár bármelyik tagja elindíthatja, a párcsere után ő marad. Ha az új partnered 7 napon belül elfogadja, a szervező dönt róla: a csere akkor végleges, ha jóváhagyja. A szervező látja, ki hányszor cserélt partnert, és a gyakori cserét elutasíthatja.
+  - A kör hátralévő meccsein az új partnered játszik a régi párod helyett, mint a helyettes (lásd lent): a régi párod Élő-pontja ezeken nem változik.
+  - A következő körtől az új pár a régi pár helyén játszik (lásd a 7. pontot). Ha a következő kör beosztása már elkészült, akkor az azutáni körtől, addig az új partnered a következő kör meccsein is helyettesként játszik.
+  - A régi párod értesítést kap, és utána új párt alakíthat, amelyet új párként sorolunk be.
+  - Vita esetén a szervező az új pár indulásáig visszavonhatja a cserét. Két kör között a szervező is cserélhet partnert, ilyenkor szólj neki.
+- **Helyettes:** ha valamelyikőtök nem tud játszani egy meccsen, bárki beállhat helyette, a ligán kívülről is, a szervező jóváhagyása nélkül. A nevét nem kell megadni, csak azt jelöljétek a meccs oldalán, hogy ki nem játszik: a meccs előtt bármelyikőtök, hirtelen sérülésnél pedig az eredmény beírásakor az, aki beírja. Az ellenfél értesítést kap, és az eredménnyel együtt ezt is megerősíti.
+  - Az eredmény a párotoké, ugyanúgy számít, mint bármelyik meccs.
+  - A hiányzó játékos Élő-pontja nem változik: a számításban az ő Élő-pontja áll a helyettesé helyett. A másik három játékosé a szokásos módon változik.
+  - Ez a meccs nem számít bele a hiányzó játékos díjhoz szükséges részvételébe.
+  - A szervező látja, hányszor játszott egy pár helyettessel, és ha túl gyakran fordul elő, közbeléphet.
 - **Visszalépés kör közben:** ha egy pár nem tudja folytatni (sérülés, költözés), szólj a szervezőnek. A pár összes meccse kikerül a csoport tabellájából, a lejátszottak is, és a csoport nélkülük folytatja. A pár ezzel a szezonból is kikerül; ha újra játszanátok, a szervező újra benevezhet, és a következő kör elején kapcsolódtok be.
 - **Nevezés:** regisztráció után a pároddal neveztek a szezonra, és a nevezés azonnal érvényes. Ha a szezon már elindult, a következő kör elején kapcsolódtok be (a besorolást lásd a 7. pontban). A szervező is benevezhet titeket, ugyanabban az időszakban, mint ti: a regisztráció megnyitásától a szezon utolsó körének indulásáig (kör közben is: a következő kör elején kapcsolódtok be). Ki is vehet a szezonból: attól kezdve, hogy a csoportotokat kihirdették (a kör kezdete előtt is), a kör végéig csak visszaléptetéssel (lásd fent); ha a következő körre vártok, egyszerűen kivehet.
+- **Folytatás a következő körben:** ha neveztetek, a következő körben is játszotok, nem kell újra jelentkeznetek. Ha nem folytatnád, a Ligáim oldalon nyomd meg a „Nem folytatom” gombot a kör határidejéig (vasárnap 23:59). Ilyenkor a párotok a kör után kilép a szezonból, de a kör hátralévő meccsei számítanak, ezeket még le kell játszanotok. A határidőig meggondolhatod („Mégis folytatom”). A szezon utolsó körében nincs ilyen gomb.
 - **Új liga első szezonja:** nincs nevezési határidő, a szezon akkor indul, amikor elég pár nevezett (a liga minimuma, alapból 12 pár). Amint a nevezések elérik a minimumot, az 1. kör a legalább 7 nappal későbbi első hétfőn indul (ha szünet esik rá, a szünet után), és ez a dátum akkor sem változik, ha később kevesebb nevezés marad.
 
 ## 3. Időpont-egyeztetés
 - Minden meccsnek megvan a **saját hete**. Erősen ajánlott akkor lejátszani, hogy a kör végére ne torlódjanak a meccsek.
 - Ha a saját hetén nem jön össze, a **határidőig pótolhatjátok**: ez a kör utolsó hetének vasárnapja, 23:59.
-- A szervező a futó kört **meghosszabbíthatja** (például ha nehéz pályát foglalni): ilyenkor az új határidőről értesítünk, és a későbbi körök is ennyivel később kezdődnek.
+- A szervező a futó kört **meghosszabbíthatja** (például ha nehéz pályát foglalni), így egy kör 3 hétnél hosszabb is lehet. Ilyenkor az új határidőről értesítünk, és a későbbi körök is ennyivel később kezdődnek.
 - **Bármelyik pár kezdeményezhet**, nem kell megvárni a másikat. Minél előbb szóltok, annál könnyebb időpontot találni.
 - **Beszéljétek meg SMS-ben vagy e-mailben.** A meccs oldalán az „SMS mindenkinek” és az „E-mail mindenkinek” gomb egyszerre ír a párodnak és a két ellenfélnek.
 - **Rögzítsétek az időpontot az oldalon** (egész órát), és ha tudjátok, a helyszínt is. A másik pár **24 órán belül** jelezheti, ha nem így beszéltétek (ha a meccs ennél hamarabb kezdődik, a kezdésig). Ha nem jelez, az időpont fix. Megerősíteni hamarabb is lehet.
@@ -69,7 +77,8 @@ A részleteket lent találod.
 
 ## 4. A meccs
 - **Formátum:**
-  - 2 nyert szettig játszotok. Egy szett 4 nyert játékig tart, 2 játék különbséggel: 4:3 után még egy játék jön, így a szett 5:3-mal is végződhet. 4:4-nél rendes tie-break dönt 7 pontig (2 pont különbséggel), ilyenkor 5:4 a szett.
+  - 2 nyert szettig játszotok. Egy szett 6 nyert játékig tart, 2 játék különbséggel: 6:5 után még egy játék jön, így a szett 7:5-tel is végződhet. 6:6-nál rendes tie-break dönt 7 pontig (2 pont különbséggel), ilyenkor 7:6 a szett.
+  - A győri liga 1. körében még 4 nyert játékig tart egy szett: 4:3 után 5:3, 4:4-nél tie-break, ilyenkor 5:4 a szett. Ezek az eredmények így maradnak.
   - 1:1-es szettállásnál a 3. szett helyett szuper tie-break jön 10 pontig (2 pont különbséggel).
   - **Arany pont:** 40:40-nél nincs előny, egyetlen pont dönt. A fogadó pár választja ki, melyik játékosuk fogadja.
   - A szett- és játékkülönbségnél a szuper tie-break egy szettnek és 1:0-s játéknak számít.
@@ -81,9 +90,9 @@ A részleteket lent találod.
 
 ## 5. Ha elmarad a meccs
 A határidő (a kör vége) lejártakor a rendszer automatikusan dönt:
-- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 4:0, 4:0 eredménnyel.
+- **Csak az egyik pár próbált egyeztetni:** ők nyernek, 6:0, 6:0 eredménnyel (a győri 1. körben 4:0, 4:0).
 - **Mindkét pár próbált, de nem jutottak megegyezésre:** a meccs elmarad, egyik pár sem kap pontot, és az Élő-pontok sem változnak. Ha az egyeztetés alapján egyértelmű, hogy az egyik pár akadályozta a meccset, a szervező a másik párnak ítélheti a győzelmet.
-- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:4, 0:4 eredménnyel.
+- **Egyik pár sem próbált egyeztetni:** mindkét pár vereséget kap, 0:6, 0:6 eredménnyel (a győri 1. körben 0:4, 0:4).
 - **Megbeszélt időpontban az egyik pár nem jelent meg:** a megjelent pár jelzi, a szervező megerősíti, és a megjelent pár nyer.
 
 **Egyeztetésnek számít**, ha a meccs oldalán megnyomod az „SMS mindenkinek” vagy az „E-mail mindenkinek” gombot, ha időpontokat ajánlotok, vagy ha rögzítitek vagy megerősítitek a megbeszélt időpontot. Ha az időpont fix lett (megerősítve vagy magától), mindkét pár próbált egyeztetni.
@@ -120,7 +129,8 @@ Ha minden lépés után is holtverseny marad, a csoportbeosztás sorrendje dönt
 - Az első helyezett egy csoporttal feljebb lép, az utolsó (4 páros csoportban a negyedik, 3 párosban a harmadik) egy csoporttal lejjebb kerül.
 - A legfelső csoportból nincs feljutás, a legalsóból nincs kiesés.
 - **A liga első szezonjának első köre után gyorsabb a mozgás**, mert a kezdő beosztás még csak a saját becsléseteken alapul: két 4 páros csoport között 2-2 pár cserél helyet. Vagyis az első két helyezett feljebb lép, a harmadik és a negyedik lejjebb kerül. Ha a határ egyik oldalán 3 páros csoport van, ott ilyenkor is csak 1-1 pár cserél. Utána újra csak az első lép feljebb és az utolsó kerül lejjebb.
-- **Új párok a szezon közben** (később nevezők, párcsere után és visszatérők):
+- **Állandó partnercsere után** az új pár a régi pár helyét kapja meg: ha a régi pár megnyerte a csoportját, az új pár egy csoporttal feljebb kezd, ha utolsó lett, egy csoporttal lejjebb. Ha a régi pár 3 fekete pont miatt esik ki, az új párt új párként soroljuk be. Ha a maradó játékos a „Nem folytatom” gombot nyomja meg, a pár kilép a kör végén, és a csere nem jön létre.
+- **Új párok a szezon közben** (később nevezők, a szervező párcseréje után és visszatérők):
   - Ha szezon közben csatlakozol, vagy szünet után visszatérsz, a szinted (ha már játszottál, az Élő-pontod) szerinti divízió legalsó csoportjába kerülsz. Ha ott nincs hely, onnan lefelé a csoportok leggyengébb párja egy csoporttal lejjebb kerül.
   - A beosztást a kör indulása előtt a szervező átnézi.
 

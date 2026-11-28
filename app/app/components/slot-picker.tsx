@@ -16,7 +16,7 @@ import { dayChip, endHours, formatRange, pickerDays, presetRanges, rangeField, s
 import { cn } from "~/lib/utils";
 
 const CHIP =
-  "flex min-h-11 min-w-0 cursor-pointer items-center justify-center rounded-lg border bg-background px-2 py-1.5 text-sm font-medium tabular-nums outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-nav-active data-[state=checked]:bg-nav-active-bg data-[state=checked]:text-foreground";
+  "flex min-h-11 min-w-0 cursor-pointer items-center justify-center rounded-[10px] bg-surface-2 px-2 py-1.5 text-body font-semibold tabular-nums outline-none transition-colors hover:bg-surface-3 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-40 data-[state=checked]:bg-ball/14 data-[state=checked]:font-extrabold data-[state=checked]:text-ball data-[state=checked]:inset-ring-2 data-[state=checked]:inset-ring-ball";
 
 type ChipOption = { value: string; label: React.ReactNode; name?: string };
 
@@ -87,7 +87,7 @@ function DayChips({
             <span className="relative grid w-full text-center leading-tight">
               <span>{date}</span>
               <span className="text-xs font-normal text-muted-foreground">{weekday}</span>
-              {has && <span aria-hidden className="absolute -top-0.5 right-0 size-1.5 rounded-full bg-nav-active" />}
+              {has && <span aria-hidden className="absolute -top-0.5 right-0 size-1.5 rounded-full bg-ball" />}
             </span>
           ),
         };
@@ -136,7 +136,7 @@ export function RangePicker({ now, deadline }: { now: Date; deadline: Date }) {
       </div>
 
       {picked && (
-        <div className="grid gap-3 rounded-lg border bg-muted/40 p-3" role="group" aria-label={`Időszak: ${formatDay(picked.day)}`}>
+        <div className="grid gap-3 rounded-xl bg-surface-2/60 p-3" role="group" aria-label={`Időszak: ${formatDay(picked.day)}`}>
           <p className="text-sm font-medium">{formatDay(picked.day)}</p>
           <div className="flex flex-wrap gap-2">
             {presetRanges(picked).map((p) => (
@@ -206,7 +206,7 @@ export function RangePicker({ now, deadline }: { now: Date; deadline: Date }) {
         ) : (
           <ul className="grid gap-2" aria-label="Amikor ráértek">
             {ranges.map((r) => (
-              <li key={r.start.getTime()} className="flex min-h-11 items-center justify-between gap-2 rounded-lg border bg-background py-1 pr-1 pl-3 text-sm">
+              <li key={r.start.getTime()} className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] bg-surface-2 py-1 pr-1 pl-3 text-sm">
                 <span className="min-w-0 font-medium break-words">{formatRange(r)}</span>
                 <Button
                   type="button"

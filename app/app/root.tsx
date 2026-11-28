@@ -41,14 +41,16 @@ function WebAnalytics() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="hu">
+    // Dark for everyone (D181): the `dark` class turns on the shadcn
+    // components' dark styles; there is no light theme.
+    <html lang="hu" className="dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {/* Installable on the home screen: on iPhone, web push needs it. */}
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <meta name="theme-color" content="#174a8c" />
+        <meta name="theme-color" content="#0a1424" />
         <Meta />
         <Links />
       </head>

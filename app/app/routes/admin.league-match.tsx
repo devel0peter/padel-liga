@@ -228,7 +228,7 @@ export default function LeagueMatch({ loaderData, actionData }: Route.ComponentP
         {!m.running && <p className="text-sm text-muted-foreground sm:col-span-2">A kör lezárult, a telefonszámok már nem látszanak.</p>}
       </section>
 
-      <section className="grid gap-2" aria-labelledby="naplo">
+      <section className="grid gap-2" aria-label="Napló">
         <SectionLabel>Napló</SectionLabel>
         {m.log.length === 0 ? (
           <p className="text-sm text-muted-foreground">Még nem történt semmi.</p>

@@ -30,8 +30,9 @@ test("Fekete pontok: the organizer sees and cancels one with a reason; the playe
   const pairRow = main.getByRole("table", { name: "Párok listája" }).getByRole("row").filter({ hasText: x.name });
   await expect(pairRow).toContainText("2 fekete pont");
   await expect(pairRow).toContainText("1 fekete pont");
+  // Strikes live on their own Fekete pontok tab (#435).
+  await visit(page, "/admin/leagues/minta/players?tab=strikes");
   const list = main.getByRole("table", { name: "Fekete pontok" });
-  await expect(main.getByRole("heading", { name: /^Fekete pontok · / })).toBeVisible();
   await expect(list.getByRole("row").filter({ hasText: x.name })).toHaveCount(2);
   await expect(list).toContainText("Nem jelent meg");
   await expect(list).toContainText("Határidő: nem próbált egyeztetni");
@@ -43,11 +44,12 @@ test("Fekete pontok: the organizer sees and cancels one with a reason; the playe
   await noShow.getByRole("button", { name: "Törlés" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText(`Fekete pont törlése: ${x.name}`);
-  await expect(dialog.getByRole("button", { name: "Törlés" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Fekete pont törlése" })).toBeDisabled();
   await dialog.getByLabel("Indok").fill(REASON);
-  await dialog.getByRole("button", { name: "Törlés" }).click();
+  await dialog.getByRole("button", { name: "Fekete pont törlése" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(noShow).toContainText(`Törölve (${ORGANIZER.name}): ${REASON}`);
+  await visit(page, `/admin/leagues/minta/players?tab=pairs&q=${encodeURIComponent(x.name)}`);
   await expect(pairRow).not.toContainText("2 fekete pont");
   await expect(pairRow.getByText("1 fekete pont")).toHaveCount(2);
   await context.close();

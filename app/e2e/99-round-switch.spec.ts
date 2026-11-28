@@ -27,35 +27,37 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
       and gp.pair_id in (m.pair_a, m.pair_b) and gp.withdrawn_at is not null) order by m.id limit 1`)[0]!.id as number;
   d1Update(`update matches set status = 'disputed', outcome = null where id = ${disputed}`);
 
-  // Csoportok now shows round 2, with nothing drafted yet (the cron would
-  // have made it on Monday morning).
+  // Csoportok now redirects to round 2's Csoportok tab (#437).
   await visit(page, `${season}/groups`);
-  await expect(page.getByRole("navigation", { name: "Körök" }).getByRole("link", { name: "2. kör" })).toHaveAttribute("aria-current", "page");
-  await expect(content(page)).toContainText("Még nincs tervezet.");
-  await page.getByRole("button", { name: "Tervezet készítése" }).click();
+  await expect(page).toHaveURL(new RegExp(`${season}/rounds/2\\?tab=groups$`));
+  await expect(content(page).getByRole("heading", { name: "2. kör", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Tervezet elkészítése" }).click();
   await expect(page.getByRole("status")).toContainText("Újraszámoltuk a tervezetet");
 
   // Where each pair comes from; the pair withdrawn in round 1 (21-withdrawal)
   // leaves; the pair entered late (07-late-entry) is new.
   await expect(content(page).getByText(/\d\. csoport, \d\. hely/).first()).toBeVisible();
   await expect(content(page).getByText("Új pár")).toHaveCount(1);
-  await expect(content(page)).toContainText("Kimaradnak");
+  await expect(content(page)).toContainText("Kimaradó párok");
   await expect(content(page)).toContainText("visszalépett a kör közben");
 
-  // The disputed result blocks publishing and links to the match.
-  const block = page.getByRole("alert").filter({ hasText: "Közzététel előtt döntsd el ezeket:" });
-  await expect(block.getByRole("link")).toHaveAttribute("href", `/admin/leagues/minta/matches/${disputed}/decide`);
+  // The disputed result blocks publishing and links to the unified match page (#437).
+  await expect(content(page)).toContainText("Közzététel előtt rendezendő (1)");
+  await expect(content(page).getByRole("link", { name: "Döntés" })).toHaveAttribute(
+    "href",
+    new RegExp(`^/admin/leagues/minta/matches/${disputed}\\?decide=1`),
+  );
   await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
   await test.info().attach("round 2 draft, disputed", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(content(page)).toContainText("Kimaradnak");
+  await expect(content(page)).toContainText("Kimaradó párok");
   await test.info().attach("round 2 draft, 390px", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await page.setViewportSize({ width: 1280, height: 800 });
 
   // Settled: rebuilt from the final tables, nothing blocks it.
   d1Update(`update matches set status = 'final', outcome = ${won} where id = ${disputed}`);
-  await visit(page, `${season}/groups?phase=2`);
-  await expect(block).toHaveCount(0);
+  await visit(page, `${season}/rounds/2?tab=groups`);
+  await expect(content(page)).not.toContainText("Közzététel előtt rendezendő");
   await page.getByRole("button", { name: "Tervezet újraszámolása" }).click();
   await expect(page.getByRole("status")).toContainText("Újraszámoltuk a tervezetet");
   const outdated = page.getByRole("alert").filter({ hasText: "Előbb számold újra a tervezetet." });
@@ -67,11 +69,11 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
   // back, the draft is current again.
   const late = d1(`select id from season_entries where season_id = ${id} and joins_phase = 2 and status = 'approved'`)[0]!.id as number;
   d1Update(`update season_entries set status = 'withdrawn' where id = ${late}`);
-  await visit(page, `${season}/groups?phase=2`);
+  await visit(page, `${season}/rounds/2?tab=groups`);
   await expect(outdated).toBeVisible();
   await expect(page.getByRole("button", { name: "Közzététel" })).toBeDisabled();
   d1Update(`update season_entries set status = 'approved' where id = ${late}`);
-  await visit(page, `${season}/groups?phase=2`);
+  await visit(page, `${season}/rounds/2?tab=groups`);
   await expect(outdated).toHaveCount(0);
   await page.getByRole("button", { name: "Közzététel" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Közzététel" }).click();
@@ -83,9 +85,9 @@ test("round 2: draft, the dispute that blocks publishing, then Közzététel", a
       where g.season_id = ${id} and g.phase = 2 and g.published_at is not null`)[0]!;
   expect(Number(roundTwo.n)).toBeGreaterThan(0);
   expect(roundTwo.d).toBe(1);
-  // Round 1 stays as it was, one link away.
-  await page.getByRole("link", { name: "1. kör" }).click();
-  await expect(content(page)).toContainText("az 1. kör csoportjai");
+  // Round 1 stays as it was, one link away via the Season page.
+  await visit(page, `${season}/rounds/1?tab=groups`);
+  await expect(content(page)).toContainText("A csoportok már nem módosíthatók.");
   await context.close();
 });
 

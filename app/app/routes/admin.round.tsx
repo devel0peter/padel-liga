@@ -820,7 +820,7 @@ export default function AdminRound({ loaderData, actionData }: Route.ComponentPr
               )}
 
               {groupsData.preview && (
-                <section className="grid gap-3 pt-4">
+                <section className="grid gap-3 pt-4" aria-label={PREVIEW_TITLE}>
                   <SectionLabel>{PREVIEW_TITLE}</SectionLabel>
                   <p className="text-sm text-muted-foreground">
                     {previewText(groupsData.preview.nextPhase, groupsData.preview.endingPhase)}{" "}

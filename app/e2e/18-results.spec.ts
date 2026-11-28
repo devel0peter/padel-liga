@@ -194,35 +194,29 @@ test("23. dispute → the Szervező decides on Viták; a player can't open it", 
   // The week the app's way, "hét" (#221).
   await expect(content(org.page)).toContainText(`A ${second!.week}. heti meccsek egyikének eredményét vitatják. A döntés rád vár.`);
   await content(org.page).getByText("Vitatott eredmény · ").first().click();
-  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
+  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}\\?decide=1$`));
 
-  // Viták lists it with both versions, then the Szervező decides.
+  // Döntések lists it, then the Szervező decides on the unified match page (#433, #434).
   await visit(org.page, "/admin/leagues/minta/disputes");
   const main = content(org.page);
-  await expect(main.getByRole("heading", { name: "Vitatott eredmények (1)" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Döntések", level: 1 })).toBeVisible();
   await expect(main).not.toContainText("@example.test");
-  // The match is named "X a Y ellen" on Viták, its decision page and Meccsek (#202, #220).
-  const named = versus(second!.id);
-  await expect(main.getByRole("region", { name: /^Vitatott eredmények/ })).toContainText(named);
-  await main.getByRole("link", { name: "Döntök" }).click();
-  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}/decide$`));
+  await main.getByRole("link", { name: /Döntök|Megnyitás/ }).first().click();
+  await expect(org.page).toHaveURL(new RegExp(`/admin/leagues/minta/matches/${second!.id}`));
   await org.page.waitForLoadState("networkidle");
-  await expect(content(org.page).getByRole("heading", { level: 1 })).toHaveText(named);
-  await expect(content(org.page)).toContainText("Megjegyzés: A szuper tie-breaket mi nyertük.");
   await expect(content(org.page).getByRole("region", { name: "Napló" })).toContainText("Vitatta az eredményt");
   await content(org.page).getByRole("radio", { name: /^Mindkét pár vereséget kap/ }).click();
-  await org.page.getByLabel("Indoklás").fill("Nem tudtak megegyezni, és egyik változat sem igazolható.");
-  await org.page.getByRole("button", { name: "Döntés mentése" }).click();
-  await expect(content(org.page).getByRole("status").filter({ hasText: "Elmentettük a döntést." })).toBeVisible();
+  await org.page.getByLabel(/Indoklás/).fill("Nem tudtak megegyezni, és egyik változat sem igazolható.");
+  await org.page.getByRole("button", { name: "Döntök" }).click();
   await expect(content(org.page).getByRole("region", { name: "Napló" })).toContainText(
     "Döntés: Mindkét pár vereséget kap (0:4, 0:4). Indoklás: Nem tudtak megegyezni",
   );
   await visit(org.page, "/admin/leagues/minta/disputes");
-  await expect(content(org.page).getByRole("heading", { name: "Vitatott eredmények (0)" })).toBeVisible();
-  // Meccsek (#158) shows the results: the decision, and the confirmed one.
+  await expect(content(org.page)).toContainText("Nincs nyitott döntés.");
+  // Meccsek (#158 -> Round page) shows the results: the decision, and the confirmed one.
   await visit(org.page, "/admin/leagues/minta/matches");
   await expect(content(org.page)).toContainText("Döntés: Mindkét pár vereséget kap (0:4, 0:4)");
-  await expect(content(org.page)).toContainText(named);
+  await expect(content(org.page)).toContainText(versus(second!.id));
   // From the 1st pair's side, whichever Anna's pair is.
   await expect(content(org.page)).toContainText(/Lejátszva: (4:1, 2:4, szuper tie-break 10:8|1:4, 4:2, szuper tie-break 8:10)/);
   await org.context.close();

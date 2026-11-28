@@ -37,7 +37,7 @@ import {
 
 const gyor = { id: 1, slug: "gyor", city: "gyor", name: "Padelpárbaj Győr" };
 
-import { roundDraftReadyMessage } from "./notifications";
+import { newSignupMessage, roundDraftReadyMessage } from "./notifications";
 
 describe("kindsFor", () => {
   it("offers organizer kinds to Szervezők and Admins only", () => {
@@ -47,12 +47,14 @@ describe("kindsFor", () => {
       "no_show_reported",
       "partner_change_waiting",
       "round_draft_ready",
+      "new_signup",
     ]);
     expect(kindsFor({ platformRole: "superadmin", leagues: [] })).toEqual([
       "result_disputed",
       "no_show_reported",
       "partner_change_waiting",
       "round_draft_ready",
+      "new_signup",
     ]);
   });
 });
@@ -66,6 +68,22 @@ describe("roundDraftReadyMessage (#432)", () => {
 
     const blocked = roundDraftReadyMessage({ leagueSlug: "gyor", leagueName: "Győri liga", seasonId: 3, phase: 2, blockers: 2 });
     expect(blocked.body).toBe("Nézd át és tedd közzé. Előtte 2 döntés vár rád.");
+  });
+});
+
+describe("newSignupMessage (#382)", () => {
+  it("builds anonymous Hungarian notices for all 4 sign-up event kinds and suppressed counts", () => {
+    expect(newSignupMessage({ leagueSlug: "gyor", leagueName: "Győri liga", event: "player_joined" })).toEqual({
+      title: "Győri liga: új játékos csatlakozott",
+      body: "Nézd meg a várakozók listáját.",
+      url: "/admin/leagues/gyor/players?tab=waiting",
+    });
+    expect(newSignupMessage({ leagueSlug: "gyor", leagueName: "Győri liga", event: "pair_entered", joinsPhase: 2 }).title).toBe(
+      "Győri liga: új pár nevezett, a 2. körben kezd",
+    );
+    expect(newSignupMessage({ leagueSlug: "gyor", leagueName: "Győri liga", event: "pair_formed", suppressed: 4 }).body).toContain(
+      "(+4 új jelentkező)",
+    );
   });
 });
 

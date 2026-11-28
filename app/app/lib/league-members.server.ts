@@ -5,6 +5,7 @@ import { rowSelect } from "~/db/insert-select";
 import { leagueMembers, leagues, pairs } from "~/db/schema";
 import { auditIfChanged } from "~/lib/audit.server";
 import { listedCities } from "~/lib/cities.server";
+import { notifyNewSignup } from "~/lib/notifications.server";
 import { listSeasons } from "~/lib/seasons.server";
 
 import { joinableLeagues, type JoinableLeague, type JoinSource } from "./league-members";
@@ -111,8 +112,19 @@ export async function leagueOffer(userId: string, slug: string | null): Promise<
 // one more league by hand is what that button does anyway (D128).
 export async function chooseLeague(userId: string, leagueId: number): Promise<boolean> {
   if (!(await listedLeagues()).some((l) => l.id === leagueId)) return false;
-  await joinLeague(userId, leagueId, "chosen");
+  if (await joinLeague(userId, leagueId, "chosen")) {
+    await notifyNewSignup({ leagueId, event: "player_joined", except: userId });
+  }
   return true;
+}
+
+// Called when an account finishes the first-login consent page (#382 req 5):
+// notifies organizers of any league the player already joined via register button.
+export async function notifyJoinedLeagues(userId: string): Promise<void> {
+  const rows = await db.select({ leagueId: leagueMembers.leagueId }).from(leagueMembers).where(eq(leagueMembers.userId, userId));
+  for (const r of rows) {
+    await notifyNewSignup({ leagueId: r.leagueId, event: "player_joined", except: userId });
+  }
 }
 
 // For the batch that forms the pair of `a` and `b` (in this column order):

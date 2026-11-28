@@ -1,15 +1,17 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
+import { leagueAdmins, leagueSignupEvents, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
   channelKey,
   disputeRecipients,
   KIND_TOPIC,
   isEnabled,
+  NEW_SIGNUPS_DAILY_EMAIL_KEY,
+  newSignupMessage,
   partnerChangeWaitingMessage,
   resultDisputedMessage,
   noShowReportedMessage,
@@ -24,6 +26,7 @@ import {
   type NotificationKind,
   type PlayerKind,
   type PushTopic,
+  type SignupEventKind,
   type StoredKind,
   type SubscriptionInput,
 } from "./notifications";
@@ -498,6 +501,106 @@ export async function notifyRoundDraftReady(
   }
 }
 
+const SIGNUP_PUSH_COOLDOWN_MS = 3600_000;
+
+// A sign-up event happened in a league (#382): record the anonymous event for
+// the morning summary (#383), store one in-app notification per organizer/Admin
+// (excluding `except`), and throttle push to at most one per recipient per
+// league per hour (reporting suppressed count on the next push after the hour).
+// Never throws.
+export async function notifyNewSignup(
+  input: {
+    leagueId: number;
+    event: SignupEventKind;
+    joinsPhase?: number | null;
+    except?: string;
+  },
+  now = new Date(),
+): Promise<void> {
+  try {
+    await db.insert(leagueSignupEvents).values({
+      leagueId: input.leagueId,
+      kind: input.event,
+      joinsPhase: input.joinsPhase ?? null,
+      createdAt: now,
+    });
+    const [[league], recipients] = await Promise.all([
+      db.select({ slug: leagues.slug, name: leagues.name }).from(leagues).where(eq(leagues.id, input.leagueId)),
+      leagueStaff(input.leagueId, input.except ?? ""),
+    ]);
+    if (!league || recipients.length === 0) return;
+    const disabled = await disabledKinds(recipients);
+    const enabled = recipients.filter((userId) => isEnabled(disabled.get(userId) ?? NONE, "new_signup"));
+    if (enabled.length === 0) return;
+
+    const rows: NotificationRow[] = [];
+    for (const userId of enabled) {
+      const userDisabled = disabled.get(userId) ?? NONE;
+      const wantsPush = pushWanted(userDisabled, "new_signup");
+      let pushDueAt: Date | null = null;
+      let pushedAt: Date | null = null;
+      let suppressed = 0;
+      if (wantsPush) {
+        const [latest] = await db
+          .select({ id: notifications.id, pushedAt: notifications.pushedAt })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.userId, userId),
+              eq(notifications.leagueId, input.leagueId),
+              eq(notifications.kind, "new_signup"),
+              isNotNull(notifications.pushedAt),
+            ),
+          )
+          .orderBy(desc(notifications.id))
+          .limit(1);
+        const withinHour = latest?.pushedAt != null && now.getTime() - latest.pushedAt.getTime() < SIGNUP_PUSH_COOLDOWN_MS;
+        if (!withinHour) {
+          if (latest) {
+            const [s] = await db
+              .select({ n: count() })
+              .from(notifications)
+              .where(
+                and(
+                  eq(notifications.userId, userId),
+                  eq(notifications.leagueId, input.leagueId),
+                  eq(notifications.kind, "new_signup"),
+                  isNull(notifications.pushedAt),
+                  gt(notifications.id, latest.id),
+                ),
+              );
+            suppressed = s?.n ?? 0;
+          }
+          pushDueAt = now;
+          pushedAt = now;
+        }
+      }
+      const message = newSignupMessage({
+        leagueSlug: league.slug,
+        leagueName: league.name,
+        event: input.event,
+        joinsPhase: input.joinsPhase,
+        suppressed,
+      });
+      rows.push({
+        userId,
+        kind: "new_signup",
+        leagueId: input.leagueId,
+        ...message,
+        createdAt: now,
+        pushDueAt,
+        pushedAt,
+      });
+    }
+    const [first, ...rest] = notificationInserts(rows);
+    if (!first) return;
+    await db.batch([first, ...rest]);
+    if (rows.some((r) => r.pushDueAt)) await pushNow("new_signup", now);
+  } catch (error) {
+    logError("notification failed", { kind: "new_signup", error });
+  }
+}
+
 // The profile's "Próba" button. Returns how many devices got the push (none
 // with push switched off).
 export async function sendTestNotification(userId: string): Promise<number> {
@@ -566,6 +669,10 @@ async function setOptOut(userId: string, kind: string, enabled: boolean): Promis
 
 export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
   await setOptOut(userId, kind, enabled);
+}
+
+export async function setNewSignupsDailyEmailEnabled(userId: string, enabled: boolean): Promise<void> {
+  await setOptOut(userId, NEW_SIGNUPS_DAILY_EMAIL_KEY, enabled);
 }
 
 // The email and push switches (#115), stored like the kinds.

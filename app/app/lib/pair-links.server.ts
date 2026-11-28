@@ -9,6 +9,7 @@ import type { User } from "./auth/session.server";
 import { activePairIdOf, activePairWith, insertPairIfFree, pairLeagues, type PairLeague } from "./pairs.server";
 import { checkPairLink, PAIR_LINK_REFUSALS } from "./pairs";
 import { pairMemberStatements, playerLeagues } from "./league-members.server";
+import { notifyNewSignup } from "./notifications.server";
 
 // The pair link (decision log, 2026-10-31): every player without a
 // pair in a league gets their own link to send to a partner. Whoever opens
@@ -109,5 +110,6 @@ export async function acceptPairLink(user: Pick<User, "id" | "consentAt">, token
     .where(and(eq(pairs.leagueId, link.leagueId), eq(pairs.status, "active"), eq(pairs.playerA, link.ownerId), eq(pairs.playerB, user.id)));
   // Someone was quicker with one of them.
   if (!pair) return { ok: false, error: (await refusalFor(link, user.id)) ?? PAIR_LINK_REFUSALS.owner_paired };
+  await notifyNewSignup({ leagueId: link.leagueId, event: "pair_formed", except: user.id });
   return { ok: true };
 }

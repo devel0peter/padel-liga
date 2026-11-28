@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
 import { saveProfile, saveSex } from "~/lib/auth/accounts.server";
+import { notifyJoinedLeagues } from "~/lib/league-members.server";
 import { formatPhone } from "~/lib/phone";
 import { parseSex, safeReturnTo, SEX_REQUIRED, validateProfile, type ProfileErrors } from "~/lib/auth/rules";
 import { requireAccount } from "~/lib/auth/session.server";
@@ -64,6 +65,7 @@ export async function action({ request }: Route.ActionArgs) {
   );
   if (!result.ok) return { errors: result.errors };
   await saveProfile(user.id, result.value);
+  await notifyJoinedLeagues(user.id);
   return redirect(back);
 }
 

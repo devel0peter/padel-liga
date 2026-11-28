@@ -10,7 +10,7 @@ import { auditEntry, auditIfChanged } from "~/lib/audit.server";
 import { averageElo, homeEntry, organizerEntryAction, type EntryStatus, type OrganizerEntryAction } from "~/lib/season-entries";
 import { queuePairCreated } from "~/lib/email/outbox.server";
 import { partnerFoundMessage } from "~/lib/notifications";
-import { notifyPlayers } from "~/lib/notifications.server";
+import { notifyNewSignup, notifyPlayers } from "~/lib/notifications.server";
 import { pairPlayers, withdrawEntries } from "~/lib/season-entries.server";
 import { homeSeasons } from "~/lib/seasons";
 import { listSeasons } from "~/lib/seasons.server";
@@ -362,6 +362,7 @@ export async function createPair(
   const id = await activePairOf(leagueId, a, b);
   if (!id) return { ok: false, error: NEW_PAIR_REFUSALS.paired };
   await announcePair(id);
+  await notifyNewSignup({ leagueId, event: "pair_formed", except: actorId });
   return { ok: true };
 }
 

@@ -3,7 +3,7 @@ import { data, Form, Link, redirect, useFetcher, useFetchers, useNavigation, use
 
 import type { Route } from "./+types/profile";
 import { ListCard, Page, PageHeader, SectionLabel } from "~/components/blocks";
-import { FEEDBACK_TITLE, FeedbackDialog, RatingDialog } from "~/components/feedback-form";
+import { FEEDBACK_LINK, FeedbackDialog, RatingDialog } from "~/components/feedback-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -314,7 +314,7 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             <li>
               <FeedbackDialog from="/profile">
                 <button type="button" className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 md:px-5">
-                  <span className="flex-1 text-body">{FEEDBACK_TITLE}</span>
+                  <span className="flex-1 text-body">{FEEDBACK_LINK}</span>
                   <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
                 </button>
               </FeedbackDialog>

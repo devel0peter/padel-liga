@@ -21,7 +21,7 @@ export const MESSAGE_MAX = 2000;
 
 // The form's choices as the player reads them, and what the box asks (#446).
 export const FORM_CHOICES: Record<FormKind, { label: string; placeholder: string }> = {
-  bug: { label: "Valami nem működik", placeholder: "Mi történt? Pl. a Tabellán nem látom a meccsünket." },
+  bug: { label: "Hibát találtam", placeholder: "Mi történt? Pl. a Tabellán nem látom a meccsünket." },
   idea: { label: "Ötletem van", placeholder: "Mit csinálnál másképp, vagy mi hiányzik?" },
 };
 

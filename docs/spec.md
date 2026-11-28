@@ -363,7 +363,7 @@ First season: registration 29 Oct – 6 Nov (closes Fri 6 Nov 23:59; Peter, 2026
 Players and visitors can tell us from the app that something is broken or could be better, and every user is asked once how it is going. Nothing here sends mail, push or a notification, to anyone (section 13).
 
 **Form ("Visszajelzés").** Opens in a dialog over the page, from the sidebar of every logged-in page and from the footer of the public pages (decision log, 2026-11-28, D185, #444); the same form is the page `/feedback`, public, for old links. Any page can add the dialog (`FeedbackDialog`).
-- Fields (decision log, 2026-11-28, D186, #446): what it is about as two large choices, "Valami nem működik" (`bug`) and "Ötletem van" (`idea`; "Egyéb" is gone from the form, old rows keep `other`), and a required message (1–2000 characters) whose hint says what to write. No email address and no name: **we never reply by email**, so the form ends with "Választ vársz?" and the contact address. The form's name is "Hiba vagy ötlet" (dialog title and the links); it also opens from the match page ("Valami nem működik ezen az oldalon?") and Profil.
+- Fields (decision log, 2026-11-28, D186, #446): what it is about as two large choices, "Hibát találtam" (`bug`) and "Ötletem van" (`idea`; "Egyéb" is gone from the form, old rows keep `other`), and a required message (1–2000 characters) whose hint says what to write. No email address and no name: **we never reply by email**, so the form ends with "Választ vársz?" and the contact address. The links say "Visszajelzés", the dialog "Visszajelzés küldése" (as Google's Hungarian pages do); it also opens from the match page ("Hibát találtál ezen az oldalon?") and Profil.
 - Added automatically, not listed on the form (D186): the page the form was opened from (path only, no query string), the time, the device class (mobile or desktop) and browser family, the app version, and the account when logged in. The full browser string and the IP address are not stored.
 - After sending: a short thank-you in place of the form ("Bezárom" in the dialog; on the page a link back to where the sender came from). Nothing else on the page changes.
 - Logged-out visitors can send feedback too, behind the same bot check as the signup form (Turnstile, section 3's signup). A failed check or a rate limit gives a short Hungarian error and stores nothing.
@@ -378,7 +378,7 @@ Players and visitors can tell us from the app that something is broken or could 
 
 **Rating ("Hogy tetszik a Padelpárbaj?", D186, #446; replaces the use-day prompt, which was never built).** A dialog with five tennis balls (1–5, each named: "Nagyon rossz" … "Nagyon tetszik") and an optional "Mit javítanál?" box; "Küldés" works once a ball is chosen. Stored as feedback of type `rating` (logged-in players only); it opens no issue.
 - **Offered once on Kezdőlap as a tip** (section 13, D160): a week after the account's first login (consent), until the account rates. "Értékelem" opens the dialog; "Most nem", or closing the dialog without sending, hides it for 30 days, the second time for good. Not counted in logins: a login lasts 90 days, so logins are too rare to count. "Nem kérek tippeket" (D185) hides it too.
-- **Always in Profil**: "Értékeld a Padelpárbajt", next to "Hiba vagy ötlet".
+- **Always in Profil**: "Értékeld a Padelpárbajt", next to "Visszajelzés".
 - No email, no push, no notification (section 13).
 
 **Out of scope:** screenshots or attachments, chat or replies in the app, a reminder to give feedback, per-round prompts.

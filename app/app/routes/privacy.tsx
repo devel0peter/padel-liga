@@ -115,7 +115,7 @@ export default function Privacy() {
               töröljük.
             </p>
             <p>
-              Ha visszajelzést küldesz (a „Hiba vagy ötlet” ablakban, belépve
+              Ha visszajelzést küldesz (a „Visszajelzés küldése” ablakban, belépve
               vagy anélkül, vagy belépve értékeled az oldalt 1–5 labdával): az
               üzenetedet, a típusát (hiba, ötlet vagy értékelés), az
               értékelésed számát, az oldalt, ahonnan küldted, az idejét, az eszközöd típusát (mobil

@@ -1097,7 +1097,7 @@ export default function MatchRoute({ loaderData: m, actionData }: Route.Componen
               className="flex min-h-11 w-fit cursor-pointer items-center gap-2 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <Bug aria-hidden className="size-5" />
-              Valami nem működik ezen az oldalon?
+              Hibát találtál ezen az oldalon?
             </button>
           </FeedbackDialog>
         </div>

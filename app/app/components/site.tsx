@@ -1,6 +1,6 @@
 import { Link, useLocation, useRouteLoaderData } from "react-router";
 
-import { FEEDBACK_TITLE, FeedbackDialog } from "~/components/feedback-form";
+import { FEEDBACK_LINK, FeedbackDialog } from "~/components/feedback-form";
 import { CONTACT_EMAIL, FACEBOOK_URL, SITE_NAME } from "~/lib/site";
 
 export function Wrap({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -91,7 +91,7 @@ export function SiteFooter() {
           {pathname !== "/feedback" && (
             <FeedbackDialog from={pathname + search}>
               <button type="button" className="cursor-pointer underline-offset-4 hover:underline">
-                {FEEDBACK_TITLE}
+                {FEEDBACK_LINK}
               </button>
             </FeedbackDialog>
           )}

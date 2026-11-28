@@ -30,8 +30,10 @@ export type FeedbackFormData = {
 
 export type FeedbackAnswer = { ok: true } | { ok: false; error: string; kind: string; message: string };
 
-// The form's name (#446; Peter decides the final wording), its line and the thank-you.
-export const FEEDBACK_TITLE = "Hiba vagy ötlet";
+// The links' name, the dialog's title (#446, as on Google's Hungarian
+// pages), its line and the thank-you.
+export const FEEDBACK_LINK = "Visszajelzés";
+export const FEEDBACK_TITLE = "Visszajelzés küldése";
 export const FEEDBACK_INTRO = "Írd meg röviden, megnézzük.";
 export const THANKS_TITLE = "Köszi, megkaptuk!";
 export const THANKS_TEXT = "Elolvassuk, és ha kell, javítjuk.";

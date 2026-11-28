@@ -25,14 +25,14 @@ test("a logged-in player sends a bug report from the sidebar", async ({ browser 
   const { context, page } = await as(browser, PAIRS.p1[0]);
   await visit(page, "/notifications?from=e2e");
   // A dialog over the page (#444): the address doesn't change.
-  await page.locator("[data-sidebar=sidebar]").getByRole("button", { name: "Hiba vagy ötlet", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Hiba vagy ötlet" });
+  await page.locator("[data-sidebar=sidebar]").getByRole("button", { name: "Visszajelzés", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés küldése" });
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(/\/notifications\?from=e2e$/);
   // Two choices and one box (#446); what goes along is stored, not listed.
   await expect(dialog).not.toContainText("Ezt küldjük el veled");
   await expect(dialog).toContainText("hello@padelparbaj.hu");
-  await send(dialog, "Valami nem működik", BUG);
+  await send(dialog, "Hibát találtam", BUG);
   await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, device, browser, user_id is not null as account from feedback where message = '${BUG}'`)).toEqual([
     { kind: "bug", page: "/notifications", device: "desktop", browser: "Chrome", account: 1 },
@@ -47,8 +47,8 @@ test("a visitor sends an idea from a public page's footer; the 31st in an hour i
   const context = await browser.newContext();
   const page = await context.newPage();
   await visit(page, "/rules");
-  await page.getByRole("contentinfo").getByRole("button", { name: "Hiba vagy ötlet" }).click();
-  const dialog = page.getByRole("dialog", { name: "Hiba vagy ötlet" });
+  await page.getByRole("contentinfo").getByRole("button", { name: "Visszajelzés", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Visszajelzés küldése" });
   await send(dialog, "Ötletem van", IDEA);
   await expect(page.getByRole("dialog", { name: "Köszi, megkaptuk!" })).toBeVisible();
   expect(d1(`select kind, page, user_id from feedback where message = '${IDEA}'`)).toEqual([{ kind: "idea", page: "/rules", user_id: null }]);

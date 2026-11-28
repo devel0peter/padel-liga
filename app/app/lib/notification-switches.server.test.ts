@@ -214,11 +214,11 @@ describe("notification switches (#115)", () => {
     await N.notifyPlayers("groups_published", ids.map((userId) => ({ userId, message })));
     h.raw = raw;
 
-    // One opt-out lookup and 3 inserts of at most 14 rows (one D1 batch);
+    // One opt-out lookup and 4 inserts of at most 10 rows (one D1 batch);
     // no subscription lookup and no push: the pushes wait for the cron (D158).
     expect(queries.filter((q) => /^select .* from "notification_opt_outs"/.test(q))).toHaveLength(1);
-    expect(queries.filter((q) => /^insert into "notifications"/.test(q))).toHaveLength(3);
-    expect(queries).toHaveLength(4);
+    expect(queries.filter((q) => /^insert into "notifications"/.test(q))).toHaveLength(4);
+    expect(queries).toHaveLength(5);
     expect(all("select count(*) n from notifications")[0].n).toBe(40);
     expect(h.pushed).toEqual([]);
     await cronPushes();

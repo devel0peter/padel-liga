@@ -21,6 +21,7 @@ import { listLeagues, minEntriesByLeague } from "~/lib/leagues.server";
 import { currentGroups } from "~/lib/matches.server";
 import { nextRound } from "~/lib/home";
 import { greeting } from "~/lib/names";
+import { organizerHomeSummary } from "~/lib/organizer-decisions.server";
 import { optOutCard } from "~/lib/opt-out.server";
 import { pairLinkBoxes, pairLinkPath } from "~/lib/pair-links.server";
 import { finderPath } from "~/lib/partner-search";
@@ -70,9 +71,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const strikes = new Map((await myStrikes(user.id)).map(({ seasonId, ...s }) => [seasonId, s]));
   // A first season waiting for its minimum entries (D124): how many are still needed.
   const waiting = shown.filter(isWaiting);
-  const [counts, minimums] = await Promise.all([
+  const [counts, minimums, organizerSummary] = await Promise.all([
     entryCounts(waiting.map((s) => s.id)),
     minEntriesByLeague([...new Set(waiting.map((s) => s.leagueId))]),
+    organizerHomeSummary(actor, now),
   ]);
   const seasons = shown.map((s) => ({
     id: s.id,
@@ -123,6 +125,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     })),
     multiLeague: leagueName.size > 1,
     seasons,
+    organizerSummary,
     // The tips offered now (#262), in order; the browser shows the first
     // that applies on the device.
     tips: await offeredTipIds(user.id, now),
@@ -238,6 +241,34 @@ export default function AppHome({ loaderData: d, actionData }: Route.ComponentPr
           )
         }
       />
+      {d.organizerSummary.total > 0 && (
+        <section aria-label="Szervezői teendők" className="grid gap-2 rounded-2xl border border-warning/35 bg-surface px-4 py-3.5 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold">
+              Szervezőként {d.organizerSummary.total} dolog vár rád
+            </p>
+            {d.organizerSummary.leagues.length === 1 && (
+              <Link
+                to={`/admin/leagues/${d.organizerSummary.leagues[0]!.slug}`}
+                className="font-semibold underline"
+              >
+                {d.organizerSummary.leagues[0]!.name} megnyitása
+              </Link>
+            )}
+          </div>
+          {d.organizerSummary.leagues.length > 1 && (
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {d.organizerSummary.leagues.map((l) => (
+                <li key={l.slug}>
+                  <Link to={`/admin/leagues/${l.slug}`} className="underline">
+                    {l.name} ({l.count})
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {d.choices.length > 0 && <ChooseLeague choices={d.choices} offered={d.offered} />}
       {running && (
         // Phones: one column in reading order (to-dos, standing, matches).

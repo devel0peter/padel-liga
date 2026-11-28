@@ -1,5 +1,5 @@
 import { ChevronLeft, Menu } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 
 import { useOptionalSidebar } from "~/components/ui/sidebar";
 import { cn } from "~/lib/utils";
@@ -24,6 +24,8 @@ export function PageHeader({
   back?: { to: string; label: string };
 }) {
   const sidebar = useOptionalSidebar();
+  const shell = useRouteLoaderData("routes/app") as { organizerWaitingCount?: number } | undefined;
+  const orgBadge = shell?.organizerWaitingCount ?? 0;
   return (
     <header className="flex flex-col gap-2">
       {(back || sidebar) && (
@@ -42,12 +44,17 @@ export function PageHeader({
           {sidebar && (
             <button
               type="button"
-              aria-label="Menü"
+              aria-label={orgBadge > 0 ? `Menü (${orgBadge} szervezői teendő)` : "Menü"}
               aria-expanded={sidebar.openMobile}
               onClick={() => sidebar.setOpenMobile(true)}
-              className="-mr-2 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-soft-foreground transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring md:hidden"
+              className="relative -mr-2 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-soft-foreground transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring md:hidden"
             >
               <Menu aria-hidden className="size-6" />
+              {orgBadge > 0 && (
+                <span className="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[10px] leading-none font-extrabold text-ball-foreground">
+                  {orgBadge > 99 ? "99+" : orgBadge}
+                </span>
+              )}
             </button>
           )}
         </div>

@@ -1,4 +1,30 @@
-import { Shield, BarChart3, Bell, BellRing, Building2, CalendarDays, ChartNoAxesColumn, Check, ChevronsUpDown, House, HeartHandshake, LayoutDashboard, Mail, MapPin, MessageSquareText, Scale, ScrollText, Send, Swords, Trophy, User, UserCog, UsersRound } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  BellRing,
+  Building2,
+  CalendarDays,
+  ChartNoAxesColumn,
+  Check,
+  ChevronsUpDown,
+  HeartHandshake,
+  HelpCircle,
+  House,
+  LayoutDashboard,
+  Mail,
+  MapPin,
+  MessageSquareText,
+  Scale,
+  ScrollText,
+  Send,
+  Settings,
+  Shield,
+  Swords,
+  Trophy,
+  User,
+  UserCog,
+  UsersRound,
+} from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation } from "react-router";
 
 
@@ -35,6 +61,7 @@ import { requireUser } from "~/lib/auth/session.server";
 import { leagueFromPath, switchLeaguePath } from "~/lib/leagues";
 import { listLeagues, playerLeagueSlug } from "~/lib/leagues.server";
 import { unreadCount } from "~/lib/notifications.server";
+import { organizerHomeSummary, organizerSidebarMeta } from "~/lib/organizer-decisions.server";
 import { shellTeam, type ShellTeam } from "~/lib/shell.server";
 import { SITE_NAME } from "~/lib/site";
 import { cn } from "~/lib/utils";
@@ -64,6 +91,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     // The user chip's second line (D181).
     shellTeam(user.id),
   ]);
+  const urlSlug = leagueFromPath(new URL(request.url).pathname);
+  const activeLeague = leagues.find((l) => l.slug === urlSlug) ?? leagues[0] ?? null;
+  const [leagueMeta, orgHome] = await Promise.all([
+    activeLeague ? organizerSidebarMeta(activeLeague.id, activeLeague.slug) : Promise.resolve(null),
+    leagues.length > 0 ? organizerHomeSummary(actor) : Promise.resolve({ total: 0, leagues: [] }),
+  ]);
   return {
     name: user.name,
     email: user.email,
@@ -74,6 +107,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     // the same pure function; the actor is the user's own data.
     actor,
     leagues,
+    leagueMeta,
+    organizerWaitingCount: orgHome.total,
     unread,
     tableHref,
     team,
@@ -102,6 +137,8 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   log: ScrollText,
   feedback: MessageSquareText,
   profile: User,
+  settings: Settings,
+  help: HelpCircle,
 };
 
 const isCurrent = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);
@@ -252,9 +289,9 @@ function NavMenu({ nav, leagues, unread }: { nav: NavSection[]; leagues: LeagueR
                   )}
                 </NavLink>
               </SidebarMenuButton>
-              {item.to === "/notifications" && unread > 0 && (
+              {(item.to === "/notifications" ? unread : item.badge ?? 0) > 0 && (
                 <SidebarMenuBadge className="right-2.5 rounded-full bg-warning px-1.5 font-extrabold text-ball-foreground peer-hover/menu-button:text-ball-foreground peer-data-active/menu-button:text-ball-foreground peer-data-[size=default]/menu-button:top-2.5">
-                  {unreadLabel(unread)}
+                  {unreadLabel(item.to === "/notifications" ? unread : item.badge!)}
                 </SidebarMenuBadge>
               )}
             </SidebarMenuItem>
@@ -333,9 +370,9 @@ function TabBar({
 }
 
 export default function AppShell({ loaderData }: Route.ComponentProps) {
-  const { actor, leagues, unread, tableHref, ...profile } = loaderData;
+  const { actor, leagues, leagueMeta, unread, tableHref, ...profile } = loaderData;
   const { pathname, search } = useLocation();
-  const base = appNav(actor, leagues, leagueFromPath(pathname));
+  const base = appNav(actor, leagues, leagueFromPath(pathname), leagueMeta);
   // The player's own pages first, as on the mockups: Kezdőlap, Tabella and
   // Ranglista (D133, D134, D137), Ligáim, Értesítések, then Profil (D141).
   const nav = base.map((section, i): NavSection => {

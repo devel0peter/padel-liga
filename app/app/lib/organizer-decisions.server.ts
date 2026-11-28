@@ -27,7 +27,7 @@ export type OpenDecisionItem =
       kind: "dispute";
       id: string;
       matchId: number;
-      seasonId: number;
+      seasonName: string;
       phase: number;
       groupNumber: number;
       pairsLabel: string;
@@ -39,7 +39,7 @@ export type OpenDecisionItem =
       id: string;
       matchId: number;
       reportId: number;
-      seasonId: number;
+      seasonName: string;
       phase: number;
       groupNumber: number;
       pairsLabel: string;
@@ -50,11 +50,10 @@ export type OpenDecisionItem =
       kind: "partner_change";
       id: string;
       changeId: number;
-      seasonName: string | null;
       stayingName: string;
       leavingName: string;
       partnerName: string;
-      changesThisSeason: number;
+      counts: { staying: number; partner: number };
       waitingSince: Date;
       url: string;
     };
@@ -95,14 +94,14 @@ export async function openDecisions(leagueId: number, leagueSlug: string, now = 
   for (const d of disputes) {
     items.push({
       kind: "dispute",
-      id: `dispute:${d.matchId}`,
-      matchId: d.matchId,
-      seasonId: d.seasonId,
+      id: `dispute:${d.id}`,
+      matchId: d.id,
+      seasonName: d.season,
       phase: d.phase,
-      groupNumber: d.group,
-      pairsLabel: `${d.a.name} – ${d.b.name}`,
+      groupNumber: d.groupNumber,
+      pairsLabel: `${d.a} – ${d.b}`,
       waitingSince: d.disputedAt,
-      url: `/admin/leagues/${leagueSlug}/matches/${d.matchId}?from=decisions`,
+      url: `/admin/leagues/${leagueSlug}/matches/${d.id}?from=decisions`,
     });
   }
   for (const n of noShows) {
@@ -111,10 +110,10 @@ export async function openDecisions(leagueId: number, leagueSlug: string, now = 
       id: `no_show:${n.id}`,
       matchId: n.matchId,
       reportId: n.id,
-      seasonId: n.seasonId,
+      seasonName: n.season,
       phase: n.phase,
-      groupNumber: n.group,
-      pairsLabel: `${n.a.name} – ${n.b.name}`,
+      groupNumber: n.groupNumber,
+      pairsLabel: `${n.reporting} – ${n.absent}`,
       waitingSince: n.reportedAt,
       url: `/admin/leagues/${leagueSlug}/matches/${n.matchId}?from=decisions`,
     });
@@ -125,12 +124,11 @@ export async function openDecisions(leagueId: number, leagueSlug: string, now = 
       kind: "partner_change",
       id: `partner_change:${c.id}`,
       changeId: c.id,
-      seasonName: c.seasonName,
-      stayingName: c.staying.name,
-      leavingName: c.leaving.name,
-      partnerName: c.partner.name,
-      changesThisSeason: c.pairChangesThisSeason,
-      waitingSince: c.acceptedAt ?? c.createdAt,
+      stayingName: c.staying,
+      leavingName: c.leaving,
+      partnerName: c.partner,
+      counts: c.counts,
+      waitingSince: c.createdAt,
       url: `/admin/leagues/${leagueSlug}/disputes`,
     });
   }
@@ -147,7 +145,7 @@ export async function closedDecisions(leagueId: number, leagueSlug: string, now 
         matchId: matchDecisions.matchId,
         kind: matchDecisions.kind,
         reason: matchDecisions.reason,
-        at: matchDecisions.decidedAt,
+        at: matchDecisions.at,
         deciderName: decider.name,
         groupNumber: groups.number,
         phase: groups.phase,
@@ -156,9 +154,9 @@ export async function closedDecisions(leagueId: number, leagueSlug: string, now 
       .innerJoin(matches, eq(matches.id, matchDecisions.matchId))
       .innerJoin(groups, eq(groups.id, matches.groupId))
       .innerJoin(seasons, eq(seasons.id, groups.seasonId))
-      .leftJoin(decider, eq(decider.id, matchDecisions.decidedBy))
-      .where(and(eq(seasons.leagueId, leagueId), gte(matchDecisions.decidedAt, cutoff)))
-      .orderBy(desc(matchDecisions.decidedAt))
+      .leftJoin(decider, eq(decider.id, matchDecisions.userId))
+      .where(and(eq(seasons.leagueId, leagueId), eq(matchDecisions.kind, "organizer"), gte(matchDecisions.at, cutoff)))
+      .orderBy(desc(matchDecisions.at))
       .limit(50),
     db
       .select({
@@ -194,7 +192,7 @@ export async function closedDecisions(leagueId: number, leagueSlug: string, now 
       id: `decision:${d.id}`,
       kind: "dispute",
       title: `${d.phase}. kör · ${d.groupNumber}. csoport`,
-      outcome: d.kind === "override" ? "Felülbírálat" : "Vita eldöntve",
+      outcome: "Szervezői döntés",
       decidedBy: d.deciderName ?? null,
       decidedAt: d.at,
       url: `/admin/leagues/${leagueSlug}/matches/${d.matchId}?from=decisions`,
@@ -213,28 +211,23 @@ export async function closedDecisions(leagueId: number, leagueSlug: string, now 
     });
   }
   for (const c of changes) {
-    const decidedAt = c.decidedAt ?? c.updatedAt;
     const isFinalPendingStart = c.status === "final";
-    const isRecentClosed = (c.status === "rejected" || c.status === "started" || c.status === "undone") && decidedAt >= cutoff;
-    if (!isFinalPendingStart && !isRecentClosed) continue;
+    const isRecentStarted = c.status === "started" && c.createdAt >= cutoff;
+    if (!isFinalPendingStart && !isRecentStarted) continue;
     out.push({
       id: `pc_closed:${c.id}`,
       kind: "partner_change",
-      title: `Partnercsere: ${c.staying.name} (${c.leaving.name} → ${c.partner.name})`,
+      title: `Partnercsere: ${c.staying} (${c.leaving} → ${c.partner})`,
       outcome:
         c.status === "final"
           ? c.startsPhase
             ? `Jóváhagyva (${c.startsPhase}. körtől indul)`
             : "Jóváhagyva (következő szezontól)"
-          : c.status === "started"
-            ? "Elindult"
-            : c.status === "undone"
-              ? "Visszavonva"
-              : "Elutasítva",
+          : "Elindult",
       decidedBy: null,
-      decidedAt,
+      decidedAt: c.createdAt,
       url: null,
-      undoChangeId: isFinalPendingStart ? c.id : undefined,
+      undoChangeId: isFinalPendingStart && c.canUndo ? c.id : undefined,
     });
   }
   return out.sort((a, b) => b.decidedAt.getTime() - a.decidedAt.getTime());

@@ -1,134 +1,184 @@
-import { ChevronRight } from "lucide-react";
-import { data, Link } from "react-router";
+import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/admin.league-disputes";
-import { AppPage } from "~/components/app-page";
-import { PairNames } from "~/components/person-link";
+import { ListCard, ListRow, Page, PageHeader, SectionLabel, Segmented, StatusPill } from "~/components/blocks";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import { requirePermission } from "~/lib/auth/admin.server";
-import { leagueMatches, type LeagueMatch } from "~/lib/decisions.server";
-import { formatDateTime, formatSlot } from "~/lib/format";
+import { formatDateTime } from "~/lib/format";
 import { getLeague } from "~/lib/leagues.server";
-import { leagueNoShows } from "~/lib/no-shows.server";
-import { article } from "~/lib/results";
+import { closedDecisions, openDecisions } from "~/lib/organizer-decisions.server";
+import { approvePartnerChange, rejectPartnerChange, undoPartnerChange } from "~/lib/partner-changes.server";
 import { SITE_NAME } from "~/lib/site";
 
-// Viták (#29): the league's disputed results with both pairs' versions, and
-// every match of its published groups, each with a link to decide or
-// override it. The league's Szervező and the Admin only. Names only.
+// Döntések (#434): replaces Viták. Lists every open decision waiting on the
+// organizer (disputed results, no-show reports, permanent partner changes)
+// oldest first, plus Lezárt (last 14 days and any approved partner change that
+// has not started yet, with Visszavonás).
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: `Viták – ${SITE_NAME}` }];
+  return [{ title: `Döntések – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const league = await getLeague(params.league);
   if (!league) throw data("Nincs ilyen liga.", { status: 404 });
   await requirePermission(request, { kind: "league.manage", league: league.slug });
-  const [list, noShows] = await Promise.all([leagueMatches(league.id), leagueNoShows(league.id)]);
-  return { league, ...list, noShows };
+  const [open, closed] = await Promise.all([openDecisions(league.id, league.slug), closedDecisions(league.id, league.slug)]);
+  return { league, open, closed };
 }
 
-// "X a Y ellen" with each player a link for the Admin (#301).
-function Versus({ m }: { m: Pick<LeagueMatch, "b" | "players"> }) {
-  return (
-    <>
-      <PairNames players={m.players.a} /> {article(m.b)} <PairNames players={m.players.b} /> ellen
-    </>
-  );
+export async function action({ request, params }: Route.ActionArgs) {
+  const league = await getLeague(params.league);
+  if (!league) throw data("Nincs ilyen liga.", { status: 404 });
+  const actor = await requirePermission(request, { kind: "league.manage", league: league.slug });
+  const form = await request.formData();
+  const intent = String(form.get("intent") ?? "");
+  const changeId = Number(form.get("changeId"));
+  if (!Number.isInteger(changeId) || changeId <= 0) return data({ ok: false, error: "Érvénytelen kérés." }, { status: 400 });
+
+  if (intent === "approve-change") {
+    const res = await approvePartnerChange(actor.id, league.id, changeId);
+    return res.ok ? { ok: true, notice: "Partnercsere jóváhagyva." } : data({ ok: false, error: res.error }, { status: 400 });
+  }
+  if (intent === "reject-change") {
+    const res = await rejectPartnerChange(actor.id, league.id, changeId, String(form.get("reason") ?? ""));
+    return res.ok ? { ok: true, notice: "Partnercsere elutasítva." } : data({ ok: false, error: res.error }, { status: 400 });
+  }
+  if (intent === "undo-change") {
+    const res = await undoPartnerChange(actor.id, league.id, changeId);
+    return res.ok ? { ok: true, notice: "Partnercsere visszavonva." } : data({ ok: false, error: res.error }, { status: 400 });
+  }
+  return data({ ok: false, error: "Ismeretlen művelet." }, { status: 400 });
 }
 
-const where = (m: Pick<LeagueMatch, "season" | "phase" | "groupNumber" | "week">) => `${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét`;
+export default function LeagueDecisions({ loaderData, actionData }: Route.ComponentProps) {
+  const { league, open, closed } = loaderData;
+  const [search] = useSearchParams();
+  const tab = search.get("tab") === "closed" ? "closed" : "open";
+  const busy = useNavigation().state !== "idle";
+  const base = `/admin/leagues/${league.slug}/disputes`;
 
-export default function LeagueDisputes({ loaderData }: Route.ComponentProps) {
-  const { league, disputes, matches, noShows } = loaderData;
-  const decide = (id: number) => `/admin/leagues/${league.slug}/matches/${id}/decide`;
   return (
-    <AppPage title="Viták" description="Vitatott eredmények, „nem jöttek el” bejelentések, és bármelyik meccs kimenetelének felülbírálása.">
-      <section className="grid max-w-3xl gap-3" aria-labelledby="vitatott">
-        <h2 id="vitatott" className="font-display text-lg font-bold">
-          Vitatott eredmények ({disputes.length})
-        </h2>
-        {disputes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Most nincs vitatott eredmény.</p>
-        ) : (
-          <ul className="grid gap-3">
-            {disputes.map((d) => (
-              <li key={d.id} className="grid gap-1 rounded-lg border p-4 text-sm">
-                <p className="text-xs text-muted-foreground">{where(d)}</p>
-                <p className="font-medium break-words">
-                  <Versus m={d} />
-                </p>
-                <p className="break-words">
-                  <PairNames players={d.players[d.recordedBySide]} /> szerint: <strong>{d.recorded}</strong>
-                </p>
-                <p className="break-words">
-                  <PairNames players={d.players[d.recordedBySide === "a" ? "b" : "a"]} /> szerint:{" "}
-                  <strong>{d.counter ?? "nem adott meg eredményt"}</strong> ({formatDateTime(d.disputedAt)})
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Az eredmények az 1. pár (<PairNames players={d.players.a} />) szemszögéből.
-                </p>
-                <Link to={decide(d.id)} className="inline-flex w-fit items-center gap-1 font-semibold underline">
-                  Döntök
-                  <ChevronRight className="size-4" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+    <Page>
+      <PageHeader eyebrow={league.name} title="Döntések" />
 
-      <section className="grid max-w-3xl gap-3" aria-labelledby="nem-jottek-el">
-        <h2 id="nem-jottek-el" className="font-display text-lg font-bold">
-          Nem jöttek el ({noShows.length})
-        </h2>
-        {noShows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Most nincs döntésre váró bejelentés.</p>
-        ) : (
-          <ul className="grid gap-3">
-            {noShows.map((n) => (
-              <li key={n.id} className="grid gap-1 rounded-lg border p-4 text-sm">
-                <p className="text-xs text-muted-foreground">{where(n)}</p>
-                <p className="font-medium break-words">
-                  <PairNames players={n.reportingPlayers} /> szerint <PairNames players={n.absentPlayers} /> nem jött el
-                </p>
-                <p className="break-words">
-                  {n.slot ? `Időpont: ${formatSlot(n.slot)} · ` : ""}Bejelentve: {formatDateTime(n.reportedAt)}
-                </p>
-                <Link to={decide(n.matchId)} className="inline-flex w-fit items-center gap-1 font-semibold underline">
-                  Döntök
-                  <ChevronRight className="size-4" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Segmented
+        label="Döntések szűrő"
+        value={tab}
+        options={[
+          { value: "open", label: open.length > 0 ? `Nyitott (${open.length})` : "Nyitott", to: `${base}?tab=open` },
+          { value: "closed", label: `Lezárt (${closed.length})`, to: `${base}?tab=closed` },
+        ]}
+      />
 
-      <section className="grid max-w-3xl gap-3" aria-labelledby="minden">
-        <h2 id="minden" className="font-display text-lg font-bold">
-          Minden meccs
-        </h2>
-        {matches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Még nincs kihirdetett csoport.</p>
+      {actionData && "error" in actionData && actionData.error && (
+        <p role="alert" className="rounded-xl bg-danger-tint px-4 py-3 text-sm font-semibold text-danger">
+          {actionData.error}
+        </p>
+      )}
+      {actionData && "notice" in actionData && actionData.notice && (
+        <p role="status" className="rounded-xl bg-success-tint px-4 py-3 text-sm font-semibold text-success">
+          {actionData.notice}
+        </p>
+      )}
+
+      {tab === "open" ? (
+        open.length === 0 ? (
+          <div className="rounded-2xl bg-surface p-6 text-center text-sm text-muted-foreground">
+            Nincs nyitott döntés. Minden rendben.
+          </div>
         ) : (
-          <ul className="grid gap-2" aria-label="Meccsek">
-            {matches.map((m) => (
-              <li key={m.id} className="grid gap-0.5 rounded-md border p-3 text-sm">
-                <p className="text-xs text-muted-foreground">{where(m)}</p>
-                <p className="font-medium break-words">
-                  <Versus m={m} />
+          <div className="grid gap-3">
+            <SectionLabel tone="warning">Legrégebbi elöl · {open.length}</SectionLabel>
+            {open.map((item) => {
+              if (item.kind === "partner_change") {
+                return (
+                  <div key={item.id} className="grid gap-3 rounded-2xl bg-surface p-4 sm:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <StatusPill tone="warning">Partnercsere</StatusPill>
+                      <span className="text-caption text-muted-foreground">{formatDateTime(item.waitingSince)}</span>
+                    </div>
+                    <p className="font-semibold">
+                      {item.stayingName}: {item.leavingName} helyett {item.partnerName}
+                    </p>
+                    <p className="text-caption text-muted-foreground">
+                      Ebben a szezonban partnercsere: {item.stayingName} ({item.counts.staying}), {item.partnerName} ({item.counts.partner})
+                    </p>
+                    <Form method="post" className="grid gap-2">
+                      <input type="hidden" name="changeId" value={item.changeId} />
+                      <Input name="reason" placeholder="Indoklás elutasítás esetén (opcionális)" className="max-w-md" />
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" size="xl" name="intent" value="approve-change" disabled={busy}>
+                          Jóváhagyom
+                        </Button>
+                        <Button type="submit" size="xl" variant="secondary" name="intent" value="reject-change" disabled={busy}>
+                          Elutasítom
+                        </Button>
+                      </div>
+                    </Form>
+                  </div>
+                );
+              }
+              return (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface p-4 sm:p-5">
+                  <div className="grid gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill tone={item.kind === "dispute" ? "danger" : "warning"}>
+                        {item.kind === "dispute" ? "Vitatott eredmény" : "Nem jöttek el"}
+                      </StatusPill>
+                      <span className="text-caption text-muted-foreground">
+                        {item.seasonName} · {item.phase}. kör · {item.groupNumber}. csoport
+                      </span>
+                    </div>
+                    <p className="font-semibold">{item.pairsLabel}</p>
+                    <p className="text-caption text-muted-foreground">Várakozik: {formatDateTime(item.waitingSince)}</p>
+                  </div>
+                  <Button asChild size="xl" variant="secondary">
+                    <Link to={item.url} className="no-underline">
+                      Döntök
+                    </Link>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : closed.length === 0 ? (
+        <div className="rounded-2xl bg-surface p-6 text-center text-sm text-muted-foreground">
+          Az elmúlt 14 napban nem volt lezárt döntés.
+        </div>
+      ) : (
+        <ListCard>
+          {closed.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+              <div className="grid gap-0.5">
+                <p className="font-medium">{item.title}</p>
+                <p className="text-caption text-muted-foreground">
+                  {item.outcome}
+                  {item.decidedBy ? ` · ${item.decidedBy}` : ""} · {formatDateTime(item.decidedAt)}
                 </p>
-                <p className="break-words">{m.label}</p>
-                <Link to={decide(m.id)} className="inline-flex w-fit items-center gap-1 underline">
-                  Felülbírálom
-                  <ChevronRight className="size-4" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </AppPage>
+              </div>
+              <div className="flex items-center gap-2">
+                {item.undoChangeId && (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="undo-change" />
+                    <input type="hidden" name="changeId" value={item.undoChangeId} />
+                    <Button type="submit" size="sm" variant="secondary" disabled={busy}>
+                      Visszavonás
+                    </Button>
+                  </Form>
+                )}
+                {item.url && (
+                  <Link to={item.url} className="text-sm font-semibold text-foreground underline">
+                    Megnyitás
+                  </Link>
+                )}
+              </div>
+            </div>
+          ))}
+        </ListCard>
+      )}
+    </Page>
   );
 }

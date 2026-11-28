@@ -399,9 +399,9 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
     h.raw.prepare("update matches set status = 'disputed' where id = ?").run(disputed);
 
     expect(await R.draftRoundSwitches(AFTER)).toBe("drafted phase 2 of season 1");
-    const rows = all<{ user_id: string; kind: string; title: string; body: string; url: string; push_due_at: number | null }>(
+    const rows = all(
       "select user_id, kind, title, body, url, push_due_at from notifications where kind = 'round_draft_ready' order by user_id",
-    );
+    ) as { user_id: string; kind: string; title: string; body: string; url: string; push_due_at: number | null }[];
     expect(rows.map((r) => r.user_id)).toEqual(["adm1", "org1"]);
     expect(rows[0].title).toContain("kész a 2. kör tervezete");
     expect(rows[0].body).toContain("Előtte 1 döntés vár rád.");
@@ -410,7 +410,7 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
 
     // Manual rebuild ("Tervezet újraszámolása") sends no new notification.
     expect(await R.generateRoundSwitchDraft(1, 2, "org1", AFTER)).toEqual({ ok: true });
-    const afterRebuild = all<{ id: number }>("select id from notifications where kind = 'round_draft_ready'");
+    const afterRebuild = all("select id from notifications where kind = 'round_draft_ready'");
     expect(afterRebuild).toHaveLength(2);
   });
 });

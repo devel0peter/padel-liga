@@ -28,7 +28,7 @@ const all = <T = Record<string, unknown>>(sql: string) => h.raw!.prepare(sql).al
 function freshDb() {
   h.raw = migratedDatabase();
   h.sent = [];
-  h.raw.exec(`
+  h.raw!.exec(`
     insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1), ('movar', 'Mosonmagyaróvár', 1);
     insert or replace into leagues (id, city, slug, name, contact_name, contact_email) values
       (1, 'gyor', 'gyor', 'Győri liga', 'Péter, Padelpárbaj', 'hello@padelparbaj.hu'),

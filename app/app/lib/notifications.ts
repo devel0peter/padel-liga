@@ -488,8 +488,8 @@ export function absenceMarkedMessage(input: { matchId: number; name: string; pla
 export function partnerChangeWaitingMessage(input: { leagueSlug: string; leagueName: string }): Message {
   return {
     title: `Partnercsere jóváhagyásra vár · ${input.leagueName}`,
-    body: "Egy állandó partnercserét az új partner elfogadott. Te döntesz róla a Párok oldalon.",
-    url: `/admin/leagues/${input.leagueSlug}/pairs`,
+    body: "Egy állandó partnercserét az új partner elfogadott. Te döntesz róla a Döntések oldalon.",
+    url: `/admin/leagues/${input.leagueSlug}/disputes`,
   };
 }
 

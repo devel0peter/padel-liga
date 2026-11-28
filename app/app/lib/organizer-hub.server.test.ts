@@ -20,7 +20,7 @@ const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
 function freshDb() {
   h.raw = migratedDatabase();
-  h.raw.exec(`
+  h.raw!.exec(`
     insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1), ('movar', 'Mosonmagyaróvár', 0);
     insert or replace into leagues (id, city, slug, name, contact_name, contact_email) values
       (1, 'gyor', 'gyor', 'Győri liga', 'Péter', 'hello@padelparbaj.hu'),

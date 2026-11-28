@@ -565,6 +565,6 @@ export function newSignupsDaily(input: {
       SIGNATURE,
     ],
     [link],
-    "Ezt a napi összefoglalót azért kaptad, mert szervező vagy a ligában. A Profil → Értesítések alatt kikapcsolhatod.",
+    footer("Ezt a napi összefoglalót azért kaptad, mert szervező vagy a ligában. A Profil → Értesítések alatt kikapcsolhatod."),
   );
 }

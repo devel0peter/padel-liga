@@ -37,12 +37,20 @@ import {
   isNotificationKind,
   isPushTopic,
   kindsFor,
+  NEW_SIGNUPS_DAILY_EMAIL_KEY,
   NOTIFICATION_KINDS,
   PUSH_TOPICS,
   topicEnabled,
   type PushTopic,
 } from "~/lib/notifications";
-import { disabledKindsFor, setChannelEnabled, setKindEnabled, setTopicEnabled, vapidPublicKey } from "~/lib/notifications.server";
+import {
+  disabledKindsFor,
+  setChannelEnabled,
+  setKindEnabled,
+  setNewSignupsDailyEmailEnabled,
+  setTopicEnabled,
+  vapidPublicKey,
+} from "~/lib/notifications.server";
 import { formatPhone } from "~/lib/phone";
 import { ratingFor, resolveLevel } from "~/lib/profile-level";
 import { hasTakenPartInSeason } from "~/lib/profile-level.server";
@@ -108,6 +116,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     // One push switch per topic (#349), for every account: anyone may play.
     topics: (Object.keys(PUSH_TOPICS) as PushTopic[]).map((topic) => ({ topic, ...PUSH_TOPICS[topic], enabled: topicEnabled(disabled, topic) })),
     kinds: kindsFor(actor).map((kind) => ({ kind, ...NOTIFICATION_KINDS[kind], enabled: isEnabled(disabled, kind) })),
+    newSignupsDailyEmailOn: !disabled.has(NEW_SIGNUPS_DAILY_EMAIL_KEY),
   };
 }
 
@@ -156,6 +165,11 @@ export async function action({ request }: Route.ActionArgs) {
     const topic = form.get("topic");
     if (!isPushTopic(topic)) return data({ ok: false }, { status: 400 });
     await setTopicEnabled(user.id, topic, enabled);
+    return { ok: true };
+  }
+  if (form.get("intent") === "new-signups-daily-email") {
+    if (kindsFor(actor).length === 0) return data({ ok: false }, { status: 403 });
+    await setNewSignupsDailyEmailEnabled(user.id, enabled);
     return { ok: true };
   }
   const kind = form.get("kind");
@@ -363,6 +377,14 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
                 {d.kinds.map((k) => (
                   <SettingSwitch key={k.kind} id={`kind-${k.kind}`} label={k.label} description={k.description} enabled={k.enabled} fields={{ kind: k.kind }} />
                 ))}
+                <SettingSwitch
+                  id="organizer-new-signups-daily-email"
+                  label="Új jelentkezők napi levélben"
+                  description="Reggeli összesítő levél azokról a napokról, amikor új jelentkező érkezett a ligádba."
+                  enabled={d.newSignupsDailyEmailOn}
+                  disabled={!d.emailOn}
+                  fields={{ intent: "new-signups-daily-email" }}
+                />
               </div>
             )}
           </Block>

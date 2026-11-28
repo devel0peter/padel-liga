@@ -29,6 +29,7 @@ const KIND_LABELS: Partial<Record<MessageKind, string>> = {
   season_start: "Indul a szezon",
   round_extended: "Meghosszabbított kör",
   partner_change: "Állandó partnercsere",
+  new_signups_daily: "Új jelentkezők napi összefoglaló",
 };
 
 export function kindLabel(kind: string): string {

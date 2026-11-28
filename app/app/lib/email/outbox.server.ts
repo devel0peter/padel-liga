@@ -33,6 +33,7 @@ import {
   matchProposal,
   matchResult,
   matchTomorrow,
+  newSignupsDaily,
   pairCreated,
   partnerChange,
   type PartnerChangeEmail,
@@ -66,14 +67,15 @@ const MAX_BATCHES_PER_RUN = 10;
 // mid-send, at most this many are left "sending" (unknown, never resent by
 // themselves); the rest are still pending and go with the next run.
 export const SEND_CHUNK = 10;
-// D1 allows 100 bound parameters per statement; a message row binds 9
-// (its 8 values and the attempts default), so 11 rows fit.
-const INSERT_CHUNK = 11;
+// D1 allows 100 bound parameters per statement; a message row binds 10
+// (its 9 values including leagueId and the attempts default), so 9 rows fit.
+const INSERT_CHUNK = 9;
 
 type NewMessage = Email & {
   kind: MessageKind;
   toEmail: string;
   broadcastId?: number;
+  leagueId?: number | null;
   headers?: Record<string, string>;
 };
 
@@ -94,6 +96,7 @@ function messageValues(m: NewMessage) {
     kind: m.kind,
     status: "pending" as const,
     broadcastId: m.broadcastId ?? null,
+    leagueId: m.leagueId ?? null,
     toEmail: m.toEmail,
     subject: m.subject,
     html: m.html,
@@ -201,9 +204,21 @@ export async function queueSeasonEntered(
 // leaving player once it is final; one email each, right after the
 // response. An unsubscribed or bounced address, or a player who switched
 // email off (#115), gets nothing; the in-app notice and push still have it.
-export async function queuePartnerChangeEmail(toEmail: string, input: PartnerChangeEmail): Promise<void> {
+export async function queuePartnerChangeEmail(toEmail: string, input: PartnerChangeEmail, leagueId?: number | null): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  sendAfterResponse(await enqueue([{ kind: "partner_change", toEmail, ...partnerChange(input) }]));
+  sendAfterResponse(await enqueue([{ kind: "partner_change", toEmail, leagueId, ...partnerChange(input) }]));
+}
+
+// Morning summary of the previous day's sign-ups per league (#383).
+export async function queueNewSignupsDaily(
+  recipients: readonly string[],
+  input: Parameters<typeof newSignupsDaily>[0],
+  leagueId: number,
+): Promise<number> {
+  if (recipients.length === 0) return 0;
+  const email = newSignupsDaily(input);
+  const ids = await enqueue(recipients.map((toEmail) => ({ kind: "new_signups_daily" as const, toEmail, leagueId, ...email })));
+  return ids.length;
 }
 
 // The groups are published (#24, D22): one email per player, sent right after the response

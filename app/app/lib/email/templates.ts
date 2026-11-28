@@ -528,3 +528,43 @@ export function matchTomorrow(input: { to: string; opponents: string; matchId: n
     matchFooter(),
   );
 }
+
+// Morning summary of the previous Budapest day's sign-up events for a league's
+// organizers (#383). No player names or contact data.
+export function newSignupsDaily(input: {
+  leagueName: string;
+  leagueSlug: string;
+  counts: {
+    playerJoined: number;
+    pairFormed: number;
+    pairEnteredByPhase: { phase: number | null; count: number }[];
+    partnerSearch: number;
+  };
+  waiting: { pairs: number; singles: number };
+}): Email {
+  const parts: string[] = [];
+  if (input.counts.playerJoined > 0) parts.push(`${input.counts.playerJoined} új játékos`);
+  if (input.counts.pairFormed > 0) parts.push(`${input.counts.pairFormed} új pár`);
+  for (const e of input.counts.pairEnteredByPhase) {
+    if (e.count <= 0) continue;
+    if (e.phase && e.phase > 1) parts.push(`${e.count} nevezés ${withArticle(e.phase)} körre`);
+    else if (e.phase === null) parts.push(`${e.count} nevezés a következő szezonra`);
+    else parts.push(`${e.count} nevezés`);
+  }
+  if (input.counts.partnerSearch > 0) parts.push(`${input.counts.partnerSearch} játékos párt keres`);
+  const summary = parts.join(", ");
+  const link = `${SITE_URL}/admin/leagues/${input.leagueSlug}/players?tab=waiting`;
+  return buildPlain(
+    `Új jelentkezők – ${input.leagueName}`,
+    [
+      "Szia!",
+      `Tegnap az alábbi jelentkezések érkeztek a ligádba (${input.leagueName}): ${summary}.`,
+      `Jelenleg ${input.waiting.pairs} pár és ${input.waiting.singles} egyedül jelentkező várakozik a futó körön kívül.`,
+      "Várakozók listája:",
+      link,
+      SIGNATURE,
+    ],
+    [link],
+    "Ezt a napi összefoglalót azért kaptad, mert szervező vagy a ligában. A Profil → Értesítések alatt kikapcsolhatod.",
+  );
+}

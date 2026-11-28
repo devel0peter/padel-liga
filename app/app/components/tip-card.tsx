@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useFetcher } from "react-router";
 import { Lightbulb } from "lucide-react";
 
+import { RatingDialog } from "~/components/feedback-form";
 import { usePushDevice } from "~/components/use-push-device";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
@@ -51,6 +52,12 @@ export function TipCard({ offered, vapidPublicKey }: { offered: string[]; vapidP
             <Button type="button" disabled={push.busy} onClick={() => void push.subscribe()}>
               {tip.button}
             </Button>
+          ) : tip.action.kind === "rating" ? (
+            // Sent: the card goes; the server doesn't offer it again (#446).
+            // Closed without sending: as "Most nem", it stays away a long while.
+            <RatingDialog onSent={() => setDismissed((d) => [...d, tip.id])} onDismiss={() => later(tip)}>
+              <Button type="button">{tip.button}</Button>
+            </RatingDialog>
           ) : (
             <Button asChild>
               <Link to={tip.action.to}>{tip.button}</Link>

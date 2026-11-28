@@ -2,7 +2,7 @@ import { Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/feedback";
 import { AuthPage } from "~/components/auth";
-import { FEEDBACK_INTRO, FeedbackFields, THANKS_TEXT, THANKS_TITLE, type FeedbackAnswer } from "~/components/feedback-form";
+import { FEEDBACK_INTRO, FEEDBACK_TITLE, FeedbackFields, THANKS_TEXT, THANKS_TITLE, type FeedbackAnswer } from "~/components/feedback-form";
 import { Button } from "~/components/ui/button";
 import { APP_VERSION } from "~/lib/app-version";
 import { safeReturnTo } from "~/lib/auth/rules";
@@ -19,7 +19,7 @@ import { turnstileSiteKey } from "~/lib/turnstile.server";
 // the signup's bot check (Turnstile). Nothing is mailed or notified.
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: `Visszajelzés – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
+  return [{ title: `${FEEDBACK_TITLE} – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -64,7 +64,7 @@ export default function Feedback({ loaderData, actionData }: Route.ComponentProp
     );
   }
   return (
-    <AuthPage title="Visszajelzés" intro={FEEDBACK_INTRO}>
+    <AuthPage title={FEEDBACK_TITLE} intro={FEEDBACK_INTRO}>
       <FeedbackFields data={loaderData} failed={actionData && !actionData.ok ? actionData : null} busy={busy} answer={actionData} />
     </AuthPage>
   );

@@ -12,6 +12,8 @@ export type TipAccount = {
   pushChannelOn: boolean;
   // The site can push at all (VAPID keys set).
   pushConfigured: boolean;
+  // The rating is due (#446): the account is at least a week old and hasn't rated yet.
+  ratingDue: boolean;
 };
 
 // What this browser knows; filled in by the card once the checks are done.
@@ -20,8 +22,8 @@ export type TipDevice = {
 };
 
 // What the button does: subscribe this device to push (the same as the
-// profile's push switch), or open a page.
-export type TipAction = { kind: "push" } | { kind: "link"; to: string };
+// profile's push switch), open a page, or open the rating dialog (#446).
+export type TipAction = { kind: "push" } | { kind: "link"; to: string } | { kind: "rating" };
 
 export type Tip = {
   id: string;
@@ -33,6 +35,8 @@ export type Tip = {
   offered: (account: TipAccount) => boolean;
   // Checked in the browser: whether it applies on this device now.
   applies: (device: TipDevice) => boolean;
+  // How long "Most nem" hides it; TIP_SNOOZE_DAYS when not set.
+  snoozeDays?: number;
 };
 
 // The tips, in order: the Kezdőlap shows the first that applies and isn't
@@ -50,7 +54,28 @@ export const TIPS: readonly Tip[] = [
     // to allow them, not a new prompt.
     applies: (d) => d.push === "off" || d.push === "denied",
   },
+  {
+    // The rating (#446): answering ends it; "Most nem" or closing it
+    // unanswered hides it for 30 days, the second time for good. Not
+    // logins: a login lasts 90 days, so they are too rare to count.
+    id: "rating",
+    title: "Hogy tetszik a Padelpárbaj?",
+    text: "Értékeld egytől öt labdáig, pár másodperc az egész.",
+    button: "Értékelem",
+    action: { kind: "rating" },
+    offered: (a) => a.ratingDue,
+    applies: () => true,
+    snoozeDays: 30,
+  },
 ];
+
+// The account's age before the rating is offered (#446).
+export const RATING_AFTER_DAYS = 7;
+
+/** Whether to offer the rating: a week after the first login, until the account rates. */
+export function ratingDue(firstLoginAt: Date | null, hasRated: boolean, now: Date): boolean {
+  return !hasRated && firstLoginAt !== null && now.getTime() - firstLoginAt.getTime() >= RATING_AFTER_DAYS * 86_400_000;
+}
 
 export const TIP_SNOOZE_DAYS = 14;
 // The dismissal after which a tip never comes back.
@@ -58,16 +83,16 @@ export const TIP_DISMISSALS_FOR_GOOD = 2;
 
 export type TipDismissal = { count: number; dismissedAt: Date };
 
-// "Most nem": hidden for 14 days; the second time for good.
-export function isDismissed(d: TipDismissal | undefined, now: Date): boolean {
+// "Most nem": hidden for 14 days (or the tip's own snooze); the second time for good.
+export function isDismissed(d: TipDismissal | undefined, now: Date, snoozeDays = TIP_SNOOZE_DAYS): boolean {
   if (!d) return false;
   if (d.count >= TIP_DISMISSALS_FOR_GOOD) return true;
-  return now.getTime() - d.dismissedAt.getTime() < TIP_SNOOZE_DAYS * 86_400_000;
+  return now.getTime() - d.dismissedAt.getTime() < snoozeDays * 86_400_000;
 }
 
 // The tips offered to this account now, in order (the server's part).
 export function offeredTips(tips: readonly Tip[], account: TipAccount, dismissals: ReadonlyMap<string, TipDismissal>, now: Date): Tip[] {
-  return tips.filter((t) => t.offered(account) && !isDismissed(dismissals.get(t.id), now));
+  return tips.filter((t) => t.offered(account) && !isDismissed(dismissals.get(t.id), now, t.snoozeDays));
 }
 
 // The one tip the card shows on this device: the first offered one that

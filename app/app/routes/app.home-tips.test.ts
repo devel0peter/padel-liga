@@ -32,14 +32,22 @@ beforeEach(async () => {
   h.raw.exec(`insert or replace into cities (slug, name, listed) values ('gyor', 'Győr', 1)`);
   h.raw.exec(`insert into leagues (id, city, slug, name) values (1, 'gyor', 'gyor', 'Padelpárbaj Győr')`);
   h.raw.exec(`insert into users (id, email, name, level, phone, sex, consent_at) values
-    ('a', 'a@x.hu', 'Anna', 'kezdo', '+36301234567', 'female', 1),
-    ('o', 'o@x.hu', 'Org', 'kezdo', '+36301234568', 'male', 1)`);
+    ('a', 'a@x.hu', 'Anna', 'kezdo', '+36301234567', 'female', unixepoch()),
+    ('o', 'o@x.hu', 'Org', 'kezdo', '+36301234568', 'male', unixepoch())`);
   h.raw.exec(`insert into league_members (league_id, user_id, source) values (1, 'a', 'register'), (1, 'o', 'register')`);
   h.raw.exec(`insert into league_admins (league_id, user_id) values (1, 'o')`);
   anna = (await createSession("a")).split(";")[0]!;
 });
 
 describe("Kezdőlap tip (#262)", () => {
+  it("the rating a week after the first login, gone once rated (#446)", async () => {
+    expect(await tips(anna)).toEqual(["push"]);
+    h.raw.exec(`update users set consent_at = unixepoch() - 8 * 86400 where id = 'a'`);
+    expect(await tips(anna)).toEqual(["push", "rating"]);
+    h.raw.exec(`insert into feedback (kind, message, rating, page, device, browser, app_version, user_id, created_at) values ('rating', '', 5, '/home', 'mobile', 'Safari', 'dev', 'a', unixepoch())`);
+    expect(await tips(anna)).toEqual(["push"]);
+  });
+
   it("offers the push tip, with the key the button subscribes with", async () => {
     const page: any = await Home.loader(args(anna));
     expect(page.tips).toEqual(["push"]);

@@ -64,7 +64,7 @@ import { unreadCount } from "~/lib/notifications.server";
 import { organizerHomeSummary, organizerSidebarMeta } from "~/lib/organizer-decisions.server";
 import { shellTeam, type ShellTeam } from "~/lib/shell.server";
 import { SITE_NAME } from "~/lib/site";
-import { FeedbackDialog } from "~/components/feedback-form";
+import { FEEDBACK_LINK, FeedbackDialog } from "~/components/feedback-form";
 import { cn } from "~/lib/utils";
 
 // The app shell (D181, docs/ui/mockups): the sidebar on wider screens, the
@@ -414,7 +414,7 @@ export default function AppShell({ loaderData }: Route.ComponentProps) {
               <SidebarMenuItem>
                 {/* In a dialog, without leaving the page (#444). */}
                 <FeedbackDialog from={pathname + search}>
-                  <SidebarMenuButton className={cn(footLink, "cursor-pointer")}>Visszajelzés</SidebarMenuButton>
+                  <SidebarMenuButton className={cn(footLink, "cursor-pointer")}>{FEEDBACK_LINK}</SidebarMenuButton>
                 </FeedbackDialog>
               </SidebarMenuItem>
               <SidebarMenuItem>

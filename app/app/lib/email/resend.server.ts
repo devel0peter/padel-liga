@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 import { countCall } from "~/lib/run-usage";
 
+import { formatFromHeader, isSafeAddress } from "./mime";
 import { REPLY_TO, SENDER, type OutgoingEmail } from "./sender";
 
 // Minimal Resend client (plain fetch, no SDK), the fallback behind the SMTP
@@ -35,8 +36,8 @@ export async function sendBatch(emails: OutgoingEmail[]): Promise<BatchResult> {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(
         emails.map((e) => ({
-          from: FROM,
-          reply_to: REPLY_TO,
+          from: e.fromName ? formatFromHeader(e.fromName, SENDER.address) : FROM,
+          reply_to: e.replyTo && isSafeAddress(e.replyTo) ? e.replyTo : REPLY_TO,
           to: [e.to],
           subject: e.subject,
           html: e.html,

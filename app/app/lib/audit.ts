@@ -6,10 +6,14 @@ export const AUDIT_ACTIONS = {
   // Leagues and Szervezők
   "league.create": "Liga létrehozása",
   "league.min_entries": "Minimum nevezés módosítása",
+  "league.contact": "Kapcsolattartó módosítása",
+  "league.local_rules": "Helyi kiegészítés módosítása",
+  "league.register_link_shared": "Regisztrációs link megosztva",
   "league_admin.grant": "Szervező kinevezése",
   "league_admin.invite": "Szervező meghívása",
   "league_admin.revoke": "Szervező elvétele",
   "league_admin.invite_cancel": "Szervezői meghívó visszavonása",
+  "league_admin.privacy_agreement": "Adatvédelmi megállapodás rögzítve",
   // Admin role and account invites (command line)
   "superadmin.grant": "Admin jog adása",
   "superadmin.revoke": "Admin jog elvétele",

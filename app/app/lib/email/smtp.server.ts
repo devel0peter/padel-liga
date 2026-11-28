@@ -88,7 +88,9 @@ export async function sendViaRelay(emails: OutgoingEmail[], now = new Date()): P
   const messages = emails.flatMap((e, i) => {
     if (results[i]) return [];
     const id = `${crypto.randomUUID()}@${SENDER_DOMAIN}`;
-    const data = smtpData(buildMessage({ from: SENDER, replyTo: REPLY_TO, ...e, messageId: id, date: now }));
+    const from = { name: e.fromName || SENDER.name, address: SENDER.address };
+    const replyTo = e.replyTo && isSafeAddress(e.replyTo) ? e.replyTo : REPLY_TO;
+    const data = smtpData(buildMessage({ ...e, from, replyTo, messageId: id, date: now }));
     return [{ index: i, to: e.to, data, id }];
   });
   const sent = await smtpSend(openSocket, { hostname: SENDER_DOMAIN, from: SENDER.address, ...login }, messages);

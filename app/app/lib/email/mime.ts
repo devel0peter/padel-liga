@@ -31,9 +31,9 @@ function base64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-// A header value can't carry a line break: that would start a new header.
+// A header value can't carry a line break or control chars: that would start a new header.
 function oneLine(value: string): string {
-  return value.replace(/[\r\n]+/g, " ");
+  return value.replace(/[\x00-\x1f\x7f]+/g, " ").trim();
 }
 
 // Encoded words of at most 75 characters each (RFC 2047): 45 UTF-8 bytes are
@@ -55,6 +55,17 @@ export function encodeWords(value: string): string {
   return words.map((w) => `=?UTF-8?B?${base64(Uint8Array.from(w))}?=`).join(`${CRLF} `);
 }
 
+// Formats a safe RFC 5322 / RFC 2047 From header (#384). Strips control chars
+// and CRLF, encodes non-ASCII display names as UTF-8 Base64 encoded words, and
+// quotes ASCII names that contain RFC 5322 specials (e.g. commas).
+export function formatFromHeader(name: string, address: string): string {
+  const clean = oneLine(name);
+  if (!clean) return `<${address}>`;
+  if (!/^[\x20-\x7e]*$/.test(clean)) return `${encodeWords(clean)} <${address}>`;
+  if (/[",\\<>@;:()[\]]/.test(clean)) return `"${clean.replace(/[\\"]/g, "\\$&")}" <${address}>`;
+  return `${clean} <${address}>`;
+}
+
 // Base64 in lines of 76 characters (RFC 2045).
 function base64Body(text: string): string {
   return (base64(enc.encode(text)).match(/.{1,76}/g) ?? []).join(CRLF);
@@ -72,9 +83,9 @@ function part(type: "plain" | "html", body: string): string {
 // The whole message, CRLF line endings, without SMTP's final ".".
 export function buildMessage(email: MimeEmail): string {
   const headers: [string, string][] = [
-    ["From", `${encodeWords(email.from.name)} <${email.from.address}>`],
+    ["From", formatFromHeader(email.from.name, email.from.address)],
     ["To", `<${email.to}>`],
-    ["Reply-To", email.replyTo],
+    ["Reply-To", oneLine(email.replyTo)],
     ["Subject", encodeWords(email.subject)],
     ["Date", rfc5322Date(email.date)],
     ["Message-ID", `<${email.messageId}>`],

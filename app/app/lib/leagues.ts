@@ -9,6 +9,7 @@ export type LeagueField = keyof LeagueInput;
 export type LeagueResult = { ok: true; data: LeagueInput } | { ok: false; errors: Partial<Record<LeagueField, string>> };
 
 const MAX_NAME = 80;
+export const LOCAL_RULES_MAX = 4000;
 
 // The slug is the league's address (/admin/leagues/gyor, later the public
 // league pages); empty means "made from the name".

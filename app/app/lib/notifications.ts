@@ -763,7 +763,7 @@ export function roundDraftReadyMessage(input: {
   return {
     title: `${input.leagueName}: kész ${withArticle(input.phase)} kör tervezete`,
     body: input.blockers > 0 ? `${base} Előtte ${input.blockers} döntés vár rád.` : base,
-    url: input.url ?? `/admin/leagues/${input.leagueSlug}/seasons/${input.seasonId}/groups?phase=${input.phase}`,
+    url: input.url ?? `/admin/leagues/${input.leagueSlug}/seasons/${input.seasonId}/rounds/${input.phase}?tab=groups`,
   };
 }
 

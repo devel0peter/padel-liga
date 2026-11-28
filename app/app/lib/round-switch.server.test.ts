@@ -405,7 +405,7 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
     expect(rows.map((r) => r.user_id)).toEqual(["adm1", "org1"]);
     expect(rows[0].title).toContain("kész a 2. kör tervezete");
     expect(rows[0].body).toContain("Előtte 1 döntés vár rád.");
-    expect(rows[0].url).toBe("/admin/leagues/gyor/seasons/1/groups?phase=2");
+    expect(rows[0].url).toBe("/admin/leagues/gyor/seasons/1/rounds/2?tab=groups");
     expect(rows[0].push_due_at).not.toBeNull();
 
     // Manual rebuild ("Tervezet újraszámolása") sends no new notification.

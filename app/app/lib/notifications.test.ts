@@ -64,7 +64,7 @@ describe("roundDraftReadyMessage (#432)", () => {
     const clean = roundDraftReadyMessage({ leagueSlug: "gyor", leagueName: "Győri liga", seasonId: 3, phase: 2, blockers: 0 });
     expect(clean.title).toBe("Győri liga: kész a 2. kör tervezete");
     expect(clean.body).toBe("Nézd át és tedd közzé.");
-    expect(clean.url).toBe("/admin/leagues/gyor/seasons/3/groups?phase=2");
+    expect(clean.url).toBe("/admin/leagues/gyor/seasons/3/rounds/2?tab=groups");
 
     const blocked = roundDraftReadyMessage({ leagueSlug: "gyor", leagueName: "Győri liga", seasonId: 3, phase: 2, blockers: 2 });
     expect(blocked.body).toBe("Nézd át és tedd közzé. Előtte 2 döntés vár rád.");

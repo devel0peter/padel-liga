@@ -76,23 +76,18 @@ const mergeMaps = <K, V>(maps: readonly Map<K, V>[]): Map<K, V> => new Map(maps.
  * which don't count (the round's numbers count them as "Nem számít" only).
  * Normally one phase; a league running two seasons at once gets one each.
  */
-export async function runningPhases(leagueId: number, now = new Date()): Promise<OverviewPhase[]> {
-  const groupRows = await db
-    .select({
-      id: groups.id,
-      number: groups.number,
-      seasonId: groups.seasonId,
-      phase: groups.phase,
-      season: seasons.name,
-      startsAt: seasonPhases.startsAt,
-      deadline: seasonPhases.deadline,
-      setGames: seasonPhases.setGames,
-    })
-    .from(groups)
-    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
-    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
-    .where(and(eq(seasons.leagueId, leagueId), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)))
-    .orderBy(asc(seasonPhases.startsAt), asc(groups.seasonId), asc(groups.number));
+type GroupPhaseRow = {
+  id: number;
+  number: number;
+  seasonId: number;
+  phase: number;
+  season: string;
+  startsAt: Date;
+  deadline: Date;
+  setGames: SetGames;
+};
+
+async function buildOverviewPhases(groupRows: readonly GroupPhaseRow[], now: Date): Promise<OverviewPhase[]> {
   if (groupRows.length === 0) return [];
 
   // D1 binds at most 100 parameters per statement: a big phase has more
@@ -157,7 +152,8 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     const result = results.get(m.id) ?? EMPTY_RESULT;
     const status = resultStatus(result.state, names, g.setGames) ?? overviewStatus(state, names, state.status === "to_schedule" ? null : venues.get(state.clubId ?? -1));
     const overview = statusOf(state, result.state);
-    const stuck = stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now });
+    const running = g.deadline.getTime() >= now.getTime();
+    const stuck = running ? stuckReason({ state, events: log, result: result.state, phaseStartsAt: g.startsAt, week: m.week, now }) : null;
     phase.history.push({
       groupNumber: g.number,
       week: m.week,
@@ -186,6 +182,51 @@ export async function runningPhases(leagueId: number, now = new Date()): Promise
     ...p,
     round: roundStatus({ phaseStartsAt: p.phaseStartsAt, deadline: p.deadline, groups: p.groups, matches: history, voided, now }),
   }));
+}
+
+export async function runningPhases(leagueId: number, now = new Date()): Promise<OverviewPhase[]> {
+  const groupRows = await db
+    .select({
+      id: groups.id,
+      number: groups.number,
+      seasonId: groups.seasonId,
+      phase: groups.phase,
+      season: seasons.name,
+      startsAt: seasonPhases.startsAt,
+      deadline: seasonPhases.deadline,
+      setGames: seasonPhases.setGames,
+    })
+    .from(groups)
+    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(eq(seasons.leagueId, leagueId), isNotNull(groups.publishedAt), gte(seasonPhases.deadline, now)))
+    .orderBy(asc(seasonPhases.startsAt), asc(groups.seasonId), asc(groups.number));
+  return buildOverviewPhases(groupRows, now);
+}
+
+/**
+ * Published matches and round status for one specific phase (running or
+ * finished) of a league (#377). Null when the phase has no published groups.
+ */
+export async function phaseOverview(leagueId: number, seasonId: number, phaseNumber: number, now = new Date()): Promise<OverviewPhase | null> {
+  const groupRows = await db
+    .select({
+      id: groups.id,
+      number: groups.number,
+      seasonId: groups.seasonId,
+      phase: groups.phase,
+      season: seasons.name,
+      startsAt: seasonPhases.startsAt,
+      deadline: seasonPhases.deadline,
+      setGames: seasonPhases.setGames,
+    })
+    .from(groups)
+    .innerJoin(seasons, eq(seasons.id, groups.seasonId))
+    .innerJoin(seasonPhases, and(eq(seasonPhases.seasonId, groups.seasonId), eq(seasonPhases.number, groups.phase)))
+    .where(and(eq(seasons.leagueId, leagueId), eq(groups.seasonId, seasonId), eq(groups.phase, phaseNumber), isNotNull(groups.publishedAt)))
+    .orderBy(asc(groups.number));
+  const [phase] = await buildOverviewPhases(groupRows, now);
+  return phase ?? null;
 }
 
 // --- One match ----------------------------------------------------------------

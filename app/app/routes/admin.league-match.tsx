@@ -128,12 +128,12 @@ export default function LeagueMatch({ loaderData, actionData }: Route.ComponentP
           </div>
         ))}
       </RadioGroup>
-      <ScoreFields setGames={d.setGames} initial={score} pairA={d.a} pairB={d.b} />
+      <ScoreFields id="decide-score" columns={[d.a, d.b]} values={score} />
       <div className="grid gap-1.5">
         <Label htmlFor="decision-reason">Indoklás (kötelező, mindkét pár látja)</Label>
         <Textarea id="decision-reason" name="reason" required maxLength={REASON_MAX} rows={3} placeholder="Rövid indoklás a döntéshez..." />
       </div>
-      {actionData?.intent === "decide" && <FormFeedback ok={actionData.ok} message={actionData.message} />}
+      <FormFeedback result={actionData} intent="decide" />
       <div>
         <Button type="submit" size="xl" variant={primary ? "default" : "secondary"} disabled={busy}>
           {primary ? "Döntök" : "Felülbírálom"}
@@ -175,7 +175,7 @@ export default function LeagueMatch({ loaderData, actionData }: Route.ComponentP
               <Label htmlFor="ns-reason">Indoklás (opcionális, mindkét pár látja)</Label>
               <Textarea id="ns-reason" name="reason" maxLength={NO_SHOW_REASON_MAX} rows={2} />
             </div>
-            {actionData?.intent === "no-show" && <FormFeedback ok={actionData.ok} message={actionData.message} />}
+            <FormFeedback result={actionData} intent="no-show" />
             <div className="flex flex-wrap gap-2">
               <Button type="submit" size="xl" name="intent" value="no-show-confirm" disabled={busy}>
                 Jóváhagyom (játék nélkül)

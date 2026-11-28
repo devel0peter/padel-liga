@@ -91,8 +91,10 @@ export type SubmitResult = { ok: true } | { ok: false; error: string };
 // nothing.
 export async function submitFeedback(form: FormData, request: Request, userId: string | null, now = new Date()): Promise<SubmitResult> {
   const kind = form.get("kind");
-  if (!isFormKind(kind)) return { ok: false, error: ERRORS.kind };
-  const checked = validateFeedback({ kind, message: form.get("message") });
+  // A rating comes from a logged-in player's rating dialog (#446); the form sends a bug or an idea.
+  const rating = kind === "rating" && userId !== null;
+  if (!isFormKind(kind) && !rating) return { ok: false, error: ERRORS.kind };
+  const checked = validateFeedback({ kind, message: form.get("message"), rating: form.get("rating") });
   if (!checked.ok) return checked;
   if (userId === null) {
     const bot = await verifyTurnstile(form, request, "feedback");

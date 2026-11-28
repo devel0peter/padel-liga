@@ -1,7 +1,9 @@
+import { ChevronRight } from "lucide-react";
 import { data, Form, Link, redirect, useFetcher, useFetchers, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/profile";
-import { Page, PageHeader, SectionLabel } from "~/components/blocks";
+import { ListCard, Page, PageHeader, SectionLabel } from "~/components/blocks";
+import { FEEDBACK_LINK, FeedbackDialog, RatingDialog } from "~/components/feedback-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -299,6 +301,25 @@ export default function Profile({ loaderData: d, actionData }: Route.ComponentPr
             )}
             <PlayerProfileView profile={d.profile} own={{ rating: d.rating, rated: d.rated }} />
           </div>
+          {/* The app itself (#446): a rating, a bug or an idea, any time. */}
+          <ListCard label="A Padelpárbajról">
+            <li>
+              <RatingDialog>
+                <button type="button" className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 md:px-5">
+                  <span className="flex-1 text-body">Értékeld a Padelpárbajt</span>
+                  <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
+                </button>
+              </RatingDialog>
+            </li>
+            <li>
+              <FeedbackDialog from="/profile">
+                <button type="button" className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 md:px-5">
+                  <span className="flex-1 text-body">{FEEDBACK_LINK}</span>
+                  <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
+                </button>
+              </FeedbackDialog>
+            </li>
+          </ListCard>
         </TabsContent>
 
         <TabsContent value="settings" className="grid max-w-2xl gap-6">

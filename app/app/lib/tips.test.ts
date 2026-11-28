@@ -3,12 +3,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { PushDeviceState } from "./push/device";
-import { isDismissed, offeredTips, tipById, tipCardParts, tipToShow, TIPS, type Tip } from "./tips";
+import { isDismissed, offeredTips, ratingDue, tipById, tipCardParts, tipToShow, TIPS, type Tip } from "./tips";
 
 const NOW = new Date("2026-11-20T10:00:00Z");
 const DAY = 86_400_000;
 const ago = (days: number) => new Date(NOW.getTime() - days * DAY);
-const ACCOUNT = { pushChannelOn: true, pushConfigured: true };
+const ACCOUNT = { pushChannelOn: true, pushConfigured: true, ratingDue: false };
 const push = tipById("push")!;
 const device = (state: PushDeviceState) => ({ push: state });
 
@@ -105,5 +105,29 @@ describe("one list, one at a time", () => {
   it("every tip has the card's parts and a unique id", () => {
     expect(new Set(TIPS.map((t) => t.id)).size).toBe(TIPS.length);
     for (const t of TIPS) for (const s of [t.title, t.text, t.button]) expect(s.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the rating tip (#446)", () => {
+  const rating = tipById("rating")!;
+  it("is offered a week after the first login, until the account rates", () => {
+    expect(ratingDue(ago(6), false, NOW)).toBe(false);
+    expect(ratingDue(ago(7), false, NOW)).toBe(true);
+    expect(ratingDue(ago(30), true, NOW)).toBe(false);
+    expect(ratingDue(null, false, NOW)).toBe(false);
+    expect(rating.offered({ ...ACCOUNT, ratingDue: true })).toBe(true);
+    expect(rating.offered(ACCOUNT)).toBe(false);
+  });
+
+  it("comes after the push tip, applies on every device, and follows the dismissal rules", () => {
+    expect(TIPS.map((t) => t.id)).toEqual(["push", "rating"]);
+    expect(rating.applies(device("unsupported"))).toBe(true);
+    const due = { ...ACCOUNT, pushConfigured: false, ratingDue: true };
+    expect(offeredTips(TIPS, due, new Map(), NOW).map((t) => t.id)).toEqual(["rating"]);
+    // "Most nem" (or closing it unanswered): away for 30 days, not 14; the second time for good.
+    const once = (days: number) => new Map([["rating", { count: 1, dismissedAt: ago(days) }]]);
+    expect(offeredTips(TIPS, due, once(20), NOW)).toEqual([]);
+    expect(offeredTips(TIPS, due, once(31), NOW).map((t) => t.id)).toEqual(["rating"]);
+    expect(offeredTips(TIPS, due, new Map([["rating", { count: 2, dismissedAt: ago(400) }]]), NOW)).toEqual([]);
   });
 });

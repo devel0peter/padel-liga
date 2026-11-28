@@ -96,13 +96,12 @@ describe("sidebar", () => {
     expect(nav[0].items.map((i) => i.to)).toEqual(["/home", "/leagues", "/notifications"]);
     expect(nav[1].items.map((i) => i.to)).toEqual([
       "/admin/leagues/gyor",
-      "/admin/leagues/gyor/seasons",
-      "/admin/leagues/gyor/matches",
-      "/admin/leagues/gyor/players",
-      "/admin/leagues/gyor/pairs",
-      "/admin/leagues/gyor/reminders",
-      "/admin/leagues/gyor/clubs",
       "/admin/leagues/gyor/disputes",
+      "/admin/leagues/gyor/players",
+      "/admin/leagues/gyor/seasons",
+      "/admin/leagues/gyor/mail",
+      "/admin/leagues/gyor/settings",
+      "/admin/leagues/gyor/help",
     ]);
     expect(nav[2].items.map((i) => i.to)).toEqual([
       "/admin/leagues",
@@ -117,12 +116,25 @@ describe("sidebar", () => {
     expect(adminHome(superadmin)).toBe("/admin/leagues");
   });
 
-  it("has two people pages, each with a one-line description (#301)", () => {
-    const nav = appNav(superadmin, [gyor]);
-    const people = nav.flatMap((s) => s.items).filter((i) => i.icon === "players" || i.icon === "users");
-    expect(people.map((i) => i.label)).toEqual(["Játékosok", "Felhasználók"]);
-    for (const i of people) expect(i.hint?.trim()).toBeTruthy();
-    expect(nav.flatMap((s) => s.items).some((i) => i.to.endsWith("/solos"))).toBe(false);
+  it("includes dynamic running round item and organizer badges when meta is provided (#379, #434, #438)", () => {
+    const nav = appNav(superadmin, [gyor], "gyor", {
+      radVarCount: 3,
+      decisionsCount: 2,
+      runningRound: { seasonId: 7, phase: 2 },
+    });
+    expect(nav[1].items.map((i) => i.label)).toEqual([
+      "Áttekintés",
+      "Döntések",
+      "2. kör",
+      "Játékosok",
+      "Szezonok",
+      "Levelek",
+      "Beállítások",
+      "Súgó",
+    ]);
+    expect(nav[1].items[0]!.badge).toBe(3);
+    expect(nav[1].items[1]!.badge).toBe(2);
+    expect(nav[1].items[2]!.to).toBe("/admin/leagues/gyor/seasons/7/rounds/2");
   });
 
   it("lets only the Admin edit a player's profile (#301, D156)", () => {
@@ -134,7 +146,7 @@ describe("sidebar", () => {
   it("follows the league in the URL", () => {
     const nav = appNav(superadmin, [gyor, debrecen], "debrecen");
     expect(nav[1].label).toBe("Padelpárbaj Debrecen");
-    expect(nav[1].items.find((i) => i.label === "Klubok")?.to).toBe("/admin/leagues/debrecen/clubs");
+    expect(nav[1].items.find((i) => i.label === "Beállítások")?.to).toBe("/admin/leagues/debrecen/settings");
   });
 
   it("offers the Admin every league, a Szervező only their own", () => {
@@ -145,7 +157,15 @@ describe("sidebar", () => {
   it("shows a Szervező their league and no Admin section", () => {
     const nav = appNav(organizer, navLeagues(organizer, [gyor, debrecen]));
     expect(nav.map((s) => s.label)).toEqual(["", "Padelpárbaj Győr"]);
-    expect(nav[1].items.map((i) => i.label)).toEqual(["Áttekintés", "Szezonok", "Meccsek", "Játékosok", "Párok", "Emlékeztetők", "Klubok", "Viták"]);
+    expect(nav[1].items.map((i) => i.label)).toEqual([
+      "Áttekintés",
+      "Döntések",
+      "Játékosok",
+      "Szezonok",
+      "Levelek",
+      "Beállítások",
+      "Súgó",
+    ]);
     expect(adminHome(organizer)).toBe("/admin/leagues/gyor");
   });
 

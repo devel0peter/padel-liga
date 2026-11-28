@@ -34,14 +34,14 @@ test("23. Meccsek: every match with its status, the stuck filter, one match's lo
 
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta");
-  await page.getByRole("link", { name: "Meccsek" }).first().click();
-  await expect(page).toHaveURL(new RegExp(`${LIST}$`));
+  await page.getByRole("link", { name: "1. kör", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/admin\/leagues\/minta\/seasons\/\d+\/rounds\/1$/);
   const main = content(page);
-  await expect(main.getByRole("heading", { name: "Meccsek", level: 1 })).toBeVisible();
-  await expect(main).toContainText("1. kör · határidő:");
+  await expect(main.getByRole("heading", { name: "1. kör", level: 1 })).toBeVisible();
+  await expect(main).toContainText("Határidő:");
   await expect(main.getByRole("heading", { name: /divízió, 1\. csoport$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: /divízió, 2\. csoport$/ })).toBeVisible();
-  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Napló és telefonszámok" }) });
+  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Meccs megnyitása" }) });
   await expect(rows).toHaveCount(matchCount);
   // Step 19 scheduled anna's second match; her first (step 18) was cancelled
   // late in step 24 (15-matches). The backdated one waits.
@@ -56,7 +56,7 @@ test("23. Meccsek: every match with its status, the stuck filter, one match's lo
 
   // The stuck switch: exactly that match, as many as its count.
   await main.getByRole("button", { name: "Elakadtak (1)" }).click();
-  await expect(page).toHaveURL(/\?stuck=1$/);
+  await expect(page).toHaveURL(/stuck=1/);
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText("Elakadt: 48 órája nincs válasz");
   await expect(rows.first()).toContainText("Utolsó lépés: ");
@@ -71,8 +71,8 @@ test("23. Meccsek: every match with its status, the stuck filter, one match's lo
   await expect(main.getByRole("button", { name: "Elakadtak (0)" })).toBeVisible();
 
   // Step 19's match: both pairs active, four phones, the log.
-  await rows.filter({ hasText: "Mindkét pár lépett" }).getByRole("link", { name: "Napló és telefonszámok" }).click();
-  await expect(page).toHaveURL(new RegExp(`${LIST}/\\d+$`));
+  await rows.filter({ hasText: "Mindkét pár lépett" }).getByRole("link", { name: "Meccs megnyitása" }).click();
+  await expect(page).toHaveURL(new RegExp(`${LIST}/\\d+`));
   const match = content(page);
   await expect(match.getByRole("region", { name: "Állapot" })).toContainText(/Lefixálva: /);
   await expect(match.getByRole("region", { name: "Állapot" })).toContainText("Mindkét pár lépett");

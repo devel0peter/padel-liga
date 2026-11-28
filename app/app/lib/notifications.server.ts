@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
-import { leagueAdmins, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
+import { leagueAdmins, leagueSignupEvents, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
   TIPS_OFF,
@@ -11,9 +11,12 @@ import {
   disputeRecipients,
   KIND_TOPIC,
   isEnabled,
+  NEW_SIGNUPS_DAILY_EMAIL_KEY,
+  newSignupMessage,
   partnerChangeWaitingMessage,
   resultDisputedMessage,
   noShowReportedMessage,
+  roundDraftReadyMessage,
   pushPayload,
   pushWanted,
   TEST_MESSAGE,
@@ -24,6 +27,7 @@ import {
   type NotificationKind,
   type PlayerKind,
   type PushTopic,
+  type SignupEventKind,
   type StoredKind,
   type SubscriptionInput,
 } from "./notifications";
@@ -51,9 +55,9 @@ export function vapidPublicKey(): string | null {
 // A fan-out (e.g. the groups published to every player) must stay within a
 // Workers Free request's D1 queries, so lookups and inserts go in a few
 // multi-row statements, not one per user (#115). D1 allows 100 bound
-// parameters per statement; a notification row binds up to 7.
+// parameters per statement; a notification row binds up to 9.
 const ID_CHUNK = 90;
-const INSERT_CHUNK = 14;
+const INSERT_CHUNK = 10;
 
 function chunks<T>(list: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -438,7 +442,7 @@ export async function notifyPartnerChangeWaiting(input: { leagueId: number; leag
 
 // The league's Szervezők and every Admin, once each, accounts being deleted
 // and `except` (the player whose step it is) left out.
-async function leagueStaff(leagueId: number, except: string): Promise<string[]> {
+export async function leagueStaff(leagueId: number, except = ""): Promise<string[]> {
   const [organizers, admins] = await Promise.all([
     db
       .select({ id: users.id })
@@ -469,6 +473,132 @@ export async function notifyNoShowReported(input: {
     await notify("no_show_reported", (await leagueStaff(input.leagueId, input.reportedBy)).map((userId) => ({ userId, message })));
   } catch (error) {
     logError("notification failed", { kind: "no_show_reported", error });
+  }
+}
+
+// The Monday cron drafted the next round's groups (#432): tell the league's
+// Szervezők and every Admin, in the app and by push (their own switch), never
+// by email. Rebuilding by hand does not call this. Never throws.
+export async function notifyRoundDraftReady(
+  input: {
+    leagueId: number;
+    leagueSlug: string;
+    leagueName: string;
+    seasonId: number;
+    phase: number;
+    blockers: number;
+  },
+  createdAt?: Date,
+): Promise<void> {
+  try {
+    const message = roundDraftReadyMessage(input);
+    await notify(
+      "round_draft_ready",
+      (await leagueStaff(input.leagueId)).map((userId) => ({ userId, message })),
+      createdAt,
+    );
+  } catch (error) {
+    logError("notification failed", { kind: "round_draft_ready", error });
+  }
+}
+
+const SIGNUP_PUSH_COOLDOWN_MS = 3600_000;
+
+// A sign-up event happened in a league (#382): record the anonymous event for
+// the morning summary (#383), store one in-app notification per organizer/Admin
+// (excluding `except`), and throttle push to at most one per recipient per
+// league per hour (reporting suppressed count on the next push after the hour).
+// Never throws.
+export async function notifyNewSignup(
+  input: {
+    leagueId: number;
+    event: SignupEventKind;
+    joinsPhase?: number | null;
+    except?: string;
+  },
+  now = new Date(),
+): Promise<void> {
+  try {
+    await db.insert(leagueSignupEvents).values({
+      leagueId: input.leagueId,
+      kind: input.event,
+      joinsPhase: input.joinsPhase ?? null,
+      createdAt: now,
+    });
+    const [[league], recipients] = await Promise.all([
+      db.select({ slug: leagues.slug, name: leagues.name }).from(leagues).where(eq(leagues.id, input.leagueId)),
+      leagueStaff(input.leagueId, input.except ?? ""),
+    ]);
+    if (!league || recipients.length === 0) return;
+    const disabled = await disabledKinds(recipients);
+    const enabled = recipients.filter((userId) => isEnabled(disabled.get(userId) ?? NONE, "new_signup"));
+    if (enabled.length === 0) return;
+
+    const rows: NotificationRow[] = [];
+    for (const userId of enabled) {
+      const userDisabled = disabled.get(userId) ?? NONE;
+      const wantsPush = pushWanted(userDisabled, "new_signup");
+      let pushDueAt: Date | null = null;
+      let pushedAt: Date | null = null;
+      let suppressed = 0;
+      if (wantsPush) {
+        const [latest] = await db
+          .select({ id: notifications.id, pushedAt: notifications.pushedAt })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.userId, userId),
+              eq(notifications.leagueId, input.leagueId),
+              eq(notifications.kind, "new_signup"),
+              isNotNull(notifications.pushedAt),
+            ),
+          )
+          .orderBy(desc(notifications.id))
+          .limit(1);
+        const withinHour = latest?.pushedAt != null && now.getTime() - latest.pushedAt.getTime() < SIGNUP_PUSH_COOLDOWN_MS;
+        if (!withinHour) {
+          if (latest) {
+            const [s] = await db
+              .select({ n: count() })
+              .from(notifications)
+              .where(
+                and(
+                  eq(notifications.userId, userId),
+                  eq(notifications.leagueId, input.leagueId),
+                  eq(notifications.kind, "new_signup"),
+                  isNull(notifications.pushedAt),
+                  gt(notifications.id, latest.id),
+                ),
+              );
+            suppressed = s?.n ?? 0;
+          }
+          pushDueAt = now;
+          pushedAt = now;
+        }
+      }
+      const message = newSignupMessage({
+        leagueSlug: league.slug,
+        leagueName: league.name,
+        event: input.event,
+        joinsPhase: input.joinsPhase,
+        suppressed,
+      });
+      rows.push({
+        userId,
+        kind: "new_signup",
+        leagueId: input.leagueId,
+        ...message,
+        createdAt: now,
+        pushDueAt,
+        pushedAt,
+      });
+    }
+    const [first, ...rest] = notificationInserts(rows);
+    if (!first) return;
+    await db.batch([first, ...rest]);
+    if (rows.some((r) => r.pushDueAt)) await pushNow("new_signup", now);
+  } catch (error) {
+    logError("notification failed", { kind: "new_signup", error });
   }
 }
 
@@ -540,6 +670,10 @@ async function setOptOut(userId: string, kind: string, enabled: boolean): Promis
 
 export async function setKindEnabled(userId: string, kind: NotificationKind, enabled: boolean): Promise<void> {
   await setOptOut(userId, kind, enabled);
+}
+
+export async function setNewSignupsDailyEmailEnabled(userId: string, enabled: boolean): Promise<void> {
+  await setOptOut(userId, NEW_SIGNUPS_DAILY_EMAIL_KEY, enabled);
 }
 
 // "Nem kérek tippeket" (#444): `off` stores the opt-out.

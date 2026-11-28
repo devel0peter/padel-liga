@@ -106,7 +106,7 @@ test("no Helyettesek page or menu item for the Szervező (#400: nothing to appro
   const org = await as(browser, ORGANIZER.email);
   await visit(org.page, "/admin/leagues/minta");
   const sidebar = org.page.locator("[data-sidebar=sidebar]");
-  await expect(sidebar.getByRole("link", { name: "Viták" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Döntések" })).toBeVisible();
   await expect(sidebar.getByRole("link", { name: "Helyettesek" })).toHaveCount(0);
   const res = await org.page.goto("/admin/leagues/minta/substitutes");
   expect(res?.status()).toBe(404);

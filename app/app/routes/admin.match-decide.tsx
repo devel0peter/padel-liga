@@ -1,35 +1,15 @@
-import { data, Form, useNavigation } from "react-router";
+import { data, redirect } from "react-router";
 
 import type { Route } from "./+types/admin.match-decide";
-import { OrganizerAbsences } from "~/components/absences";
-import { AppPage } from "~/components/app-page";
-import { PairNames, PersonLink } from "~/components/person-link";
-import { FormFeedback, ScoreFields } from "~/components/match-result";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Label } from "~/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-import { Textarea } from "~/components/ui/textarea";
 import { requirePermission } from "~/lib/auth/admin.server";
 import { decideMatch, decisionPage } from "~/lib/decisions.server";
-import { formatDateTime, formatDeadline, formatSlot } from "~/lib/format";
-import { NO_SHOW_REASON_MAX, NO_SHOW_REFUSALS } from "~/lib/no-shows";
-import { decideNoShow, leagueNoShows } from "~/lib/no-shows.server";
 import { getLeague } from "~/lib/leagues.server";
-import { REASON_MAX } from "@padel-liga/rules";
-import { bothLostText, neutralScoreText, parseOutcome, versusText, walkoverScoreText, type OutcomeChoice } from "~/lib/results";
-import { SITE_NAME } from "~/lib/site";
-import { organizerAbsences } from "~/lib/substitutes.server";
+import { NO_SHOW_REFUSALS } from "~/lib/no-shows";
+import { decideNoShow, leagueNoShows } from "~/lib/no-shows.server";
+import { parseOutcome } from "~/lib/results";
 
-// Deciding a match (#29): a disputed result, or an override of any match of
-// the league, played or not, with a required reason; and a waiting no-show
-// report (#33), confirmed or rejected with an optional reason. Both pairs'
-// versions and the full log are shown. The league's Szervező and the Admin only; a
-// match of another league is 404.
-
-export function meta({}: Route.MetaArgs) {
-  return [{ title: `Döntés – ${SITE_NAME}` }, { name: "robots", content: "noindex" }];
-}
+// Legacy decision address (#433): redirects to the unified match page while
+// keeping POST action working for backwards compatibility.
 
 const NOT_FOUND = "Nincs ilyen meccs ebben a ligában.";
 
@@ -46,11 +26,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { league, id } = await scope(request, params);
   const page = await decisionPage(league.id, id);
   if (!page) throw data(NOT_FOUND, { status: 404 });
-  // A waiting no-show report on this match (#33), if any.
-  const [noShow] = await leagueNoShows(league.id, id);
-  // Who didn't play (#400): the opponents confirmed or disputed the result with it.
-  const absent = await organizerAbsences(id);
-  return { slug: league.slug, page, noShow: noShow ?? null, absent };
+  throw redirect(`/admin/leagues/${league.slug}/matches/${id}?decide=1`);
 }
 
 type ActionResult = { intent: string; ok: boolean; message: string };
@@ -60,12 +36,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   const { league, actor, id } = await scope(request, params);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  // Confirming or rejecting a no-show report (#33, D108).
   if (intent === "no-show-confirm" || intent === "no-show-reject") {
     const report = Number(form.get("report"));
-    // Only this match's waiting report: decided or withdrawn meanwhile, it's gone.
     const [waiting] = await leagueNoShows(league.id, id);
-    if (!waiting || waiting.id !== report) return data<ActionResult>({ intent: "no-show", ok: false, message: NO_SHOW_REFUSALS.not_open }, { status: 400 });
+    if (!waiting || waiting.id !== report)
+      return data<ActionResult>({ intent: "no-show", ok: false, message: NO_SHOW_REFUSALS.not_open }, { status: 400 });
     const done = await decideNoShow(actor.id, league.id, report, NO_SHOW_INTENTS[intent], String(form.get("reason") ?? ""));
     if (done.ok) return data<ActionResult>({ intent: "no-show", ok: true, message: done.notice });
     if (done.notFound) throw data(NOT_FOUND, { status: 404 });
@@ -79,151 +54,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   return data<ActionResult>({ intent: "decide", ok: false, message: done.error }, { status: 400 });
 }
 
-export default function MatchDecide({ loaderData, actionData }: Route.ComponentProps) {
-  const { slug, page: m, noShow, absent } = loaderData;
-  const busy = useNavigation().state !== "idle";
-  const r = m.result;
-  const choices: { value: OutcomeChoice; label: string }[] = [
-    { value: "played", label: "Eredmény (lent add meg)" },
-    { value: "walkover-a", label: `Játék nélküli győzelem: ${m.a} (${walkoverScoreText(m.setGames)})` },
-    { value: "walkover-b", label: `Játék nélküli győzelem: ${m.b} (${walkoverScoreText(m.setGames)})` },
-    { value: "both-inactive", label: bothLostText(m.setGames) },
-    { value: "unplayed", label: "Elmaradt (egyik pár sem kap pontot, nem számít bele a tabellába)" },
-  ];
-  const current: OutcomeChoice | undefined = !m.current
-    ? undefined
-    : m.current.kind === "walkover"
-      ? (`walkover-${m.current.winner}` as const)
-      : m.current.kind;
-  const score = m.current?.kind === "played" ? m.current.score : null;
-  return (
-    <AppPage
-      title={versusText(m.a, m.b)}
-      description={`${m.season} · ${m.phase}. kör · ${m.groupNumber}. csoport · ${m.week}. hét · határidő: ${formatDeadline(m.deadline)}`}
-      back={{ to: `/admin/leagues/${slug}/disputes`, label: "Viták" }}
-    >
-      <section className="grid max-w-2xl gap-1 rounded-lg border p-4 text-sm sm:p-6" aria-label="Állapot">
-        <p>
-          <span className="font-medium">1. pár:</span> <PairNames players={m.players.a} />
-        </p>
-        <p>
-          <span className="font-medium">2. pár:</span> <PairNames players={m.players.b} />
-        </p>
-        <p className="font-semibold">{m.label}</p>
-        <OrganizerAbsences absent={absent} />
-        {r.status === "disputed" && (
-          <>
-            <p>
-              <PairNames players={m.players[r.by]} /> szerint: <strong>{neutralScoreText(r.score)}</strong>
-            </p>
-            <p>
-              <PairNames players={m.players[r.by === "a" ? "b" : "a"]} /> szerint: <strong>{r.counter ? neutralScoreText(r.counter) : "nem adott meg eredményt"}</strong>
-            </p>
-            {m.note && <p className="break-words">Megjegyzés: {m.note}</p>}
-            <p className="text-xs text-muted-foreground">Az eredmények az 1. pár szemszögéből.</p>
-          </>
-        )}
-      </section>
-
-      {noShow && (
-        <Card className="max-w-2xl border-primary">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Nem jöttek el: döntés</CardTitle>
-            <CardDescription className="break-words">
-              <PairNames players={noShow.reportingPlayers} /> jelezte, hogy <PairNames players={noShow.absentPlayers} /> nem jött el
-              a lefixált időpontra
-              {noShow.slot ? ` (${formatSlot(noShow.slot)})` : ""}. Bejelentve: {formatDateTime(noShow.reportedAt)}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form key={`ns${noShow.id}`} method="post" className="grid gap-3">
-              <input type="hidden" name="report" value={noShow.id} />
-              <p className="text-sm">
-                Ha jóváhagyod: {walkoverScoreText(m.setGames)} a bejelentő párnak, a másik pár mindkét játékosa fekete pontot kap. Ha elutasítod, a meccs ott tart, ahol a
-                bejelentés előtt. Mindkét pár értesítést kap.
-              </p>
-              <div className="grid gap-1.5">
-                <Label htmlFor="no-show-reason">Indoklás (nem kötelező, mindkét pár látja)</Label>
-                <Textarea id="no-show-reason" name="reason" maxLength={NO_SHOW_REASON_MAX} rows={2} />
-              </div>
-              <FormFeedback result={actionData as ActionResult | undefined} intent="no-show" />
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" name="intent" value="no-show-confirm" disabled={busy}>
-                  Jóváhagyom
-                </Button>
-                <Button type="submit" name="intent" value="no-show-reject" variant="outline" disabled={busy}>
-                  Elutasítom
-                </Button>
-              </div>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
-      {!noShow && <FormFeedback result={actionData as ActionResult | undefined} intent="no-show" />}
-
-      {m.voided ? (
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Az egyik pár visszalépett a körből: ez a meccs nem számít bele a tabellába, nincs miről dönteni.
-        </p>
-      ) : (
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">{r.status === "disputed" ? "Döntés a vitában" : "Kimenetel felülbírálása"}</CardTitle>
-            <CardDescription>
-              A döntésed végleges, és mindkét pár értesítést kap róla. Az indoklás kötelező: a meccs naplójába kerül, a párok is látják.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Keyed by the log, so the form resets after a decision. */}
-            <Form key={m.log.length} method="post" className="grid gap-4">
-              <RadioGroup name="outcome" defaultValue={current} required aria-label="Kimenetel">
-                {choices.map((c) => (
-                  <div key={c.value} className="flex items-start gap-2">
-                    <RadioGroupItem value={c.value} id={`outcome-${c.value}`} className="mt-0.5" />
-                    <Label htmlFor={`outcome-${c.value}`} className="font-normal break-words">
-                      {c.label}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-              <div className="grid gap-1">
-                <p className="text-sm font-medium">Eredmény (csak „Eredmény” esetén)</p>
-                <ScoreFields id="decide" columns={["1. pár", "2. pár"]} values={score} required={false} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="reason">Indoklás</Label>
-                <Textarea id="reason" name="reason" maxLength={REASON_MAX} rows={3} required />
-              </div>
-              <FormFeedback result={actionData as ActionResult | undefined} intent="decide" />
-              <div>
-                <Button type="submit" disabled={busy}>
-                  Döntés mentése
-                </Button>
-              </div>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
-
-      <section className="grid max-w-2xl gap-2" aria-labelledby="naplo">
-        <h2 id="naplo" className="font-display text-lg font-bold">
-          Napló
-        </h2>
-        {m.log.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Még nem történt semmi.</p>
-        ) : (
-          <ol className="grid gap-2 text-sm">
-            {m.log.map((e) => (
-              <li key={e.key} className="grid gap-0.5 rounded-md border p-3">
-                <span className="text-xs text-muted-foreground">
-                  {formatDateTime(e.at)} · <PersonLink id={e.whoId} name={e.who} /> ({e.role})
-                </span>
-                <span className="break-words">{e.text}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </AppPage>
-  );
+export default function MatchDecideRedirect() {
+  return null;
 }

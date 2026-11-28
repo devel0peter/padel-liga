@@ -16,8 +16,14 @@ async function tileCount(tile: Locator): Promise<number> {
 test("40. the deadline projection on Meccsek and the next round's preview on Csoportok; players refused", async ({ browser }) => {
   const rowsBefore = d1("select (select count(*) from match_decisions) + (select count(*) from strikes) + (select count(*) from audit_log) as n")[0]!.n;
   const { context, page } = await as(browser, ORGANIZER.email);
-  await visit(page, LIST);
+  const season = await seasonPath(page);
+  await visit(page, `${season}/rounds/1`);
   const main = content(page);
+  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Meccs megnyitása" }) });
+  const total = await rows.count();
+  expect(total).toBeGreaterThan(0);
+
+  await visit(page, `${season}/rounds/1?tab=stats`);
   const section = main.getByRole("region", { name: "Ha most lenne a határidő" });
   await expect(section).toBeVisible();
   await expect(section).toContainText(/ha a határidő \(.+ \d\d:\d\d\) most lenne\./);
@@ -25,10 +31,7 @@ test("40. the deadline projection on Meccsek and the next round's preview on Cso
   await expect(section.getByRole("heading", { name: "2. fekete pont (figyelmeztető e-mail)" })).toBeVisible();
   await expect(section.getByRole("heading", { name: "Kiesnének a körváltáskor (3. fekete pont)" })).toBeVisible();
 
-  // The five tiles add up to the list below.
-  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Napló és telefonszámok" }) });
-  const total = await rows.count();
-  expect(total).toBeGreaterThan(0);
+  // The five tiles add up to the list on Meccsek.
   const tiles = section.getByRole("link");
   await expect(tiles).toHaveCount(5);
   let sum = 0;

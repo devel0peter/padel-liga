@@ -45,9 +45,9 @@ test("search and the Nincs a ligában filter, kept in the address", async ({ bro
   // Never an email address; phone numbers tap to call (D126).
   await expect(content(page)).not.toContainText("@example.test");
   await expect(bodyRows.filter({ hasText: anna.name }).locator('a[href="tel:+36301234567"]').first()).toBeVisible();
-  // The broadcast page is the Admin's: the Szervező has no "Levél nekik".
+  // Szervező can also open league-scoped Levél nekik (#387).
   await visit(page, `${PAGE}?entry=entered`);
-  await expect(page.getByRole("link", { name: "Levél nekik" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Levél nekik" })).toHaveAttribute("href", /\/admin\/leagues\/minta\/mail\?/);
   await context.close();
 });
 
@@ -64,7 +64,7 @@ test("Levél nekik opens the broadcast page with the players shown; nothing is s
   await expect(content(page)).toContainText(anna.name);
   await expect(content(page)).not.toContainText(akos.name);
   await page.getByRole("link", { name: "Szűrők módosítása" }).click();
-  await expect(page).toHaveURL(/\/admin\/leagues\/minta\/pairs\?entry=entered/);
+  await expect(page).toHaveURL(/\/admin\/leagues\/minta\/players\?.*tab=pairs/);
 
   // The players without a pair: from Játékosok (#301).
   await visit(page, "/admin/leagues/minta/players?filter=no_pair");

@@ -21,8 +21,8 @@ test("1. the Admin lands on Kezdőlap with the season card and both sidebar sect
   await expect(sidebar).toContainText("Platform");
   await expect(sidebar).toContainText("Admin");
   await expect(sidebar).toContainText("Padelpárbaj Mintaváros");
-  for (const link of ["Áttekintés", "Szezonok", "Játékosok", "Párok", "Emlékeztetők", "Klubok"])
-    await expect(sidebar.getByRole("link", { name: link })).toBeVisible();
+  for (const link of ["Áttekintés", "Döntések", "Játékosok", "Szezonok", "Levelek", "Beállítások", "Súgó"])
+    await expect(sidebar.getByRole("link", { name: link, exact: true })).toBeVisible();
   await context.close();
 });
 

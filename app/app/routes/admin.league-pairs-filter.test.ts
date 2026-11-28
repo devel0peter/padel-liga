@@ -21,6 +21,7 @@ vi.mock("~/lib/email/send.server", () => ({
 const { migratedDatabase } = await import("~/test/sqlite");
 const { createSession } = await import("~/lib/auth/session.server");
 const Pairs = await import("~/routes/admin.league-pairs");
+const Players = await import("~/routes/admin.league-players");
 const Broadcast = await import("~/routes/admin.broadcast-new");
 
 const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -39,7 +40,11 @@ async function cookieFor(id: string, role: "player" | "superadmin", organizes?: 
 
 const args = (url: string, cookie: string, league = "gyor") =>
   ({ request: new Request(url, { headers: { Cookie: cookie } }), params: { league }, context: {} }) as any;
-const pairsPage = (query: string, cookie: string) => Pairs.loader(args(`http://localhost/admin/leagues/gyor/pairs${query}`, cookie));
+const pairsPage = async (query: string, cookie: string) => {
+  const qs = query.startsWith("?") ? `${query}&tab=pairs` : `?tab=pairs${query}`;
+  const res = await Players.loader(args(`http://localhost/admin/leagues/gyor/players${qs}`, cookie));
+  return { ...res, rows: res.pairRows, counts: res.pairCounts, query: res.pairsQuery };
+};
 
 const names = (rows: any[]) => rows.map((r) => r.players.map((p: any) => p.name).join(" + "));
 
@@ -95,7 +100,7 @@ describe("Párok search and filter (#148)", () => {
 
   it("sends the old Nincs párja address to Játékosok with the same filter and search (#301 requirement 5)", async () => {
     const cookie = await cookieFor("szervezo", "player", 1);
-    const moved = await pairsPage("?entry=no_pair&q=%20kiss", cookie).then(
+    const moved = await Pairs.loader(args("http://localhost/admin/leagues/gyor/pairs?entry=no_pair&q=%20kiss", cookie)).then(
       () => null,
       (r: Response) => r,
     );
@@ -173,10 +178,10 @@ describe("two leagues in two cities: each Párok offers only its players (#331, 
 
   it("offers for a new pair only the league's players; staff only where they joined", async () => {
     const admin = await cookieFor("admin", "superadmin");
-    const gyor = await Pairs.loader(args("http://localhost/admin/leagues/gyor/pairs", admin));
+    const gyor = await Players.loader(args("http://localhost/admin/leagues/gyor/players?tab=pairs", admin));
     expect(gyor.candidates.map((c: any) => c.id)).toEqual(["admin", "e", "k", "f"]);
-    const deb = await Pairs.loader(args("http://localhost/admin/leagues/deb/pairs", admin, "deb"));
-    expect(deb.rows).toEqual([]);
+    const deb = await Players.loader(args("http://localhost/admin/leagues/deb/players?tab=pairs", admin, "deb"));
+    expect(deb.pairRows).toEqual([]);
     expect(deb.candidates.map((c: any) => c.id)).toEqual(["g", "h", "e"]);
   });
 

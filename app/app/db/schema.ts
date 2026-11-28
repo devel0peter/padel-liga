@@ -79,9 +79,14 @@ export const emailMessages = sqliteTable(
         "season_start",
         "round_extended",
         "partner_change",
+        "new_signups_daily",
       ],
     }).notNull(),
     broadcastId: integer("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
+    // League that owns this email (#384, #388): resolves per-league sender
+    // name and reply-to, and filters Kimenő levelek for a Szervező. Null for
+    // platform emails such as login codes.
+    leagueId: integer("league_id").references(() => leagues.id, { onDelete: "set null" }),
     toEmail: text("to_email").notNull(),
     subject: text("subject").notNull(),
     html: text("html"),
@@ -113,22 +118,30 @@ export const emailMessages = sqliteTable(
     index("email_messages_to_idx").on(t.toEmail),
     // A Resend event names the email by its id (#242).
     index("email_messages_provider_idx").on(t.providerId),
+    index("email_messages_league_idx").on(t.leagueId, t.kind, t.status),
   ],
 );
 
-// Admin-written emails to a filtered audience (app/routes/admin.broadcasts.*).
-export const broadcasts = sqliteTable("broadcasts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  subject: text("subject").notNull(),
-  body: text("body").notNull(),
-  // Human-readable audience, e.g. "Győr · Kezdő".
-  audience: text("audience").notNull(),
-  recipients: integer("recipients").notNull(),
-  createdBy: text("created_by").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+// Admin- and organizer-written emails to a filtered audience (app/routes/admin.broadcasts.*).
+export const broadcasts = sqliteTable(
+  "broadcasts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    // Set for league-scoped broadcasts (#387, #388) to enforce the daily cap
+    // and filter the organizer's outbox. Null for Admin platform broadcasts.
+    leagueId: integer("league_id").references(() => leagues.id, { onDelete: "set null" }),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    // Human-readable audience, e.g. "Győr · Kezdő".
+    audience: text("audience").notNull(),
+    recipients: integer("recipients").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("broadcasts_league_idx").on(t.leagueId, t.createdAt)],
+);
 
 // Addresses that unsubscribed from broadcasts. Kept after a signup is deleted,
 // so a re-imported or re-entered address is still not mailed.
@@ -297,6 +310,15 @@ export const leagues = sqliteTable("leagues", {
   // (D124, #335): three groups of four by default. Editable while that
   // season waits; later seasons keep their own calendar.
   minEntries: integer("min_entries").notNull().default(12),
+  // League contact person (#384): sender display name, reply-to address, and
+  // optional phone shown to this league's players.
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  // Free-text local rules supplement shown under the common rules (#390).
+  localRules: text("local_rules"),
+  // Launch checklist tick (#391): organizer confirmed the register link was shared.
+  registerLinkSharedAt: integer("register_link_shared_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -370,6 +392,9 @@ export const leagueAdmins = sqliteTable(
     grantedAt: integer("granted_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
+    // Launch checklist tick (#391): Admin recorded the data protection
+    // agreement for this organizer.
+    privacyAgreementAt: integer("privacy_agreement_at", { mode: "timestamp" }),
   },
   (t) => [primaryKey({ columns: [t.leagueId, t.userId] }), index("league_admins_user_idx").on(t.userId)],
 );
@@ -477,9 +502,13 @@ export const notifications = sqliteTable(
         "no_show_reported",
         "no_show_confirmed",
         "no_show_rejected",
+        "round_draft_ready",
         "test",
       ],
     }).notNull(),
+    // League this notification belongs to (#382): used for per-league hourly
+    // push throttling on new_signup notices. Nullable for non-league notices.
+    leagueId: integer("league_id").references(() => leagues.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     body: text("body").notNull(),
     // A path on this site, opened through /notifications/<id>.
@@ -492,11 +521,39 @@ export const notifications = sqliteTable(
     // since D158, #126): the cron pushes as many as fit its run and the next
     // run goes on. Null: pushed, or nothing to push (push or its topic off).
     pushDueAt: integer("push_due_at", { mode: "timestamp" }),
+    // Set when a new_signup notification was allowed to push (not suppressed by
+    // the hourly throttle, #382), so later events know when the last push went
+    // out and how many events were suppressed since.
+    pushedAt: integer("pushed_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (t) => [index("notifications_user_idx").on(t.userId, t.id), index("notifications_push_due_idx").on(t.pushDueAt)],
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.id),
+    index("notifications_push_due_idx").on(t.pushDueAt),
+    index("notifications_league_kind_idx").on(t.userId, t.leagueId, t.kind, t.id),
+  ],
+);
+
+// Sign-up events per league (#382, #383): counts only, no personal data.
+// Used by the 07:00 morning summary email (#383) so counts stay exact even if
+// an organizer switched off in-app new_signup notifications.
+export const leagueSignupEvents = sqliteTable(
+  "league_signup_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leagueId: integer("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["player_joined", "partner_search", "pair_formed", "pair_entered"] }).notNull(),
+    // For pair_entered: which round the pair starts in (null: next season or waiting start).
+    joinsPhase: integer("joins_phase"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("league_signup_events_league_at_idx").on(t.leagueId, t.createdAt)],
 );
 
 // One row per browser that allowed push (Push API subscription). Removed when

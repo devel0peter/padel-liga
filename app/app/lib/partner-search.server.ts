@@ -1,8 +1,9 @@
-import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "~/db/client.server";
-import { pairs, partnerSearches, users } from "~/db/schema";
+import { auditLog, pairs, partnerSearches, users } from "~/db/schema";
 import { auditEntry } from "~/lib/audit.server";
+import { notifyNewSignup } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
 import { finderEntries, searchState, type FinderEntry, type SearchState } from "./partner-search";
@@ -61,10 +62,31 @@ export async function setPartnerSearch(
   seeking: boolean,
   list: PairLeague[],
   actorId = user.id,
+  now = new Date(),
 ): Promise<boolean> {
   if (!user.consentAt || !list.some((l) => l.id === leagueId)) return false;
   const own = actorId === user.id;
-  const now = new Date();
+  // Dedupe "Párt keresek" organizer notices within 24h via audit_log (#382).
+  let recentOn = false;
+  if (seeking) {
+    const cutoff = new Date(now.getTime() - 24 * 3600_000);
+    const [prior] = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "partner_search.on"),
+          eq(auditLog.leagueId, leagueId),
+          gte(auditLog.at, cutoff),
+          or(
+            and(eq(auditLog.actorId, user.id), eq(auditLog.target, `league:${leagueId}`)),
+            eq(auditLog.target, `user:${user.id}`),
+          ),
+        ),
+      )
+      .limit(1);
+    recentOn = !!prior;
+  }
   // An Admin's switch-on leaves `listed` as the player left it.
   const listed = own || !seeking ? { listed: own && seeking } : {};
   await db.batch([
@@ -78,8 +100,10 @@ export async function setPartnerSearch(
       target: own ? `league:${leagueId}` : `user:${user.id}`,
       detail: own ? null : `league:${leagueId}`,
       leagueId,
+      at: now,
     }),
   ]);
+  if (seeking && !recentOn) await notifyNewSignup({ leagueId, event: "partner_search", except: actorId }, now);
   return true;
 }
 

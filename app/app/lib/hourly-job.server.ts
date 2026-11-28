@@ -5,6 +5,7 @@ import { deleteOldFeedback } from "~/lib/feedback-retention.server";
 import { PURGE_MIN, purgeInterestList } from "~/lib/interest-list-purge.server";
 import { beginInvocation, logError, logInfo, logWarn } from "~/lib/log";
 import { runMatchReminders } from "~/lib/match-reminders.server";
+import { queueNewSignupsDailyEmails } from "~/lib/new-signups-daily.server";
 import { pushQueued } from "~/lib/notifications.server";
 import { PUSH_STATS_QUERIES, recordPushStats } from "~/lib/push-stats.server";
 import { queueDueReminders, STUCK_QUERIES } from "~/lib/reminders.server";
@@ -111,6 +112,10 @@ export const CRON_STEPS: readonly CronStep[] = [
       const n = await queueDueReminders(now);
       return n ? `queued ${n} reminders` : null;
     },
+  },
+  {
+    name: "new signups daily email",
+    run: (now, run) => queueNewSignupsDailyEmails(now, { run, keep: AFTER_STUCK }),
   },
   {
     // Chunks while the run has room beyond what delivery needs; a query a

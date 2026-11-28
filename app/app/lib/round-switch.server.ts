@@ -19,6 +19,7 @@ import { phaseProjection } from "./deadline-projection.server";
 import { updateElo, ELO_REPLAY_QUERIES } from "./elo.server";
 import { enteredPairs, type GroupPair, phaseGroups, publishPhase, writeDraft } from "./groups.server";
 import { groupTable } from "./ladder";
+import { notifyRoundDraftReady } from "./notifications.server";
 import { markChangesAfterPublish, startChangesAtPublish, switchChanges, type SwitchChange } from "./partner-changes.server";
 import { resultsOf } from "./result-log.server";
 import { DISPUTES_FIRST, type LeaveReason, NOT_READY, NOTHING_TO_DRAFT, type Origin, OUTDATED_DRAFT } from "./round-switch";
@@ -344,7 +345,12 @@ export async function roundSwitchPreview(seasonId: number, nextPhase: number, no
  * moves are lost. Refused before the ending phase is settled and once the
  * phase is published.
  */
-export async function generateRoundSwitchDraft(seasonId: number, nextPhase: number, actorId: string | null, now = new Date()): Promise<Result> {
+async function buildRoundSwitchDraft(
+  seasonId: number,
+  nextPhase: number,
+  actorId: string | null,
+  now = new Date(),
+): Promise<{ ok: true; blockers: number } | { ok: false; error: string }> {
   // The draft reads the current Elo: a replay first, in case the one after
   // the last final match failed (#13), as the phase-1 draft does.
   await updateElo(now);
@@ -352,7 +358,13 @@ export async function generateRoundSwitchDraft(seasonId: number, nextPhase: numb
   if (!s) return { ok: false, error: "Ehhez a körhöz nem készül tervezet." };
   if (s.state !== "ready") return { ok: false, error: NOT_READY };
   if (s.draft.length === 0) return { ok: false, error: NOTHING_TO_DRAFT };
-  return writeDraft(seasonId, nextPhase, s.draft, actorId, actorId ? undefined : now, draftBasis(s));
+  const written = await writeDraft(seasonId, nextPhase, s.draft, actorId, actorId ? undefined : now, draftBasis(s));
+  return written.ok ? { ok: true, blockers: s.disputes.length } : written;
+}
+
+export async function generateRoundSwitchDraft(seasonId: number, nextPhase: number, actorId: string | null, now = new Date()): Promise<Result> {
+  const res = await buildRoundSwitchDraft(seasonId, nextPhase, actorId, now);
+  return res.ok ? { ok: true } : res;
 }
 
 /**
@@ -389,8 +401,8 @@ export const ROUND_LOOKUP_QUERIES = 1;
 // One run drafts at most one switch: the Elo replay, the switch's reads
 // (season 2, groups 2, league, first season, matches, entries, strikes 2,
 // opt-outs, recorded results, no-show reports, partner changes #403), the
-// write batch and the job mark.
-export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 14 + 2, calls: 0 };
+// write batch, the job mark and the organizer notice (#432).
+export const ROUND_DRAFT_MIN: Usage = { queries: ELO_REPLAY_QUERIES + 14 + 2 + 4, calls: 0 };
 
 const jobKey = (seasonId: number, phase: number) => `round-draft:${seasonId}:${phase}`;
 
@@ -409,9 +421,17 @@ export async function draftRoundSwitches(now: Date, budget?: { run: RunBudget; k
   if (!fits(ROUND_LOOKUP_QUERIES)) return "round switch draft: no room in this run; left for the next one";
   const next = alias(seasonPhases, "next_phase");
   const candidates = await db
-    .select({ seasonId: seasonPhases.seasonId, phase: next.number })
+    .select({
+      seasonId: seasonPhases.seasonId,
+      phase: next.number,
+      leagueId: leagues.id,
+      leagueSlug: leagues.slug,
+      leagueName: leagues.name,
+    })
     .from(seasonPhases)
     .innerJoin(next, and(eq(next.seasonId, seasonPhases.seasonId), eq(next.number, sql`${seasonPhases.number} + 1`)))
+    .innerJoin(seasons, eq(seasons.id, seasonPhases.seasonId))
+    .innerJoin(leagues, eq(leagues.id, seasons.leagueId))
     .where(
       and(
         lt(seasonPhases.deadline, now),
@@ -429,13 +449,25 @@ export async function draftRoundSwitches(now: Date, budget?: { run: RunBudget; k
     .orderBy(asc(seasonPhases.deadline), asc(seasonPhases.seasonId));
   for (const c of candidates) {
     if (!fits(ROUND_DRAFT_MIN.queries)) return `round switch draft: phase ${c.phase} of season ${c.seasonId} left for the next run (run limits)`;
-    const result = await generateRoundSwitchDraft(c.seasonId, c.phase, null, now);
+    const result = await buildRoundSwitchDraft(c.seasonId, c.phase, null, now);
     // Changed since the lookup (a match reopened): the next run looks again.
     if (!result.ok && result.error === NOT_READY) return null;
     await db.insert(jobRuns).values({ key: jobKey(c.seasonId, c.phase), doneAt: now }).onConflictDoNothing();
-    return result.ok
-      ? `drafted phase ${c.phase} of season ${c.seasonId}`
-      : `no draft for phase ${c.phase} of season ${c.seasonId}: ${result.error}`;
+    if (result.ok) {
+      await notifyRoundDraftReady(
+        {
+          leagueId: c.leagueId,
+          leagueSlug: c.leagueSlug,
+          leagueName: c.leagueName,
+          seasonId: c.seasonId,
+          phase: c.phase,
+          blockers: result.blockers,
+        },
+        now,
+      );
+      return `drafted phase ${c.phase} of season ${c.seasonId}`;
+    }
+    return `no draft for phase ${c.phase} of season ${c.seasonId}: ${result.error}`;
   }
   return null;
 }

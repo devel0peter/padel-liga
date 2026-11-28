@@ -68,19 +68,21 @@ describe("/admin/leagues/:league/pairs access (#97)", () => {
     expect(await status(R.loader(args(get(""))))).toBe(302);
   });
 
-  it("lets the league's Szervező and the Admin open the page and create a pair", async () => {
+  it("lets the league's Szervező and the Admin open the page (redirected to Játékosok → Párok) and create a pair", async () => {
     const szervezo = await cookieFor("szervezo", "player", 1);
     const admin = await cookieFor("admin", "superadmin");
     for (const cookie of [szervezo, admin]) {
-      const page = await R.loader(args(get(cookie)));
-      expect(page.name).toBe("Padelpárbaj Győr");
+      const res = await R.loader(args(get(cookie)));
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/admin/leagues/gyor/players?tab=pairs");
     }
     expect(await R.action(args(post(szervezo, { intent: "create", a: "a", b: "b" })))).toEqual({ ok: true });
     expect(h.raw.prepare("select actor_id, action from audit_log where action like 'pair.%'").all()).toEqual([
       { actor_id: "szervezo", action: "pair.create" },
     ]);
-    const page = await R.loader(args(get(admin)));
-    expect(page.rows.map((r) => r.players.map((x) => x.id))).toEqual([["a", "b"]]);
+    const Players = await import("./admin.league-players");
+    const page = await Players.loader(args(new Request("http://localhost/admin/leagues/gyor/players?tab=pairs", { headers: { Cookie: admin } })));
+    expect(page.pairRows.map((r) => r.players.map((x) => x.id))).toEqual([["a", "b"]]);
     expect(JSON.stringify(page)).not.toContain("@");
     expect(h.mails).toEqual([]);
   });

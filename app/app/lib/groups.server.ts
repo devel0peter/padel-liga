@@ -523,7 +523,7 @@ export async function publishPhase(seasonId: number, number: number, actorId: st
       }));
     });
   });
-  await queueGroupsPublished(messages);
+  await queueGroupsPublished(messages, season.leagueId);
   // Then in the app for every player, whatever their email switch says
   // (#115). The pushes wait for the cron (D150, D158): a whole league's
   // pushes here would use up the invocation's subrequests that the emails,

@@ -34,7 +34,8 @@ test("Párok at 390px: the list and the strikes table fit, with no counts table"
   await expect(pairRow.getByText("Aktív").first()).toBeVisible();
   const box = await pairRow.getByRole("button", { name: "Felbontás" }).boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  // The strikes table: spec 24 leaves strikes on minta, so it must be there (a failure, not a skip).
+  // The strikes table now lives on the Fekete pontok tab (#435).
+  await visit(page, "/admin/leagues/minta/players?tab=strikes");
   const strikes = page.getByRole("table", { name: "Fekete pontok" });
   await expect(strikes).toBeVisible();
   await expectFits(strikes, "Fekete pontok");

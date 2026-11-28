@@ -8,7 +8,10 @@ vi.mock("cloudflare:workers", () => ({ env: {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 vi.mock("~/lib/cities.server", () => ({ listedCities: async () => [{ slug: "gyor" }] }));
 vi.mock("~/lib/email/outbox.server", () => ({ queuePairCreated: async (...args: unknown[]) => void h.mailed.push(args) }));
-vi.mock("~/lib/notifications.server", () => ({ notifyPlayers: async (...args: unknown[]) => void h.notified.push(args) }));
+vi.mock("~/lib/notifications.server", () => ({
+  notifyPlayers: async (...args: unknown[]) => void h.notified.push(args),
+  notifyNewSignup: async () => {},
+}));
 
 const { migratedDatabase } = await import("~/test/sqlite");
 const S = await import("~/lib/partner-search.server");

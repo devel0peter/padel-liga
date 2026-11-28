@@ -13,4 +13,6 @@ export type OutgoingEmail = {
   html: string;
   text: string;
   headers?: Record<string, string>;
+  fromName?: string;
+  replyTo?: string;
 };

@@ -8,6 +8,7 @@ import type { LadderGroup } from "~/lib/ladder";
 
 const h = vi.hoisted(() => ({ raw: null as any }));
 
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: () => {} }));
 vi.mock("~/db/client.server", async () => (await import("~/test/sqlite")).mockClient(h));
 
 const { migratedDatabase } = await import("~/test/sqlite");

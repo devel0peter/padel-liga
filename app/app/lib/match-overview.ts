@@ -153,6 +153,7 @@ export type OverviewFilter = {
   week: number | null;
   status: OverviewStatus | null;
   deadline?: ProjectionKind | null;
+  q?: string;
 };
 
 const positive = (v: string | null): number | null => {
@@ -160,33 +161,53 @@ const positive = (v: string | null): number | null => {
   return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-// The filters from the URL (?stuck=1&group=2&week=1&status=proposed&deadline=walkover);
+function normalizeSearch(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// The filters from the URL (?stuck=1&group=2&week=1&status=proposed&deadline=walkover&q=kiss);
 // anything unreadable is ignored.
 export function parseFilter(params: URLSearchParams): OverviewFilter {
   const status = params.get("status") ?? "";
   const deadline = params.get("deadline") ?? "";
+  const q = (params.get("q") ?? "").trim();
   return {
     stuck: params.get("stuck") === "1",
     group: positive(params.get("group")),
     week: positive(params.get("week")),
     status: isOverviewStatus(status) ? status : null,
     deadline: isProjectionKind(deadline) ? deadline : null,
+    ...(q ? { q } : {}),
   };
 }
 
-type Filterable = { groupNumber: number; week: number; status: OverviewStatus; stuck: StuckReason | null; deadline?: ProjectionKind | null };
+type Filterable = {
+  groupNumber: number;
+  week: number;
+  status: OverviewStatus;
+  stuck: StuckReason | null;
+  deadline?: ProjectionKind | null;
+  names?: Record<Side, string>;
+};
 
 /**
- * The matches the filters show, and the stuck count under the group, week
- * and status filters (so the count is what the stuck switch would show).
+ * The matches the filters show, and the stuck count under the group, week,
+ * status, deadline and search filters (so the count is what the stuck switch
+ * would show).
  */
 export function filterMatches<T extends Filterable>(matches: readonly T[], filter: OverviewFilter): { shown: T[]; stuckCount: number } {
+  const needle = filter.q ? normalizeSearch(filter.q) : "";
   const base = matches.filter(
     (m) =>
       (filter.group === null || m.groupNumber === filter.group) &&
       (filter.week === null || m.week === filter.week) &&
       (filter.status === null || m.status === filter.status) &&
-      (filter.deadline == null || m.deadline === filter.deadline),
+      (filter.deadline == null || m.deadline === filter.deadline) &&
+      (!needle || !m.names || normalizeSearch(`${m.names.a} ${m.names.b}`).includes(needle)),
   );
   const stuck = base.filter((m) => m.stuck !== null);
   return { shown: filter.stuck ? stuck : base, stuckCount: stuck.length };

@@ -67,13 +67,42 @@ export function roleLabel(actor: Pick<Actor, "platformRole" | "leagues">): RoleL
 
 // --- Sidebar ----------------------------------------------------------------
 
-export type NavIcon = "home" | "myLeagues" | "notifications" | "rankings" | "profile" | "overview" | "seasons" | "matches" | "pairs" | "players" | "disputes" | "reminders" | "broadcasts" | "outbox" | "clubs" | "traffic" | "leagues" | "cities" | "users" | "log" | "feedback";
+export type NavIcon =
+  | "home"
+  | "myLeagues"
+  | "notifications"
+  | "rankings"
+  | "profile"
+  | "overview"
+  | "seasons"
+  | "matches"
+  | "pairs"
+  | "players"
+  | "disputes"
+  | "reminders"
+  | "broadcasts"
+  | "outbox"
+  | "clubs"
+  | "traffic"
+  | "leagues"
+  | "cities"
+  | "users"
+  | "log"
+  | "feedback"
+  | "settings"
+  | "help";
 // `hint`: one short line under the label on what the page lists (#301: the
 // people pages say what each is for).
-export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string };
+export type NavItem = { label: string; to: string; icon: NavIcon; permission: Permission; hint?: string; badge?: number };
 // `role`: who the section is for, shown as a tag next to its title, so a
 // Szervező or the Admin sees which pages players don't have.
 export type NavSection = { label: string; role?: "Szervező" | "Admin"; items: NavItem[] };
+
+export type LeagueNavMeta = {
+  radVarCount: number;
+  decisionsCount: number;
+  runningRound: { seasonId: number; phase: number } | null;
+};
 
 const PLATFORM_ITEMS: NavItem[] = [
   { label: "Ligák", to: "/admin/leagues", icon: "leagues", permission: { kind: "leagues.manage" } },
@@ -92,32 +121,27 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Visszajelzések", to: "/admin/feedback", icon: "feedback", permission: { kind: "feedback.view" } },
 ];
 
-function leagueItems(league: LeagueRef): NavItem[] {
+function leagueItems(league: LeagueRef, meta?: LeagueNavMeta | null): NavItem[] {
   const base = `/admin/leagues/${league.slug}`;
+  const manage: Permission = { kind: "league.manage", league: league.slug };
   return [
-    { label: "Áttekintés", to: base, icon: "overview", permission: { kind: "league.manage", league: league.slug } },
-    { label: "Szezonok", to: `${base}/seasons`, icon: "seasons", permission: { kind: "league.manage", league: league.slug } },
-    { label: "Meccsek", to: `${base}/matches`, icon: "matches", permission: { kind: "league.manage", league: league.slug } },
-    // The league's people (#301, D155): every registered player once, with
-    // pair, "Párt keresek" and entry; Párok lists the pairs.
-    {
-      label: "Játékosok",
-      to: `${base}/players`,
-      icon: "players",
-      permission: { kind: "league.manage", league: league.slug },
-      hint: "Mindenki egyszer, párral",
-    },
-    {
-      label: "Párok",
-      to: `${base}/pairs`,
-      icon: "pairs",
-      permission: { kind: "league.manage", league: league.slug },
-      hint: "A párok és nevezésük",
-    },
-    { label: "Emlékeztetők", to: `${base}/reminders`, icon: "reminders", permission: { kind: "league.manage", league: league.slug } },
-    { label: "Klubok", to: `${base}/clubs`, icon: "clubs", permission: { kind: "clubs.manage", city: league.city } },
-    // Disputed results and decisions on any match (#29).
-    { label: "Viták", to: `${base}/disputes`, icon: "disputes", permission: { kind: "league.manage", league: league.slug } },
+    { label: "Áttekintés", to: base, icon: "overview", permission: manage, badge: meta?.radVarCount || undefined },
+    { label: "Döntések", to: `${base}/disputes`, icon: "disputes", permission: manage, badge: meta?.decisionsCount || undefined },
+    ...(meta?.runningRound
+      ? [
+          {
+            label: `${meta.runningRound.phase}. kör`,
+            to: `${base}/seasons/${meta.runningRound.seasonId}/rounds/${meta.runningRound.phase}`,
+            icon: "matches" as const,
+            permission: manage,
+          },
+        ]
+      : []),
+    { label: "Játékosok", to: `${base}/players`, icon: "players", permission: manage },
+    { label: "Szezonok", to: `${base}/seasons`, icon: "seasons", permission: manage },
+    { label: "Levelek", to: `${base}/mail`, icon: "broadcasts", permission: manage },
+    { label: "Beállítások", to: `${base}/settings`, icon: "settings", permission: manage },
+    { label: "Súgó", to: `${base}/help`, icon: "help", permission: manage },
   ];
 }
 
@@ -130,7 +154,12 @@ export function navLeagues(actor: Actor, allLeagues: LeagueRef[]): LeagueRef[] {
 // The league section shows the current league (from the URL, else the first);
 // the switcher above it lists the others. Only what the actor may open; a
 // section with nothing in it isn't shown.
-export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []), current?: string | null): NavSection[] {
+export function appNav(
+  actor: Actor,
+  leagues: LeagueRef[] = navLeagues(actor, []),
+  current?: string | null,
+  leagueMeta?: LeagueNavMeta | null,
+): NavSection[] {
   const league = leagues.find((l) => l.slug === current) ?? leagues[0];
   // First, unlabelled: the app home, Ligáim (#394) and the notifications, for
   // everyone (the pair is a section of Profil, D141).
@@ -144,7 +173,7 @@ export function appNav(actor: Actor, leagues: LeagueRef[] = navLeagues(actor, []
       ],
     },
   ];
-  if (league) sections.push({ label: league.name, role: "Szervező", items: leagueItems(league) });
+  if (league) sections.push({ label: league.name, role: "Szervező", items: leagueItems(league, leagueMeta) });
   sections.push({ label: "Platform", role: "Admin", items: PLATFORM_ITEMS });
   return sections
     .map((s) => ({ ...s, items: s.items.filter((i) => can(actor, i.permission)) }))

@@ -68,11 +68,11 @@ test("a first season opens without dates and starts by itself at the minimum ent
   const seasonRow = content(page).getByRole("row").filter({ hasText: SEASON });
   await expect(seasonRow).toContainText("0 pár nevezett, még 5 kell, utána indul.");
 
-  // The league's page: the minimum, editable while the season waits.
-  await visit(page, `/admin/leagues/${LEAGUE.slug}`);
-  await content(page).getByLabel(/Az első szezon akkor indul, ha ennyi pár nevezett/).fill("3");
-  await content(page).getByRole("button", { name: "Mentés" }).click();
-  await expect(content(page).getByRole("status")).toHaveText("Elmentetted a minimumot.");
+  // Beállítások → Liga: the minimum, editable while the season waits (#436).
+  await visit(page, `/admin/leagues/${LEAGUE.slug}/settings?tab=league`);
+  await content(page).locator("#minEntries").fill("3");
+  await content(page).locator("#minEntries").locator("xpath=ancestor::form[1]").getByRole("button", { name: /Mentés/ }).click();
+  await expect(content(page)).toContainText("Minimum nevezés mentve.");
 
   // Two pairs entered: one more is needed, on the landing card and the league page.
   await visit(page, `/admin/leagues/${LEAGUE.slug}/pairs`);

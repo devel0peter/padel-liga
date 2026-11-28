@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 import { db } from "~/db/client.server";
@@ -9,6 +9,7 @@ import {
   broadcasts,
   emailMessages,
   emailSuppressions,
+  leagues,
   notificationOptOuts,
   users,
 } from "~/db/schema";
@@ -33,6 +34,7 @@ import {
   matchProposal,
   matchResult,
   matchTomorrow,
+  newSignupsDaily,
   pairCreated,
   partnerChange,
   type PartnerChangeEmail,
@@ -66,14 +68,15 @@ const MAX_BATCHES_PER_RUN = 10;
 // mid-send, at most this many are left "sending" (unknown, never resent by
 // themselves); the rest are still pending and go with the next run.
 export const SEND_CHUNK = 10;
-// D1 allows 100 bound parameters per statement; a message row binds 9
-// (its 8 values and the attempts default), so 11 rows fit.
-const INSERT_CHUNK = 11;
+// D1 allows 100 bound parameters per statement; a message row binds 10
+// (its 9 values including leagueId and the attempts default), so 9 rows fit.
+const INSERT_CHUNK = 9;
 
 type NewMessage = Email & {
   kind: MessageKind;
   toEmail: string;
   broadcastId?: number;
+  leagueId?: number | null;
   headers?: Record<string, string>;
 };
 
@@ -94,6 +97,7 @@ function messageValues(m: NewMessage) {
     kind: m.kind,
     status: "pending" as const,
     broadcastId: m.broadcastId ?? null,
+    leagueId: m.leagueId ?? null,
     toEmail: m.toEmail,
     subject: m.subject,
     html: m.html,
@@ -201,9 +205,21 @@ export async function queueSeasonEntered(
 // leaving player once it is final; one email each, right after the
 // response. An unsubscribed or bounced address, or a player who switched
 // email off (#115), gets nothing; the in-app notice and push still have it.
-export async function queuePartnerChangeEmail(toEmail: string, input: PartnerChangeEmail): Promise<void> {
+export async function queuePartnerChangeEmail(toEmail: string, input: PartnerChangeEmail, leagueId?: number | null): Promise<void> {
   if (await isSuppressed(toEmail)) return;
-  sendAfterResponse(await enqueue([{ kind: "partner_change", toEmail, ...partnerChange(input) }]));
+  sendAfterResponse(await enqueue([{ kind: "partner_change", toEmail, leagueId, ...partnerChange(input) }]));
+}
+
+// Morning summary of the previous day's sign-ups per league (#383).
+export async function queueNewSignupsDaily(
+  recipients: readonly string[],
+  input: Parameters<typeof newSignupsDaily>[0],
+  leagueId: number,
+): Promise<number> {
+  if (recipients.length === 0) return 0;
+  const email = newSignupsDaily(input);
+  const ids = await enqueue(recipients.map((toEmail) => ({ kind: "new_signups_daily" as const, toEmail, leagueId, ...email })));
+  return ids.length;
 }
 
 // The groups are published (#24, D22): one email per player, sent right after the response
@@ -212,12 +228,13 @@ export async function queuePartnerChangeEmail(toEmail: string, input: PartnerCha
 // players who switched email off (#115), get nothing; the groups still show
 // in the app.
 export async function queueGroupsPublished(
-  messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0] }[],
+  messages: { toEmail: string; input: Parameters<typeof groupsPublished>[0]; leagueId?: number | null }[],
+  leagueId?: number | null,
 ): Promise<void> {
   const suppressed = await suppressedSet();
   const queued = messages
     .filter((m) => !suppressed.has(m.toEmail.toLowerCase()))
-    .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, ...groupsPublished(m.input) }));
+    .map((m): NewMessage => ({ kind: "groups_published", toEmail: m.toEmail, leagueId: m.leagueId ?? leagueId ?? null, ...groupsPublished(m.input) }));
   sendAfterResponse(await enqueue(queued));
 }
 
@@ -227,10 +244,11 @@ export async function queueGroupsPublished(
 // the in-app list and push still have it.
 export async function queueMatchEmails(
   messages: (
-    | { kind: "match_proposal"; toEmail: string; input: Parameters<typeof matchProposal>[0] }
-    | { kind: "match_agreed_time"; toEmail: string; input: Parameters<typeof matchAgreedTime>[0] }
-    | { kind: "match_result"; toEmail: string; input: Parameters<typeof matchResult>[0] }
+    | { kind: "match_proposal"; toEmail: string; input: Parameters<typeof matchProposal>[0]; leagueId?: number | null }
+    | { kind: "match_agreed_time"; toEmail: string; input: Parameters<typeof matchAgreedTime>[0]; leagueId?: number | null }
+    | { kind: "match_result"; toEmail: string; input: Parameters<typeof matchResult>[0]; leagueId?: number | null }
   )[],
+  leagueId?: number | null,
 ): Promise<void> {
   const suppressed = await suppressedSet();
   const queued = messages
@@ -239,6 +257,7 @@ export async function queueMatchEmails(
       (m): NewMessage => ({
         kind: m.kind,
         toEmail: m.toEmail,
+        leagueId: m.leagueId ?? leagueId ?? null,
         ...(m.kind === "match_proposal" ? matchProposal(m.input) : m.kind === "match_result" ? matchResult(m.input) : matchAgreedTime(m.input)),
       }),
     );
@@ -350,19 +369,24 @@ export async function createBroadcast(input: {
   audience: string;
   recipients: Recipient[];
   createdBy: string;
-  // The Admin's account id, for the audit log (#225).
+  // The Admin's or Szervező's account id, for the audit log (#225, #387).
   actorId: string;
+  leagueId?: number | null;
+  createdAt?: Date;
 }): Promise<number> {
   const recipients = input.recipients.filter((r) => toSomeone({ toEmail: r.email }));
+  const leagueId = input.leagueId ?? null;
   const [[{ id }]] = await db.batch([
     db
       .insert(broadcasts)
       .values({
+        leagueId,
         subject: input.subject,
         body: input.body,
         audience: input.audience,
         recipients: recipients.length,
         createdBy: input.createdBy,
+        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
       })
       .returning({ id: broadcasts.id }),
     auditEntry({
@@ -372,6 +396,7 @@ export async function createBroadcast(input: {
       // The count only: the audience label can hold the Admin's search, an email
       // address or a name (review of #272). The target names the subject.
       detail: `${recipients.length} recipients`,
+      leagueId,
     }),
   ]);
 
@@ -382,6 +407,7 @@ export async function createBroadcast(input: {
       return {
         kind: "broadcast",
         broadcastId: id,
+        leagueId,
         toEmail: r.email,
         headers: unsubscribeHeaders(url),
         ...broadcastEmail(input, r, url),
@@ -494,14 +520,28 @@ async function claim(limit: number, group: Group, runStart: Date, ids?: number[]
 // out, so it is never retried), or one more failed attempt. Stops the run
 // when a provider asks to wait or when nothing in the batch went out.
 async function sendClaimed(rows: Claimed[]): Promise<{ sent: number; stop: boolean }> {
+  const leagueIds = [...new Set(rows.map((r) => r.leagueId).filter((id): id is number => id != null))];
+  const contacts = new Map<number, { name: string | null; email: string | null }>();
+  if (leagueIds.length > 0) {
+    const found = await db
+      .select({ id: leagues.id, name: leagues.contactName, email: leagues.contactEmail })
+      .from(leagues)
+      .where(inArray(leagues.id, leagueIds));
+    for (const l of found) contacts.set(l.id, { name: l.name, email: l.email });
+  }
   const results: SendResult[] = await sendEmails(
-    rows.map((r) => ({
-      to: r.toEmail,
-      subject: r.subject,
-      html: r.html ?? "",
-      text: r.text ?? "",
-      headers: r.headers ? (JSON.parse(r.headers) as Record<string, string>) : undefined,
-    })),
+    rows.map((r) => {
+      const contact = r.leagueId != null ? contacts.get(r.leagueId) : undefined;
+      return {
+        to: r.toEmail,
+        subject: r.subject,
+        html: r.html ?? "",
+        text: r.text ?? "",
+        headers: r.headers ? (JSON.parse(r.headers) as Record<string, string>) : undefined,
+        fromName: contact?.name || undefined,
+        replyTo: contact?.email || undefined,
+      };
+    }),
   );
 
   const now = new Date();
@@ -608,13 +648,17 @@ export type BroadcastSummary = typeof broadcasts.$inferSelect & {
   failed: number;
 };
 
-export async function listBroadcasts(): Promise<BroadcastSummary[]> {
+export async function listBroadcasts(leagueId?: number): Promise<BroadcastSummary[]> {
   const [list, stats] = await Promise.all([
-    db.select().from(broadcasts).orderBy(sql`${broadcasts.id} desc`),
+    db
+      .select()
+      .from(broadcasts)
+      .where(leagueId !== undefined ? eq(broadcasts.leagueId, leagueId) : undefined)
+      .orderBy(sql`${broadcasts.id} desc`),
     db
       .select({ broadcastId: emailMessages.broadcastId, status: emailMessages.status, n: count() })
       .from(emailMessages)
-      .where(eq(emailMessages.kind, "broadcast"))
+      .where(and(eq(emailMessages.kind, "broadcast"), leagueId !== undefined ? eq(emailMessages.leagueId, leagueId) : undefined))
       .groupBy(emailMessages.broadcastId, emailMessages.status),
   ]);
   return list.map((b) => {
@@ -637,8 +681,10 @@ export type KindLog = {
 };
 
 // Per kind, oldest kind first: how many emails wait, went out and failed.
-// No recipient.
-export async function outboxLog(): Promise<KindLog[]> {
+// No recipient. When `leagueId` is given (#388), only that league's emails are
+// counted and login codes are excluded.
+export async function outboxLog(leagueId?: number): Promise<KindLog[]> {
+  const scope = leagueId !== undefined ? and(eq(emailMessages.leagueId, leagueId), ne(emailMessages.kind, "login_code")) : undefined;
   const [counts, errors] = await Promise.all([
     db
       .select({
@@ -648,6 +694,7 @@ export async function outboxLog(): Promise<KindLog[]> {
         first: sql<number>`min(${emailMessages.id})`,
       })
       .from(emailMessages)
+      .where(scope)
       .groupBy(emailMessages.kind, emailMessages.status),
     // With one max() in the select, SQLite takes the bare columns from the
     // row holding that max: each kind's newest error (by attempt time, then id).
@@ -659,7 +706,7 @@ export async function outboxLog(): Promise<KindLog[]> {
         newest: sql<string>`max(printf('%012d %012d', coalesce(${emailMessages.claimedAt}, 0), ${emailMessages.id}))`,
       })
       .from(emailMessages)
-      .where(isNotNull(emailMessages.lastError))
+      .where(and(isNotNull(emailMessages.lastError), scope))
       .groupBy(emailMessages.kind),
   ]);
   const firstId = new Map<MessageKind, number>();

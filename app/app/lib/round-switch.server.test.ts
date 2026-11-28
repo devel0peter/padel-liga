@@ -384,6 +384,35 @@ describe("draftRoundSwitches, the cron step (#35)", () => {
     expect(await R.draftRoundSwitches(AFTER, { run, keep: { queries: 0, calls: 0 } })).toBeNull();
     expect(run.used().queries).toBe(1);
   });
+
+  it("notifies league Szervezők and Admins once with blocker count, respects opt-out, and skips manual rebuild (#432)", async () => {
+    h.raw.exec(`
+      insert into users (id, email, name, platform_role) values
+        ('org1', 'org1@x.hu', 'Szervező Egy', 'player'),
+        ('org2', 'org2@x.hu', 'Szervező Kettő', 'player'),
+        ('adm1', 'adm1@x.hu', 'Admin Egy', 'superadmin');
+      insert into league_admins (league_id, user_id) values (1, 'org1'), (1, 'org2');
+      insert into notification_opt_outs (user_id, kind) values ('org2', 'round_draft_ready');
+    `);
+    const disputed = matchOf(5, 6);
+    finishAll([disputed]);
+    h.raw.prepare("update matches set status = 'disputed' where id = ?").run(disputed);
+
+    expect(await R.draftRoundSwitches(AFTER)).toBe("drafted phase 2 of season 1");
+    const rows = all(
+      "select user_id, kind, title, body, url, push_due_at from notifications where kind = 'round_draft_ready' order by user_id",
+    ) as { user_id: string; kind: string; title: string; body: string; url: string; push_due_at: number | null }[];
+    expect(rows.map((r) => r.user_id)).toEqual(["adm1", "org1"]);
+    expect(rows[0].title).toContain("kész a 2. kör tervezete");
+    expect(rows[0].body).toContain("Előtte 1 döntés vár rád.");
+    expect(rows[0].url).toBe("/admin/leagues/gyor/seasons/1/rounds/2?tab=groups");
+    expect(rows[0].push_due_at).not.toBeNull();
+
+    // Manual rebuild ("Tervezet újraszámolása") sends no new notification.
+    expect(await R.generateRoundSwitchDraft(1, 2, "org1", AFTER)).toEqual({ ok: true });
+    const afterRebuild = all("select id from notifications where kind = 'round_draft_ready'");
+    expect(afterRebuild).toHaveLength(2);
+  });
 });
 
 describe("roundSwitchPreview (#363): the next round if the round ended now", () => {

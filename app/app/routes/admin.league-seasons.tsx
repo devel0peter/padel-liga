@@ -497,7 +497,11 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                 const end = seasonEnd(s);
                 return (
                   <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link to={`${base}/${s.id}`} className="underline">
+                        {s.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {s.registrationClosesAt
                         ? `${formatShortDate(s.registrationOpensAt)} – ${formatShortDate(s.registrationClosesAt)}`
@@ -512,12 +516,12 @@ export default function LeagueSeasons({ loaderData, actionData, params }: Route.
                     </TableCell>
                     <TableCell>{end && formatDate(end)}</TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Link to={`${base}/${s.id}/entries`} className="underline">
+                      <Link to={`${base}/${s.id}?tab=entries`} className="underline">
                         {s.entries} nevezett
                       </Link>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Link to={`${base}/${s.id}/groups`} className="underline">
+                      <Link to={`${base}/${s.id}/rounds/1?tab=groups`} className="underline">
                         {s.canEdit ? "Csoportok" : "Közzétéve"}
                       </Link>
                     </TableCell>

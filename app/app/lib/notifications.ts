@@ -30,6 +30,14 @@ export const NOTIFICATION_KINDS = {
     label: "Partnercsere jóváhagyásra vár",
     description: "Ha a ligádban egy állandó partnercserét az új partner elfogadott, és te hagyod jóvá vagy utasítod el.",
   },
+  round_draft_ready: {
+    label: "Körváltás tervezete",
+    description: "Ha elkészült a következő kör csoportbeosztásának tervezete, és átnézheted, közzéteheted.",
+  },
+  new_signup: {
+    label: "Új jelentkező",
+    description: "Ha új játékos csatlakozik a ligádhoz, párt keres, új pár alakul, vagy egy pár benevez.",
+  },
 } as const;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -201,7 +209,7 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 // The kinds that can reach this user, so the profile only offers those.
 export function kindsFor(actor: Pick<Actor, "platformRole" | "leagues">): NotificationKind[] {
   if (actor.platformRole !== "superadmin" && actor.leagues.length === 0) return [];
-  return ["result_disputed", "no_show_reported", "partner_change_waiting"];
+  return ["result_disputed", "no_show_reported", "partner_change_waiting", "round_draft_ready", "new_signup"];
 }
 
 // No row means on: a setting is stored only once someone changes it.
@@ -486,8 +494,8 @@ export function absenceMarkedMessage(input: { matchId: number; name: string; pla
 export function partnerChangeWaitingMessage(input: { leagueSlug: string; leagueName: string }): Message {
   return {
     title: `Partnercsere jóváhagyásra vár · ${input.leagueName}`,
-    body: "Egy állandó partnercserét az új partner elfogadott. Te döntesz róla a Párok oldalon.",
-    url: `/admin/leagues/${input.leagueSlug}/pairs`,
+    body: "Egy állandó partnercserét az új partner elfogadott. Te döntesz róla a Döntések oldalon.",
+    url: `/admin/leagues/${input.leagueSlug}/disputes`,
   };
 }
 
@@ -727,6 +735,8 @@ const TONES: Record<string, NoticeTone> = {
   match_deadline_soon: "warning",
   match_no_proposal: "warning",
   partner_change_waiting: "warning",
+  round_draft_ready: "warning",
+  new_signup: "info",
   // A time to pick.
   match_proposal: "info",
   match_tomorrow: "info",
@@ -744,3 +754,65 @@ const TONES: Record<string, NoticeTone> = {
 };
 
 export const noticeTone = (kind: string): NoticeTone => TONES[kind] ?? "neutral";
+
+// To the league's Szervezők and Admins when the Monday cron drafts the next
+// round's groups (#432). No names.
+export function roundDraftReadyMessage(input: {
+  leagueSlug: string;
+  leagueName: string;
+  seasonId: number;
+  phase: number;
+  blockers: number;
+  url?: string;
+}): Message {
+  const base = "Nézd át és tedd közzé.";
+  return {
+    title: `${input.leagueName}: kész ${withArticle(input.phase)} kör tervezete`,
+    body: input.blockers > 0 ? `${base} Előtte ${input.blockers} döntés vár rád.` : base,
+    url: input.url ?? `/admin/leagues/${input.leagueSlug}/seasons/${input.seasonId}/rounds/${input.phase}?tab=groups`,
+  };
+}
+
+export type SignupEventKind = "player_joined" | "partner_search" | "pair_formed" | "pair_entered";
+
+// To the league's Szervezők and Admins when a sign-up event happens (#382).
+// No names and no contact data (lock screens).
+export function newSignupMessage(input: {
+  leagueSlug: string;
+  leagueName: string;
+  event: SignupEventKind;
+  joinsPhase?: number | null;
+  suppressed?: number;
+}): Message {
+  let title: string;
+  switch (input.event) {
+    case "player_joined":
+      title = `${input.leagueName}: új játékos csatlakozott`;
+      break;
+    case "partner_search":
+      title = `${input.leagueName}: egy játékos párt keres`;
+      break;
+    case "pair_formed":
+      title = `${input.leagueName}: új pár alakult`;
+      break;
+    case "pair_entered":
+      title =
+        input.joinsPhase && input.joinsPhase > 1
+          ? `${input.leagueName}: új pár nevezett, ${withArticle(input.joinsPhase)} körben kezd`
+          : `${input.leagueName}: új pár nevezett`;
+      break;
+  }
+  const extra = input.suppressed && input.suppressed > 0 ? ` (+${input.suppressed} új jelentkező)` : "";
+  return {
+    title,
+    body: `Nézd meg a várakozók listáját.${extra}`,
+    url: `/admin/leagues/${input.leagueSlug}/players?tab=waiting`,
+  };
+}
+
+// Organizer opt-out key for the morning new sign-ups summary email (#383).
+export const NEW_SIGNUPS_DAILY_EMAIL_KEY = "email:new_signups_daily" as const;
+
+export function newSignupsDailyEmailEnabled(disabled: ReadonlySet<string>): boolean {
+  return channelEnabled(disabled, "email") && !disabled.has(NEW_SIGNUPS_DAILY_EMAIL_KEY);
+}

@@ -29,17 +29,19 @@ test("38. A kör állása: totals, filtered links, burn-down and the Áttekinté
 
   const { context, page } = await as(browser, ORGANIZER.email);
   await visit(page, "/admin/leagues/minta");
-  const running = content(page).getByRole("region", { name: "A futó kör" });
+  const running = content(page).getByRole("region", { name: "1. kör" });
   await expect(running).toContainText(/Lejátszva \d+\/\d+ \(\d+(,\d)?%\) · (még \d+ nap|ma a határidő) · (Jó ütemben|Lemaradás|Még korai becsülni)/);
-  await running.getByRole("link").first().click();
-  await expect(page).toHaveURL(new RegExp(`${LIST}#allapot$`));
 
+  await visit(page, LIST);
   const main = content(page);
-  const section = main.getByRole("region", { name: "A kör állása" });
-  await expect(section).toBeVisible();
-  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Napló és telefonszámok" }) });
+  const rows = main.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Meccs megnyitása" }) });
   const total = await rows.count();
   expect(total).toBeGreaterThan(0);
+
+  const roundUrl = page.url().split("?")[0]!.split("#")[0]!;
+  await visit(page, `${roundUrl}?tab=stats`);
+  const section = main.getByRole("region", { name: "A kör állása" });
+  await expect(section).toBeVisible();
   await expect(section).toContainText(`Az állapotok összege ${total} meccs`);
   await expect(section).toContainText(new RegExp(`Lejátszva \\d+/${total} `));
   await expect(section.getByText("Nem számít (visszalépés)").locator("..")).toContainText(String(voided));
@@ -53,9 +55,7 @@ test("38. A kör állása: totals, filtered links, burn-down and the Áttekinté
   for (const tile of await tiles.all()) sum += await tileCount(tile);
   expect(sum).toBe(total);
 
-  // The burn-down: its lines in the legend and the weeks marked. The suite's
-  // round 1 starts after today (results are recorded before it), so only the
-  // ideal line has points yet; the actual lines fill from the first day.
+  // The burn-down: its lines in the legend and the weeks marked.
   const chart = section.getByRole("img", { name: "A kör meccseinek alakulása naponta" });
   await expect(chart).toBeVisible();
   for (const label of ["Hátralévő meccsek", "Még nincs fix időpont", "Ideális"]) await expect(chart).toContainText(label);
@@ -69,7 +69,7 @@ test("38. A kör állása: totals, filtered links, burn-down and the Áttekinté
   await expect(rows).toHaveCount(pendingCount);
 
   // A week opens the list filtered to that week (?week=, #350).
-  await visit(page, LIST);
+  await visit(page, `${roundUrl}?tab=stats`);
   const week1 = section.getByRole("row").filter({ has: page.getByRole("link", { name: "1. hét" }) });
   const week1Total = Number((await week1.getByRole("cell").nth(1).innerText()).split("/")[1]);
   await week1.getByRole("link", { name: "1. hét" }).click();

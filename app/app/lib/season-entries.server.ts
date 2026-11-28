@@ -6,7 +6,7 @@ import { rowSelect } from "~/db/insert-select";
 import { groupPairs, groups, leagues, matches, pairs, seasonEntries, seasonPhases, users } from "~/db/schema";
 import { queueSeasonEntered } from "~/lib/email/outbox.server";
 import { pairWithdrawnMessage, seasonEntryMessage } from "~/lib/notifications";
-import { notifyPlayers } from "~/lib/notifications.server";
+import { notifyNewSignup, notifyPlayers } from "~/lib/notifications.server";
 
 import type { User } from "./auth/session.server";
 import { auditIfChanged } from "./audit.server";
@@ -312,6 +312,7 @@ export async function applyToSeason(
     ])
       await queueSeasonEntered(to.email, { to: to.name, partnerName: partner.name, league: players.league, season: season.name, joins: entered.joins });
   }
+  await notifyNewSignup({ leagueId: season.leagueId, event: "pair_entered", joinsPhase: entered.joins?.phase ?? null, except: user.id }, now);
   return { ok: true, joins: entered.joins };
 }
 
@@ -380,6 +381,7 @@ export async function enterPairByOrganizer(
   const entered = await enter(season, { id: pair.id, players: [pair.a.id, pair.b.id] }, actor.id, now, { actorId: actor.id });
   if (!entered) return { ok: false, error: "A pár közben változott. Frissítsd az oldalt." };
   if (!entered.started) await notifyPair(pairId, season, "entered_by_organizer", entered.joins);
+  await notifyNewSignup({ leagueId: season.leagueId, event: "pair_entered", joinsPhase: entered.joins?.phase ?? null, except: actor.id }, now);
   return { ok: true, joins: entered.joins };
 }
 

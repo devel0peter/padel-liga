@@ -37,6 +37,9 @@ vi.mock("~/lib/reminders.server", () => ({
   STUCK_QUERIES: 20,
   queueDueReminders: async (now?: Date) => (step("stuck", now), h.result.stuck),
 }));
+vi.mock("~/lib/new-signups-daily.server", () => ({
+  queueNewSignupsDailyEmails: async (now?: Date) => (step("new signups daily", now), h.result["new signups daily"] ?? null),
+}));
 vi.mock("~/lib/interest-list-purge.server", () => ({
   PURGE_MIN: { queries: 3, calls: 0 },
   purgeInterestList: async (now?: Date) => (step("interest list", now), h.result["interest list"] ?? null),
@@ -63,7 +66,7 @@ const { runCron } = await import("~/lib/hourly-job.server");
 // A scheduled time well before the test runs, so a step that read the clock
 // itself would show.
 const RUN = new Date("2026-11-10T06:00:00Z");
-const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "auto-fix", "match", "stuck", "interest list", "push", "deliver", "push stats", "feedback retention"];
+const ALL = ["cleanup", "auto-accept", "deadline", "round draft", "auto-fix", "match", "stuck", "new signups daily", "interest list", "push", "deliver", "push stats", "feedback retention"];
 
 type Line = { level: string; event: string; requestId?: string; step?: string; result?: string; error?: { message: string } };
 let lines: Line[] = [];
@@ -177,6 +180,7 @@ describe("runCron", () => {
       "cron step failed: agreed time auto-fix",
       "cron step failed: match reminders",
       "cron step failed: stuck reminders",
+      "cron step failed: new signups daily email",
       "cron step failed: interest list deletion",
       "cron step failed: push delivery",
       "cron step failed: email delivery",

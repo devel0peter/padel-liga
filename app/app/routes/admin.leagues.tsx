@@ -13,6 +13,7 @@ import { requirePermission } from "~/lib/auth/admin.server";
 import { isValidEmail, normalizeEmail } from "~/lib/auth/rules";
 import { cityName } from "~/lib/cities";
 import { listCities } from "~/lib/cities.server";
+import { missingChecklistByLeague } from "~/lib/launch-checklist.server";
 import { parseLeague, type LeagueField } from "~/lib/leagues";
 import {
   cancelOrganizerInvite,
@@ -23,6 +24,7 @@ import {
   listLeagues,
   organizersByLeague,
   revokeOrganizer,
+  updateLeagueContact,
 } from "~/lib/leagues.server";
 
 // Leagues and their Szervezők (Admin only; docs/admin-plan.md, #18).
@@ -30,12 +32,14 @@ import {
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, { kind: "leagues.manage" });
   const [leagues, organizers, cities] = await Promise.all([listLeagues(), organizersByLeague(), listCities()]);
+  const missingChecklist = await missingChecklistByLeague(leagues.map((l) => l.id));
   return {
     leagues: leagues.map((l) => ({
       ...l,
       cityName: cityName(l.city, cities),
       organizers: organizers.get(l.id)?.active ?? [],
       pending: organizers.get(l.id)?.pending ?? [],
+      missingChecklist: missingChecklist.get(l.id) ?? 0,
     })),
     cities: cities.map(({ slug, name }) => ({ slug, name })),
   };
@@ -63,6 +67,15 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData 
     if (await leagueSlugTaken(result.data.slug))
       return { intent, errors: { slug: "Ez az azonosító már egy másik ligáé." } };
     await createLeague(result.data, actor.id);
+    const contactName = String(form.get("contactName") ?? "").trim();
+    const contactEmail = String(form.get("contactEmail") ?? "").trim();
+    const contactPhone = String(form.get("contactPhone") ?? "").trim();
+    if (contactName || contactEmail || contactPhone) {
+      const created = await getLeague(result.data.slug);
+      if (created) {
+        await updateLeagueContact(created.id, { name: contactName, email: contactEmail, phone: contactPhone }, actor.id);
+      }
+    }
     return redirect("/admin/leagues");
   }
 
@@ -113,7 +126,12 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
           <section key={league.id} className="grid gap-4 rounded-lg border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 className="font-display text-lg font-bold">{league.name}</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-display text-lg font-bold">{league.name}</h2>
+                  {league.missingChecklist > 0 && (
+                    <Badge variant="outline">Indulás: {league.missingChecklist} hiányzik</Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {league.cityName} · /{league.slug}
                 </p>
@@ -204,6 +222,20 @@ export default function AdminLeagues({ loaderData, actionData }: Route.Component
               </SelectContent>
             </Select>
             {createErrors.city && <p className="text-sm font-semibold text-destructive">{createErrors.city}</p>}
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="contactName">Kapcsolattartó neve (opcionális)</Label>
+            <Input id="contactName" name="contactName" placeholder="Pl. Péter, Padelpárbaj" maxLength={80} />
+          </div>
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="contactEmail">Kapcsolattartó e-mail (opcionális)</Label>
+            <Input id="contactEmail" name="contactEmail" type="email" placeholder="liga@example.com" maxLength={120} />
+          </div>
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="contactPhone">Telefon (opcionális)</Label>
+            <Input id="contactPhone" name="contactPhone" placeholder="+36 ..." maxLength={30} />
           </div>
         </div>
         <div>

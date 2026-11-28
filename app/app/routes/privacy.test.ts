@@ -64,10 +64,11 @@ describe("privacy page: feedback (#250, spec 17 and 19)", () => {
   const text = page();
 
   it("says what the feedback form stores, and what it doesn't", () => {
-    expect(text).toContain("Ha visszajelzést küldesz (a Visszajelzés oldalon, belépve vagy anélkül)");
+    expect(text).toContain("Ha visszajelzést küldesz (a „Hiba vagy ötlet” ablakban, belépve vagy anélkül, vagy belépve értékeled az oldalt 1–5 labdával)");
     for (const item of [
       "az üzenetedet",
-      "a típusát (hiba, ötlet vagy egyéb)",
+      "a típusát (hiba, ötlet vagy értékelés)",
+      "az értékelésed számát",
       "az oldalt, ahonnan küldted",
       "az idejét",
       "az eszközöd típusát (mobil vagy számítógép) és a böngésződ nevét",

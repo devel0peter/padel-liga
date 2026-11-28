@@ -107,6 +107,18 @@ describe("Profil: level lock and Élő-pont", () => {
     expect((bad as any).init?.status).toBe(400);
     expect(h.raw.prepare("select count(*) as n from notification_opt_outs").get().n).toBe(0);
   });
+
+  // "Nem kérek tippeket" (#444): off for a new player; on and off again.
+  it("saves Nem kérek tippeket", async () => {
+    const off = async () => ((await P.loader(args(get(free)))) as any).tipsOff;
+    expect(await off()).toBe(false);
+    const tips = (enabled: string) =>
+      new Request("http://localhost/profile", { method: "POST", headers: { Cookie: free }, body: new URLSearchParams({ intent: "tips", enabled }) });
+    expect(await P.action(args(tips("1")))).toEqual({ ok: true });
+    expect(await off()).toBe(true);
+    expect(await P.action(args(tips("0")))).toEqual({ ok: true });
+    expect(await off()).toBe(false);
+  });
 });
 
 // Fiók törlése (#38): the dialog's text comes from the loader; the action

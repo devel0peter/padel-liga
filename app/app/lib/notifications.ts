@@ -247,6 +247,12 @@ export function channelEnabled(disabled: ReadonlySet<string>, channel: Channel):
   return !disabled.has(channelKey(channel));
 }
 
+// "Nem kérek tippeket" (#444): stored with the other per-account switches;
+// present, Kezdőlap offers the account no tip on any device.
+export const TIPS_OFF = "tips:off";
+
+export const tipsOff = (disabled: ReadonlySet<string>): boolean => disabled.has(TIPS_OFF);
+
 // Emails that go out whatever the email switch says: only login codes
 // (#115; Peter, 2026-10-29; the signup confirmation went with the interest
 // list, #334). Every other kind, a new one too, broadcasts included, is

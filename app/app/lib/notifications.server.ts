@@ -6,6 +6,7 @@ import { db } from "~/db/client.server";
 import { leagueAdmins, leagueSignupEvents, leagues, notificationOptOuts, notifications, pushSubscriptions, users } from "~/db/schema";
 
 import {
+  TIPS_OFF,
   channelKey,
   disputeRecipients,
   KIND_TOPIC,
@@ -673,6 +674,11 @@ export async function setKindEnabled(userId: string, kind: NotificationKind, ena
 
 export async function setNewSignupsDailyEmailEnabled(userId: string, enabled: boolean): Promise<void> {
   await setOptOut(userId, NEW_SIGNUPS_DAILY_EMAIL_KEY, enabled);
+}
+
+// "Nem kérek tippeket" (#444): `off` stores the opt-out.
+export async function setTipsOff(userId: string, off: boolean): Promise<void> {
+  await setOptOut(userId, TIPS_OFF, !off);
 }
 
 // The email and push switches (#115), stored like the kinds.
